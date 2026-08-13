@@ -33,8 +33,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          cache: yarn
           node-version: 22
+
+      # `yarn` has to mean 3.8.1, as package.json's packageManager field declares.
+      # The runner ships Yarn 1, which refuses to run in a project pinned to 3, and
+      # Corepack is what resolves that. It has to come *after* setup-node, because
+      # the shims belong to whichever Node is on PATH — which is also why
+      # setup-node can't use `cache: yarn`: that probe runs `yarn cache dir`
+      # while Yarn 1 is still in charge, and fails the job before install.
+      - name: Enable Corepack
+        run: corepack enable
 
       - run: yarn install --immutable
 
