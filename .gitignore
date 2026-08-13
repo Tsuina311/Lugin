@@ -1,0 +1,19 @@
+node_modules
+dist
+dist-web
+dist-smoke
+release
+*.local
+.DS_Store
+.vite
+
+*.tsbuildinfo
+
+# Yarn (Berry, node-modules linker) — commit yarn.lock, ignore the rest
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*

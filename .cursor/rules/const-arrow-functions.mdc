@@ -1,0 +1,55 @@
+---
+description: Prefer const arrow functions over function declarations
+globs: **/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Const Arrow Functions
+
+Declare functions as `const` arrow functions, not `function` declarations. This
+applies to module-level helpers, exported functions, and React components.
+
+```typescript
+// ❌ BAD
+export function cardKey(name: string): string {
+  return stripVersion(name).toLowerCase();
+}
+
+async function fetchDoc(url: string): Promise<Document> { /* ... */ }
+
+export function App() {
+  return <div />;
+}
+
+// ✅ GOOD
+export const cardKey = (name: string): string => stripVersion(name).toLowerCase();
+
+const fetchDoc = async (url: string): Promise<Document> => { /* ... */ };
+
+export const App = () => {
+  return <div />;
+};
+```
+
+## Exception: functions that rely on `this`
+
+Keep a regular `function` when the function's behavior depends on runtime `this`
+binding, since arrow functions capture `this` lexically and would break it. This
+covers prototype method patches and reassigned host methods:
+
+```typescript
+// ✅ Must stay a regular function — `this` is the XHR instance / window.
+OriginalXHR.prototype.open = function open(this: XMLHttpRequest, method: string) {
+  return originalOpen.call(this, method);
+};
+
+window.fetch = async function patchedFetch(this: typeof window, input: RequestInfo) {
+  return originalFetch.call(this, input);
+};
+```
+
+## Notes
+
+- Arrow consts are not hoisted, so define a function before the module-level code
+  that calls it. (Calls made later at runtime, e.g. from other functions, are fine.)
+- Class methods stay as methods — this rule is about standalone functions.

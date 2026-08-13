@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover so the safe-area insets the header and tab bar use
+         actually have somewhere to come from on a notched phone. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1017" />
+    <meta name="description" content="Read your Lugin collection and decks on your phone." />
+    <!-- iOS takes fullscreen and title from these; Android reads the manifest. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Lugin" />
+
+    <title>Lugin</title>
+
+    <!-- Root-absolute, so the build rewrites them for the Pages base path. -->
+    <link rel="icon" type="image/png" sizes="48x48" href="/icons/icon-48.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <!-- Relative, unlike the icons above: Vite rewrites the asset types it knows,
+         and .webmanifest isn't one of them — a root-absolute href would 404 under
+         a /<repo>/ base and silently cost the install prompt. Relative resolves
+         against this document either way. -->
+    <link rel="manifest" href="manifest.webmanifest" />
+
+    <style>
+      /* Tailwind's preflight is off (the overlay must not restyle host pages), so
+         the page box and the background are set here — and setting the background
+         before any JS runs is what stops a white flash on a dark app. */
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        background: #0b1017;
+        /* A tap that scrolls nothing shouldn't rubber-band the whole app. */
+        overscroll-behavior: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="../src/web/main.tsx"></script>
+  </body>
+</html>

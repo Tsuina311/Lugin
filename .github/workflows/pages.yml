@@ -1,0 +1,67 @@
+# Publish the phone app to GitHub Pages.
+#
+# The extension is not built here — it goes to the Chrome Web Store as a signed
+# package (see docs/DISTRIBUTION.md). This deploys only the web build.
+#
+# The Google client id is read from a repository *variable*, not a secret: it
+# ships inside the bundle either way, and pretending otherwise would just make it
+# awkward to rotate. There is no client secret in this app at all.
+
+name: Deploy phone app to Pages
+
+on:
+  push:
+    branches: [main]
+  # So a deploy can be triggered without a commit, e.g. after setting the variable.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  pages: write
+
+# A superseded deploy is worth cancelling; a half-finished one is not.
+concurrency:
+  cancel-in-progress: false
+  group: pages
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          cache: yarn
+          node-version: 22
+
+      - run: yarn install --immutable
+
+      - name: Render checks
+        run: yarn test:web
+
+      - name: Build
+        env:
+          # Pages serves a project site from /<repo>/, so every asset URL needs
+          # that prefix compiled in. Taken from the repo name so a rename can't
+          # quietly break the deploy.
+          LUGIN_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+        run: yarn build:web
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-web
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
