@@ -55,13 +55,22 @@ yarn build    # production build to dist/
 ### Giving it to testers
 
 ```bash
-yarn package   # release/lugin-<version>.zip, validated for the Chrome Web Store
+yarn key              # once: pins the extension id, so one redirect URI serves everyone
+yarn package:testers  # release/lugin-<version>-testers.zip → Load unpacked
+yarn package          # release/lugin-<version>.zip, validated for the Chrome Web Store
 ```
 
-The extension goes to the **Chrome Web Store** as a `Private` item visible only
-to your trusted testers — not to Google Play, which only carries Android apps.
-`docs/DISTRIBUTION.md` is the runbook, including the extension-id pinning that
-Google sign-in depends on and the listing answers the store asks for.
+Two shapes of the same build, differing over the manifest's `key`. The tester zip
+**keeps** it, because that is what gives every unpacked install the same
+extension id — and the Google sign-in redirect is derived from that id, so
+without it each tester would hit `redirect_uri_mismatch`. The store zip **drops**
+it, because an upload declaring its own key is rejected.
+
+Longer term the extension goes to the **Chrome Web Store** as a `Private` item
+visible only to trusted testers — not to Google Play, which only carries Android
+apps. Note the store re-signs with its own key, so publishing *changes* the id;
+`docs/DISTRIBUTION.md` is the runbook, and covers keeping both redirect URIs
+registered through that switch.
 
 ## On a phone
 

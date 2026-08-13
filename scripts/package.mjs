@@ -1,16 +1,21 @@
-// Turn dist/ into the zip the Chrome Web Store will accept, and refuse to
-// produce one it would reject.
+// Turn dist/ into a zip, in one of two shapes — because the two audiences want
+// opposite things from the manifest's `key`.
 //
-// Two things make this more than `zip -r`:
+//   yarn package           → for the Chrome Web Store. `key` is *stripped*: the
+//                            store rejects any upload that declares its own, and
+//                            the rejection arrives by email hours later.
 //
-//   1. The manifest's `key` has to come back out. It pins local builds to the
-//      published extension id (see src/manifest.config.ts), but the store
-//      rejects any upload that declares its own key, and the rejection arrives
-//      by email hours later. Stripping it here means dist/ stays loadable as an
-//      unpacked extension with the real id while the zip stays uploadable.
+//   yarn package:testers   → for a person loading it unpacked. `key` is *kept*,
+//                            and required, because it is the only thing giving
+//                            every tester's install the same extension id, and
+//                            therefore the same Google sign-in redirect URI.
+//                            Contents are nested in a folder, so unzipping gives
+//                            them something to point "Load unpacked" at.
 //
-//   2. The listing limits — name, description — are checked before upload
-//      rather than after review.
+// Either way dist/ keeps its key and stays loadable locally with the real id.
+//
+// The listing limits — name, description — are checked here rather than after a
+// review, and so is dist/ being stale.
 //
 // Dependency-free, like scripts/make-logos.mjs: a zip is a series of local
 // headers over deflated bytes plus a central directory, and node has zlib.
@@ -22,6 +27,8 @@ import { join, relative, sep } from 'node:path';
 const ROOT = new URL('..', import.meta.url).pathname;
 const DIST = join(ROOT, 'dist');
 const OUT_DIR = join(ROOT, 'release');
+
+const FOR_TESTERS = process.argv.includes('--testers');
 
 // Sourcemaps are ~4x the bundle and no use to a reviewer or a tester; the store
 // counts them against the package size limit all the same. The 192/512 icons are
@@ -169,36 +176,62 @@ for (const path of Object.values(manifest.icons ?? {})) {
 }
 if (process.exitCode === 1) process.exit(1);
 
-// Warnings: these produce a valid upload that behaves badly for testers.
 const hadKey = 'key' in manifest;
-delete manifest.key;
-if (!hadKey) {
-  console.warn(
-    '! no LUGIN_EXTENSION_KEY set, so local builds get a random extension id and\n' +
-    '  Google sign-in will fail against the registered redirect URI.\n' +
-    '  Fine for a first upload — that is where the key comes from. See docs/DISTRIBUTION.md.',
-  );
+
+if (FOR_TESTERS) {
+  // Hard failure, not a warning: a keyless tester zip installs and then fails at
+  // sign-in on every machine, which is a far more expensive thing to discover.
+  if (!hadKey) {
+    console.error('✖ no LUGIN_EXTENSION_KEY, so every tester would get a different');
+    console.error('  extension id and Google sign-in would fail for all of them.');
+    console.error('  Run `yarn key` first, then `yarn build`. See docs/DISTRIBUTION.md.');
+    process.exit(1);
+  }
+} else {
+  delete manifest.key;
+  if (!hadKey) {
+    console.warn(
+      '! no LUGIN_EXTENSION_KEY set, so local builds get a random extension id and\n' +
+      '  Google sign-in will fail against the registered redirect URI.\n' +
+      '  Run `yarn key` to pin one. See docs/DISTRIBUTION.md.',
+    );
+  }
 }
+
 if (!/BETA|DEVELOPMENT BUILD/i.test(manifest.name ?? '')) {
   console.warn('! the store asks test builds to say "BETA" in the name; this one does not');
 }
+
+// A store upload must have manifest.json at the root; a tester's copy is nicer as
+// a folder, since that is what they select in the "Load unpacked" dialog.
+const PREFIX = FOR_TESTERS ? `lugin-${pkg.version}/` : '';
 
 const entries = walk(DIST)
   .map(path => ({ name: relative(DIST, path).split(sep).join('/'), path }))
   .filter(({ name }) => !SKIP.some(re => re.test(name)))
   .sort((a, b) => a.name.localeCompare(b.name))
   .map(({ name, path }) => ({
-    // The stripped manifest replaces the built one; everything else is copied.
+    // The rewritten manifest replaces the built one; everything else is copied.
     data: name === 'manifest.json' ? Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`) : readFileSync(path),
-    name,
+    name: `${PREFIX}${name}`,
   }));
 
 const archive = zip(entries);
 mkdirSync(OUT_DIR, { recursive: true });
-const out = join(OUT_DIR, `lugin-${pkg.version}.zip`);
+const out = join(OUT_DIR, `lugin-${pkg.version}${FOR_TESTERS ? '-testers' : ''}.zip`);
 writeFileSync(out, archive);
 
 const kb = n => `${(n / 1024).toFixed(0)} KB`;
 console.log(`\n${relative(ROOT, out)}  ${kb(archive.length)}, ${entries.length} files`);
-if (hadKey) console.log('manifest key stripped for upload (dist/ keeps it)');
-console.log('\nnext: https://chrome.google.com/webstore/devconsole → Add new item');
+
+if (FOR_TESTERS) {
+  console.log('manifest key kept: every install gets the id below');
+  console.log('\nsend it with these four steps:');
+  console.log('  1. unzip it somewhere it can stay — deleting the folder uninstalls it');
+  console.log('  2. chrome://extensions → Developer mode, on');
+  console.log('  3. Load unpacked → select the unzipped folder');
+  console.log('  4. open cardmarket.com; the toolbar icon toggles the overlay');
+} else {
+  if (hadKey) console.log('manifest key stripped for upload (dist/ keeps it)');
+  console.log('\nnext: https://chrome.google.com/webstore/devconsole → Add new item');
+}

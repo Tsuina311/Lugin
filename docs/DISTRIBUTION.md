@@ -1,16 +1,17 @@
 # Shipping Lugin to a list of test users
 
-Three routes, because they carry different things:
+Four routes, because they carry different things:
 
-| What                       | Where                | Gate on the tester list                | Cost |
-| -------------------------- | -------------------- | -------------------------------------- | ---- |
-| The Chrome extension       | **Chrome Web Store** | Visibility `Private` + trusted testers | $5   |
-| The phone app (read-only)  | **GitHub Pages**     | OAuth test users — no sign-in, no data | free |
-| The phone app (minibrowser) | **Google Play**     | Internal testing track + tester emails | $25  |
+| What                        | Where                | Gate on the tester list                | Cost |
+| --------------------------- | -------------------- | -------------------------------------- | ---- |
+| The extension, as a zip     | **You, by hand**     | Whoever you send the file to           | free |
+| The extension, installable  | **Chrome Web Store** | Visibility `Private` + trusted testers | $5   |
+| The phone app (read-only)   | **GitHub Pages**     | OAuth test users — no sign-in, no data | free |
+| The phone app (minibrowser) | **Google Play**      | Internal testing track + tester emails | $25  |
 
 Google Play does not distribute browser extensions, and the Chrome Web Store does
-not distribute Android apps. There is no single place that does both — and the
-read-only phone app needs neither.
+not distribute Android apps. There is no single place that does both — and
+neither of the free routes needs an account anywhere.
 
 A third list also exists and is easy to forget: the **OAuth consent screen's
 test users**, in Google Cloud. Lugin's consent screen is in `Testing` status, so
@@ -20,7 +21,103 @@ the store's, and the OAuth one.
 
 ---
 
-# Part 1 — The Chrome extension
+# Part 1 — The extension, today: a zip you send people
+
+No account, no review, no fee. The cost is manual installation and manual
+updates, which is a fair trade for the first handful of testers.
+
+## 1. Give the extension a fixed identity
+
+Do this once, before building anything you intend to send out:
+
+```bash
+yarn key
+```
+
+It generates an RSA key pair, keeps the private half in `.extension-key.pem`
+(gitignored), and writes the public half into `.env.local` as
+`LUGIN_EXTENSION_KEY`, which the manifest carries as `key`.
+
+This exists because the sign-in redirect is derived from the extension id:
+
+```ts
+`https://${chrome.runtime.id}.chromiumapp.org/`;
+```
+
+Google matches that string exactly, and an unpacked extension is assigned a
+**random id every time it is loaded fresh** — so without a pinned key, every
+tester's install would have a different id and a different redirect URI, and
+Google would answer `redirect_uri_mismatch` for all of them. With the key, every
+copy of this build has the same id, which `yarn key` prints:
+
+```
+extension id: dlkphhoegbfpjnkmijopncgbmfbimakg
+redirect URI: https://dlkphhoegbfpjnkmijopncgbmfbimakg.chromiumapp.org/
+```
+
+**Back up `.extension-key.pem`.** Regenerating it changes the id, which makes
+every existing install a different extension — new redirect URI, and Chrome
+treats it as unrelated to the one already installed.
+
+## 2. Register that redirect URI
+
+Google Cloud console → **APIs & Services** → **Credentials** → your OAuth 2.0
+client (the *Web application* one) → **Authorised redirect URIs** → add the line
+`yarn key` printed, trailing slash included. A client can hold several, so
+existing ones can stay.
+
+Then add each tester's Google address under **OAuth consent screen** →
+**Audience** → **Test users**. Without that they can install the extension and
+still not sign in.
+
+## 3. Build the zip
+
+```bash
+yarn package:testers
+```
+
+Writes `release/lugin-<version>-testers.zip` (~190 KB). Unlike `yarn package`,
+this **keeps** the manifest's `key` — that is the entire point — and refuses to
+build at all if no key is set, since a keyless tester build installs fine and
+then fails at sign-in on every machine.
+
+## 4. What a tester does
+
+1. Unzip it somewhere it can stay: Chrome loads an unpacked extension from that
+   folder every start, so deleting or moving it uninstalls the extension.
+2. `chrome://extensions` → turn on **Developer mode** (top right).
+3. **Load unpacked** → select the unzipped `lugin-<version>` folder.
+4. Open a Cardmarket page; the toolbar icon toggles the overlay.
+
+What to warn them about, so it doesn't read as a bug:
+
+- Chrome shows **"Disable developer mode extensions"** on some startups. Dismissing
+  it is safe; it reappears.
+- There are **no automatic updates**. A new version means a new zip, and
+  **Update** on `chrome://extensions` after replacing the folder.
+- Chrome will not install a `.crx` dragged in from outside the store on Windows or
+  macOS, so unpacked really is the only free route.
+
+## 5. Shipping an update
+
+Bump `version` in `package.json`, `yarn package:testers`, send the new zip. The
+key is unchanged, so the id, the redirect URI and their signed-in state all
+survive.
+
+---
+
+# Part 2 — The extension, properly: the Chrome Web Store
+
+Worth doing when the tester list outgrows email, or the developer-mode nag does.
+`Private` visibility keeps it invisible to everyone but your trusted testers,
+while giving them a normal one-click install and automatic updates.
+
+> **The id changes here, and it is the one thing to plan for.** The store re-signs
+> the item with its *own* key and assigns its own permanent id, so the published
+> extension does **not** have the id from Part 1. Nothing breaks if you register
+> both redirect URIs on the OAuth client and leave them there: the zip installs
+> keep working while the store item takes over. Step 3 below then switches
+> `.env.local` to the store's key so your local build matches the published id.
 
 ## 1. Register as a Chrome Web Store developer
 
@@ -39,31 +136,24 @@ would reject: it checks the name and description lengths, that every icon the
 manifest names is really there, that `dist/` isn't stale, and it strips the
 manifest's `key` field, which the store rejects on upload.
 
-## 3. Create the item, then pin the extension id
+## 3. Create the item, then re-pin the extension id to it
 
 This ordering matters, and it's the step that breaks Google sign-in if skipped.
-
-Lugin's sign-in redirect is derived from the extension id:
-
-```ts
-`https://${chrome.runtime.id}.chromiumapp.org/`;
-```
-
-Google matches that string exactly. An unpacked build invents a **new random id**
-every time it is loaded fresh, and the store assigns its own **permanent** id
-when the item is created — so without pinning, the id in the redirect keeps
-changing and Google answers `redirect_uri_mismatch`.
+The id you get here replaces the one from Part 1 — same mechanism, different key,
+because the store insists on signing with its own.
 
 1. On the dashboard, **Add new item**, and upload the zip. Do not publish yet.
 2. Open the item's **Package** tab → **View public key**.
 3. Copy everything between `-----BEGIN PUBLIC KEY-----` and `-----END PUBLIC
-   KEY-----`, and put it in `.env.local`:
+   KEY-----`, and **replace** the value `yarn key` wrote in `.env.local`:
 
    ```bash
    LUGIN_EXTENSION_KEY=MIIBIjANBgkqhkiG9w0…
    ```
 
    Newlines are stripped for you, so pasting the block as-is on one line is fine.
+   Keep `.extension-key.pem` regardless: it is what the zip installs from Part 1
+   are still running on.
 4. `yarn build`, then reload the unpacked extension. Its id at
    `chrome://extensions` should now equal the **Item ID** on the dashboard.
 
@@ -142,8 +232,12 @@ allows more), category *Productivity*, language, and:
   purpose, not used to determine creditworthiness or for lending). Syncing to the
   user's own Drive counts as data leaving the device, so declaring it is the
   honest answer even though no server of ours receives it.
-- _Privacy policy URL_: required. `docs/PRIVACY.md` is the text — publish it at a
-  public URL (GitHub Pages, or a gist) and paste the link.
+- _Privacy policy URL_: required, and already satisfied now that the repository is
+  public — GitHub renders the file, and that counts:
+
+  ```
+  https://github.com/Tsuina311/lugin/blob/main/docs/PRIVACY.md
+  ```
 
 **Distribution** — **Visibility: Private**, then *Only trusted testers from the
 current publisher settings*. Free, and pick your countries.
@@ -173,7 +267,7 @@ changes, so the OAuth client needs no further edits. Keep the `key` in
 
 ---
 
-# Part 2 — The phone app, today: a web app on GitHub Pages
+# Part 3 — The phone app, today: a web app on GitHub Pages
 
 No store, no review, no tester list, no toolchain. `yarn build:web` produces a
 static site; Pages serves it; your phone opens it and can add it to the home
@@ -194,34 +288,39 @@ Cardmarket *inside* our own interface needs two things a web page may not have:
   non-browser requests, so fetching and re-rendering it server-side is out too.
 
 Browsing and buying from the phone therefore needs a native WebView the app owns
-— which is Part 3, and the only reason the Android SDK and Play Store come into
+— which is Part 4, and the only reason the Android SDK and Play Store come into
 it at all.
 
 ## Steps
 
-1. **Push the repository to GitHub.** It currently has no commits and no remote.
-   Note that **Pages on a free account requires a public repository**; a private
-   one needs GitHub Pro. Nothing secret is committed — `.env.local` is ignored,
-   and the Google client id is not a credential — but the code becomes public.
-2. **Settings → Pages → Source: GitHub Actions.** The workflow in
-   `.github/workflows/pages.yml` handles the rest; it derives the base path from
-   the repository name, so no hardcoded URL to keep in sync.
-3. **Settings → Secrets and variables → Actions → Variables** → add
-   `VITE_GOOGLE_CLIENT_ID` with the same client id the extension uses. It's a
-   variable rather than a secret deliberately: it ships in the bundle regardless.
-4. **Register the origin.** Google Cloud console → Credentials → your OAuth
+The repository is already on GitHub and public, which Pages requires on a free
+account. What remains is three settings and a push.
+
+1. **Enable Pages**: <https://github.com/Tsuina311/lugin/settings/pages> → Build
+   and deployment → Source: **GitHub Actions**. Until this is on, the build
+   succeeds and the deploy step has nowhere to publish to.
+2. **Add the client id**:
+   <https://github.com/Tsuina311/lugin/settings/variables/actions> → New
+   repository variable → `VITE_GOOGLE_CLIENT_ID`, the same one the extension uses.
+   A variable rather than a secret deliberately: it ships in the bundle
+   regardless. Omitting it still deploys — the app just reports itself
+   unconfigured instead of offering sign-in.
+3. **Register the origin.** Google Cloud console → Credentials → your OAuth
    client → **Authorised JavaScript origins** → add:
 
    ```
-   https://<your-github-username>.github.io
+   https://tsuina311.github.io
    ```
 
    Origin only — no path, no trailing slash. The phone build uses Google Identity
    Services, which validates the *origin* and needs no redirect URI, so there is
    nothing extension-id-shaped to keep in step here.
-5. **Push to `main`.** The workflow runs the render checks, builds, and deploys to
-   `https://<username>.github.io/<repo>/`.
-6. **On your phone**, open that URL, tap **Connect Google**, and your collection
+4. **Push to `main`.** The workflow in `.github/workflows/pages.yml` runs the
+   render checks, builds with the base path derived from the repository name, and
+   deploys to <https://tsuina311.github.io/lugin/>. `workflow_dispatch` is also
+   enabled, so a failed deploy can be re-run from the Actions tab without a
+   commit.
+5. **On your phone**, open that URL, tap **Connect Google**, and your collection
    and decks appear. Chrome's ⋮ menu → **Add to Home screen** installs it.
 
 Your testers are gated by the OAuth consent screen's test-user list: without a
@@ -243,7 +342,7 @@ deployed Pages URL is the one to sign in from.
 
 ---
 
-# Part 3 — Later: the native Android app
+# Part 4 — Later: the native Android app
 
 > **Status: not built.** Needed only for the minibrowser — browsing Cardmarket
 > inside the app with our overlay injected, using your logged-in session.
