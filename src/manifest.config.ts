@@ -119,6 +119,13 @@ export default defineManifest({
       matches: TARGET_MATCHES,
       // icons/* so the overlay's wordmark, which the page itself loads once we
       // put the <img> in its DOM, isn't blocked as an extension-internal file.
+      //
+      // `assets/*` covers the built chunks — but crxjs also resolves these globs
+      // against the project directory and copies whatever matches, so anything
+      // put in a top-level assets/ folder gets shipped inside the extension
+      // whether or not a line of code imports it. That is why the source artwork
+      // lives in artwork/ instead: as assets/, it added 800 KB of unread PNGs to
+      // every package.
       resources: ['assets/*', 'icons/*', 'src/interceptor/main.ts'],
     },
   ],

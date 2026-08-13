@@ -328,6 +328,7 @@ const write = (rel, img) => {
 const [markSrc, logoSrc] = process.argv.slice(2);
 if (!markSrc || !logoSrc) {
   console.error('usage: node scripts/make-logos.mjs <mark.png> <full-logo.png>');
+  console.error('   eg: node scripts/make-logos.mjs artwork/logo-mark.png artwork/logo-full.png');
   console.error('inputs must be real 8-bit PNGs: sips -s format png in.jpg --out out.png');
   process.exit(1);
 }
