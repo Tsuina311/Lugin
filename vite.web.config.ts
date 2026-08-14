@@ -35,7 +35,7 @@ const pwaAssets = (): Plugin => ({
       source: JSON.stringify(
         {
           background_color: THEME,
-          description: 'Read your Lugin collection and decks on your phone.',
+          description: 'Your collection and decks on your phone, and ManaBox imports into them.',
           display: 'standalone',
           icons: [
             { sizes: '192x192', src: `${BASE}icons/icon-192.png`, type: 'image/png' },
@@ -50,6 +50,42 @@ const pwaAssets = (): Plugin => ({
           name: NAME,
           orientation: 'portrait',
           scope: BASE,
+          // Put Lugin in Android's share sheet, so a ManaBox export can go
+          // straight from the export screen into the import review. Without this
+          // the only route is "save it somewhere, then find it again in a file
+          // picker", which is several taps and a small act of faith on the device
+          // where nearly every import is going to start.
+          //
+          // POST with multipart/form-data because this shares a *file*; the
+          // service worker answers `action` and hands the file to the app. The
+          // accept list is as generous as the file input's, and for the same
+          // reason: Android's idea of a CSV's type varies by which app produced it.
+          share_target: {
+            action: `${BASE}share`,
+            enctype: 'multipart/form-data',
+            method: 'POST',
+            params: {
+              files: [
+                {
+                  accept: [
+                    'text/csv',
+                    'text/plain',
+                    'text/tab-separated-values',
+                    'text/comma-separated-values',
+                    'application/csv',
+                    'application/vnd.ms-excel',
+                    'application/octet-stream',
+                    '.csv',
+                    '.txt',
+                    '.tsv',
+                  ],
+                  name: 'file',
+                },
+              ],
+              text: 'text',
+              title: 'title',
+            },
+          },
           short_name: NAME,
           start_url: BASE,
           theme_color: THEME,
@@ -62,10 +98,22 @@ const pwaAssets = (): Plugin => ({
 
     // Network-first, cache only as an offline fallback. A cache-first shell would
     // hand testers yesterday's build and make every bug report a guess.
+    //
+    // It also receives shared files, because a share target's `action` has to be
+    // answered by *something* and a static host can't answer a POST. Written as a
+    // plain string with no `${'$'}{...}` in it: this is a template literal, so an
+    // interpolation meant for the browser would be evaluated here at build time.
     this.emitFile({
       fileName: 'sw.js',
       source: `const SHELL = '${BASE}';
+const SHARE = '${BASE}share';
 const CACHE = 'lugin-shell-v1';
+
+// Shared files wait here for the page to collect them. A cache of its own so the
+// sweep below can't mistake it for a stale shell, and it is named in that sweep's
+// allowlist for the same reason.
+const INBOX = 'lugin-share-inbox';
+const INBOX_KEY = SHELL + 'shared-import';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -75,15 +123,50 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
+      .then(keys => Promise.all(
+        keys.filter(key => key !== CACHE && key !== INBOX).map(key => caches.delete(key)),
+      ))
       .then(() => self.clients.claim()),
   );
 });
 
+// Stash the file, then send the browser to the app with a GET.
+const receiveShare = async request => {
+  try {
+    const form = await request.formData();
+    const file = form.get('file');
+    if (file && typeof file.text === 'function') {
+      const body = JSON.stringify({
+        at: Date.now(),
+        name: file.name || 'shared.csv',
+        text: await file.text(),
+      });
+      const cache = await caches.open(INBOX);
+      await cache.put(INBOX_KEY, new Response(body, {
+        headers: { 'content-type': 'application/json' },
+      }));
+    }
+  } catch (error) {
+    // A share we can't read still has to land the user in the app rather than on
+    // a browser error page, where the file would look like it had vanished. The
+    // file picker is right there once they arrive.
+  }
+  // 303 so the browser follows with a GET: left as the POST it arrived as, a
+  // reload would re-submit the share.
+  return Response.redirect(new URL(SHELL + '?shared=1', self.location.href).href, 303);
+};
+
 self.addEventListener('fetch', event => {
-  if (event.request.mode !== 'navigate') return;
+  const request = event.request;
+  // A share is itself a navigation, so this has to come before the branch below —
+  // which would otherwise put a multipart POST to a static host and get a 405.
+  if (request.method === 'POST' && new URL(request.url).pathname === SHARE) {
+    event.respondWith(receiveShare(request));
+    return;
+  }
+  if (request.mode !== 'navigate') return;
   event.respondWith(
-    fetch(event.request)
+    fetch(request)
       .then(response => {
         caches.open(CACHE).then(cache => cache.put(SHELL, response.clone())).catch(() => {});
         return response;

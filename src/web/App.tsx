@@ -11,11 +11,12 @@
 // separate claim from "loaded" — which is why the header states the two
 // separately rather than conflating them into a spinner.
 
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 
 import { CollectionView } from './CollectionView';
 import { DeckList } from './DeckList';
 import { ImportScreen } from './ImportScreen';
+import { takeSharedImport, type SharedImport } from './sharedImport';
 import { syncStore } from './syncStore';
 
 import type { DomainKey } from '@/core/sync/model';
@@ -83,6 +84,19 @@ export const App = () => {
     syncStore.getSnapshot,
   );
   const [tab, setTab] = useState<Tab>('collection');
+  const [shared, setShared] = useState<SharedImport | null>(null);
+
+  // Was this launch a ManaBox export being shared to us? Held in state rather
+  // than left where it was found, because the inbox is emptied on reading — so a
+  // share that arrives on a phone which still has to sign in waits here, in
+  // memory, and opens as soon as the app is past that.
+  useEffect(() => {
+    void takeSharedImport().then(file => {
+      if (!file) return;
+      setShared(file);
+      setTab('import');
+    });
+  }, []);
 
   // `byKey` isn't stored — the desktop rebuilds it on load and so do we. It's
   // what turns 20,000 rows into "how many of this card do I own".
@@ -128,9 +142,12 @@ export const App = () => {
           action={{ label: 'Connect Google', onClick: syncStore.connect }}
           title="Lugin on your phone"
         >
-          Sign in to pick up the collection and decks from your desktop — and to import ManaBox
-          scans from here. Lugin only ever sees its own hidden folder in your Drive, nothing else
-          there.
+          {shared
+            ? `${shared.name} is ready to import — sign in first, so this phone starts from what
+               your desktop already has rather than replacing it.`
+            : `Sign in to pick up the collection and decks from your desktop — and to import ManaBox
+               scans from here. Lugin only ever sees its own hidden folder in your Drive, nothing
+               else there.`}
         </Splash>
       );
     }
@@ -190,9 +207,14 @@ export const App = () => {
         {tab === 'decks' ? <DeckList collection={collection} decks={decks} /> : null}
         {tab === 'import' ? (
           <ImportScreen
+            // Remount for each new share, so its file becomes the screen's
+            // starting state without an effect reaching in to replace it.
+            key={shared ? `shared-${shared.at}` : 'picker'}
             existing={collection?.cards ?? []}
+            incoming={shared}
             onImport={async (decisions, file) => {
               await syncStore.importDecisions(decisions, file);
+              setShared(null);
               // Land on what changed. "Choose a file" reappearing is the one
               // outcome that leaves someone unsure whether it worked.
               setTab(decisions.every(d => d.kind === 'deck') ? 'decks' : 'collection');

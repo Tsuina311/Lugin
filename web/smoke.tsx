@@ -9,13 +9,16 @@
 // Built through vite so the `@/` aliases and TSX resolve the same way they do in
 // the real build, which is also what makes it free of test dependencies.
 
-import { renderToString } from 'react-dom/server';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
+import { renderToString } from 'react-dom/server';
 
 import { App } from '../src/web/App';
 import { CollectionView } from '../src/web/CollectionView';
 import { DeckList } from '../src/web/DeckList';
 import { ImportScreen } from '../src/web/ImportScreen';
+import { SHARE_INBOX, SHARE_KEY_PATH } from '../src/web/sharedImport';
 
 import { buildCollection } from '@/lib/collection';
 import type { Deck } from '@/lib/deck';
@@ -153,6 +156,78 @@ for (const [what, needle] of says) {
   } else {
     failed += 1;
     console.log(`  FAIL  ${what} — expected "${needle}" in the review markup`);
+  }
+}
+
+// The service worker and the manifest are strings in vite.web.config.ts, so
+// nothing typechecks them and a slip shows up as an app that won't install or a
+// share that silently disappears. This build emits both next to this script, so
+// they can at least be parsed and cross-checked against the code they pair with.
+const emitted = (file: string): string =>
+  readFileSync(join(process.cwd(), 'dist-smoke', file), 'utf8');
+
+const asserts: [string, () => void][] = [
+  [
+    'the service worker parses',
+    () => {
+      // Compiles without running: a SyntaxError here is a phone that silently
+      // fails to register a worker at all.
+      new Function(emitted('sw.js'));
+    },
+  ],
+  [
+    'the worker catches a shared POST before its navigation branch',
+    () => {
+      const sw = emitted('sw.js');
+      const post = sw.indexOf('request.method === \'POST\'');
+      const navigate = sw.indexOf('request.mode !== \'navigate\'');
+      if (post < 0 || navigate < 0) throw new Error('one of the two branches is gone');
+      // A share *is* a navigation, so the other order sends the file to Pages.
+      if (post > navigate) throw new Error('the navigation branch would swallow the share');
+    },
+  ],
+  [
+    'the worker and the app agree on where shared files wait',
+    () => {
+      const sw = emitted('sw.js');
+      for (const name of [SHARE_INBOX, SHARE_KEY_PATH]) {
+        if (!sw.includes(`'${name}'`)) throw new Error(`the worker no longer names ${name}`);
+      }
+    },
+  ],
+  [
+    'the manifest offers Lugin as a share target for files',
+    () => {
+      const manifest = JSON.parse(emitted('manifest.webmanifest')) as {
+        scope: string;
+        share_target?: {
+          action: string;
+          enctype: string;
+          method: string;
+          params: { files: { accept: string[]; name: string }[] };
+        };
+      };
+      const share = manifest.share_target;
+      if (!share) throw new Error('no share_target');
+      // Chrome ignores the whole entry if any of these are wrong, without saying so.
+      if (!share.action.startsWith(manifest.scope)) throw new Error('action is outside the scope');
+      if (share.method !== 'POST') throw new Error('a file share has to be a POST');
+      if (share.enctype !== 'multipart/form-data') throw new Error('wrong enctype for a file');
+      if (share.params.files[0]?.name !== 'file') {
+        throw new Error('the worker reads the part named "file"');
+      }
+      if (!share.params.files[0].accept.includes('text/csv')) throw new Error('CSV is not accepted');
+    },
+  ],
+];
+
+for (const [what, check] of asserts) {
+  try {
+    check();
+    console.log(`  ok  ${what}`);
+  } catch (error) {
+    failed += 1;
+    console.log(`  FAIL  ${what} — ${error instanceof Error ? error.message : error}`);
   }
 }
 

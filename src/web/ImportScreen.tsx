@@ -15,6 +15,8 @@
 
 import { useState } from 'react';
 
+import type { SharedImport } from './sharedImport';
+
 import type { CollectionCard } from '@/lib/collection';
 import {
   inspectImport,
@@ -24,9 +26,15 @@ import {
 } from '@/lib/import';
 import { ImportReview } from '@/ui/components/ImportReview';
 
+
 interface ImportScreenProps {
   /** Rows to match against, so duplicates are found before anything is written. */
   existing: CollectionCard[];
+  /**
+   * A file shared to the app from elsewhere, to review instead of asking for one.
+   * Read at mount; the caller remounts this screen (by key) to offer a new one.
+   */
+  incoming?: SharedImport | null;
   onImport: (
     decisions: ImportDecision[],
     file: { format: ImportFormat; source: string },
@@ -39,8 +47,13 @@ interface Pending {
   source: string;
 }
 
-export const ImportScreen = ({ existing, onImport }: ImportScreenProps) => {
-  const [pending, setPending] = useState<Pending | null>(null);
+export const ImportScreen = ({ existing, incoming, onImport }: ImportScreenProps) => {
+  // A shared file opens straight into the review, since picking it was the tap
+  // that got us here. Parsed in the initialiser rather than an effect so it never
+  // renders the picker first and flickers past it.
+  const [pending, setPending] = useState<Pending | null>(() =>
+    incoming ? { inspection: inspectImport(incoming.text), source: incoming.name } : null,
+  );
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -104,10 +117,25 @@ export const ImportScreen = ({ existing, onImport }: ImportScreenProps) => {
           {busy ? 'Reading…' : 'Choose a file'}
         </span>
         <input
-          // ManaBox shares .csv and .txt; some Android pickers report a CSV as
-          // text/plain or as nothing at all, so the list is generous and the
-          // parser is what actually decides.
-          accept=".csv,.txt,.tsv,text/csv,text/plain,text/tab-separated-values"
+          // Every spelling of "a CSV" that an Android picker might report, plus
+          // the ones that aren't spellings at all: a file arriving from Drive or a
+          // share sheet is routinely typed application/octet-stream, and Android
+          // has historically called .csv application/vnd.ms-excel. Anything
+          // missing from this list is greyed out in the picker — the user can see
+          // their export and not select it — so it is deliberately generous, and
+          // `inspectImport` is what actually decides whether a file is usable.
+          accept={[
+            '.csv',
+            '.txt',
+            '.tsv',
+            'text/csv',
+            'text/plain',
+            'text/tab-separated-values',
+            'text/comma-separated-values',
+            'application/csv',
+            'application/vnd.ms-excel',
+            'application/octet-stream',
+          ].join(',')}
           className="sr-only"
           disabled={busy}
           onChange={event => void read(event.target.files?.[0])}
