@@ -217,7 +217,13 @@ export const App = () => {
         </p>
       ) : null}
 
-      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <main
+        className={`min-h-0 flex-1 ${
+          tab === 'scan'
+            ? 'flex flex-col overflow-hidden'
+            : 'overflow-y-auto overscroll-contain'
+        }`}
+      >
         {tab === 'collection' ? <CollectionView collection={collection} /> : null}
         {tab === 'decks' ? <DeckList collection={collection} decks={decks} /> : null}
         {tab === 'scan' ? (

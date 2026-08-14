@@ -377,10 +377,10 @@ export const ScanScreen = ({
   const pickList = filterPrintings(progress.printings, progress.collector);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-canvas">
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-canvas">
       {phase === 'pick' ? (
         <div className="flex min-h-0 flex-1 flex-col bg-panel">
-          <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+          <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-3">
             <button
               className="rounded-lg border border-line-strong px-3 py-2 text-sm text-ink-muted"
               onClick={() => setPhase('camera')}
@@ -396,7 +396,7 @@ export const ScanScreen = ({
               </p>
             </div>
           </div>
-          <ul className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+          <ul className="min-h-0 flex-1 overflow-y-auto px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             {pickList.map(p => (
               <li key={p.id}>
                 <button
@@ -428,107 +428,29 @@ export const ScanScreen = ({
             ))}
           </ul>
         </div>
-      ) : (
-        <>
-      <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
-        <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
-          <div
-            ref={frameRef}
-            className="relative w-[min(78vw,320px)] overflow-hidden rounded-xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
-            style={{ aspectRatio: '63 / 88' }}
-          >
-            <div
-              className={`absolute border ${haveName ? 'border-pos/80 bg-pos/20' : 'border-sky-300/80 bg-sky-400/15'}`}
-              style={{
-                height: `${NAME_REGION.h * 100}%`,
-                left: `${NAME_REGION.x * 100}%`,
-                top: `${NAME_REGION.y * 100}%`,
-                width: `${NAME_REGION.w * 100}%`,
-              }}
+      ) : phase === 'review' && review ? (
+        <div className="flex min-h-0 flex-1 flex-col bg-panel px-4 py-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex gap-1.5">
+            <StatusChip done={haveName} icon={Type} label="Name" value={progress.name} />
+            <StatusChip
+              done={haveSet}
+              icon={Library}
+              label="Edition"
+              value={progress.collector.setCode?.toUpperCase()}
             />
-            {!haveName ? (
-              <div
-                className="absolute border border-dashed border-sky-200/50 bg-sky-400/5"
-                style={{
-                  height: `${NAME_FOCUS_REGION.h * 100}%`,
-                  left: `${NAME_FOCUS_REGION.x * 100}%`,
-                  top: `${NAME_FOCUS_REGION.y * 100}%`,
-                  width: `${NAME_FOCUS_REGION.w * 100}%`,
-                }}
-              />
-            ) : null}
-            <div
-              className={`absolute border ${haveNumber ? 'border-pos/80 bg-pos/20' : 'border-amber-300/90 bg-amber-400/20'}`}
-              style={{
-                height: `${NUMBER_REGION.h * 100}%`,
-                left: `${NUMBER_REGION.x * 100}%`,
-                top: `${NUMBER_REGION.y * 100}%`,
-                width: `${NUMBER_REGION.w * 100}%`,
-              }}
-            />
-            <div
-              className={`absolute border ${haveNumber ? 'border-pos/80 bg-pos/20' : 'border-amber-300/50 bg-amber-400/10'}`}
-              style={{
-                height: `${CLASSIC_NUMBER_REGION.h * 100}%`,
-                left: `${CLASSIC_NUMBER_REGION.x * 100}%`,
-                top: `${CLASSIC_NUMBER_REGION.y * 100}%`,
-                width: `${CLASSIC_NUMBER_REGION.w * 100}%`,
-              }}
-            />
-            <div
-              className={`absolute border ${haveSet ? 'border-pos/80 bg-pos/20' : 'border-violet-300/90 bg-violet-400/20'}`}
-              style={{
-                height: `${SET_REGION.h * 100}%`,
-                left: `${SET_REGION.x * 100}%`,
-                top: `${SET_REGION.y * 100}%`,
-                width: `${SET_REGION.w * 100}%`,
-              }}
-            />
-            <div
-              className={`absolute border ${haveSet ? 'border-pos/80 bg-pos/20' : 'border-violet-300/70 bg-violet-400/15'}`}
-              style={{
-                height: `${SET_SYMBOL_REGION.h * 100}%`,
-                left: `${SET_SYMBOL_REGION.x * 100}%`,
-                top: `${SET_SYMBOL_REGION.y * 100}%`,
-                width: `${SET_SYMBOL_REGION.w * 100}%`,
-              }}
+            <StatusChip
+              done={haveNumber}
+              icon={Hash}
+              label="Number"
+              value={progress.collector.collectorNumber}
             />
           </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3 border-t border-line bg-panel px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="flex gap-1.5">
-          <StatusChip done={haveName} icon={Type} label="Name" value={progress.name} />
-          <StatusChip
-            done={haveSet}
-            icon={Library}
-            label="Edition"
-            value={progress.collector.setCode?.toUpperCase()}
-          />
-          <StatusChip
-            done={haveNumber}
-            icon={Hash}
-            label="Number"
-            value={progress.collector.collectorNumber}
-          />
-        </div>
-        <p className="text-[11px] leading-snug text-ink-faint">
-          Name first (EN/FR/DE/IT). Edition from bottom text or the set symbol. Once the name
-          is locked, Pick manually lists every printing if OCR can’t finish the job.
-        </p>
-        {message ? <p className="text-xs text-ink-muted">{message}</p> : null}
-
-        {phase === 'error' ? (
-          <p className="text-sm text-neg">{message ?? 'Camera unavailable.'}</p>
-        ) : phase === 'review' && review ? (
-          <div className="space-y-3">
+          <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
             <div className="flex gap-3">
               {review.printing.imageUrl ? (
                 <img
                   alt=""
-                  className="h-24 w-auto rounded-md border border-line"
+                  className="h-28 w-auto rounded-md border border-line"
                   src={review.printing.imageUrl}
                 />
               ) : null}
@@ -552,79 +474,179 @@ export const ScanScreen = ({
                 ({review.foil.reason}, {Math.round(review.foil.confidence * 100)}%)
               </span>
             </label>
-            <div className="flex gap-2">
-              <button
-                className="flex-1 rounded-lg border border-line-strong py-3 text-sm font-medium text-ink"
-                onClick={reset}
-                type="button"
-              >
-                Start over
-              </button>
-              <button
-                className="flex-1 rounded-lg bg-accent py-3 text-sm font-semibold text-accent-ink disabled:opacity-50"
-                disabled={busy}
-                onClick={() => void save()}
-                type="button"
-              >
-                {busy ? 'Adding…' : 'Add to collection'}
-              </button>
-            </div>
           </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <div className="flex gap-2">
-              {(haveName || haveSet || haveNumber) && (
-                <button
-                  className="rounded-lg border border-line-strong px-3 py-3.5 text-sm font-medium text-ink-muted"
-                  disabled={phase === 'working'}
-                  onClick={reset}
-                  type="button"
-                >
-                  Reset
-                </button>
-              )}
-              <button
-                className="flex-1 rounded-lg bg-accent py-3.5 text-sm font-semibold text-accent-ink disabled:opacity-50"
-                disabled={phase === 'working'}
-                onClick={() => void snap()}
-                type="button"
-              >
-                {phase === 'working' ? 'Reading…' : 'Scan'}
-              </button>
-            </div>
-            {haveName ? (
-              <button
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-line-strong py-2.5 text-sm font-medium text-ink disabled:opacity-50"
-                disabled={phase === 'working'}
-                onClick={() => void openManualPick()}
-                type="button"
-              >
-                <List aria-hidden size={14} />
-                Pick manually
-              </button>
-            ) : null}
+          <div className="mt-3 flex shrink-0 gap-2">
             <button
-              className="rounded-lg border border-line-strong py-2.5 text-sm font-medium text-ink-muted disabled:opacity-50"
-              disabled={phase === 'working'}
-              onClick={() => fileRef.current?.click()}
+              className="flex-1 rounded-lg border border-line-strong py-3 text-sm font-medium text-ink"
+              onClick={reset}
               type="button"
             >
-              Use photo instead
+              Start over
             </button>
-            <input
-              ref={fileRef}
-              accept="image/*"
-              className="hidden"
-              onChange={e => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                void onPickPhoto(file);
-              }}
-              type="file"
-            />
+            <button
+              className="flex-1 rounded-lg bg-accent py-3 text-sm font-semibold text-accent-ink disabled:opacity-50"
+              disabled={busy}
+              onClick={() => void save()}
+              type="button"
+            >
+              {busy ? 'Adding…' : 'Add to collection'}
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <>
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
+            <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4 pb-24">
+              <div
+                ref={frameRef}
+                className="relative w-[min(72vw,280px)] overflow-hidden rounded-xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
+                style={{ aspectRatio: '63 / 88' }}
+              >
+                <div
+                  className={`absolute border ${haveName ? 'border-pos/80 bg-pos/20' : 'border-sky-300/80 bg-sky-400/15'}`}
+                  style={{
+                    height: `${NAME_REGION.h * 100}%`,
+                    left: `${NAME_REGION.x * 100}%`,
+                    top: `${NAME_REGION.y * 100}%`,
+                    width: `${NAME_REGION.w * 100}%`,
+                  }}
+                />
+                {!haveName ? (
+                  <div
+                    className="absolute border border-dashed border-sky-200/50 bg-sky-400/5"
+                    style={{
+                      height: `${NAME_FOCUS_REGION.h * 100}%`,
+                      left: `${NAME_FOCUS_REGION.x * 100}%`,
+                      top: `${NAME_FOCUS_REGION.y * 100}%`,
+                      width: `${NAME_FOCUS_REGION.w * 100}%`,
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`absolute border ${haveNumber ? 'border-pos/80 bg-pos/20' : 'border-amber-300/90 bg-amber-400/20'}`}
+                  style={{
+                    height: `${NUMBER_REGION.h * 100}%`,
+                    left: `${NUMBER_REGION.x * 100}%`,
+                    top: `${NUMBER_REGION.y * 100}%`,
+                    width: `${NUMBER_REGION.w * 100}%`,
+                  }}
+                />
+                <div
+                  className={`absolute border ${haveNumber ? 'border-pos/80 bg-pos/20' : 'border-amber-300/50 bg-amber-400/10'}`}
+                  style={{
+                    height: `${CLASSIC_NUMBER_REGION.h * 100}%`,
+                    left: `${CLASSIC_NUMBER_REGION.x * 100}%`,
+                    top: `${CLASSIC_NUMBER_REGION.y * 100}%`,
+                    width: `${CLASSIC_NUMBER_REGION.w * 100}%`,
+                  }}
+                />
+                <div
+                  className={`absolute border ${haveSet ? 'border-pos/80 bg-pos/20' : 'border-violet-300/90 bg-violet-400/20'}`}
+                  style={{
+                    height: `${SET_REGION.h * 100}%`,
+                    left: `${SET_REGION.x * 100}%`,
+                    top: `${SET_REGION.y * 100}%`,
+                    width: `${SET_REGION.w * 100}%`,
+                  }}
+                />
+                <div
+                  className={`absolute border ${haveSet ? 'border-pos/80 bg-pos/20' : 'border-violet-300/70 bg-violet-400/15'}`}
+                  style={{
+                    height: `${SET_SYMBOL_REGION.h * 100}%`,
+                    left: `${SET_SYMBOL_REGION.x * 100}%`,
+                    top: `${SET_SYMBOL_REGION.y * 100}%`,
+                    width: `${SET_SYMBOL_REGION.w * 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Always-visible capture control — sits on the camera, above the chip bar. */}
+            <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-4 pb-3 pt-10">
+              {message ? (
+                <p className="text-center text-xs text-white/90">{message}</p>
+              ) : phase === 'error' ? (
+                <p className="text-center text-xs text-red-300">
+                  {message ?? 'Camera unavailable.'}
+                </p>
+              ) : (
+                <p className="text-center text-[11px] text-white/70">
+                  Line up the card, then tap Scan — it does not run by itself.
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                {(haveName || haveSet || haveNumber) && (
+                  <button
+                    className="rounded-full border border-white/30 bg-black/40 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={phase === 'working'}
+                    onClick={reset}
+                    type="button"
+                  >
+                    Reset
+                  </button>
+                )}
+                <button
+                  className="flex-1 rounded-full bg-accent py-3.5 text-base font-semibold text-accent-ink shadow-lg disabled:opacity-50"
+                  disabled={phase === 'working' || phase === 'error'}
+                  onClick={() => void snap()}
+                  type="button"
+                >
+                  {phase === 'working' ? 'Reading…' : 'Scan'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-2 border-t border-line bg-panel px-4 py-2.5">
+            <div className="flex gap-1.5">
+              <StatusChip done={haveName} icon={Type} label="Name" value={progress.name} />
+              <StatusChip
+                done={haveSet}
+                icon={Library}
+                label="Edition"
+                value={progress.collector.setCode?.toUpperCase()}
+              />
+              <StatusChip
+                done={haveNumber}
+                icon={Hash}
+                label="Number"
+                value={progress.collector.collectorNumber}
+              />
+            </div>
+            <div className="flex gap-2">
+              {haveName ? (
+                <button
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-strong py-2 text-sm font-medium text-ink disabled:opacity-50"
+                  disabled={phase === 'working'}
+                  onClick={() => void openManualPick()}
+                  type="button"
+                >
+                  <List aria-hidden size={14} />
+                  Pick manually
+                </button>
+              ) : null}
+              <button
+                className="flex-1 rounded-lg border border-line-strong py-2 text-sm font-medium text-ink-muted disabled:opacity-50"
+                disabled={phase === 'working'}
+                onClick={() => fileRef.current?.click()}
+                type="button"
+              >
+                Use photo
+              </button>
+              <input
+                ref={fileRef}
+                accept="image/*"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  void onPickPhoto(file);
+                }}
+                type="file"
+              />
+            </div>
+          </div>
         </>
       )}
     </div>
