@@ -6,7 +6,7 @@ Four routes, because they carry different things:
 | --------------------------- | -------------------- | -------------------------------------- | ---- |
 | The extension, as a zip     | **You, by hand**     | Whoever you send the file to           | free |
 | The extension, installable  | **Chrome Web Store** | Visibility `Private` + trusted testers | $5   |
-| The phone app (read-only)   | **GitHub Pages**     | OAuth test users — no sign-in, no data | free |
+| The phone app               | **GitHub Pages**     | OAuth test users — no sign-in, no data | free |
 | The phone app (minibrowser) | **Google Play**      | Internal testing track + tester emails | $25  |
 
 Google Play does not distribute browser extensions, and the Chrome Web Store does
@@ -273,8 +273,16 @@ No store, no review, no tester list, no toolchain. `yarn build:web` produces a
 static site; Pages serves it; your phone opens it and can add it to the home
 screen, where it runs fullscreen with its own icon.
 
-It is read-only on purpose: it shows the collection and decks your desktop
-synced, and can't write to Drive.
+It shows the collection and decks your desktop synced, **and imports ManaBox
+exports into them** — which is why it needs the same `drive.appdata` scope the
+extension uses, and why a tester signing in here is granting write access to that
+one hidden folder, not just reads.
+
+It carries the same sync engine as the extension, so an import made here is
+reconciled per domain against whatever the desktop has done meanwhile rather than
+overwriting it, and a version that loses is kept as a `conflict-*.json` in the
+same folder. Imports are written to the phone first, so no signal means "pushed
+later", not "lost".
 
 ## Why a web app can't be the minibrowser
 
@@ -322,6 +330,11 @@ account. What remains is three settings and a push.
    commit.
 5. **On your phone**, open that URL, tap **Connect Google**, and your collection
    and decks appear. Chrome's ⋮ menu → **Add to Home screen** installs it.
+6. **Try an import**, since that is the path most testers will actually use:
+   ManaBox → Collection → Export → CSV → share it to Files, then **Import** in
+   Lugin. It will say what it thinks the file is and which rows you may already
+   own before writing anything, and the header shows "changes to upload" until the
+   push lands.
 
 Your testers are gated by the OAuth consent screen's test-user list: without a
 Google sign-in the app shows nothing, so an address that isn't on that list gets

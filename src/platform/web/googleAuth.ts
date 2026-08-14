@@ -20,7 +20,13 @@ import { AuthError, type TokenProvider, type TokenRequest } from '@/core/sync/au
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 
-/** The narrowest scope that gives us somewhere to read the user's data from. */
+/**
+ * The narrowest scope that gives us somewhere to keep the user's data.
+ *
+ * Read *and* write, on both platforms, and always has been — `drive.appdata` is
+ * not offered in a read-only flavour. That mattered little while this app only
+ * read; now that a phone import pushes, it is the whole permission it needs.
+ */
 export const DRIVE_APPDATA_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 
 /** Set at build time; see .env.example. Shared with the extension build. */

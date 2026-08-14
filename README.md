@@ -80,15 +80,28 @@ yarn build:web    # static site in dist-web/, deployed to GitHub Pages by CI
 yarn test:web     # server-renders every screen, to catch a blank page early
 ```
 
-A second, much smaller build of the same source (`web/index.html` →
-`src/web/`) that reads the collection and decks from the user's Drive folder and
-shows them on a phone. It is **read-only**: no local store, no sync engine,
-nothing that can push a half-formed phone state over the desktop's collection.
+A second, much smaller build of the same source (`web/index.html` → `src/web/`)
+showing the collection and decks on a phone — and importing into them, which is
+the point: cards get scanned into ManaBox on a phone, so that is where the export
+file already is.
 
-What makes it nearly free is that `src/core/sync` never knew about Chrome —
+It runs the **same sync engine as the extension**, not a lighter cousin. Two
+devices writing to one document needs reconciliation wherever the writing
+happens, and a second implementation of that would be a second set of ways to
+lose a collection. So `createSyncEngine` sits on
+`src/platform/web/localRepository.ts` (IndexedDB — a scanned collection outgrows
+localStorage's quota) exactly as it sits on `chrome.storage`, and the per-domain
+resolution, the conflict copies and the retry are shared and tested once.
+
+It renders that local copy rather than a fetch, so the collection is there before
+any network call and an import made in a shop with no signal is kept and pushed
+later.
+
+What makes all this nearly free is that `src/core/sync` never knew about Chrome —
 `createDriveRepository` takes an injected `fetch` and a `TokenProvider`, so the
-only new platform code is `src/platform/web/googleAuth.ts`, which gets a token
-from Google Identity Services instead of `chrome.identity`.
+only genuinely new platform code is `src/platform/web/googleAuth.ts`, which gets
+a token from Google Identity Services instead of `chrome.identity`, and the local
+store above.
 
 It cannot show Cardmarket itself: the site sends `x-frame-options: SAMEORIGIN`,
 and no page may script another origin's document. That needs a native WebView —

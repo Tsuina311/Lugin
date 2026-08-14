@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { Button } from './Button';
+import { ImportReview } from './ImportReview';
 import { SelectionBar } from './Selection';
 import { useSequentialImages } from './useSequentialImages';
 
@@ -11,6 +12,7 @@ import { expansionIconStore, normalizeSetName } from '@/content/expansionIconSto
 import { previewStore } from '@/content/previewStore';
 import { purchaseStore } from '@/content/purchaseStore';
 import { cardKey, stripVersion } from '@/lib/cardName';
+import { inspectImport, type ImportDecision, type ImportInspection } from '@/lib/import';
 import { requestScryfall, requestScryfallCached } from '@/lib/messaging';
 import { MANA_VALUE_BUCKETS, manaValueBucket, manaValueLabel, type CardMetadata } from '@/lib/mtg';
 import { fetchCardPrints, type CardPrint } from '@/lib/prints';
@@ -164,6 +166,11 @@ export const CollectionPanel = () => {
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
+  /** A file read but not yet imported: the review is open over the panel. */
+  const [pending, setPending] = useState<{
+    inspection: ImportInspection;
+    source: string;
+  } | null>(null);
   const [search, setSearch] = useState('');
 
   // List vs. box (grid) view, persisted independently of the wants view.
@@ -214,17 +221,48 @@ export const CollectionPanel = () => {
     closePicker();
   };
 
+  // Uploading no longer imports: it opens the review, which is what decides
+  // whether the file is a deck or cards, and which rows you already own.
   const onFile = async (file: File | undefined) => {
     if (!file) return;
     setImporting(true);
     try {
       const text = await file.text();
-      await collectionStore.importText(text, file.name);
+      setPending({ inspection: inspectImport(text), source: file.name });
     } catch {
       // error surfaced via the store
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const applyImport = async (decisions: ImportDecision[]) => {
+    if (!pending) return;
+    setImporting(true);
+    try {
+      for (const decision of decisions) {
+        if (decision.kind === 'deck') {
+          await deckStore.importCards(decision.deck, {
+            name: decision.label,
+            source: pending.source,
+          });
+        } else {
+          await collectionStore.mergeImport({
+            cards: decision.cards,
+            duplicates: decision.duplicates,
+            // 'manabox' is the label for rows that carry printing detail; a bare
+            // list of names is the other kind, and that is all it distinguishes.
+            format: pending.inspection.format === 'plain-list' ? 'list' : 'manabox',
+            source: decision.label ?? pending.source,
+          });
+        }
+      }
+      setPending(null);
+    } catch {
+      // error surfaced via the store
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -834,7 +872,7 @@ export const CollectionPanel = () => {
             size="md"
             variant="primary"
           >
-            {importing ? 'Importing…' : collection ? 'Replace collection' : 'Upload collection'}
+            {importing ? 'Reading…' : collection ? 'Add cards' : 'Upload collection'}
           </Button>
           {collection && (
             <span className="text-slate-500">
@@ -868,8 +906,9 @@ export const CollectionPanel = () => {
           </div>
         )}
         <div className="mt-1 text-[10px] text-slate-500">
-          Export from ManaBox (Collection → Export → CSV) and upload it here. A plain deck list (one
-          card per line, optional leading quantity) also works.
+          Export from ManaBox (Collection → Export → CSV) and upload it here — a whole collection,
+          one binder, or a deck; it works out which. A plain deck list (one card per line, optional
+          leading quantity) also works. You get to check what it found before anything is added.
         </div>
         {collection && (
           <div className="mt-1 text-[10px] text-slate-600">
@@ -1358,6 +1397,19 @@ export const CollectionPanel = () => {
           </>
         )}
       </div>
+
+      {pending && (
+        <div className="absolute inset-0 z-20 flex flex-col bg-canvas/95 p-2 backdrop-blur">
+          <ImportReview
+            busy={importing}
+            existing={collection?.cards ?? []}
+            inspection={pending.inspection}
+            onCancel={() => setPending(null)}
+            onConfirm={decisions => void applyImport(decisions)}
+            source={pending.source}
+          />
+        </div>
+      )}
 
       {pickerRow && (
         <div

@@ -8,6 +8,7 @@
 import { cardKey } from '@/lib/cardName';
 import {
   countCards,
+  deckFromImport,
   newDeckId,
   parseDeckList,
   type Deck,
@@ -85,6 +86,27 @@ const mutateDeck = async (id: string, update: (d: Deck) => Deck): Promise<void> 
   await persist(decks);
 };
 
+/**
+ * File parsed rows as a new deck. Both import doors come through here — a pasted
+ * or uploaded decklist, and rows lifted out of a spreadsheet — and the deck
+ * itself is built by `deckFromImport`, which the phone app uses too.
+ */
+const createDeck = async (
+  cards: DeckCard[],
+  name: string | undefined,
+  source: string,
+): Promise<string | null> => {
+  const deck = deckFromImport(cards, { name, source });
+  if (!deck) {
+    set({ error: 'No cards found in that list.' });
+    return null;
+  }
+  const decks = [deck, ...state.decks].sort(byRecent);
+  set({ decks, error: null });
+  await persist(decks);
+  return deck.id;
+};
+
 export const deckStore = {
   /** Add a card (or bump its quantity) in a deck's section. */
   async addCard(id: string, name: string, section: DeckSection = 'main', qty = 1): Promise<void> {
@@ -152,34 +174,23 @@ export const deckStore = {
   },
 
   /**
+   * Import already-parsed rows as a NEW deck — the path for a file that was
+   * never plain text, such as a ManaBox CSV binder marked as a deck.
+   */
+  async importCards(
+    cards: DeckCard[],
+    options: { name?: string; source: string },
+  ): Promise<string | null> {
+    return createDeck(cards, options.name, options.source);
+  },
+
+  /**
    * Import a decklist as a NEW deck. Returns the new deck's id, or null when the
    * text held no recognizable cards.
    */
   async importText(text: string, source: string): Promise<string | null> {
     const { cards, name } = parseDeckList(text);
-    if (cards.length === 0) {
-      set({ error: 'No cards found in that list.' });
-      return null;
-    }
-    // Guess Commander when the list carried a Commander section; otherwise leave
-    // it freeform (the user can switch formats in the editor).
-    const format: DeckFormat = cards.some(c => c.section === 'commander')
-      ? 'commander'
-      : 'freeform';
-    const now = Date.now();
-    const deck: Deck = {
-      cards,
-      createdAt: now,
-      format,
-      id: newDeckId(),
-      name: (name ?? source.replace(/\.[^.]+$/, '')).trim() || 'Imported deck',
-      source,
-      updatedAt: now,
-    };
-    const decks = [deck, ...state.decks].sort(byRecent);
-    set({ decks, error: null });
-    await persist(decks);
-    return deck.id;
+    return createDeck(cards, name, source);
   },
 
   /** Merge an imported decklist into an existing deck. */

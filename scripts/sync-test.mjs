@@ -23,7 +23,8 @@ await writeFile(
    export * from '${root}src/core/sync/engine';
    export * from '${root}src/core/sync/memory';
    export * from '${root}src/core/sync/repository';
-   export * from '${root}src/core/sync/serialize';`,
+   export * from '${root}src/core/sync/serialize';
+   export * from '${root}src/platform/web/localRepository';`,
 );
 
 const bundle = join(out, 'sync.mjs');
@@ -43,6 +44,7 @@ const {
   SYNC_SCHEMA_VERSION,
   createDriveRepository,
   createSyncEngine,
+  createWebLocalRepository,
   emptyData,
   readSyncedState,
   toSyncedState,
@@ -187,6 +189,102 @@ test('junk and missing pieces read as absent rather than throwing', async () => 
   assert.deepEqual(partial.state.data.decks.value, [deck('a')]);
   // A domain the writer never sent loses to whatever the reader has.
   assert.equal(partial.state.data.collection.updatedAt, new Date(0).toISOString());
+});
+
+// --- the phone's local repository -------------------------------------------
+// Run for real, not mocked. There is no IndexedDB in node, and the repository is
+// built to fall back to memory when it can't open a store — so what these
+// exercise is the same code the phone runs, minus persistence between calls,
+// which is exactly the seam that fallback creates.
+
+const stored = cards => ({ cards, format: 'manabox', importedAt: 1, source: 'ManaBox.csv' });
+const card = (name, over) => ({ foil: false, name, quantity: 1, ...over });
+
+test('a phone with no usable store says so rather than failing', async () => {
+  const phone = createWebLocalRepository(() => at(1));
+  // Still a working device for the session: a locked-down browser is a warning,
+  // not an error screen.
+  const data = await phone.read();
+  assert.equal(data.collection.value, null);
+  assert.equal(data.collection.updatedAt, new Date(0).toISOString());
+  assert.equal(phone.persistent(), false, 'and it admits nothing will be kept');
+
+  await phone.edit('collection', stored([card('Sol Ring')]));
+  assert.deepEqual((await phone.read()).collection.value.cards, [card('Sol Ring')]);
+});
+
+test('a fresh phone mints one device id and keeps it', async () => {
+  const phone = createWebLocalRepository(() => at(1));
+  const first = await phone.readMeta();
+  assert.match(first.deviceId, /\S/);
+  assert.equal((await phone.readMeta()).deviceId, first.deviceId);
+});
+
+test('an import on the phone reaches the desktop', async () => {
+  const remote = new InMemorySyncRepository();
+  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
+  desktop.edit('collection', stored([card('Sol Ring')]), at(2));
+  await createSyncEngine({ local: desktop, now: () => at(2), remote }).sync();
+
+  // The phone picks the collection up, then a ManaBox scan is imported on it.
+  const phone = createWebLocalRepository(() => at(5));
+  await createSyncEngine({ local: phone, now: () => at(3), remote }).sync();
+  assert.deepEqual((await phone.read()).collection.value.cards, [card('Sol Ring')]);
+
+  await phone.edit('collection', stored([card('Sol Ring'), card('Rhystic Study')]));
+  assert.equal((await phone.readMeta()).dirtyAt, at(5), 'an edit is marked for pushing');
+
+  const push = await createSyncEngine({ local: phone, now: () => at(5), remote }).sync();
+  assert.deepEqual(push.pushed, ['collection']);
+  assert.equal((await phone.readMeta()).dirtyAt, null, 'and unmarked once pushed');
+
+  const report = await createSyncEngine({ local: desktop, now: () => at(6), remote }).sync();
+  assert.deepEqual(report.applied, ['collection']);
+  assert.deepEqual(desktop.snapshot().collection.value.cards.map(c => c.name), [
+    'Sol Ring',
+    'Rhystic Study',
+  ]);
+});
+
+test('adopting a deck from the desktop leaves the phone’s collection alone', async () => {
+  const remote = new InMemorySyncRepository();
+  const phone = createWebLocalRepository(() => at(4));
+  await phone.edit('collection', stored([card('Sol Ring')]));
+  await createSyncEngine({ local: phone, now: () => at(4), remote }).sync();
+
+  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
+  await createSyncEngine({ local: desktop, now: () => at(5), remote }).sync();
+  desktop.edit('decks', [deck('desktop-deck')], at(6));
+  await createSyncEngine({ local: desktop, now: () => at(6), remote }).sync();
+
+  const report = await createSyncEngine({ local: phone, now: () => at(7), remote }).sync();
+
+  assert.ok(report.applied.includes('decks'));
+  const data = await phone.read();
+  assert.deepEqual(data.decks.value, [deck('desktop-deck')]);
+  // The stamp is what proves it: a restamped collection would be pushed back on
+  // the next sync as though the phone had edited it.
+  assert.equal(data.collection.updatedAt, at(4));
+  assert.deepEqual(data.collection.value.cards, [card('Sol Ring')]);
+});
+
+test('a phone import and a desktop import of the same day are a conflict, not a silent loss', async () => {
+  const remote = new InMemorySyncRepository();
+  const phone = createWebLocalRepository(() => at(5));
+  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
+  await createSyncEngine({ local: phone, now: () => at(2), remote }).sync();
+  await createSyncEngine({ local: desktop, now: () => at(2), remote }).sync();
+
+  await phone.edit('collection', stored([card('from-phone')]));
+  await createSyncEngine({ local: phone, now: () => at(5), remote }).sync();
+
+  desktop.edit('collection', stored([card('from-desktop')]), at(6));
+  const report = await createSyncEngine({ local: desktop, now: () => at(7), remote }).sync();
+
+  assert.ok(report.conflicted.includes('collection'));
+  // The phone's scan is the one at risk here, and it is still recoverable.
+  const shelved = remote.archived.find(a => a.domain === 'collection');
+  assert.deepEqual(shelved.value.cards, [card('from-phone')]);
 });
 
 // --- Drive client -----------------------------------------------------------

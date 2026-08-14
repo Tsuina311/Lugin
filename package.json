@@ -20,6 +20,7 @@
     "key": "node scripts/make-key.mjs",
     "package": "yarn build && node scripts/package.mjs",
     "package:testers": "yarn build && node scripts/package.mjs --testers",
+    "test:import": "node scripts/import-test.mjs",
     "test:sync": "node scripts/sync-test.mjs",
     "test:web": "vite build --config vite.web.config.ts --ssr smoke.tsx --outDir ../dist-smoke --emptyOutDir && node dist-smoke/smoke.js",
     "stylelint": "stylelint \"src/**/*.{css,tsx}\"",

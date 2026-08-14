@@ -15,9 +15,12 @@ import { renderToString } from 'react-dom/server';
 import { App } from '../src/web/App';
 import { CollectionView } from '../src/web/CollectionView';
 import { DeckList } from '../src/web/DeckList';
+import { ImportScreen } from '../src/web/ImportScreen';
 
 import { buildCollection } from '@/lib/collection';
 import type { Deck } from '@/lib/deck';
+import { inspectImport } from '@/lib/import';
+import { ImportReview } from '@/ui/components/ImportReview';
 
 const collection = buildCollection(
   [
@@ -46,8 +49,52 @@ const decks: Deck[] = [
   },
 ];
 
+// A ManaBox export holding one binder and one deck, so the review has both a
+// kind toggle and a duplicate to show (Sol Ring is already in `collection`).
+const manabox = inspectImport(
+  [
+    'Name,Set code,Collector number,Foil,Quantity,Scryfall ID,Binder Name,Binder Type',
+    'Sol Ring,ltr,123,normal,1,abc-1,Main binder,binder',
+    'Rhystic Study,cmr,90,foil,1,abc-2,Main binder,binder',
+    'Talrand,dtk,71,normal,1,abc-3,Talrand deck,deck',
+  ].join('\n'),
+);
+
 const checks: [string, () => string][] = [
   ['App', () => renderToString(<App />)],
+  [
+    'ImportReview',
+    () =>
+      renderToString(
+        <ImportReview
+          existing={collection.cards}
+          inspection={manabox}
+          onCancel={() => {}}
+          onConfirm={() => {}}
+          source="ManaBox_Collection.csv"
+        />,
+      ),
+  ],
+  [
+    'ImportReview (nothing readable)',
+    () =>
+      renderToString(
+        <ImportReview
+          existing={[]}
+          inspection={inspectImport('')}
+          onCancel={() => {}}
+          onConfirm={() => {}}
+          source="empty.csv"
+        />,
+      ),
+  ],
+  [
+    'ImportScreen',
+    () =>
+      renderToString(
+        <ImportScreen existing={collection.cards} onImport={() => Promise.resolve()} />,
+      ),
+  ],
   ['CollectionView', () => renderToString(<CollectionView collection={collection} />)],
   ['CollectionView (empty)', () => renderToString(<CollectionView collection={null} />)],
   ['DeckList', () => renderToString(<DeckList collection={collection} decks={decks} />)],
@@ -79,6 +126,34 @@ if (!html.includes('2 missing')) {
   console.log('  FAIL  shortfall badge missing from deck row');
 } else {
   console.log('  ok  shortfall badge shows 2 missing (Rhystic Study, Talrand)');
+}
+
+// The review is the one screen that must never quietly agree to something, so
+// assert it says what it found rather than merely rendering without throwing.
+const review = renderToString(
+  <ImportReview
+    existing={collection.cards}
+    inspection={manabox}
+    onCancel={() => {}}
+    onConfirm={() => {}}
+    source="ManaBox_Collection.csv"
+  />,
+).replace(/<!--.*?-->/g, '');
+
+const says: [string, string][] = [
+  ['the ordinary binder is named', 'Main binder'],
+  ['the deck binder is named', 'Talrand deck'],
+  ['ManaBox’s own marking is quoted back', 'as a deck'],
+  ['the card you already own is flagged', 'Sol Ring'],
+  ['the button says what confirming will do', 'Treat selected as duplicates'],
+];
+for (const [what, needle] of says) {
+  if (review.includes(needle)) {
+    console.log(`  ok  ${what}`);
+  } else {
+    failed += 1;
+    console.log(`  FAIL  ${what} — expected "${needle}" in the review markup`);
+  }
 }
 
 console.log(failed === 0 ? '\nall render checks passed' : `\n${failed} failed`);

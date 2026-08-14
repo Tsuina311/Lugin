@@ -12,11 +12,11 @@
 import { cardKey, stripVersion } from '@/lib/cardName';
 import {
   buildCollection,
-  parseCollection,
   type Collection,
   type CollectionCard,
   type StoredCollection,
 } from '@/lib/collection';
+import { applyImport } from '@/lib/duplicates';
 import { isCardPurchase, type PurchaseIndex } from '@/sites/cardmarket/wants';
 
 const STORAGE_KEY = 'lugin:collection';
@@ -97,19 +97,31 @@ export const collectionStore = {
   },
 
   /**
-   * Import an uploaded file's text. Replaces the 'import'-sourced rows but keeps
-   * any 'purchases'-sourced rows already folded in.
+   * Fold a reviewed import into the collection, keeping what is already there.
+   *
+   * Adding rather than replacing is the whole point: two ManaBox binders, or a
+   * scan and a year of Cardmarket purchases, are meant to accumulate. What stops
+   * that from double-counting is the caller having already been through the rows
+   * one by one — `duplicates` are the ones the user said they already own, and
+   * those are dropped rather than merged.
    */
-  async importText(text: string, source: string): Promise<Collection> {
-    const { cards, format } = parseCollection(text);
+  async mergeImport(options: {
+    cards: CollectionCard[];
+    duplicates?: Iterable<number>;
+    format: Collection['format'];
+    source: string;
+  }): Promise<Collection> {
+    const { cards, duplicates = [], format, source } = options;
     if (cards.length === 0) {
-      const err = 'No cards found in that file. Expected a ManaBox CSV or a deck list.';
+      const err = 'Nothing to import from that file.';
       set({ error: err });
       throw new Error(err);
     }
-    const imported: CollectionCard[] = cards.map(c => ({ ...c, source: 'import' }));
-    const keptPurchases = (state.collection?.cards ?? []).filter(c => c.source === 'purchases');
-    return persistCards([...imported, ...keptPurchases], source, format);
+    const existing = state.collection;
+    const merged = applyImport(existing?.cards ?? [], cards, duplicates);
+    // Keep the established format once there is one: after a merge the label
+    // describes the collection, not the last file to land in it.
+    return persistCards(merged, source, existing?.format ?? format);
   },
 
   /**

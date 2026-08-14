@@ -85,20 +85,86 @@ export interface Deck {
 // the current section (or is skipped) rather than being read as a card.
 const SIDEBOARD_HEADERS = /^(sideboard|maybeboard|sideboard:|maybe board)\b/i;
 const COMMANDER_HEADERS = /^(commander|commanders)\b\s*:?\s*$/i;
-const MAIN_HEADERS = /^(deck|maindeck|main deck|companion|tokens?)\b\s*:?\s*$/i;
-const ABOUT_HEADER = /^about\b/i;
+const MAIN_HEADERS = /^(deck|maindeck|main deck|mainboard|companion|tokens?)\b\s*:?\s*$/i;
+// Anchored, unlike the others: Arena writes "About" alone above the deck name,
+// and `\b` would also match the card About Face sitting on a line of its own.
+const ABOUT_HEADER = /^about\s*$/i;
 const NAME_LINE = /^name\s+(.+)$/i;
 
 /**
- * Strip trailing set/collector annotations Arena appends ("(2XM) 123"), foil
- * markers ("*F*") and stray whitespace, leaving just the card name.
+ * Take the decoration off a would-be header: "// COMMANDER", "== Sideboard ==",
+ * "**Deck**" all name a section, and only the words in the middle say which.
+ *
+ * This is why comments can't simply be skipped on sight. ManaBox writes its
+ * section headers *as* comments — `// COMMANDER`, `// SIDEBOARD` — so a parser
+ * that drops every `//` line before looking at it files the commander in the
+ * main deck and loses the sideboard entirely.
  */
-const cleanCardName = (raw: string): string =>
-  raw
-    .replace(/\s*\*[a-z]\*\s*$/i, '') // "*F*" / "*E*" foil markers
-    .replace(/\s+\([A-Za-z0-9]{2,6}\)\s+[A-Za-z0-9-]+\s*$/, '') // "(SET) 123"
-    .replace(/\s+\([A-Za-z0-9]{2,6}\)\s*$/, '') // trailing "(SET)"
-    .trim();
+const undecorate = (line: string): string => line.replace(/^[/#=*\s]+/, '').replace(/[=:*\s]+$/, '');
+
+/** The section a header line names, or null if it isn't one. */
+export const sectionHeader = (line: string): DeckSection | null => {
+  const bare = undecorate(line);
+  if (COMMANDER_HEADERS.test(bare)) return 'commander';
+  if (SIDEBOARD_HEADERS.test(bare)) return 'sideboard';
+  if (MAIN_HEADERS.test(bare)) return 'main';
+  return null;
+};
+
+/** One parsed decklist line: the card, and whatever printing detail it carried. */
+export interface CardLine {
+  collectorNumber?: string;
+  foil: boolean;
+  name: string;
+  quantity: number;
+  setCode?: string;
+}
+
+/**
+ * Parse "2 Lightning Bolt (M10) 146 *F*" into its parts, or null for a line
+ * with no card in it.
+ *
+ * The printing detail is returned rather than discarded because the same line
+ * format arrives from two directions: a decklist, which only wants the name and
+ * count, and a ManaBox export being filed into a collection, where the set and
+ * finish are exactly what makes the row worth keeping.
+ */
+export const parseCardLine = (line: string): CardLine | null => {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+
+  const counted = trimmed.match(/^(\d+)\s*[xX]?\s+(.+)$/);
+  const quantity = counted ? Number.parseInt(counted[1], 10) || 1 : 1;
+  let rest = counted ? counted[2] : trimmed;
+
+  // "*F*" (foil) and "*E*" (etched); both mean "not a plain copy" to us.
+  let foil = false;
+  rest = rest.replace(/\s*\*([a-z])\*\s*$/i, (_all, marker: string) => {
+    foil = /[fe]/i.test(marker);
+    return '';
+  });
+
+  let collectorNumber: string | undefined;
+  let setCode: string | undefined;
+  // "(SET) 123" and "[SET] #123" — same annotation, two houses' punctuation.
+  const printing = rest.match(/\s+[([]([A-Za-z0-9]{2,6})[)\]]\s+#?([A-Za-z0-9-]+)\s*$/);
+  if (printing) {
+    setCode = printing[1];
+    collectorNumber = printing[2];
+    rest = rest.slice(0, printing.index);
+  } else {
+    const setOnly = rest.match(/\s+[([]([A-Za-z0-9]{2,6})[)\]]\s*$/);
+    if (setOnly) {
+      setCode = setOnly[1];
+      rest = rest.slice(0, setOnly.index);
+    }
+  }
+
+  const name = rest.trim();
+  if (!name || cardKey(name).length === 0) return null;
+
+  return { collectorNumber, foil, name, quantity, setCode };
+};
 
 /**
  * Parse a plain-text decklist. Understands quantities ("4 Bolt", "4x Bolt"),
@@ -116,46 +182,71 @@ export const parseDeckList = (text: string): { cards: DeckCard[]; name?: string 
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
-    if (!line || line.startsWith('//') || line.startsWith('#')) continue;
+    if (!line) {
+      // ManaBox closes its commander block with a blank line and gives the main
+      // deck no header of its own, so the blank is the only thing separating one
+      // commander from the other ninety-nine cards.
+      if (section === 'commander') section = 'main';
+      continue;
+    }
 
+    const header = sectionHeader(line);
     if (ABOUT_HEADER.test(line)) {
       inAbout = true;
       continue;
     }
-    const isHeader = (l: string): boolean =>
-      MAIN_HEADERS.test(l) || SIDEBOARD_HEADERS.test(l) || COMMANDER_HEADERS.test(l);
     if (inAbout) {
       const nm = line.match(NAME_LINE);
       if (nm) name = nm[1].trim();
       // The About block ends once the real deck starts.
-      if (isHeader(line)) inAbout = false;
+      if (header) inAbout = false;
       else continue;
     }
-    if (COMMANDER_HEADERS.test(line)) {
-      section = 'commander';
+    if (header) {
+      section = header;
       continue;
     }
-    if (SIDEBOARD_HEADERS.test(line)) {
-      section = 'sideboard';
-      continue;
-    }
-    if (MAIN_HEADERS.test(line)) {
-      section = 'main';
-      continue;
-    }
+    // A comment that names no section really is just a comment.
+    if (line.startsWith('//') || line.startsWith('#')) continue;
 
-    const m = line.match(/^(\d+)\s*[xX]?\s+(.+)$/);
-    const quantity = m ? Number.parseInt(m[1], 10) || 1 : 1;
-    const cardName = cleanCardName(m ? m[2] : line);
-    if (!cardName || cardKey(cardName).length === 0) continue;
+    const card = parseCardLine(line);
+    if (!card) continue;
 
-    const key = `${section}|${cardKey(cardName)}`;
+    const key = `${section}|${cardKey(card.name)}`;
     const prev = merged.get(key);
-    if (prev) prev.quantity += quantity;
-    else merged.set(key, { name: cardName, quantity, section });
+    if (prev) prev.quantity += card.quantity;
+    else merged.set(key, { name: card.name, quantity: card.quantity, section });
   }
 
   return { cards: [...merged.values()], name };
+};
+
+/**
+ * Build a deck from imported rows, or null when there were none.
+ *
+ * Shared rather than reimplemented per platform: the phone is expected to be
+ * where most imports actually happen, and a deck it created differing from a
+ * desktop one — a different format guess, a different fallback name — would show
+ * up as a mystery days later, on whichever device didn't make it.
+ */
+export const deckFromImport = (
+  cards: DeckCard[],
+  options: { at?: number; name?: string; source: string },
+): Deck | null => {
+  if (cards.length === 0) return null;
+  const { at = Date.now(), name, source } = options;
+  return {
+    cards,
+    createdAt: at,
+    // Guess Commander when the list carried a Commander section; otherwise leave
+    // it freeform (the user can switch formats in the editor).
+    format: cards.some(c => c.section === 'commander') ? 'commander' : 'freeform',
+    id: newDeckId(),
+    // A filename is a better name than "Imported deck", minus its extension.
+    name: (name ?? source.replace(/\.[^.]+$/, '')).trim() || 'Imported deck',
+    source,
+    updatedAt: at,
+  };
 };
 
 /** A stable id for a new deck. */
