@@ -1,8 +1,9 @@
 // Where to look on a *standard* frame Magic card.
 //
 // Fractions of the card rectangle after the user has lined it up in the guide.
-// Special layouts (showcase, textless, adventure, DFCs) will need their own
-// presets later — this is the common case the camera guide is drawn for.
+// Tuned for the common layout (name top bar; collector number then set code
+// stacked at the bottom-left — e.g. CMR's `286/361` over `CMR`). Special
+// frames get their own presets later.
 //
 // Coordinates are { x, y, w, h } in 0–1 of the card frame, origin top-left.
 
@@ -14,13 +15,22 @@ export interface Region {
 }
 
 /** Title bar — name sits in the same band on almost every modern frame. */
-export const NAME_REGION: Region = { h: 0.08, w: 0.84, x: 0.08, y: 0.045 };
+export const NAME_REGION: Region = { h: 0.075, w: 0.78, x: 0.08, y: 0.042 };
 
 /**
- * Bottom-left strip under the text box: collector number, set code, language,
- * and the foil/non-foil marker (• vs ★). Printed in English on every language.
+ * Collector number line (bottom-left): `286/361 R` or modern `0123 •`.
+ * Sits just above the set code on classic frames.
  */
-export const COLLECTOR_REGION: Region = { h: 0.055, w: 0.55, x: 0.04, y: 0.905 };
+export const NUMBER_REGION: Region = { h: 0.04, w: 0.42, x: 0.035, y: 0.885 };
+
+/** Three-letter set code under the number — `CMR`, `DMU`, … */
+export const SET_REGION: Region = { h: 0.035, w: 0.28, x: 0.035, y: 0.928 };
+
+/**
+ * Wider strip covering both number and set, used as a fallback OCR pass when
+ * the split crops miss (phone tilt, older frames, modern one-line prints).
+ */
+export const COLLECTOR_REGION: Region = { h: 0.085, w: 0.55, x: 0.03, y: 0.875 };
 
 /** Crop a region out of a source canvas into a new one. */
 export const cropRegion = (

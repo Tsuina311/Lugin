@@ -26,7 +26,9 @@ await esbuild.build({
   },
 });
 
-const { guessFoil, parseCollectorLine } = await import(pathToFileURL(bundle).href);
+const { guessFoil, mergeParts, parseCollectorLine, parseCollectorParts } = await import(
+  pathToFileURL(bundle).href,
+);
 
 let failed = 0;
 const check = (name, fn) => {
@@ -54,13 +56,33 @@ check('modern collector line with non-foil bullet', () => {
   assert.equal(p?.foilMarker, false);
 });
 
-check('classic collector line', () => {
-  const p = parseCollectorLine('150/350 MIR');
-  assert.equal(p?.setCode, 'MIR');
-  assert.equal(p?.collectorNumber, '150');
+check('classic CMR-style number over set', () => {
+  const p = parseCollectorLine('286/361 R CMR');
+  assert.equal(p?.setCode, 'CMR');
+  assert.equal(p?.collectorNumber, '286');
 });
 
-check('noise does not invent a card', () => {
+check('partial number-only pass is kept', () => {
+  const p = parseCollectorParts('286/361');
+  assert.equal(p.collectorNumber, '286');
+  assert.equal(p.setCode, undefined);
+});
+
+check('partial set-only pass is kept', () => {
+  const p = parseCollectorParts('CMR');
+  assert.equal(p.setCode, 'CMR');
+});
+
+check('merge fills gaps across snaps', () => {
+  const merged = mergeParts(
+    parseCollectorParts('286/361'),
+    parseCollectorParts('CMR'),
+  );
+  assert.equal(merged.collectorNumber, '286');
+  assert.equal(merged.setCode, 'CMR');
+});
+
+check('noise does not invent a full card', () => {
   assert.equal(parseCollectorLine('hello world'), null);
 });
 

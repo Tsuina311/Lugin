@@ -7,7 +7,7 @@
 //      midtones in a way flat ink does not. A hint, never a verdict alone.
 //   3. The user — every scan review lets them flip the finish before saving.
 
-import type { CollectorParse } from './parseCollector';
+import type { CollectorParts } from './parseCollector';
 
 export interface FoilHint {
   /** 0–1; below ~0.5 the UI should treat this as "please confirm". */
@@ -53,7 +53,7 @@ export const imageStats = (data: Uint8ClampedArray): ImageStats => {
 
 /** Foil guess from the collector-line parse and optional strip pixels. */
 export const guessFoil = (
-  collector: Pick<CollectorParse, 'foilMarker'> | null,
+  collector: Pick<CollectorParts, 'foilMarker'> | null,
   stats?: ImageStats | null,
 ): FoilHint => {
   if (collector?.foilMarker === true) {

@@ -1,7 +1,6 @@
 // Resolve a scan to a Scryfall printing, then to a CollectionCard.
 
 import type { FoilHint } from './foil';
-import type { CollectorParse } from './parseCollector';
 
 import type { CollectionCard } from '@/lib/collection';
 
@@ -40,7 +39,10 @@ export const fetchPrinting = async (
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Scryfall responded ${res.status}`);
-  const card = (await res.json()) as ScryfallCard;
+  return toPrinting((await res.json()) as ScryfallCard);
+};
+
+const toPrinting = (card: ScryfallCard): ScryfallPrinting => {
   const images = card.image_uris ?? card.card_faces?.[0]?.image_uris;
   return {
     collectorNumber: card.collector_number,
@@ -52,6 +54,57 @@ export const fetchPrinting = async (
     setCode: card.set,
     setName: card.set_name,
   };
+};
+
+/**
+ * Fuzzy name lookup — turns messy OCR ("Liesa Shroud of Dusk") into Scryfall's
+ * canonical name before we list printings.
+ */
+export const fetchNamedFuzzy = async (name: string): Promise<ScryfallPrinting | null> => {
+  const url = `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name.trim())}`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Scryfall responded ${res.status}`);
+  return toPrinting((await res.json()) as ScryfallCard);
+};
+
+/** Every printing of an exact card name — used once OCR locks the name. */
+export const fetchPrintingsByName = async (name: string): Promise<ScryfallPrinting[]> => {
+  const exact = name.trim();
+  if (!exact) return [];
+  const query = `!"${exact.replace(/"/g, '')}"`;
+  const url =
+    `https://api.scryfall.com/cards/search?order=released&dir=desc&unique=prints&q=` +
+    encodeURIComponent(query);
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`Scryfall responded ${res.status}`);
+  const json = (await res.json()) as { data?: ScryfallCard[] };
+  return (json.data ?? []).map(toPrinting);
+};
+
+/**
+ * Pick a printing from a name-narrowed list using whatever set/number we have.
+ * Returns null when more than one candidate still fits (user must scan more).
+ */
+export const pickPrinting = (
+  printings: readonly ScryfallPrinting[],
+  parts: { collectorNumber?: string; setCode?: string },
+): ScryfallPrinting | null => {
+  let pool = [...printings];
+  if (parts.setCode) {
+    const set = parts.setCode.toLowerCase();
+    pool = pool.filter(p => p.setCode.toLowerCase() === set);
+  }
+  if (parts.collectorNumber) {
+    const num = parts.collectorNumber.toLowerCase();
+    const stripped = num.replace(/^0+/, '') || '0';
+    pool = pool.filter(p => {
+      const c = p.collectorNumber.toLowerCase();
+      return c === num || c.replace(/^0+/, '') === stripped || c === stripped.padStart(c.length, '0');
+    });
+  }
+  return pool.length === 1 ? pool[0] : null;
 };
 
 /** Build the collection row a successful scan should add. */
@@ -85,4 +138,3 @@ export const namesAgree = (ocr: string | undefined, scryfall: string): boolean =
   return a.includes(b.slice(0, Math.min(8, b.length))) || b.includes(a.slice(0, Math.min(8, a.length)));
 };
 
-export type { CollectorParse };
