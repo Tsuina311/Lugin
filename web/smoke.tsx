@@ -196,6 +196,27 @@ const asserts: [string, () => void][] = [
     },
   ],
   [
+    'the app shows which build it is',
+    () => {
+      // End to end: the config computed a stamp, `define` replaced it, and a
+      // screen renders it. Missing means the phone can't answer "is my fix live?".
+      const view = renderToString(<App />);
+      if (!/v\d+\.\d+\.\d+ · [0-9a-f]{7}/.test(view)) {
+        throw new Error('no version and commit in the rendered app');
+      }
+    },
+  ],
+  [
+    'the shell cache is named after the build',
+    () => {
+      // Otherwise a deploy keeps the previous shell as its offline fallback, and
+      // an offline launch can show code the user already replaced.
+      if (!/const CACHE = 'lugin-shell-[0-9a-f]{7}/.test(emitted('sw.js'))) {
+        throw new Error('the cache name no longer carries the commit');
+      }
+    },
+  ],
+  [
     'the manifest offers Lugin as a share target for files',
     () => {
       const manifest = JSON.parse(emitted('manifest.webmanifest')) as {

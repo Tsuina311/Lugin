@@ -9,10 +9,48 @@
 // `root` is web/, so index.html sits next to nothing else and the entry it points
 // at (../src/web/main.tsx) is shared source.
 
+import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
+
+const ROOT = fileURLToPath(new URL('.', import.meta.url));
+
+/**
+ * Which build is this, in words the app can show.
+ *
+ * Worth the trouble because the phone build is served over a network-first
+ * service worker: after a deploy you reload and get *something*, and there is
+ * otherwise no way to tell the new code from a cached shell — so "did my fix
+ * reach the phone?" becomes guesswork, and every bug report after it is suspect.
+ *
+ * The commit is the identity; `+local` marks a build made from an uncommitted
+ * tree, which is the other half of the same question when testing by hand.
+ */
+const buildStamp = (): { id: string; label: string } => {
+  const { version } = JSON.parse(readFileSync(`${ROOT}package.json`, 'utf8')) as { version: string };
+  const git = (args: string): string => {
+    try {
+      return execSync(`git ${args}`, { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] })
+        .toString()
+        .trim();
+    } catch {
+      // No git — a tarball, or a CI runner without the history.
+      return '';
+    }
+  };
+  // GITHUB_SHA as the fallback rather than the first choice: it names the commit
+  // that triggered the run, which is the same thing here but wrong the moment a
+  // workflow builds anything else.
+  const commit = git('rev-parse --short=7 HEAD') || process.env.GITHUB_SHA?.slice(0, 7) || 'unknown';
+  const dirty = git('status --porcelain') !== '';
+  const id = `${commit}${dirty ? '+local' : ''}`;
+  return { id, label: `v${version} · ${id}` };
+};
+
+const BUILD = buildStamp();
 
 // GitHub Pages serves a project site from /<repo>/, so relative URLs need the
 // prefix baked in at build time. The Pages workflow sets this from the repo name;
@@ -99,15 +137,21 @@ const pwaAssets = (): Plugin => ({
     // Network-first, cache only as an offline fallback. A cache-first shell would
     // hand testers yesterday's build and make every bug report a guess.
     //
-    // It also receives shared files, because a share target's `action` has to be
-    // answered by *something* and a static host can't answer a POST. Written as a
-    // plain string with no `${'$'}{...}` in it: this is a template literal, so an
-    // interpolation meant for the browser would be evaluated here at build time.
+    // It also receives shared files, because a share target's action has to be
+    // answered by *something* and a static host can't answer a POST.
+    //
+    // Two things to remember when editing the worker below: it is a template
+    // literal, so a dollar-brace meant for the browser is evaluated here at build
+    // time instead — and a backtick anywhere in it, including in a comment,
+    // silently ends the string.
     this.emitFile({
       fileName: 'sw.js',
       source: `const SHELL = '${BASE}';
 const SHARE = '${BASE}share';
-const CACHE = 'lugin-shell-v1';
+
+// Named after the build, so the sweep on activation drops the previous one and
+// the offline fallback can never be a shell from two deploys ago.
+const CACHE = 'lugin-shell-${BUILD.id}';
 
 // Shared files wait here for the page to collect them. A cache of its own so the
 // sweep below can't mistake it for a stale shell, and it is named in that sweep's
@@ -190,6 +234,11 @@ export default defineConfig({
     // default hashed filenames are right: a Pages deploy wants cache-busting.
     sourcemap: true,
     target: 'es2020',
+  },
+  // Read by the app to show which build is running. Defined rather than left to
+  // an .env file so it can't go stale or be forgotten in CI.
+  define: {
+    'import.meta.env.VITE_LUGIN_BUILD': JSON.stringify(BUILD.label),
   },
   plugins: [react(), pwaAssets()],
   publicDir: '../public',

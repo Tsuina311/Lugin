@@ -52,6 +52,16 @@ const DOMAIN_NAMES: Record<DomainKey, string> = {
 const list = (items: string[]): string =>
   items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 
+/**
+ * Which build this is, shown rather than hidden behind a gesture.
+ *
+ * The service worker serves the page network-first, so a reload after a deploy
+ * *usually* brings the new code — but "usually" is no good when the next question
+ * is whether a fix is live. This is the version and the commit, on screen, so that
+ * question is answered by looking.
+ */
+const BUILD: string = import.meta.env.VITE_LUGIN_BUILD ?? 'dev';
+
 const Splash = ({
   action,
   children,
@@ -74,6 +84,7 @@ const Splash = ({
         {action.label}
       </button>
     ) : null}
+    <span className="text-[10px] text-ink-faint opacity-70">{BUILD}</span>
   </div>
 );
 
@@ -160,16 +171,19 @@ export const App = () => {
       <header className="flex items-center gap-3 border-b border-line bg-panel px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <img alt="Lugin" className="h-5 w-auto" src={asset('icons/logo-dark.png')} />
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-[11px] text-ink-faint">
-            {status === 'busy'
-              ? 'syncing…'
-              : status === 'disconnected'
-                ? 'not signed in'
-                : pending
-                  ? 'changes to upload'
-                  : syncedAt
-                    ? `synced ${ago(syncedAt)}`
-                    : 'on this phone'}
+          <span className="flex flex-col items-end leading-tight">
+            <span className="text-[11px] text-ink-faint">
+              {status === 'busy'
+                ? 'syncing…'
+                : status === 'disconnected'
+                  ? 'not signed in'
+                  : pending
+                    ? 'changes to upload'
+                    : syncedAt
+                      ? `synced ${ago(syncedAt)}`
+                      : 'on this phone'}
+            </span>
+            <span className="text-[10px] text-ink-faint opacity-70">{BUILD}</span>
           </span>
           <button
             className="rounded-md bg-raised px-3 py-1.5 text-xs font-medium text-ink-muted disabled:opacity-50"
