@@ -25,12 +25,19 @@ createRoot(mount).render(
   </ErrorBoundary>,
 );
 
-// Only for installability — "Add to Home Screen" gives a real standalone app
-// rather than a bookmark once a service worker is in play. It deliberately does
-// not cache the app shell: a stale build during testing is a worse problem than
-// a blank screen with no signal.
+// The worker earns installability — "Add to Home Screen" gives a real standalone
+// app rather than a bookmark once one is registered — but it also owns updates and
+// the share sheet's inbox, so what it caches it caches as a fallback for no
+// signal, never as the thing it serves first.
+//
+// `updateViaCache: 'none'` for the same reason the worker revalidates the page:
+// GitHub Pages sends max-age=600 on sw.js too, and the browser would honour that
+// when checking for a new worker. A ten-minute-old copy deciding whether there is
+// a new version is the update check answering from the thing it is checking.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, {
+      updateViaCache: 'none',
+    });
   });
 }

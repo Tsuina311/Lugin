@@ -216,8 +216,16 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (request.mode !== 'navigate') return;
+  // Revalidate rather than trust the phone's own HTTP cache. GitHub Pages serves
+  // this page with max-age=600, so a plain fetch can be answered locally for ten
+  // minutes after a deploy — meaning a relaunch to check whether a fix is live
+  // could truthfully show the build before it. 'no-cache' still sends the ETag,
+  // so an unchanged page costs a 304 and nothing more.
+  //
+  // A URL rather than the request: constructing one from a navigation is where
+  // engines disagree, and this is a same-origin GET of our own shell.
   event.respondWith(
-    fetch(request)
+    fetch(request.url, { cache: 'no-cache' })
       .then(response => {
         caches.open(CACHE).then(cache => cache.put(SHELL, response.clone())).catch(() => {});
         return response;

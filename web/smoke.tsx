@@ -218,6 +218,18 @@ const asserts: [string, () => void][] = [
     },
   ],
   [
+    'the worker revalidates the page instead of trusting the phone',
+    () => {
+      // Pages sends max-age=600 on the page, so a plain fetch here means a
+      // relaunch within ten minutes of a deploy can still be the old build —
+      // exactly when someone is relaunching to see whether a fix landed.
+      const sw = emitted('sw.js');
+      if (!/fetch\(request\.url, \{ cache: 'no-cache' \}\)/.test(sw)) {
+        throw new Error('the navigation fetch no longer revalidates');
+      }
+    },
+  ],
+  [
     'the shell cache is named after the build',
     () => {
       // Otherwise a deploy keeps the previous shell as its offline fallback, and
