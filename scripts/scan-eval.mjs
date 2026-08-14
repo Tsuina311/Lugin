@@ -467,6 +467,114 @@ const similarity = (a, b) => {
 const MATCHABLE = 0.75;
 
 // ---------------------------------------------------------------------------
+// Title ROI calibration
+// ---------------------------------------------------------------------------
+
+/**
+ * Find the rows of dark text in the top of a normalized card.
+ *
+ * Locally dark rather than globally: the name box is pale on modern frames and
+ * near-black on borderless ones, so an absolute threshold picks one and misses
+ * the other. Comparing each row against its own median finds ink either way.
+ */
+const inkRows = (card, { from = 0, to = 0.16, x0 = 0.08, x1 = 0.7 } = {}) => {
+  const yFrom = Math.floor(from * card.height);
+  const yTo = Math.ceil(to * card.height);
+  const xFrom = Math.floor(x0 * card.width);
+  const xTo = Math.ceil(x1 * card.width);
+  const rows = [];
+
+  for (let y = yFrom; y < yTo; y++) {
+    const luma = [];
+    for (let x = xFrom; x < xTo; x++) {
+      const i = (y * card.width + x) * 4;
+      luma.push(0.299 * card.data[i] + 0.587 * card.data[i + 1] + 0.114 * card.data[i + 2]);
+    }
+    const sorted = [...luma].sort((a, b) => a - b);
+    const median = sorted[sorted.length >> 1];
+    // Ink is a minority of any row containing text, so compare to the row's own
+    // median. Both directions, because showcase frames print pale titles on dark.
+    const inked = luma.filter(v => Math.abs(v - median) > 45).length;
+    rows.push({ share: inked / luma.length, y: y / card.height });
+  }
+  return rows;
+};
+
+/**
+ * *First* run of inked rows, not the longest.
+ *
+ * The longest run in the top of a card is the artwork, every time. The title is
+ * the first thing below the border, and it is followed by a gap.
+ */
+const inkBand = (rows, { minHeight = 0.01, minShare = 0.04 } = {}) => {
+  let run = null;
+  for (const row of rows) {
+    if (row.share >= minShare) {
+      run ??= { from: row.y, to: row.y };
+      run.to = row.y;
+    } else if (run) {
+      if (run.to - run.from >= minHeight) return run;
+      run = null;
+    }
+  }
+  return run && run.to - run.from >= minHeight ? run : null;
+};
+
+const runCalibration = async fixtures => {
+  console.log('\nWhere the title actually sits on a normalized card\n');
+  console.log('  category           top     bottom  height');
+  const bands = [];
+
+  for (const fixture of fixtures) {
+    const card = await fixtureImage(fixture);
+    // Flat placement, then the real detect → warp, so the measurement includes
+    // any systematic bias the warp itself introduces.
+    const prepared = scan.prepareCard(placeCard(card));
+    const band = inkBand(inkRows(prepared.image));
+    if (!band) {
+      console.log(`  ${fixture.tag.padEnd(18)} no ink found`);
+      continue;
+    }
+    bands.push({ ...band, tag: fixture.tag });
+    console.log(
+      `  ${fixture.tag.padEnd(18)} ${band.from.toFixed(3)}   ${band.to.toFixed(3)}` +
+        `   ${(band.to - band.from).toFixed(3)}`,
+    );
+    if (dumpDir) await dump(`calib-${fixture.tag}-card`, prepared.image);
+  }
+
+  if (!bands.length) return bands;
+  const tops = bands.map(b => b.from).sort((a, b) => a - b);
+  const bottoms = bands.map(b => b.to).sort((a, b) => a - b);
+  const at = (xs, q) => xs[Math.min(xs.length - 1, Math.floor(q * xs.length))];
+
+  console.log(`\n  ${bands.length} card(s) measured`);
+  console.log(`  top     min ${tops[0].toFixed(3)}  median ${at(tops, 0.5).toFixed(3)}  max ${tops.at(-1).toFixed(3)}`);
+  console.log(
+    `  bottom  min ${bottoms[0].toFixed(3)}  median ${at(bottoms, 0.5).toFixed(3)}  max ${bottoms.at(-1).toFixed(3)}`,
+  );
+
+  // Cards whose band ran to the end of the search window never found a gap after
+  // the title, so their measurement is not a title at all. Battle cards are
+  // landscape and split cards print sideways; both need their own profile rather
+  // than a wider standard region, so letting them stretch the suggestion would
+  // be fitting the region to layouts it cannot read anyway.
+  const unresolved = bands.filter(b => b.to >= 0.155);
+  const clean = bands.filter(b => b.to < 0.155);
+  if (unresolved.length) {
+    console.log(`\n  ignoring ${unresolved.map(b => b.tag).join(', ')} — no title band found`);
+  }
+  if (!clean.length) return bands;
+
+  const pad = 0.008;
+  const y = Math.max(0, Math.min(...clean.map(b => b.from)) - pad);
+  const h = Math.min(1 - y, Math.max(...clean.map(b => b.to)) + pad - y);
+  console.log(`\n  covers all ${clean.length} readable layouts: { h: ${h.toFixed(3)}, y: ${y.toFixed(3)} }`);
+  console.log(`  shipping NAME_REGION:  { h: ${scan.NAME_REGION.h}, y: ${scan.NAME_REGION.y} }`);
+  return bands;
+};
+
+// ---------------------------------------------------------------------------
 // Node recognizer
 // ---------------------------------------------------------------------------
 
@@ -724,6 +832,13 @@ if (flag('self-test')) {
 }
 
 const fixtures = await loadFixtures();
+
+if (flag('calibrate')) {
+  await runCalibration(fixtures);
+  await rm(bundleDir, { force: true, recursive: true });
+  process.exit(0);
+}
+
 console.log(
   `${fixtures.length} fixture(s) × ${conditions.length} condition(s)` +
     `${withOcr ? '' : ', OCR disabled'}\n`,

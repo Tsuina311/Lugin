@@ -25,8 +25,15 @@ export const cornersToQuad = (corners: CardCorners): Quad => [
 /** Physical Magic card aspect (mm): width / height. */
 export const CARD_ASPECT = 63 / 88;
 
-/** Canonical upright card raster used for region crops + OCR. */
-export const CARD_WIDTH = 504;
+/**
+ * Canonical upright card raster used for region crops + OCR.
+ *
+ * 744 rather than something smaller so the title band lands ~75px tall, just
+ * above the cap height Tesseract wants. At 504 the same band arrived at 51px and
+ * had to be interpolated back up — a lossy round trip through a smaller raster,
+ * which measured 3 points worse on the corpus to save 11ms.
+ */
+export const CARD_WIDTH = 744;
 export const CARD_HEIGHT = Math.round(CARD_WIDTH / CARD_ASPECT);
 
 export const dist = (a: Pt, b: Pt): number => {

@@ -1,11 +1,14 @@
-// Where to look on a *standard* frame Magic card.
+// Where to look on a normalized card.
 //
-// Fractions of the card rectangle after the user has lined it up in the guide.
-// Tuned for the common layout (name top bar; collector number then set code
-// stacked at the bottom-left — e.g. CMR's `286/361` over `CMR`). Special
-// frames get their own presets later.
+// Every region is a fraction of the card rectangle produced by `prepareCard`,
+// origin top-left. Because the card has been detected and perspective-corrected
+// first, the same fractions hold at any camera angle or distance — which is the
+// whole reason detection had to work before these numbers could mean anything.
 //
-// Coordinates are { x, y, w, h } in 0–1 of the card frame, origin top-left.
+// The vertical bands come from measurement, not from reading a card by eye:
+// `node scripts/scan-eval.mjs --calibrate` locates the title on every fixture and
+// prints the spread. Standard frames land at 0.043–0.101; borderless and
+// full-art sit a little higher, which is what the wide framing is for.
 
 import type { RelativeRegion } from './types';
 
@@ -15,17 +18,28 @@ import type { RelativeRegion } from './types';
  */
 export type Region = RelativeRegion;
 
+export interface NamedRegion {
+  /** How much page structure OCR should assume for this crop. */
+  mode: 'block' | 'line';
+  name: string;
+  region: Region;
+}
+
 /**
- * Large centre band for step 1 when the user fills the guide with only the
- * title (name zoom). Nearly the whole frame — not the tiny top strip.
+ * Title band, cut before the mana cost.
+ *
+ * Stopping at 0.78 costs a little of the longest names but keeps mana symbols out
+ * of the crop, and those reliably come back as punctuation glued to the name.
  */
-export const TITLE_ZOOM_REGION: Region = { h: 0.7, w: 0.96, x: 0.02, y: 0.15 };
+export const NAME_REGION: Region = { h: 0.072, w: 0.72, x: 0.06, y: 0.038 };
 
-/** Mid-frame title line when the name bar alone is held across the guide. */
-export const TITLE_LINE_REGION: Region = { h: 0.28, w: 0.96, x: 0.02, y: 0.36 };
-
-/** Title bar — name sits in the same band on almost every modern frame. */
-export const NAME_REGION: Region = { h: 0.085, w: 0.82, x: 0.06, y: 0.035 };
+/**
+ * Tolerant framing: higher, taller, and full width.
+ *
+ * Covers borderless and full-art prints, whose titles sit above the standard
+ * band, and any card where the detected quad ran a couple of percent small.
+ */
+export const NAME_WIDE_REGION: Region = { h: 0.105, w: 0.88, x: 0.045, y: 0.012 };
 
 /**
  * Expansion symbol on the type line (right). Core sets like M11 print the code
@@ -55,16 +69,39 @@ export const SET_REGION: Region = { h: 0.035, w: 0.28, x: 0.035, y: 0.928 };
 export const COLLECTOR_REGION: Region = { h: 0.085, w: 0.94, x: 0.03, y: 0.875 };
 
 /**
+ * A card layout the scanner knows how to read.
+ *
+ * One profile today. It exists as a named group rather than eight loose exports
+ * because split, battle, and rotated layouts need entirely different geometry —
+ * a battle card's canonical image is landscape — and that will be a second
+ * profile, not a wider set of tolerances on this one.
+ */
+export interface ScanProfile {
+  collector: readonly NamedRegion[];
+  name: string;
+  title: readonly NamedRegion[];
+}
+
+export const STANDARD_PROFILE: ScanProfile = {
+  collector: [
+    { mode: 'block', name: 'number', region: NUMBER_REGION },
+    { mode: 'block', name: 'number-classic', region: CLASSIC_NUMBER_REGION },
+    { mode: 'block', name: 'set', region: SET_REGION },
+    { mode: 'block', name: 'set-symbol', region: SET_SYMBOL_REGION },
+    { mode: 'block', name: 'collector', region: COLLECTOR_REGION },
+  ],
+  name: 'standard',
+  title: [
+    { mode: 'line', name: 'title', region: NAME_REGION },
+    { mode: 'line', name: 'title-wide', region: NAME_WIDE_REGION },
+  ],
+};
+
+/**
  * Every region the scanner reads, in the order the debug view lists them.
  * Named so diagnostics can label a crop without a second lookup table.
  */
-export const NAMED_REGIONS: ReadonlyArray<{ name: string; region: Region }> = [
-  { name: 'title-bar', region: NAME_REGION },
-  { name: 'title-line', region: TITLE_LINE_REGION },
-  { name: 'title-zoom', region: TITLE_ZOOM_REGION },
-  { name: 'set-symbol', region: SET_SYMBOL_REGION },
-  { name: 'number', region: NUMBER_REGION },
-  { name: 'number-classic', region: CLASSIC_NUMBER_REGION },
-  { name: 'set', region: SET_REGION },
-  { name: 'collector', region: COLLECTOR_REGION },
+export const NAMED_REGIONS: readonly NamedRegion[] = [
+  ...STANDARD_PROFILE.title,
+  ...STANDARD_PROFILE.collector,
 ];

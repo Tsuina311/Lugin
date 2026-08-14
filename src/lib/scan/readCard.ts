@@ -7,22 +7,8 @@
 import { emptyDiagnostics, type OcrSample, ScanTimer } from './diagnostics';
 import { bestName, parseCollectorParts, parseSetSymbolText, type CollectorParts } from './parseCollector';
 import { PRODUCTION_VARIANT, enhanceForOcr } from './preprocess';
-import {
-  CLASSIC_NUMBER_REGION,
-  COLLECTOR_REGION,
-  NAME_REGION,
-  NUMBER_REGION,
-  SET_REGION,
-  SET_SYMBOL_REGION,
-  TITLE_LINE_REGION,
-  TITLE_ZOOM_REGION,
-  type Region,
-} from './regions';
-import {
-  type RecognizeOptions,
-  type TextRecognitionResult,
-  type TextRecognizer,
-} from './textRecognizer';
+import { STANDARD_PROFILE, type NamedRegion, type ScanProfile } from './regions';
+import { type TextRecognitionResult, type TextRecognizer } from './textRecognizer';
 import { cropImage, type ScanImage } from './types';
 
 /** Latin script plus the punctuation that shows up in card names. */
@@ -40,37 +26,19 @@ export const SET_SYMBOL_WHITELIST =
 export interface ReadOptions {
   /** Attach each preprocessed crop to its sample, for the debug view. */
   keepCrops?: boolean;
+  /** Which layout to read. Only the standard frame exists so far. */
+  profile?: ScanProfile;
   timer?: ScanTimer;
 }
 
-interface Pass {
-  mode: RecognizeOptions['mode'];
-  name: string;
-  region: Region;
-  whitelist: string;
-}
-
-/** Step 1 reads only the title, from the three framings a user might offer. */
-const TITLE_PASSES: readonly Pass[] = [
-  { mode: 'line', name: 'title-bar', region: NAME_REGION, whitelist: TITLE_WHITELIST },
-  { mode: 'line', name: 'title-line', region: TITLE_LINE_REGION, whitelist: TITLE_WHITELIST },
-  { mode: 'line', name: 'title-zoom', region: TITLE_ZOOM_REGION, whitelist: TITLE_WHITELIST },
-  // A block read catches names that wrap onto a second line.
-  { mode: 'block', name: 'title-zoom-block', region: TITLE_ZOOM_REGION, whitelist: TITLE_WHITELIST },
-];
-
-/** Step 2 reads set and collector number, which sit in a few possible places. */
-const COLLECTOR_PASSES: readonly Pass[] = [
-  { mode: 'block', name: 'number', region: NUMBER_REGION, whitelist: COLLECTOR_WHITELIST },
-  { mode: 'block', name: 'number-classic', region: CLASSIC_NUMBER_REGION, whitelist: COLLECTOR_WHITELIST },
-  { mode: 'block', name: 'set', region: SET_REGION, whitelist: COLLECTOR_WHITELIST },
-  { mode: 'block', name: 'set-symbol', region: SET_SYMBOL_REGION, whitelist: SET_SYMBOL_WHITELIST },
-  { mode: 'block', name: 'collector', region: COLLECTOR_REGION, whitelist: COLLECTOR_WHITELIST },
-];
+const whitelistFor = (name: string): string => {
+  if (name.startsWith('title')) return TITLE_WHITELIST;
+  return name === 'set-symbol' ? SET_SYMBOL_WHITELIST : COLLECTOR_WHITELIST;
+};
 
 const runPass = async (
   card: ScanImage,
-  pass: Pass,
+  pass: NamedRegion,
   recognizer: TextRecognizer,
   options: ReadOptions,
 ): Promise<{ result: TextRecognitionResult; sample: OcrSample }> => {
@@ -78,7 +46,7 @@ const runPass = async (
   const began = Date.now();
   const result = await recognizer.recognize(crop, {
     mode: pass.mode,
-    whitelist: pass.whitelist,
+    whitelist: whitelistFor(pass.name),
   });
   return {
     result,
@@ -110,7 +78,7 @@ export const readTitle = async (
 ): Promise<TitleReading> => {
   const samples: OcrSample[] = [];
   const texts: string[] = [];
-  for (const pass of TITLE_PASSES) {
+  for (const pass of (options.profile ?? STANDARD_PROFILE).title) {
     const { result, sample } = await runPass(card, pass, recognizer, options);
     samples.push(sample);
     texts.push(result.text);
@@ -140,7 +108,7 @@ export const readCollector = async (
   const samples: OcrSample[] = [];
   let parts: CollectorParts = { foilMarker: null, raw: '' };
 
-  for (const pass of COLLECTOR_PASSES) {
+  for (const pass of (options.profile ?? STANDARD_PROFILE).collector) {
     const { result, sample } = await runPass(card, pass, recognizer, options);
     samples.push(sample);
 

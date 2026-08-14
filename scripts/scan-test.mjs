@@ -27,6 +27,8 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/prepareCard.ts')}';
       export * from '${join(root, 'src/lib/scan/diagnostics.ts')}';
       export * from '${join(root, 'src/lib/scan/readCard.ts')}';
+      export * from '${join(root, 'src/lib/scan/detectCard.ts')}';
+      export * from '${join(root, 'src/lib/scan/regions.ts')}';
     `,
     resolveDir: root,
     sourcefile: 'entry.ts',
@@ -34,26 +36,38 @@ await esbuild.build({
 });
 
 const {
+  CARD_ASPECT,
+  CARD_HEIGHT,
+  CARD_WIDTH,
+  STANDARD_PROFILE,
   ScanTimer,
   applyH,
   bestName,
   binarize,
   blankImage,
   contrastStretch,
+  convexHull,
   cornersToQuad,
   cropImage,
+  detectCardQuad,
+  extremalCorners,
   glareRatio,
   grayscale,
   guessFoil,
   homographyDestToSrc,
+  isLightOnDark,
+  largestComponent,
   mergeParts,
   mergePartsForScan,
+  minAreaRectAngle,
+  normalizePolarity,
   orderCorners,
   otsuThreshold,
   parseCollectorLine,
   parseCollectorParts,
   parseSetSymbolText,
   prepareCard,
+  prepareCardWithGuideFallback,
   quadToCorners,
   readCollector,
   readTitle,
@@ -63,6 +77,7 @@ const {
   scoreCardQuad,
   sharpnessScore,
   tidyName,
+  trimToTextBand,
   upscaleFactorFor,
   warpQuadToCard,
 } = await import(pathToFileURL(bundle).href);
@@ -393,6 +408,262 @@ check('corners round-trip through the named form', () => {
   assert.deepEqual(quadToCorners(quad).bottomRight, quad[2]);
 });
 
+// --- polarity and trimming ------------------------------------------------
+
+/** A crop with one text-like band of `ink` on a `ground` background. */
+const textCrop = ({ ground = 235, ink = 25, bandFrom = 20, bandTo = 32, h = 60, w = 120 } = {}) => {
+  const image = blankImage(w, h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const inBand = y >= bandFrom && y < bandTo;
+      // Glyph-ish: ink for part of each band row, ground elsewhere.
+      const v = inBand && x % 7 < 3 ? ink : ground;
+      const i = (y * w + x) * 4;
+      image.data[i] = image.data[i + 1] = image.data[i + 2] = v;
+    }
+  }
+  return image;
+};
+
+check('isLightOnDark spots an inverted crop', () => {
+  assert.equal(isLightOnDark(textCrop()), false, 'dark text on light paper');
+  assert.equal(
+    isLightOnDark(textCrop({ ground: 20, ink: 240 })),
+    true,
+    'pale title over dark art',
+  );
+});
+
+check('normalizePolarity leaves normal crops alone and flips inverted ones', () => {
+  const normal = textCrop();
+  assert.equal(normalizePolarity(normal).data[0], normal.data[0]);
+
+  // Borderless prints read at 5% similarity before this step, because Tesseract
+  // is trained on printed pages and does not expect a negative.
+  const inverted = textCrop({ ground: 20, ink: 240 });
+  const fixed = normalizePolarity(inverted);
+  assert.ok(fixed.data[0] > 200, 'background became paper');
+  const inkIndex = (25 * inverted.width + 0) * 4;
+  assert.ok(fixed.data[inkIndex] < 60, 'glyphs became ink');
+});
+
+check('trimToTextBand crops away border and artwork', () => {
+  const crop = textCrop({ bandFrom: 20, bandTo: 32, h: 60 });
+  const trimmed = trimToTextBand(crop);
+  assert.ok(trimmed.height < 60, `still ${trimmed.height} tall`);
+  assert.ok(trimmed.height >= 12, 'the text line itself survived');
+  assert.equal(trimmed.width, crop.width, 'trimming is vertical only');
+});
+
+check('trimToTextBand keeps the whole crop when there is nothing to trim', () => {
+  // Degrading to the untrimmed crop is the point: a bad measurement must not
+  // crop the title away.
+  const blank = solid(120, 60, [200, 200, 200]);
+  assert.equal(trimToTextBand(blank).height, 60);
+  const allText = textCrop({ bandFrom: 0, bandTo: 60, h: 60 });
+  assert.equal(trimToTextBand(allText).height, 60);
+});
+
+check('trimToTextBand works on an inverted crop too', () => {
+  const trimmed = trimToTextBand(textCrop({ ground: 20, ink: 240 }));
+  assert.ok(trimmed.height < 60, 'ink detection is polarity-agnostic');
+});
+
+// --- card detection -------------------------------------------------------
+
+/**
+ * Render a card-shaped quad into a frame: rounded corners, a dark border, a
+ * lighter interior, and per-pixel background noise. Enough structure to exercise
+ * detection without needing a downloaded fixture.
+ */
+const renderCard = ({
+  background = 90,
+  border = 12,
+  interior = 205,
+  rotate = 0,
+  scale = 0.8,
+  tilt = 0,
+  frameW = 480,
+  frameH = 640,
+} = {}) => {
+  const image = blankImage(frameW, frameH);
+  let seed = 7;
+  for (let i = 0; i < image.data.length; i += 4) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const v = Math.max(0, Math.min(255, background + (seed % 9) - 4));
+    image.data[i] = image.data[i + 1] = image.data[i + 2] = v;
+  }
+
+  const ch = frameH * scale;
+  const cw = ch * CARD_ASPECT;
+  const cx = frameW / 2;
+  const cy = frameH / 2;
+  const a = (rotate * Math.PI) / 180;
+  const radius = cw * 0.045;
+
+  // Walk the frame and ask, for each pixel, where it lands in card space.
+  const cos = Math.cos(-a);
+  const sin = Math.sin(-a);
+  for (let y = 0; y < frameH; y++) {
+    for (let x = 0; x < frameW; x++) {
+      const rx = (x - cx) * cos - (y - cy) * sin;
+      const ry = (x - cx) * sin + (y - cy) * cos;
+      // Perspective: the top edge is narrower by `tilt`.
+      const rowShrink = 1 - tilt * (0.5 - ry / ch);
+      const halfW = (cw / 2) * rowShrink;
+      if (Math.abs(rx) > halfW || Math.abs(ry) > ch / 2) continue;
+      // Rounded corners.
+      const overX = Math.abs(rx) - (halfW - radius);
+      const overY = Math.abs(ry) - (ch / 2 - radius);
+      if (overX > 0 && overY > 0 && Math.hypot(overX, overY) > radius) continue;
+
+      const onBorder = halfW - Math.abs(rx) < cw * 0.04 || ch / 2 - Math.abs(ry) < ch * 0.03;
+      const v = onBorder ? border : interior;
+      const i = (y * frameW + x) * 4;
+      image.data[i] = image.data[i + 1] = image.data[i + 2] = v;
+    }
+  }
+  return image;
+};
+
+check('convexHull wraps a point cloud', () => {
+  const hull = convexHull([
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+    { x: 0, y: 10 },
+    { x: 5, y: 5 },
+  ]);
+  assert.equal(hull.length, 4, 'the interior point is not a vertex');
+});
+
+check('minAreaRectAngle finds the rotation of a rectangle', () => {
+  const angleOf = degrees => {
+    const a = (degrees * Math.PI) / 180;
+    const pts = [
+      { x: -40, y: -60 },
+      { x: 40, y: -60 },
+      { x: 40, y: 60 },
+      { x: -40, y: 60 },
+    ].map(p => ({
+      x: 200 + p.x * Math.cos(a) - p.y * Math.sin(a),
+      y: 300 + p.x * Math.sin(a) + p.y * Math.cos(a),
+    }));
+    return minAreaRectAngle(convexHull(pts));
+  };
+  // Any of the four edge directions is a valid answer, so compare modulo 90°.
+  const mod90 = r => {
+    const d = ((r * 180) / Math.PI) % 90;
+    return d < 0 ? d + 90 : d;
+  };
+  assert.ok(Math.abs(mod90(angleOf(0))) < 0.5 || Math.abs(mod90(angleOf(0)) - 90) < 0.5);
+  assert.ok(Math.abs(mod90(angleOf(20)) - 20) < 0.5);
+});
+
+check('extremalCorners orders a rotated rectangle', () => {
+  const a = (15 * Math.PI) / 180;
+  const pts = [
+    { x: -40, y: -60 },
+    { x: 40, y: -60 },
+    { x: 40, y: 60 },
+    { x: -40, y: 60 },
+  ].map(p => ({
+    x: 200 + p.x * Math.cos(a) - p.y * Math.sin(a),
+    y: 300 + p.x * Math.sin(a) + p.y * Math.cos(a),
+  }));
+  const corners = extremalCorners(convexHull(pts));
+  assert.equal(corners.length, 4);
+  // The topmost input corner must come back as the first (top-left) slot.
+  const quad = orderCorners(corners);
+  assert.ok(quad[0].y < quad[3].y, 'top-left sits above bottom-left');
+  assert.ok(quad[0].x < quad[1].x, 'top-left sits left of top-right');
+});
+
+check('largestComponent ignores speckle', () => {
+  const w = 40;
+  const h = 40;
+  const mask = new Uint8Array(w * h);
+  // A 10×10 block plus scattered single pixels.
+  for (let y = 5; y < 15; y++) for (let x = 5; x < 15; x++) mask[y * w + x] = 1;
+  mask[30 * w + 30] = 1;
+  mask[35 * w + 5] = 1;
+  const found = largestComponent(mask, w, h);
+  assert.equal(found.area, 100);
+  assert.equal(found.pixels[30 * w + 30], 0, 'speckle excluded from the winner');
+});
+
+check('detects a flat card on a plain background', () => {
+  const { quad, score, corners } = detectCardQuad(renderCard());
+  assert.ok(quad, 'no quad found on the easiest possible frame');
+  assert.ok(score > 0.35, `score ${score?.toFixed(3)} below the acceptance threshold`);
+  // Corners should land near the true card rectangle: 0.8 × 640 tall, centred.
+  const expectedH = 640 * 0.8;
+  const expectedW = expectedH * CARD_ASPECT;
+  assert.ok(Math.abs(corners.topLeft.x - (480 - expectedW) / 2) < 6);
+  assert.ok(Math.abs(corners.topLeft.y - (640 - expectedH) / 2) < 6);
+  assert.ok(Math.abs(corners.bottomRight.x - (480 + expectedW) / 2) < 6);
+});
+
+check('detects a rotated card', () => {
+  for (const rotate of [-20, -7, 9, 18]) {
+    const { quad, score } = detectCardQuad(renderCard({ rotate }));
+    assert.ok(quad, `no quad at ${rotate}°`);
+    assert.ok(score > 0.3, `score ${score.toFixed(3)} too low at ${rotate}°`);
+  }
+});
+
+check('detects a tilted card', () => {
+  for (const tilt of [0.1, 0.2]) {
+    const { quad } = detectCardQuad(renderCard({ tilt }));
+    assert.ok(quad, `no quad at tilt ${tilt}`);
+  }
+});
+
+check('detects a dark card on a light background and vice versa', () => {
+  // The card is not reliably the bright part of the frame; only the difference
+  // from the background is reliable.
+  const onLight = detectCardQuad(renderCard({ background: 235, border: 10, interior: 90 }));
+  assert.ok(onLight.quad, 'dark card on a light desk');
+  const onDark = detectCardQuad(renderCard({ background: 20, border: 40, interior: 210 }));
+  assert.ok(onDark.quad, 'light card on a dark desk');
+});
+
+check('detects a small, distant card', () => {
+  const { quad, score } = detectCardQuad(renderCard({ scale: 0.35 }));
+  assert.ok(quad, 'no quad for a card far from the camera');
+  assert.ok(score > 0.2, `score ${score.toFixed(3)}`);
+});
+
+check('refined corners beat the rounded-corner hull points', () => {
+  // Rounded corners put every extreme hull point inside the true corner, which
+  // would shrink the quad and shift every region crop.
+  const { corners } = detectCardQuad(renderCard({ scale: 0.8 }));
+  const width = corners.topRight.x - corners.topLeft.x;
+  const expectedW = 640 * 0.8 * CARD_ASPECT;
+  assert.ok(
+    width > expectedW * 0.985,
+    `quad width ${width.toFixed(1)} shrank against the true ${expectedW.toFixed(1)}`,
+  );
+});
+
+check('finds nothing in a featureless frame', () => {
+  const flat = solid(200, 280, [90, 90, 90]);
+  assert.equal(detectCardQuad(flat).quad, null);
+});
+
+check('finds nothing when the frame is pure noise', () => {
+  // Better to fall back to the guide than to invent a card out of a busy desk.
+  const noise = blankImage(200, 280);
+  let seed = 99;
+  for (let p = 0; p < 200 * 280; p++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const i = p * 4;
+    noise.data[i] = noise.data[i + 1] = noise.data[i + 2] = seed % 256;
+  }
+  const { score } = detectCardQuad(noise);
+  assert.ok(score < 0.35, `noise scored ${score.toFixed(3)} and would be trusted`);
+});
+
 check('prepareCard reports how it framed the card', () => {
   // A featureless frame gives detection nothing to find, so it must say so
   // rather than quietly claiming a detection.
@@ -402,6 +673,36 @@ check('prepareCard reports how it framed the card', () => {
   assert.equal(prepared.corners, null);
   assert.equal(prepared.score, 0);
   assert.ok(prepared.image.width > 0 && prepared.image.height > 0);
+});
+
+check('prepareCard detects a real card and says so', () => {
+  const prepared = prepareCard(renderCard());
+  assert.equal(prepared.detected, true);
+  assert.equal(prepared.source, 'detected');
+  assert.ok(prepared.corners, 'corners are reported in source-frame pixels');
+  assert.ok(prepared.score > 0.35);
+  // The warp always emits the canonical raster, whatever the card measured.
+  assert.equal(prepared.image.width, CARD_WIDTH);
+  assert.equal(prepared.image.height, CARD_HEIGHT);
+});
+
+check('the guide fallback crops the guide rectangle, not a transposed one', () => {
+  // Only reachable from the live camera, so the evaluation harness would never
+  // catch a swapped width/height here — it would just quietly read the wrong
+  // part of every frame that failed detection.
+  const frame = blankImage(400, 800);
+  // Mark one pixel inside the guide's top-left corner and check it lands there.
+  const guide = { h: 0.5, w: 0.5, x: 0.25, y: 0.25 };
+  const mark = (200 * 400 + 100) * 4;
+  frame.data[mark] = 255;
+  frame.data[mark + 1] = 0;
+  frame.data[mark + 2] = 0;
+
+  const prepared = prepareCardWithGuideFallback(frame, guide);
+  assert.equal(prepared.source, 'guide');
+  assert.equal(prepared.detected, false);
+  // The mark sat at the guide's origin, so it must warp to the card's origin.
+  assert.ok(prepared.image.data[0] > 100, 'guide origin maps to the card origin');
 });
 
 // --- diagnostics ----------------------------------------------------------
@@ -446,21 +747,34 @@ const stubRecognizer = (byRegion, log = []) => ({
   },
 });
 
-await checkAsync('readTitle runs every framing and tidies the best', async () => {
+await checkAsync('readTitle runs every framing in the profile and tidies the best', async () => {
   const card = solid(504, 704, [200, 200, 200]);
   const log = [];
-  const reading = await readTitle(
-    card,
-    stubRecognizer(['Sol', '', 'Sol Ring\nArtifact', ''], log),
-    {},
+  const reading = await readTitle(card, stubRecognizer(['Sol', 'Sol Ring\nArtifact'], log), {});
+  assert.equal(log.length, STANDARD_PROFILE.title.length, 'one pass per title framing');
+  assert.ok(log.every(pass => pass.mode === 'line'));
+  assert.equal(reading.samples.length, STANDARD_PROFILE.title.length);
+  assert.deepEqual(
+    reading.samples.map(s => s.region),
+    STANDARD_PROFILE.title.map(t => t.name),
+    'samples are labelled with the region they came from',
   );
-  assert.equal(log.length, 4, 'four title framings');
-  assert.equal(log[0].mode, 'line');
-  assert.equal(log[3].mode, 'block', 'last pass is a block read for wrapped names');
-  assert.equal(reading.samples.length, 4);
   // tidyName drops the type line; bestName prefers the fuller read.
   assert.equal(reading.name, 'Sol Ring');
   assert.ok(reading.samples.every(s => s.cropWidth > 0 && s.cropHeight > 0));
+});
+
+check('every title region stays inside the card and above the artwork', () => {
+  // The measured title band across the fixture corpus is 0.043–0.101 on standard
+  // frames; a region that misses it produces confident nonsense rather than a
+  // visible failure, so the numbers are asserted rather than merely commented.
+  for (const { name, region } of STANDARD_PROFILE.title) {
+    assert.ok(region.x >= 0 && region.y >= 0, `${name} starts inside the card`);
+    assert.ok(region.x + region.w <= 1, `${name} stays within the card width`);
+    assert.ok(region.y <= 0.043, `${name} starts at or above the measured title top`);
+    assert.ok(region.y + region.h >= 0.101, `${name} reaches the measured title bottom`);
+    assert.ok(region.y + region.h < 0.25, `${name} stops short of the artwork`);
+  }
 });
 
 check('bestName breaks ties by length, not by quality (known defect)', () => {
@@ -475,7 +789,7 @@ check('bestName breaks ties by length, not by quality (known defect)', () => {
 await checkAsync('readTitle reports nothing when OCR reads nothing', async () => {
   const reading = await readTitle(solid(504, 704, [0, 0, 0]), stubRecognizer([]), {});
   assert.equal(reading.name, null);
-  assert.equal(reading.samples.length, 4);
+  assert.equal(reading.samples.length, STANDARD_PROFILE.title.length);
   assert.ok(reading.samples.every(s => s.confidence === 0));
 });
 

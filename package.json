@@ -26,6 +26,7 @@
     "test:import": "node scripts/import-test.mjs",
     "test:prices": "node scripts/prices-test.mjs",
     "test:scan": "node scripts/scan-test.mjs",
+    "scan:calibrate": "node scripts/scan-eval.mjs --calibrate",
     "scan:eval": "node scripts/scan-eval.mjs",
     "scan:fixtures": "node scripts/scan-eval.mjs --build-fixtures",
     "scan:variants": "node scripts/scan-eval.mjs --variants",

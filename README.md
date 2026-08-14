@@ -103,6 +103,7 @@ later.
 yarn scan:fixtures   # resolve the test corpus from Scryfall (writes scripts/fixtures/cards.json)
 yarn scan:eval       # run the corpus, print accuracy and timings
 yarn scan:variants   # benchmark preprocessing chains against each other
+yarn scan:calibrate  # measure where the title actually sits on each layout
 ```
 
 The scanner is the one feature where "that feels better" is worthless: a change
@@ -120,6 +121,32 @@ copyrighted and has no business in the repository.
 Synthetic abuse is not photography. It exercises geometry and preprocessing
 honestly, and it will tell you nothing true about foils, sleeves or a real
 autofocus hunting in bad light — those need actual phone photos.
+
+It has already earned its keep twice, in both cases by contradicting code that
+looked reasonable:
+
+- Card detection scored **0 out of 220**, including a flat, centred, evenly lit
+  card, while 98.7% of the true outline was present in the edge map. The detector
+  was fine at finding edges and hopeless at the step after, so it was replaced
+  with region separation (see `src/lib/scan/detectCard.ts`). Detection is now 100%.
+- The shipping preprocessing chain came **last of fifteen** candidates, below
+  handing Tesseract the untouched crop, because it ended in a sharpening pass.
+
+Title accuracy is 75% of the corpus and, more usefully, roughly even across every
+camera condition: tilt, blur, glare and filmed screens are no longer what limits
+it. The remaining failures are layouts and typography, not photography — battle
+cards are landscape and split cards print their names sideways, so both need their
+own `ScanProfile` rather than looser regions on the standard one, and the 1993
+frame's typeface defeats Tesseract's stock model.
+
+Treat that 75% as pessimistic. It is raw edit distance against the printed name,
+whereas identification gets to match against a finite list of real card names, so
+much of the 60–75% band is recoverable by the matcher rather than lost.
+
+Region coordinates are measured, not eyeballed. `yarn scan:calibrate` locates the
+title on every fixture and prints the spread, which is how the numbers in
+`src/lib/scan/regions.ts` were chosen — and it only means anything because
+detection normalizes the card first.
 
 `flags.scanDebug` turns on the on-device counterpart: detected corners, the
 perspective-corrected card, every OCR crop with its confidence, and where the

@@ -34,8 +34,6 @@ import {
   NUMBER_REGION,
   SET_REGION,
   SET_SYMBOL_REGION,
-  TITLE_LINE_REGION,
-  TITLE_ZOOM_REGION,
   type Region,
 } from '@/lib/scan/regions';
 import {
@@ -596,11 +594,7 @@ export const ScanScreen = ({
                 style={{ aspectRatio: '63 / 88' }}
               >
                 {onTitleStep ? (
-                  <>
-                    <Guide active done={false} region={TITLE_ZOOM_REGION} />
-                    <Guide active done={false} region={TITLE_LINE_REGION} />
-                    <Guide active done={false} region={NAME_REGION} />
-                  </>
+                  <Guide active done={false} region={NAME_REGION} />
                 ) : (
                   <>
                     <Guide active={false} done region={NAME_REGION} />

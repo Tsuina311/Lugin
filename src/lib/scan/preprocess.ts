@@ -6,7 +6,7 @@
 // assert that a clever filter stack must be an improvement. `PRODUCTION_VARIANT`
 // names whichever one currently ships; the harness reports all of them.
 
-import { blankImage, type ScanImage } from './types';
+import { blankImage, cropRect, type ScanImage } from './types';
 
 const luma = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b;
 
@@ -209,14 +209,111 @@ export const copy = (image: ScanImage): ScanImage => ({
   width: image.width,
 });
 
+export const invert = (image: ScanImage): ScanImage => {
+  const out = copy(image);
+  for (let i = 0; i < out.data.length; i += 4) {
+    out.data[i] = 255 - out.data[i];
+    out.data[i + 1] = 255 - out.data[i + 1];
+    out.data[i + 2] = 255 - out.data[i + 2];
+  }
+  return out;
+};
+
+/**
+ * True when the crop is light text on a dark ground.
+ *
+ * Decided by which side of the Otsu split holds the *majority* of pixels: a line
+ * of text is mostly background whichever way round it is printed.
+ */
+export const isLightOnDark = (image: ScanImage): boolean => {
+  const gray = grayscale(image);
+  const threshold = otsuThreshold(gray);
+  let dark = 0;
+  let total = 0;
+  for (let i = 0; i < gray.data.length; i += 4) {
+    if (gray.data[i] <= threshold) dark += 1;
+    total += 1;
+  }
+  return total > 0 && dark / total > 0.5;
+};
+
+/**
+ * Put the crop in the polarity Tesseract expects: dark ink on light paper.
+ *
+ * Not cosmetic. Borderless and showcase prints put pale titles over dark art,
+ * and read at 5% similarity before this step — the engine is trained on printed
+ * pages and does not consider that the page might be a negative.
+ */
+export const normalizePolarity = (image: ScanImage): ScanImage =>
+  isLightOnDark(image) ? invert(image) : copy(image);
+
+/**
+ * Shrink a crop to the rows that actually contain text.
+ *
+ * A region generous enough to cover every frame variant necessarily includes
+ * border and artwork on the frames where the title sits high or low. Trimming to
+ * measured ink beats adding a hand-tuned region per frame type, because it adapts
+ * to the card in front of it rather than to the ones we thought to enumerate.
+ *
+ * Returns the input untouched when it cannot find a convincing single band, so a
+ * bad measurement degrades to the old behaviour instead of cropping the title
+ * away.
+ */
+export const trimToTextBand = (image: ScanImage, margin = 0.25): ScanImage => {
+  const gray = grayscale(image);
+  const { height, width } = gray;
+  if (height < 8) return copy(image);
+
+  const inked: boolean[] = [];
+  for (let y = 0; y < height; y++) {
+    const row: number[] = [];
+    for (let x = 0; x < width; x++) row.push(gray.data[(y * width + x) * 4]);
+    const sorted = [...row].sort((a, b) => a - b);
+    const median = sorted[sorted.length >> 1];
+    const off = row.filter(v => Math.abs(v - median) > 45).length / width;
+    inked.push(off >= 0.04);
+  }
+
+  // Longest run wins here, unlike calibration: the crop is already narrowed to
+  // the title band, so the dominant run *is* the text line.
+  let from = -1;
+  let to = -1;
+  let runStart = -1;
+  for (let y = 0; y <= height; y++) {
+    if (y < height && inked[y]) {
+      if (runStart < 0) runStart = y;
+      continue;
+    }
+    if (runStart >= 0) {
+      if (y - runStart > to - from) {
+        from = runStart;
+        to = y;
+      }
+      runStart = -1;
+    }
+  }
+
+  const found = to - from;
+  // Too small to be a text line, or so large that trimming achieves nothing.
+  if (found < 6 || found > height * 0.92) return copy(image);
+
+  const pad = Math.round(found * margin);
+  const top = Math.max(0, from - pad);
+  const bottom = Math.min(height, to + pad);
+  return cropRect(image, { h: bottom - top, w: width, x: 0, y: top });
+};
+
 export interface PreprocessVariant {
   apply: (image: ScanImage) => ScanImage;
   name: string;
 }
 
 /**
- * Candidate chains, all starting from the same upscale so the comparison is
- * about filtering rather than resolution.
+ * Candidate chains.
+ *
+ * `trim` and `polarity` appear both alone and combined with the filter chains so
+ * the report separates "found the text" from "cleaned up the text" — they fix
+ * different failures and it would be easy to credit one for the other's gain.
  */
 export const PREPROCESS_VARIANTS: readonly PreprocessVariant[] = [
   { apply: image => copy(image), name: 'original' },
@@ -230,16 +327,47 @@ export const PREPROCESS_VARIANTS: readonly PreprocessVariant[] = [
     name: 'stretch-scurve-sharpen',
   },
   { apply: image => binarize(contrastStretch(upscaleForOcr(image), 0.02)), name: 'otsu' },
+  { apply: image => upscaleForOcr(trimToTextBand(image)), name: 'trim' },
+  { apply: image => upscaleForOcr(normalizePolarity(image)), name: 'polarity' },
+  {
+    apply: image => upscaleForOcr(normalizePolarity(trimToTextBand(image))),
+    name: 'trim-polarity',
+  },
+  {
+    apply: image => contrastStretch(upscaleForOcr(normalizePolarity(trimToTextBand(image))), 0.02),
+    name: 'trim-polarity-stretch',
+  },
+  { apply: image => enhanceForOcr(image), name: 'trim-polarity-stretch-scurve' },
+  {
+    apply: image =>
+      sharpen(
+        sCurve(contrastStretch(upscaleForOcr(normalizePolarity(trimToTextBand(image))), 0.02)),
+      ),
+    name: 'trim-polarity-full',
+  },
+  {
+    apply: image => binarize(contrastStretch(upscaleForOcr(normalizePolarity(trimToTextBand(image))), 0.02)),
+    name: 'trim-polarity-otsu',
+  },
 ];
 
 /** Whichever variant `enhanceForOcr` currently implements. */
-export const PRODUCTION_VARIANT = 'stretch-scurve-sharpen';
+export const PRODUCTION_VARIANT = 'trim-polarity-stretch-scurve';
 
 /**
- * The shipping preprocessing chain.
+ * The shipping preprocessing chain, chosen by `scan-eval.mjs --variants` over the
+ * corpus rather than by argument.
  *
- * Unvalidated as of Phase A — `scripts/scan-eval.mjs` exists to replace this
- * choice with a measured one.
+ * Two findings are worth keeping, because both contradict the obvious guess:
+ *
+ * - Sharpening *hurt*, badly. The previous chain ended in `sharpen` and scored
+ *   65% title similarity — last of fifteen candidates, below the 77% of feeding
+ *   Tesseract the untouched crop. Unsharp masking on a soft phone frame
+ *   manufactures edges inside glyphs.
+ * - The order of `trim` and `polarity` matters more than either step. Polarity
+ *   alone scored 74%, *below* doing nothing, because an untrimmed crop still
+ *   contains dark artwork, so the majority-dark test inverts titles that were
+ *   already the right way round. Trim first and the pair reaches 81%.
  */
 export const enhanceForOcr = (image: ScanImage): ScanImage =>
-  sharpen(sCurve(contrastStretch(upscaleForOcr(image))));
+  sCurve(contrastStretch(upscaleForOcr(normalizePolarity(trimToTextBand(image))), 0.02));
