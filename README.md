@@ -97,16 +97,25 @@ It renders that local copy rather than a fetch, so the collection is there befor
 any network call and an import made in a shop with no signal is kept and pushed
 later.
 
-Traffic with ManaBox goes both ways, in files, because files are the only door it
-has: no API, only import and export. Inbound, the manifest registers Lugin as a
-share target so a scan can be sent straight from ManaBox's share sheet
-(`src/web/sharedImport.ts`). Outbound, `src/lib/export.ts` writes ManaBox's own
-formats — its commented `// COMMANDER` headers, its CSV column names — and
-`shareFile` hands the result back to the sheet. That is a copy each way rather
-than a sync, since nothing on either side tracks the other's identity, which is
-why `deckToText` and `collectionToCsv` are round-tripped through `inspectImport`
-in the tests: a re-import is the only thing that can catch a lost commander or a
-dropped foil marker.
+Traffic with ManaBox goes both ways, but not by the same door in each direction,
+because it has no API and its two importers disagree. Inbound, the manifest
+registers Lugin as a share target, so a scan can be sent straight from ManaBox's
+share sheet (`src/web/sharedImport.ts`). Outbound, `src/lib/export.ts` writes
+ManaBox's own formats — its commented `// COMMANDER` headers, its CSV column
+names — and `src/web/share.ts` offers three routes for them, because a deck and a
+collection need different ones: ManaBox imports a deck as **pasted text**, so
+clipboard is the only way in and no file share sheet will ever list it, while its
+collection import wants a **file** picked from storage. Sharing is there for
+everything that isn't ManaBox.
+
+Either direction is a copy rather than a sync, since nothing on either side tracks
+the other's identity. Which is why `deckToText` and `collectionToCsv` are
+round-tripped through `inspectImport` in the tests: a re-import is the only thing
+that can catch a lost commander or a dropped foil marker.
+
+Versions are `MAJOR.MINOR.<commit count>` from `build/version.ts`, shared by both
+builds so the phone and the extension can't disagree about which commit they are.
+See [docs/VERSIONING.md](docs/VERSIONING.md).
 
 What makes all this nearly free is that `src/core/sync` never knew about Chrome —
 `createDriveRepository` takes an injected `fetch` and a `TokenProvider`, so the

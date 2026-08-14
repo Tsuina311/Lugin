@@ -131,15 +131,16 @@ if (!html.includes('2 missing')) {
   console.log('  ok  shortfall badge shows 2 missing (Rhystic Study, Talrand)');
 }
 
-// The phone must not be a one-way door. ManaBox can share a scan in, so the
-// collection has to offer the file that goes back out — the only route there is,
-// given ManaBox has no API to sync against.
+// The phone must not be a one-way door: ManaBox can share a scan in, so both
+// screens have to offer a way back out. Save rather than Share, because a share
+// sheet is the one route that can't reach ManaBox — and it's also the one that
+// isn't rendered here, since asking the platform about it needs a browser.
 const view = renderToString(<CollectionView collection={collection} />);
-if (!view.includes('Send to ManaBox')) {
+if (!view.includes('>Save<')) {
   failed += 1;
-  console.log('  FAIL  no way to send the collection back to ManaBox');
+  console.log('  FAIL  no way to get the collection out of the app');
 } else {
-  console.log('  ok  the collection can be sent back to ManaBox');
+  console.log('  ok  the collection can be saved as a file');
 }
 
 // The review is the one screen that must never quietly agree to something, so

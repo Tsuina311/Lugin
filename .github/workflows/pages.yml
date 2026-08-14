@@ -30,6 +30,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The version's third number is the commit count, and the default
+          # shallow fetch can only count the one commit it took. Without this the
+          # deployed app would call itself 1.0.1 forever while the phone that
+          # pushed it says 1.0.87.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:

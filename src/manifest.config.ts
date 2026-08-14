@@ -1,7 +1,12 @@
 import { defineManifest } from '@crxjs/vite-plugin';
 import { loadEnv } from 'vite';
 
+import { buildVersion } from '../build/version';
 import pkg from '../package.json';
+
+// Same source as the phone build's stamp, so the two surfaces of one product
+// can't report different versions of the same commit.
+const BUILD = buildVersion(`${process.cwd()}/`);
 
 // ---------------------------------------------------------------------------
 // EXTENSION IDENTITY
@@ -112,7 +117,13 @@ export default defineManifest({
   // its own, and no flow starts unless the user asks for one.
   permissions: ['storage', 'unlimitedStorage', 'identity'],
 
-  version: pkg.version,
+  // Numeric only — Chrome parses this and rejects anything else. It also refuses
+  // an update whose version went backwards, which the commit count can't do.
+  version: BUILD.version,
+
+  // Free-form, and shown in chrome://extensions instead of the above. The commit
+  // is the part that answers "is this the build with the fix in it".
+  version_name: BUILD.label,
 
   web_accessible_resources: [
     {

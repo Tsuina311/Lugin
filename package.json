@@ -1,7 +1,7 @@
 {
   "name": "lugin",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Chrome extension that captures a site's HTTP calls and renders a custom React UI overlay.",
   "type": "module",
   "packageManager": "yarn@3.8.1+sha512.8cfec856814c797ccb480703ca5270824327fac5abce240835e2699e01732229fd22bbeb1bb87047a0069f7698be9b2e3d9a926e6046e851faa9908fdacdeacf",
@@ -17,6 +17,8 @@
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "bump:minor": "node scripts/bump.mjs minor",
+    "bump:major": "node scripts/bump.mjs major",
     "key": "node scripts/make-key.mjs",
     "package": "yarn build && node scripts/package.mjs",
     "package:testers": "yarn build && node scripts/package.mjs --testers",

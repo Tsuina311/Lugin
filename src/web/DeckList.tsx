@@ -6,7 +6,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { ShareButton } from './ShareButton';
+import { ExportBar } from './ExportBar';
 
 import type { Collection } from '@/lib/collection';
 import { deckShortfall, type Deck, type DeckSection } from '@/lib/deck';
@@ -46,8 +46,15 @@ const DeckDetail = ({
           ‹ Decks
         </button>
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{deck.name}</span>
-        <ShareButton className="mr-1" file={() => deckFile(deck)} label="Send to ManaBox" />
       </div>
+
+      <section className="flex items-center gap-3 border-b border-line px-4 py-3">
+        <p className="min-w-0 flex-1 text-[11px] leading-snug text-ink-faint">
+          Copy the list to paste into ManaBox, Moxfield or Archidekt — all three
+          import a deck as text.
+        </p>
+        <ExportBar actions={['copy', 'save', 'share']} file={() => deckFile(deck)} />
+      </section>
 
       {collection ? (
         <section className="border-b border-line px-4 py-4">

@@ -7,7 +7,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { ShareButton } from './ShareButton';
+import { ExportBar } from './ExportBar';
 
 import { cardKey } from '@/lib/cardName';
 import type { Collection } from '@/lib/collection';
@@ -53,9 +53,14 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
             unique
             {query ? ` · ${rows.length.toLocaleString()} matching` : ''}
           </p>
-          {/* The whole collection, not the search results: a filtered export
-              would quietly hand ManaBox a fraction of what you own. */}
-          <ShareButton file={() => collectionFile(collection)} label="Send to ManaBox" />
+          {/* The whole collection, not the search results: a filtered export would
+              quietly hand another app a fraction of what you own.
+
+              No Copy here, unlike a deck. A collection is tens of thousands of
+              rows, which is past what a phone's clipboard will carry, and the apps
+              that read a collection — ManaBox included — want a file for it
+              anyway. */}
+          <ExportBar actions={['save', 'share']} file={() => collectionFile(collection)} />
         </div>
       </div>
 

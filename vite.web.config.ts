@@ -9,55 +9,22 @@
 // `root` is web/, so index.html sits next to nothing else and the entry it points
 // at (../src/web/main.tsx) is shared source.
 
-import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
+import { buildVersion } from './build/version';
+
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 
-/**
- * Which build is this, in words the app can show.
- *
- * Worth the trouble because the phone build is served over a network-first
- * service worker: after a deploy you reload and get *something*, and there is
- * otherwise no way to tell the new code from a cached shell — so "did my fix
- * reach the phone?" becomes guesswork, and every bug report after it is suspect.
- *
- * The commit is the identity; `+local` marks a build made from an uncommitted
- * tree, which is the other half of the same question when testing by hand.
- */
-const buildStamp = (): { id: string; label: string } => {
-  const { version } = JSON.parse(readFileSync(`${ROOT}package.json`, 'utf8')) as { version: string };
-  const git = (args: string): string => {
-    try {
-      return execSync(`git ${args}`, { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] })
-        .toString()
-        .trim();
-    } catch {
-      // No git — a tarball, or a CI runner without the history.
-      return '';
-    }
-  };
-  // GITHUB_SHA as the fallback rather than the first choice: it names the commit
-  // that triggered the run, which is the same thing here but wrong the moment a
-  // workflow builds anything else.
-  const commit = git('rev-parse --short=7 HEAD') || process.env.GITHUB_SHA?.slice(0, 7) || 'unknown';
-
-  // `-uno` because untracked files aren't uncommitted *source*: a build output,
-  // an .env.local or an editor's scratch file would otherwise mark every build
-  // local. And a CI build is never local by definition — it builds a commit from
-  // a fresh checkout, and whatever install steps leave lying around are not the
-  // user's edits. (The deployed stamp said "+local" until this second clause
-  // existed, which is precisely the sort of lie the marker is meant to prevent.)
-  const dirty = process.env.GITHUB_ACTIONS !== 'true' && git('status --porcelain -uno') !== '';
-  const id = `${commit}${dirty ? '+local' : ''}`;
-  return { id, label: `v${version} · ${id}` };
-};
-
-const BUILD = buildStamp();
+// Which build is this, in words the app can show.
+//
+// Worth the trouble because the phone build is served over a service worker:
+// after a deploy you reload and get *something*, and there is otherwise no way to
+// tell the new code from a cached shell — so "did my fix reach the phone?" becomes
+// guesswork, and every bug report after it is suspect.
+const BUILD = buildVersion(ROOT);
 
 // GitHub Pages serves a project site from /<repo>/, so relative URLs need the
 // prefix baked in at build time. The Pages workflow sets this from the repo name;

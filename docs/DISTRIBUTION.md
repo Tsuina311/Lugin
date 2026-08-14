@@ -336,11 +336,20 @@ account. What remains is three settings and a push.
    own before writing anything, and the header shows "changes to upload" until the
    push lands. Decks in that export — the binders ManaBox marks as decks — land in
    Lugin's deck section, not among your loose cards.
-7. **Try it the other way**, with **Send to ManaBox** on the collection screen or
-   on any deck. It hands ManaBox a file through the Android share sheet, which is
-   the only route there is: ManaBox has no API, so both directions are files. That
-   also means it is a copy, not a sync — sending the same deck twice gives ManaBox
-   a second one rather than updating the first.
+7. **Try it the other way**, with **Copy**, **Save** and **Share** on any deck, or
+   **Save** and **Share** on the collection. Which one you want depends on the app
+   you are feeding, and ManaBox wants a different one for each half:
+   - A **deck** goes in by **Copy**, then ManaBox → Decks → import → paste. Its
+     deck import only takes pasted text or a URL, so there is no file to share and
+     ManaBox will never appear in a share sheet for one.
+   - The **collection** goes in by **Save**, then ManaBox → Collection → Import →
+     pick the CSV. That import reads a file from storage rather than receiving a
+     share.
+   - **Share** is for everything else — Drive, mail, a message, another tracker.
+
+   Either way it is a copy, not a sync: ManaBox has no API, so nothing on either
+   side tracks the other's identity, and sending the same deck twice gives ManaBox
+   a second deck rather than updating the first.
 
 Your testers are gated by the OAuth consent screen's test-user list: without a
 Google sign-in the app shows nothing, so an address that isn't on that list gets
