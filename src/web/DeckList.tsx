@@ -6,8 +6,11 @@
 
 import { useMemo, useState } from 'react';
 
+import { ShareButton } from './ShareButton';
+
 import type { Collection } from '@/lib/collection';
 import { deckShortfall, type Deck, type DeckSection } from '@/lib/deck';
+import { deckFile } from '@/lib/export';
 
 const SECTIONS: readonly { id: DeckSection; label: string }[] = [
   { id: 'commander', label: 'Commander' },
@@ -43,6 +46,7 @@ const DeckDetail = ({
           ‹ Decks
         </button>
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{deck.name}</span>
+        <ShareButton className="mr-1" file={() => deckFile(deck)} label="Send to ManaBox" />
       </div>
 
       {collection ? (

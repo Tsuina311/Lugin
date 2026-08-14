@@ -7,8 +7,11 @@
 
 import { useMemo, useState } from 'react';
 
+import { ShareButton } from './ShareButton';
+
 import { cardKey } from '@/lib/cardName';
 import type { Collection } from '@/lib/collection';
+import { collectionFile } from '@/lib/export';
 
 const VISIBLE_LIMIT = 150;
 
@@ -44,11 +47,16 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
           type="search"
           value={query}
         />
-        <p className="mt-2 text-[11px] text-ink-faint">
-          {collection.totalCards.toLocaleString()} cards, {collection.uniqueCards.toLocaleString()}{' '}
-          unique
-          {query ? ` · ${rows.length.toLocaleString()} matching` : ''}
-        </p>
+        <div className="mt-2 flex items-center gap-3">
+          <p className="min-w-0 flex-1 text-[11px] text-ink-faint">
+            {collection.totalCards.toLocaleString()} cards, {collection.uniqueCards.toLocaleString()}{' '}
+            unique
+            {query ? ` · ${rows.length.toLocaleString()} matching` : ''}
+          </p>
+          {/* The whole collection, not the search results: a filtered export
+              would quietly hand ManaBox a fraction of what you own. */}
+          <ShareButton file={() => collectionFile(collection)} label="Send to ManaBox" />
+        </div>
       </div>
 
       <ul className="divide-y divide-line">

@@ -334,7 +334,13 @@ account. What remains is three settings and a push.
    ManaBox → Collection → Export → CSV → share it to Files, then **Import** in
    Lugin. It will say what it thinks the file is and which rows you may already
    own before writing anything, and the header shows "changes to upload" until the
-   push lands.
+   push lands. Decks in that export — the binders ManaBox marks as decks — land in
+   Lugin's deck section, not among your loose cards.
+7. **Try it the other way**, with **Send to ManaBox** on the collection screen or
+   on any deck. It hands ManaBox a file through the Android share sheet, which is
+   the only route there is: ManaBox has no API, so both directions are files. That
+   also means it is a copy, not a sync — sending the same deck twice gives ManaBox
+   a second one rather than updating the first.
 
 Your testers are gated by the OAuth consent screen's test-user list: without a
 Google sign-in the app shows nothing, so an address that isn't on that list gets

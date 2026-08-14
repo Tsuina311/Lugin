@@ -26,6 +26,7 @@ await writeFile(
   `export * from '${root}src/lib/import';
    export * from '${root}src/lib/deck';
    export * from '${root}src/lib/duplicates';
+   export * from '${root}src/lib/export';
    export * from '${root}src/lib/table';`,
 );
 
@@ -41,6 +42,10 @@ await build({
 
 const {
   applyImport,
+  collectionFile,
+  collectionToCsv,
+  deckFile,
+  deckToText,
   findDuplicates,
   inspectImport,
   parseCardLine,
@@ -221,6 +226,37 @@ check('a 100-card singleton list is guessed to be a deck, but flagged', () => {
   assert.equal(part.uncertain, true, 'nothing in the file actually said so');
 });
 
+check('a lone deck exported as a spreadsheet is filed as a deck', () => {
+  // What one deck exported on its own looks like: card columns, no binder named.
+  // Filing this in the collection would be the wrong default — a deck read as
+  // loose cards is invisible afterwards without counting by hand.
+  const rows = Array.from(
+    { length: 99 },
+    (_, i) => `Card Number ${i + 1},cmr,${i + 1},normal,1`,
+  ).join('\n');
+  const part = only(
+    inspectImport(`Name,Set code,Collector number,Foil,Quantity\n${rows}\n"Talrand, Sky Summoner",dtk,71,normal,1\n`),
+  );
+  assert.equal(part.kind, 'deck');
+  assert.equal(part.uncertain, true, 'the file never said so');
+  assert.match(part.reason, /deck-shaped/);
+  assert.equal(part.deck.length, 100, 'and it is readable as a decklist');
+});
+
+check('a binder ManaBox marked as a binder stays a collection, deck-shaped or not', () => {
+  // The same 60 singleton rows, but the file distinguishes binders from decks —
+  // so its saying "binder" outranks anything the shape suggests.
+  const rows = Array.from(
+    { length: 60 },
+    (_, i) => `Card Number ${i + 1},cmr,${i + 1},normal,1,Trade binder,binder`,
+  ).join('\n');
+  const part = only(
+    inspectImport(`Name,Set code,Collector number,Foil,Quantity,Binder Name,Binder Type\n${rows}\n`),
+  );
+  assert.equal(part.kind, 'collection');
+  assert.equal(part.label, 'Trade binder');
+});
+
 check('a big pile of duplicates is a collection, not a deck', () => {
   const cards = Array.from({ length: 60 }, (_, i) => `9 Card Number ${i + 1}`).join('\n');
   const part = only(inspectImport(cards));
@@ -385,6 +421,105 @@ check('a whole ManaBox binder re-imported twice is all duplicates', () => {
     candidates.every(c => c.strength === 'exact'),
     'and every pairing is exact, not a guess',
   );
+});
+
+// --- export, and back again --------------------------------------------------
+//
+// The exports exist to be read by ManaBox, which we can't run here. What we can
+// check is that our own importer — written against ManaBox's real formats, with
+// the fixtures above as evidence — reads back exactly what we wrote. A round trip
+// that loses a commander or a foil marker would lose it in ManaBox too.
+
+check('a deck exported as text comes back as the same deck', () => {
+  const deck = only(inspectImport(MANABOX_DECK)).deck;
+  const part = only(inspectImport(deckToText({ cards: deck })));
+  assert.equal(part.kind, 'deck', 'and is still recognised as a deck, not a pile of cards');
+  assert.equal(part.uncertain, false);
+  const sorted = list => [...list].sort((a, b) => a.name.localeCompare(b.name));
+  assert.deepEqual(sorted(part.deck), sorted(deck));
+});
+
+check('the commander survives the round trip', () => {
+  const text = deckToText({
+    cards: [
+      { name: 'Talrand, Sky Summoner', quantity: 1, section: 'commander' },
+      { name: 'Island', quantity: 30, section: 'main' },
+      { name: 'Negate', quantity: 2, section: 'sideboard' },
+    ],
+  });
+  const part = only(inspectImport(text));
+  assert.equal(section(part.deck, 'Talrand, Sky Summoner'), 'commander', 'a comma in the name too');
+  assert.equal(section(part.deck, 'Island'), 'main');
+  assert.equal(section(part.deck, 'Negate'), 'sideboard');
+});
+
+check('a deck with no commander exports without an empty header', () => {
+  const text = deckToText({ cards: [{ name: 'Island', quantity: 30, section: 'main' }] });
+  assert.equal(text, '30 Island\n');
+});
+
+check('a collection exported as CSV comes back card for card', () => {
+  const binder = inspectImport(MANABOX_CSV).parts.find(p => p.label === 'Main binder');
+  const csv = collectionToCsv(binder.cards);
+  const back = only(inspectImport(csv));
+  assert.equal(back.kind, 'collection', 'and is not mistaken for a deck on the way in');
+  assert.equal(back.cards.length, binder.cards.length);
+  // Printing, finish and count are what a re-import hinges on; the rest is
+  // detail ManaBox will fill in from the set and number itself.
+  const trip = cards =>
+    cards
+      .map(c => `${c.name}|${c.setCode}|${c.collectorNumber}|${c.foil}|${c.quantity}`)
+      .sort();
+  assert.deepEqual(trip(back.cards), trip(binder.cards));
+});
+
+check('an exported collection re-imported into Lugin is all exact duplicates', () => {
+  const binder = inspectImport(MANABOX_CSV).parts.find(p => p.label === 'Main binder');
+  const owned = applyImport([], binder.cards, []);
+  const { candidates, fresh } = findDuplicates(only(inspectImport(collectionToCsv(owned))).cards, owned);
+  assert.equal(fresh.length, 0, 'a round trip invents no cards');
+  assert.ok(candidates.every(c => c.strength === 'exact'));
+});
+
+check('a quoted name and an empty column do not shift the row', () => {
+  // "Erayo, Soratami Ascendant" has the comma; a nameless set and no condition
+  // are the columns a list-sourced row leaves blank.
+  const cards = [
+    { collectorNumber: '66', foil: false, name: 'Erayo, Soratami Ascendant', quantity: 1, setCode: 'chk' },
+    { foil: true, name: 'Sol Ring', quantity: 2, setCode: 'ltr' },
+  ];
+  const back = only(inspectImport(collectionToCsv(cards))).cards;
+  const erayo = back.find(c => c.name.startsWith('Erayo'));
+  assert.equal(erayo.name, 'Erayo, Soratami Ascendant', 'the quoted comma stayed in the name');
+  assert.equal(erayo.setCode.toLowerCase(), 'chk');
+  assert.equal(back.find(c => c.name === 'Sol Ring').foil, true);
+});
+
+check('a collection of bare names is exported as a list, not an unusable CSV', () => {
+  // ManaBox needs a set code or a Scryfall id to place a CSV row, so names alone
+  // have to go as text or they arrive as nothing.
+  const file = collectionFile({ cards: [{ foil: false, name: 'Sol Ring', quantity: 2 }] });
+  assert.equal(file.mime, 'text/plain');
+  assert.match(file.name, /\.txt$/);
+  const back = only(inspectImport(file.text));
+  assert.equal(qty(back.cards, 'Sol Ring'), 2);
+});
+
+check('a collection we know the printings of goes as CSV', () => {
+  const file = collectionFile(
+    { cards: [{ foil: false, name: 'Sol Ring', quantity: 2, setCode: 'ltr' }] },
+    Date.UTC(2026, 7, 14),
+  );
+  assert.equal(file.mime, 'text/csv');
+  assert.equal(file.name, 'lugin-collection-2026-08-14.csv');
+});
+
+check('a deck filename is the deck name, safe for a phone', () => {
+  const file = deckFile({
+    cards: [{ name: 'Island', quantity: 1, section: 'main' }],
+    name: 'Talrand / Sky: Summoner!',
+  });
+  assert.equal(file.name, 'talrand-sky-summoner.txt');
 });
 
 await rm(out, { force: true, recursive: true });

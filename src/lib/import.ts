@@ -188,9 +188,18 @@ const readTable = (text: string): ImportInspection | null => {
   }
 
   const sectioned = iSection >= 0;
+  /** The file distinguishes decks from binders, so its silence means "binder". */
+  const marked = iBinderType >= 0;
+
   const parts: ImportPart[] = [...groups.values()].map(group => {
-    // A section column is the file saying "this is a deck" outright.
-    const kind: ImportKind = sectioned ? 'deck' : group.kind;
+    // Nothing in the file says which this is: no section column, no binder type,
+    // not even a binder name. That is exactly what one deck exported on its own
+    // looks like — ManaBox's collection and binder exports both name the binder —
+    // so the shape of the rows is all there is to go on, and a deck that reads as
+    // loose cards is the mistake worth avoiding here.
+    const guessed =
+      !sectioned && !marked && group.label === undefined && deckShaped(group.cards);
+    const kind: ImportKind = sectioned || guessed ? 'deck' : group.kind;
     const deck = sectioned
       ? rowsToSectionedDeck(rows, iName, iQuantity, iSection, group.label, iBinder)
       : toDeckCards(group.cards);
@@ -200,8 +209,15 @@ const readTable = (text: string): ImportInspection | null => {
       deck,
       kind,
       label: group.label,
-      reason: reasonForTable({ isManaBox, kind, label: group.label, sectioned }),
-      uncertain: !sectioned && !(isManaBox && iBinderType >= 0),
+      reason: reasonForTable({
+        cards: total(group.cards),
+        guessed,
+        isManaBox,
+        kind,
+        label: group.label,
+        sectioned,
+      }),
+      uncertain: !sectioned && !(isManaBox && marked),
     };
   });
 
@@ -237,12 +253,17 @@ const rowsToSectionedDeck = (
 };
 
 const reasonForTable = (o: {
+  cards: number;
+  guessed: boolean;
   isManaBox: boolean;
   kind: ImportKind;
   label?: string;
   sectioned: boolean;
 }): string => {
   if (o.sectioned) return 'The file has a section column, so it is laid out as a deck.';
+  if (o.guessed) {
+    return `${o.cards} cards, no more than ${MAX_COPIES} of any one and no binder named — deck-shaped, though a short list of cards looks the same.`;
+  }
   if (o.kind === 'deck') return `ManaBox marks "${o.label ?? 'this binder'}" as a deck.`;
   if (o.label) return `Cards from your "${o.label}" binder.`;
   return o.isManaBox

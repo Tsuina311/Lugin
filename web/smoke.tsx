@@ -131,6 +131,17 @@ if (!html.includes('2 missing')) {
   console.log('  ok  shortfall badge shows 2 missing (Rhystic Study, Talrand)');
 }
 
+// The phone must not be a one-way door. ManaBox can share a scan in, so the
+// collection has to offer the file that goes back out — the only route there is,
+// given ManaBox has no API to sync against.
+const view = renderToString(<CollectionView collection={collection} />);
+if (!view.includes('Send to ManaBox')) {
+  failed += 1;
+  console.log('  FAIL  no way to send the collection back to ManaBox');
+} else {
+  console.log('  ok  the collection can be sent back to ManaBox');
+}
+
 // The review is the one screen that must never quietly agree to something, so
 // assert it says what it found rather than merely rendering without throwing.
 const review = renderToString(

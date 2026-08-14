@@ -97,6 +97,17 @@ It renders that local copy rather than a fetch, so the collection is there befor
 any network call and an import made in a shop with no signal is kept and pushed
 later.
 
+Traffic with ManaBox goes both ways, in files, because files are the only door it
+has: no API, only import and export. Inbound, the manifest registers Lugin as a
+share target so a scan can be sent straight from ManaBox's share sheet
+(`src/web/sharedImport.ts`). Outbound, `src/lib/export.ts` writes ManaBox's own
+formats — its commented `// COMMANDER` headers, its CSV column names — and
+`shareFile` hands the result back to the sheet. That is a copy each way rather
+than a sync, since nothing on either side tracks the other's identity, which is
+why `deckToText` and `collectionToCsv` are round-tripped through `inspectImport`
+in the tests: a re-import is the only thing that can catch a lost commander or a
+dropped foil marker.
+
 What makes all this nearly free is that `src/core/sync` never knew about Chrome —
 `createDriveRepository` takes an injected `fetch` and a `TokenProvider`, so the
 only genuinely new platform code is `src/platform/web/googleAuth.ts`, which gets
