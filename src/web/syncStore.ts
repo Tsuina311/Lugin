@@ -25,9 +25,9 @@ import { createDriveRepository } from '@/core/sync/drive';
 import { createSyncEngine } from '@/core/sync/engine';
 import type { ApplicationData, DomainKey } from '@/core/sync/model';
 import { UnsupportedSchemaError } from '@/core/sync/repository';
-import type { StoredCollection } from '@/lib/collection';
+import type { CollectionCard, StoredCollection } from '@/lib/collection';
 import { deckFromImport } from '@/lib/deck';
-import { applyImport } from '@/lib/duplicates';
+import { applyImport, findDuplicates } from '@/lib/duplicates';
 import type { ImportDecision, ImportFormat } from '@/lib/import';
 import { webGoogleAuth } from '@/platform/web/googleAuth';
 import { createWebLocalRepository } from '@/platform/web/localRepository';
@@ -151,7 +151,42 @@ void loadLocal().then(() => {
 });
 
 export const syncStore = {
-  connect(): void {
+  /**
+   * Drop scanned cards into the local collection, merging exact printings.
+   *
+   * Same path as an import without the review sheet: a scan that already matches
+   * set + number + foil bumps quantity instead of adding a twin row.
+   */
+async addCards(incoming: CollectionCard[], source = 'scan'): Promise<void> {
+    if (incoming.length === 0) return;
+    set({ error: null, status: 'busy' });
+    try {
+      const before = await local.read();
+      const existing = before.collection.value?.cards ?? [];
+      const { candidates } = findDuplicates(existing, incoming);
+      const cards = applyImport(
+        existing,
+        incoming,
+        candidates.map(c => c.index),
+      );
+      const stored: StoredCollection = {
+        cards,
+        format: before.collection.value?.format ?? 'manabox',
+        importedAt: Date.now(),
+        source,
+      };
+      const data = await local.edit('collection', stored);
+      set({ data, pending: true });
+    } catch (err) {
+      set({ error: describe(err), status: 'error' });
+      return;
+    }
+    await reconcile(true);
+  },
+
+  
+  
+connect(): void {
     set({ error: null, status: 'busy' });
     // Kept in the tap's call stack: the popup is only allowed because a person
     // just touched something.
@@ -167,18 +202,20 @@ export const syncStore = {
     );
   },
 
-  /**
+  
+/**
    * Sign out of Google, keeping this device's data.
    *
    * Deleting it here would be the one irreversible thing this app can do: an
    * import that hasn't pushed yet exists nowhere else.
    */
-  disconnect(): void {
+disconnect(): void {
     void webGoogleAuth.disconnect().finally(() => {
       set({ conflicted: [], error: null, status: 'disconnected', syncedAt: null });
     });
   },
 
+  
   getSnapshot: (): SyncState => state,
 
   /**

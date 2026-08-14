@@ -350,6 +350,14 @@ account. What remains is three settings and a push.
    Either way it is a copy, not a sync: ManaBox has no API, so nothing on either
    side tracks the other's identity, and sending the same deck twice gives ManaBox
    a second deck rather than updating the first.
+8. **Check the collection's value**, which appears under the search box once the
+   price table has downloaded — a few seconds on a first run, then offline. If your
+   ManaBox export carried purchase prices, the change since you bought them sits
+   beside it. Both numbers state how many cards they cover, because a collection is
+   usually part exact and part estimated. See [PRICES.md](PRICES.md).
+
+   For the extension to show the same thing, set `VITE_LUGIN_PRICES_URL` in
+   `.env.local` to `prices.json` beside the deployed app, then rebuild.
 
 Your testers are gated by the OAuth consent screen's test-user list: without a
 Google sign-in the app shows nothing, so an address that isn't on that list gets

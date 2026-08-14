@@ -10,6 +10,7 @@ import { CollectionPanel } from './components/CollectionPanel';
 import { DeckPanel } from './components/DeckPanel';
 import { SearchInput } from './components/Field';
 import { IconButton } from './components/IconButton';
+import { LuginMark } from './components/LuginMark';
 import { MetadataFilter } from './components/MetadataFilter';
 import { PreviewLayer } from './components/PreviewLayer';
 import { SyncButton } from './components/SyncButton';
@@ -256,26 +257,29 @@ export const App = () => {
       <PreviewLayer />
 
       {view === 'hidden' && (
-        <Button
-          className={`fixed top-4 shadow-pop ${side === 'left' ? 'left-4' : 'right-4'}`}
-          icon={Sparkles}
+        <button
+          aria-label="Open Lugin"
+          className={`pointer-events-auto fixed top-4 z-[2147483000] flex h-10 w-10 items-center justify-center rounded-full border border-line-strong bg-panel p-2 shadow-pop transition hover:bg-tint ${
+            side === 'left' ? 'left-4' : 'right-4'
+          }`}
           onClick={() => setView(lastVisibleRef.current)}
-          pill
-          size="md"
-          variant="primary"
+          title="Open Lugin"
+          type="button"
         >
-          Lugin
-        </Button>
+          <LuginMark size={22} variant="color" />
+        </button>
       )}
 
       <div
         className={
           // `overflow-hidden`: a panel that lays itself out taller than the
           // overlay must scroll inside its own list, not spill over the site.
+          // `pointer-events-auto`: the host ignores the mouse so the page stays
+          // usable; only this panel (and the restore button above) catch it.
           view === 'full'
-            ? 'fixed inset-0 z-[2147483000] flex h-screen w-screen flex-col overflow-hidden bg-canvas text-ink shadow-panel'
+            ? 'pointer-events-auto fixed inset-0 z-[2147483000] flex h-screen w-screen flex-col overflow-hidden bg-canvas text-ink shadow-panel'
             : view === 'panel'
-              ? `fixed top-0 z-[2147483000] flex h-screen w-full flex-col overflow-hidden bg-canvas text-ink shadow-panel ${
+              ? `pointer-events-auto fixed top-0 z-[2147483000] flex h-screen w-full flex-col overflow-hidden bg-canvas text-ink shadow-panel ${
                   side === 'left' ? 'left-0 border-r border-line' : 'right-0 border-l border-line'
                 }`
               : 'hidden'

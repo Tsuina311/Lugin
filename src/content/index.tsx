@@ -72,13 +72,18 @@ const mountOverlay = () => {
   if (document.getElementById(HOST_ID)) return;
 
   // A single host element on the page; everything else lives in its shadow DOM.
+  // Full-viewport + `pointer-events: none` so only our own controls catch the
+  // mouse — a zero-size host (the old top-right anchor) let hovers fall through
+  // the floating restore button onto Cardmarket's burger menu underneath.
   const host = document.createElement('div');
   host.id = HOST_ID;
   host.style.all = 'initial';
   host.style.position = 'fixed';
+  host.style.inset = '0';
+  host.style.width = '100%';
+  host.style.height = '100%';
   host.style.zIndex = '2147483647'; // max — sit above the site's own UI.
-  host.style.top = '0';
-  host.style.right = '0';
+  host.style.pointerEvents = 'none';
   document.documentElement.appendChild(host);
 
   const shadow = host.attachShadow({ mode: 'open' });
@@ -89,6 +94,8 @@ const mountOverlay = () => {
 
   const mountPoint = document.createElement('div');
   mountPoint.className = 'lugin-root';
+  mountPoint.style.height = '100%';
+  mountPoint.style.pointerEvents = 'none';
   shadow.appendChild(mountPoint);
 
   // Borrow the host site's typography (and accent color, if it exposes one) so

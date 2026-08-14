@@ -76,6 +76,9 @@ const COLUMNS: readonly { of: (card: CollectionCard) => string | undefined; titl
   { of: card => card.rarity, title: 'Rarity' },
   { of: card => String(card.quantity), title: 'Quantity' },
   { of: card => card.scryfallId, title: 'Scryfall ID' },
+  // Under ManaBox's own header, so a collection that leaves and comes back keeps
+  // its cost basis instead of forgetting what everything cost.
+  { of: card => card.purchasePrice?.toFixed(2), title: 'Purchase price' },
   { of: card => card.condition, title: 'Condition' },
   { of: card => card.language, title: 'Language' },
 ];

@@ -22,8 +22,22 @@ const BUILD = buildVersion(`${process.cwd()}/`);
 //
 // Read through loadEnv rather than import.meta.env: this file is config, it runs
 // in node before the client env exists.
-const EXTENSION_KEY = loadEnv('production', process.cwd(), '')
-  .LUGIN_EXTENSION_KEY?.replace(/\s+/g, '');
+const ENV = loadEnv('production', process.cwd(), '');
+const EXTENSION_KEY = ENV.LUGIN_EXTENSION_KEY?.replace(/\s+/g, '');
+
+// The price table lives next to the phone app on Pages. MV3 workers need an
+// explicit host permission for that origin — CORS alone is not enough, unlike a
+// page fetch. Derived from the same URL the worker reads, so pointing
+// `.env.local` at a local server for a one-off check also opens the right hole.
+const PRICES_HOST = (() => {
+  const raw = ENV.VITE_LUGIN_PRICES_URL?.trim();
+  if (!raw) return null;
+  try {
+    return `${new URL(raw).origin}/*`;
+  } catch {
+    return null;
+  }
+})();
 
 // ---------------------------------------------------------------------------
 // TARGET SITE CONFIGURATION
@@ -98,6 +112,7 @@ export default defineManifest({
     'https://www.mtggoldfish.com/*',
     'https://www.googleapis.com/*',
     'https://oauth2.googleapis.com/*',
+    ...(PRICES_HOST ? [PRICES_HOST] : []),
   ],
 
   icons: ICONS,

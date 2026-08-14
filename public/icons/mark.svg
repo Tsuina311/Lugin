@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Lugin mark  colour. Same geometry as src/ui/components/LuginMark.tsx. -->
+  <g transform="translate(14 4) rotate(18 22 30)">
+    <rect x="6" y="8" width="32" height="44" rx="5" fill="#E53935" stroke="#0B1F3A" stroke-width="2.2"/>
+  </g>
+  <g transform="translate(11 3) rotate(14 22 30)">
+    <rect x="6" y="8" width="32" height="44" rx="5" fill="#FB8C00" stroke="#0B1F3A" stroke-width="2.2"/>
+  </g>
+  <g transform="translate(8 2) rotate(10 22 30)">
+    <rect x="6" y="8" width="32" height="44" rx="5" fill="#FDD835" stroke="#0B1F3A" stroke-width="2.2"/>
+  </g>
+  <g transform="translate(5 1) rotate(6 22 30)">
+    <rect x="6" y="8" width="32" height="44" rx="5" fill="#43A047" stroke="#0B1F3A" stroke-width="2.2"/>
+  </g>
+  <g transform="translate(2 0) rotate(3 22 30)">
+    <rect x="6" y="8" width="32" height="44" rx="5" fill="#1E88E5" stroke="#0B1F3A" stroke-width="2.2"/>
+  </g>
+  <g>
+    <rect x="6" y="8" width="32" height="44" rx="5" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="2.6"/>
+  </g>
+  <path d="M20 18h7.2v22.4H36V48H20V18z" fill="#0B1F3A"/>
+  <path d="M34.5 13.9 L35.23 16.22 L37.1 16.5 L35.23 16.78 L34.5 19.1 L33.77 16.78 L31.9 16.5 L33.77 16.22 Z" fill="#7EB6FF"/>
+  <path d="M15.5 42.8 L16.12 44.78 L18.1 45 L16.12 45.22 L15.5 47.2 L14.88 45.22 L12.9 45 L14.88 44.78 Z" fill="#7EB6FF"/>
+</svg>

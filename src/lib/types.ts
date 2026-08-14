@@ -1,4 +1,5 @@
 import type { CardMetadata } from './mtg';
+import type { PriceState } from './prices';
 
 import type { DomainKey, SyncedApplicationState } from '@/core/sync/model';
 import type { RemoteSnapshot } from '@/core/sync/repository';
@@ -79,7 +80,10 @@ export type RuntimeMessage =
   | { kind: 'google:connect' }
   | { kind: 'google:disconnect' }
   | { kind: 'google:status' }
-  | { kind: 'ping' };
+  | { kind: 'ping' }
+  // The card price table. Fetched by the worker because the overlay sits inside a
+  // page with its own CSP, and cached there because it is megabytes.
+  | { kind: 'prices:get' };
 
 export type RuntimeResponse =
   | { kind: 'api:result'; result: ApiResult }
@@ -88,6 +92,7 @@ export type RuntimeResponse =
   | { kind: 'drive:snapshot'; snapshot: RemoteSnapshot | null }
   | { kind: 'ok' }
   | { kind: 'pong' }
+  | { kind: 'prices:state'; state: PriceState }
   | { code?: RuntimeErrorCode; error: string; kind: 'error' };
 
 /**

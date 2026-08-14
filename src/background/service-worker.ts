@@ -1,3 +1,4 @@
+import { getPrices } from './prices';
 import { getCardMetadata, getCachedMetadata } from './scryfall';
 import { handleSyncMessage } from './sync';
 
@@ -79,6 +80,15 @@ chrome.runtime.onMessage.addListener(
       sync.then(sendResponse).catch((err: unknown) =>
         sendResponse({ error: err instanceof Error ? err.message : String(err), kind: 'error' }),
       );
+      return true;
+    }
+
+    if (message.kind === 'prices:get') {
+      getPrices()
+        .then(state => sendResponse({ kind: 'prices:state', state }))
+        .catch((err: unknown) =>
+          sendResponse({ error: err instanceof Error ? err.message : String(err), kind: 'error' }),
+        );
       return true;
     }
 

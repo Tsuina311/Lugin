@@ -22,6 +22,14 @@ export interface CollectionCard {
    * resolves via Scryfall's `/cards/cardmarket/:id` instead of the default one.
    */
   productId?: string;
+  /**
+   * What one copy cost, in the currency of whoever exported it — ManaBox's
+   * "Purchase price" column, or the unit price from a Cardmarket order.
+   *
+   * Kept per copy rather than per row so a quantity change can't quietly rewrite
+   * history, and treated as EUR when compared against prices (see src/lib/prices.ts).
+   */
+  purchasePrice?: number;
   quantity: number;
   rarity?: string;
   scryfallId?: string;
@@ -127,9 +135,18 @@ export const parseCollection = (
     const iScry = col('scryfall id', 'scryfall_id', 'scryfallid');
     const iCond = col('condition');
     const iLang = col('language', 'lang');
+    const iPaid = col('purchase price', 'purchaseprice', 'price', 'paid');
 
     const at = (fields: string[], i: number) =>
       i >= 0 ? fields[i]?.trim() || undefined : undefined;
+
+    /** A price as a number, tolerating "1,20" and a stray currency symbol. */
+    const paid = (fields: string[]): number | undefined => {
+      const raw = at(fields, iPaid);
+      if (!raw) return undefined;
+      const n = Number.parseFloat(raw.replace(',', '.').replace(/[^\d.]/g, ''));
+      return Number.isFinite(n) && n > 0 ? n : undefined;
+    };
 
     const cards: CollectionCard[] = [];
     for (let r = 1; r < lines.length; r++) {
@@ -144,6 +161,7 @@ export const parseCollection = (
         foil: truthyFoil.has(foilRaw),
         language: at(f, iLang),
         name,
+        purchasePrice: paid(f),
         quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
         rarity: at(f, iRarity),
         scryfallId: at(f, iScry),

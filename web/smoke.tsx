@@ -18,6 +18,7 @@ import { App } from '../src/web/App';
 import { CollectionView } from '../src/web/CollectionView';
 import { DeckList } from '../src/web/DeckList';
 import { ImportScreen } from '../src/web/ImportScreen';
+import { PRICES_CACHE } from '../src/web/priceStore';
 import { SHARE_INBOX, SHARE_KEY_PATH } from '../src/web/sharedImport';
 
 import { buildCollection } from '@/lib/collection';
@@ -205,6 +206,19 @@ const asserts: [string, () => void][] = [
       for (const name of [SHARE_INBOX, SHARE_KEY_PATH]) {
         if (!sw.includes(`'${name}'`)) throw new Error(`the worker no longer names ${name}`);
       }
+    },
+  ],
+  [
+    'the worker spares the price table when it sweeps old caches',
+    () => {
+      // It isn't a stale copy of the app, and re-downloading it on every code
+      // deploy would cost the user megabytes for a change that didn't touch it.
+      const sw = emitted('sw.js');
+      if (!sw.includes(`'${PRICES_CACHE}'`)) {
+        throw new Error(`the worker no longer knows about ${PRICES_CACHE}`);
+      }
+      const sweep = sw.slice(sw.indexOf('caches.keys()'), sw.indexOf('clients.claim'));
+      if (!sweep.includes('PRICES')) throw new Error('the sweep would delete the price table');
     },
   ],
   [

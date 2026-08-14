@@ -1,4 +1,5 @@
 import type { CardMetadata } from './mtg';
+import type { PriceState } from './prices';
 import type {
   ApiRequest,
   ApiResult,
@@ -95,6 +96,21 @@ export const requestScryfall = async (names: string[]): Promise<CardMetadata[]> 
   const message: RuntimeMessage = { kind: 'scryfall:collection', names };
   const response = (await chrome.runtime.sendMessage(message)) as RuntimeResponse;
   if (response.kind === 'scryfall:result') return response.cards;
+  if (response.kind === 'error') throw new Error(response.error);
+  throw new Error(`Unexpected response from background: ${response.kind}`);
+};
+
+/**
+ * The card price table, from the worker's daily copy.
+ *
+ * One table for the whole collection, rather than a lookup per card: valuing
+ * 20,000 rows is then a sum rather than 20,000 requests. See
+ * scripts/build-prices.mjs.
+ */
+export const requestPrices = async (): Promise<PriceState> => {
+  const message: RuntimeMessage = { kind: 'prices:get' };
+  const response = (await chrome.runtime.sendMessage(message)) as RuntimeResponse;
+  if (response.kind === 'prices:state') return response.state;
   if (response.kind === 'error') throw new Error(response.error);
   throw new Error(`Unexpected response from background: ${response.kind}`);
 };

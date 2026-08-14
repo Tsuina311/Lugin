@@ -104,10 +104,10 @@ export const toCurl = (call: CapturedCall): string => {
   const parts = [`curl '${call.url}'`];
   if (call.method && call.method !== 'GET') parts.push(`-X ${call.method}`);
   for (const [k, v] of Object.entries(call.requestHeaders ?? {})) {
-    parts.push(`-H '${k}: ${v.replace(/'/g, "'\\''")}'`);
+    parts.push(`-H '${k}: ${v.replace(/'/g, '\'\\\'\'')}'`);
   }
   if (call.requestBody) {
-    parts.push(`--data-raw '${call.requestBody.replace(/'/g, "'\\''")}'`);
+    parts.push(`--data-raw '${call.requestBody.replace(/'/g, '\'\\\'\'')}'`);
   }
   return parts.join(' \\\n  ');
 };

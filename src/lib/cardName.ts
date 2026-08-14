@@ -24,7 +24,7 @@ export const stripVersion = (name: string): string =>
  * "'" ("Rider's Chaplain") while pages, feeds and decklists often carry "’" —
  * the same card either way, so identity keys shouldn't tell them apart.
  */
-export const straightenQuotes = (name: string): string => name.replace(/[’‘‛`´]/g, "'");
+export const straightenQuotes = (name: string): string => name.replace(/[’‘‛`´]/g, '\'');
 
 /**
  * Stable lookup/cache key for a card: front face, version-stripped, lowercased,

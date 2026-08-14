@@ -12,6 +12,11 @@ name: Deploy phone app to Pages
 on:
   push:
     branches: [main]
+  # Daily, for the price snapshot rather than the code: Scryfall refreshes its
+  # bulk dump every morning, and a collection's value is only as current as the
+  # last deploy. 10:30 UTC leaves comfortable room after their ~09:05 rebuild.
+  schedule:
+    - cron: '30 10 * * *'
   # So a deploy can be triggered without a commit, e.g. after setting the variable.
   workflow_dispatch:
 
@@ -52,8 +57,11 @@ jobs:
 
       - run: yarn install --immutable
 
-      - name: Render checks
-        run: yarn test:web
+      # All of them, not just the render checks: import, prices and sync are where
+      # a quiet mistake costs someone their collection or misprices it, and they
+      # take seconds.
+      - name: Tests
+        run: yarn test
 
       - name: Build
         env:
@@ -63,6 +71,18 @@ jobs:
           LUGIN_BASE_PATH: /${{ github.event.repository.name }}/
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
         run: yarn build:web
+
+      # Every paper price in Magic, distilled to ~3.5 MB (about 1.2 MB over the
+      # wire) so a phone can hold the whole table and value a collection without
+      # asking about one card at a time. Deployed beside the app, which is what
+      # makes it readable by the extension too — Pages sends
+      # `access-control-allow-origin: *`.
+      #
+      # Not fatal: a failed dump should not block a code deploy. The app treats a
+      # missing snapshot as "no prices yet" and says so.
+      - name: Price snapshot
+        continue-on-error: true
+        run: node scripts/build-prices.mjs --out dist-web/prices.json
 
       - uses: actions/configure-pages@v5
 

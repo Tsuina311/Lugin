@@ -149,6 +149,28 @@ export const findDuplicates = (
  * Anything kept is stamped `source: 'import'`, which is what lets a later
  * re-import of the same file replace this batch rather than stack on top of it.
  */
+/**
+ * The cost of one copy after two lots of the same printing are merged.
+ *
+ * A weighted average, because the row now stands for both lots: keeping the older
+ * price would report a gain on copies bought at a different price, and taking the
+ * newer one would rewrite what the first lot cost. When only one side recorded a
+ * price it speaks for all the copies — a wrong-but-stated basis beats none, and
+ * it's the same assumption as buying more of a stock you already hold.
+ */
+const blendCost = (into: CollectionCard, incoming: CollectionCard): number | undefined => {
+  const paid = [into, incoming].filter(c => c.purchasePrice !== undefined);
+  if (paid.length === 0) return undefined;
+  if (paid.length === 1) return paid[0].purchasePrice;
+  const copies = into.quantity + incoming.quantity;
+  if (copies <= 0) return into.purchasePrice;
+  const spent =
+    (into.purchasePrice ?? 0) * into.quantity + (incoming.purchasePrice ?? 0) * incoming.quantity;
+  // Rounded to the cent: a basis carrying six decimals would show up as a gain of
+  // 0,003 € on a card nobody touched.
+  return Math.round((spent / copies) * 100) / 100;
+};
+
 export const applyImport = (
   existing: CollectionCard[],
   incoming: CollectionCard[],
@@ -168,6 +190,7 @@ export const applyImport = (
     const key = printingKey(card);
     const into = mergeable.get(key);
     if (into) {
+      into.purchasePrice = blendCost(into, card);
       into.quantity += card.quantity;
       return;
     }

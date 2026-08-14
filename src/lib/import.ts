@@ -123,6 +123,13 @@ const sectionOf = (value: string | undefined): DeckSection => {
   return 'main';
 };
 
+/** A price cell as a number, tolerating "1,20" and a stray currency symbol. */
+const money = (raw: string | undefined): number | undefined => {
+  if (!raw) return undefined;
+  const value = Number.parseFloat(raw.replace(',', '.').replace(/[^\d.]/g, ''));
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+};
+
 const readTable = (text: string): ImportInspection | null => {
   const table = parseTable(text);
   if (!table) return null;
@@ -141,6 +148,9 @@ const readTable = (text: string): ImportInspection | null => {
   const iLanguage = columnIndex(header, 'language', 'lang');
   const iNumber = columnIndex(header, 'collector number', 'card number', 'collectornumber', 'number');
   const iFoil = columnIndex(header, 'foil', 'finish', 'printing');
+  // What it cost, which is the only way to answer "has my collection gone up?"
+  // later. ManaBox writes it on every scanned row and we used to drop it.
+  const iPaid = columnIndex(header, 'purchase price', 'purchaseprice', 'price', 'paid');
   const iQuantity = columnIndex(header, 'quantity', 'count', 'qty', 'amount');
   const iRarity = columnIndex(header, 'rarity');
   const iScryfall = columnIndex(header, 'scryfall id', 'scryfall_id', 'scryfallid');
@@ -168,6 +178,7 @@ const readTable = (text: string): ImportInspection | null => {
       foil: foil === 'foil' || foil === 'etched' || foil === 'true' || foil === 'yes',
       language: cell(fields, iLanguage),
       name,
+      purchasePrice: money(cell(fields, iPaid)),
       quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
       rarity: cell(fields, iRarity),
       scryfallId: cell(fields, iScryfall),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
 
 import { usePageData } from '../usePageData';
 import { useWideLayout } from '../useWideLayout';
@@ -7,6 +7,7 @@ import { Badge } from './Badge';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { SelectionBar } from './Selection';
+import { ViewToggle } from './ViewToggle';
 import {
   ChevronDown,
   Info,
@@ -32,8 +33,9 @@ import { taskQueue } from '@/content/taskQueue';
 import { wantsStore } from '@/content/wantsStore';
 import { cardKey, frontFaceName, stripVersion } from '@/lib/cardName';
 import { flags } from '@/lib/flags';
-import { requestScryfall, requestScryfallCached } from '@/lib/messaging';
+import { requestPrices, requestScryfall, requestScryfallCached } from '@/lib/messaging';
 import { MANA_VALUE_BUCKETS, manaValueBucket, manaValueLabel, type CardMetadata } from '@/lib/mtg';
+import { money, priceOf } from '@/lib/prices';
 import { addArticleToCart, findCmToken } from '@/sites/cardmarket/cart';
 import {
   COUNTRIES,
@@ -69,6 +71,7 @@ import {
   type WantsIndex,
 } from '@/sites/cardmarket/wants';
 import { taskProgress } from '@/ui/format';
+import { usePrices } from '@/ui/usePrices';
 import { useRowSelection } from '@/ui/useRowSelection';
 
 /** MTG color pips, for the metadata filter chips (C = colorless). */
@@ -205,13 +208,18 @@ interface ScanState {
  *  when the user must reload to solve Cardmarket's "verify you're human" check). */
 const scanStorageKey = (baseUrl: string) => `lugin:sellerScan:${baseUrl}`;
 
-// Market prices and the per-card editions breakdown are slow to fetch (one page
-// request each), so we cache them in chrome.storage too — the user shouldn't
-// have to reload them every session. Stamped with a fetch time and treated as
-// stale after a few days (prices drift), so old data never silently misleads.
+// Live From/Trend still come from a product page (one request each), so we cache
+// them — but the snapshot already colours every row, and a measured sample of
+// printings tracked Cardmarket's Price Trend to the cent (median ratio 1.00).
+// Live fetches are therefore only for close calls and on demand, not a crawl of
+// the whole list. Stamped with a fetch time and treated as stale after a few
+// days (prices drift), so old data never silently misleads.
 const PRICE_STORAGE_KEY = 'lugin:priceGuides';
 const EDITIONS_STORAGE_KEY = 'lugin:editions';
 const PRICE_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+/** Offer / snapshot ratios inside this band are the ones a live page can change. */
+const CLOSE_LO = 0.85;
+const CLOSE_HI = 1.2;
 type StampedPrice = { guide: PriceGuide; ts: number };
 type StampedEditions = { editions: EditionPrice[]; ts: number };
 
@@ -1001,11 +1009,12 @@ export const WantsPanel = () => {
     selection.clear();
   };
 
-  // ---- Market prices (From / Price Trend per product) ----------------------
-  // From/Trend is market data that only exists on a product page, so each card
-  // needs one page fetch (there's no bulk endpoint). We fetch ONE per card — the
-  // cheapest offer that links to a product — not one per printing, and only for
-  // the active tab, so it's as few requests as possible. Paced to stay polite.
+  // ---- Market prices (snapshot trend + live From on demand) ----------------
+  // Scryfall's daily `eur` tracks Cardmarket's Price Trend closely enough to
+  // colour every row for free. Live page fetches only earn their keep for the
+  // live *From* (and a printing-exact trend) when the offer is near market — or
+  // when the user asks for one row. One request per card, paced, still.
+  const { snapshot } = usePrices(requestPrices);
   const [prices, setPrices] = useState<Record<string, PriceGuide>>({});
   const [priceStatus, setPriceStatus] = useState<'idle' | 'loading'>('idle');
   const [priceProgress, setPriceProgress] = useState<{
@@ -1016,16 +1025,54 @@ export const WantsPanel = () => {
   // cardKey currently being fetched, for an inline per-row "loading…" hint.
   const [priceLoadingKey, setPriceLoadingKey] = useState<string | null>(null);
   const priceAbort = useRef<AbortController | null>(null);
+  /** Product URLs we already tried this session (hit or miss), so auto-confirm
+   *  doesn't re-walk the same close calls when the list refilters. */
+  const liveAttempted = useRef(new Set<string>());
 
-  const loadPrices = async () => {
+  const parseEuro = (s?: string): number | undefined => {
+    if (!s) return undefined;
+    const v = Number.parseFloat(s.replace(/[^\d,]/g, '').replace(',', '.'));
+    return Number.isFinite(v) ? v : undefined;
+  };
+
+  const fmtEuro = (n?: number): string | undefined =>
+    n == null ? undefined : `${n.toFixed(2).replace('.', ',')} €`;
+
+  /** Snapshot reference for an offer (by name + foil — seller rows rarely carry set codes). */
+  const snapshotTrend = (o: Pick<ScanMatch, 'isFoil' | 'name'>): number | undefined => {
+    if (!snapshot) return undefined;
+    const price = priceOf({ foil: o.isFoil, name: o.name }, snapshot);
+    return price ? price.cents / 100 : undefined;
+  };
+
+  /** Does this offer need a live page to decide, or is the snapshot already enough? */
+  const needsLive = (o: ScanMatch): boolean => {
+    if (!o.productUrl || prices[o.productUrl]) return false;
+    const offer = o.priceValue;
+    const trend = snapshotTrend(o);
+    if (trend == null || offer == null) return true;
+    const ratio = offer / trend;
+    return ratio >= CLOSE_LO && ratio <= CLOSE_HI;
+  };
+
+  const liveTargets = (
+    mode: 'close' | 'all',
+  ): { key: string; name: string; url: string }[] => {
     const targets: { key: string; name: string; url: string }[] = [];
     const seen = new Set<string>();
     for (const g of visibleGrouped) {
-      const url = g.offers.find(o => o.productUrl)?.productUrl;
-      if (!url || prices[url] || seen.has(url)) continue;
+      const o = g.offers.find(offer => offer.productUrl);
+      const url = o?.productUrl;
+      if (!o || !url || prices[url] || seen.has(url)) continue;
+      if (mode === 'close' && !needsLive(o)) continue;
       seen.add(url);
       targets.push({ key: cardKey(g.name), name: g.name, url });
     }
+    return targets;
+  };
+
+  const loadPrices = async (mode: 'close' | 'all' = 'close') => {
+    const targets = liveTargets(mode).filter(t => !liveAttempted.current.has(t.url));
     if (targets.length === 0) return;
     const controller = new AbortController();
     priceAbort.current = controller;
@@ -1034,6 +1081,7 @@ export const WantsPanel = () => {
       for (let i = 0; i < targets.length; i++) {
         if (controller.signal.aborted) break;
         const t = targets[i];
+        liveAttempted.current.add(t.url);
         setPriceLoadingKey(t.key);
         setPriceProgress({ done: i, name: t.name, total: targets.length });
         try {
@@ -1054,6 +1102,41 @@ export const WantsPanel = () => {
     }
   };
 
+  const confirmOneLive = async (o: ScanMatch) => {
+    const url = o.productUrl;
+    if (!url || prices[url] || priceStatus === 'loading') return;
+    liveAttempted.current.add(url);
+    const controller = new AbortController();
+    priceAbort.current = controller;
+    setPriceStatus('loading');
+    setPriceLoadingKey(cardKey(o.name));
+    setPriceProgress({ done: 0, name: o.name, total: 1 });
+    try {
+      const guide = await fetchPriceGuide(url, controller.signal);
+      setPrices(p => ({ ...p, [url]: guide }));
+      void persistPrice(url, guide);
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        // leave the row on the snapshot figure
+      }
+    } finally {
+      setPriceStatus('idle');
+      setPriceProgress(null);
+      setPriceLoadingKey(null);
+      priceAbort.current = null;
+    }
+  };
+
+  // When the snapshot lands, quietly confirm the close calls on the visible
+  // list — the ones where a live page can still change the colour.
+  useEffect(() => {
+    if (!snapshot || priceStatus === 'loading') return;
+    if (liveTargets('close').filter(t => !liveAttempted.current.has(t.url)).length === 0) return;
+    void loadPrices('close');
+    // Intentionally tied to the visible set + snapshot, not to every price write.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot, visibleGrouped]);
+
   // ---- Other editions / foil (one "Show Offers" request per card) ----------
   // Keyed by cardKey. Each metacard page aggregates every printing + foil, so a
   // single request powers the "other editions / foil" breakdown for a card.
@@ -1071,7 +1154,10 @@ export const WantsPanel = () => {
       const pMap = (stored[PRICE_STORAGE_KEY] ?? {}) as Record<string, StampedPrice>;
       const fresh: Record<string, PriceGuide> = {};
       for (const [url, v] of Object.entries(pMap)) {
-        if (v && now - v.ts < PRICE_MAX_AGE_MS) fresh[url] = v.guide;
+        if (v && now - v.ts < PRICE_MAX_AGE_MS) {
+          fresh[url] = v.guide;
+          liveAttempted.current.add(url);
+        }
       }
       if (Object.keys(fresh).length) setPrices(p => ({ ...fresh, ...p }));
 
@@ -1377,19 +1463,14 @@ export const WantsPanel = () => {
     </div>
   );
 
-  const parseEuro = (s?: string): number | undefined => {
-    if (!s) return undefined;
-    const v = Number.parseFloat(s.replace(/[^\d,]/g, '').replace(',', '.'));
-    return Number.isFinite(v) ? v : undefined;
-  };
-
-  const fmtEuro = (n?: number): string | undefined =>
-    n == null ? undefined : `${n.toFixed(2).replace('.', ',')} €`;
-
   /** Price + market-price comparison (trend / from) for one offer. */
   const renderPrice = (o: ScanMatch, inline = false) => {
     const guide = o.productUrl ? prices[o.productUrl] : undefined;
-    const trendVal = parseEuro(guide?.trend);
+    const snap = snapshotTrend(o);
+    const liveTrend = parseEuro(guide?.trend);
+    const trendVal = liveTrend ?? snap;
+    const trendLabel = guide?.trend ?? (snap != null ? money(Math.round(snap * 100)) : undefined);
+    const live = liveTrend != null;
     const ratio = trendVal && o.priceValue ? o.priceValue / trendVal : null;
     // Green when at/below trend (good deal), amber when notably above.
     const priceColor =
@@ -1401,9 +1482,26 @@ export const WantsPanel = () => {
             ? 'text-slate-100'
             : 'text-amber-300';
     const loading = priceStatus === 'loading' && !guide && priceLoadingKey === cardKey(o.name);
-    const trend = guide?.trend && (
-      <span className="whitespace-nowrap">
-        trend {guide.trend}
+    const canConfirm = !!o.productUrl && !guide && !loading;
+    const askLive = (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void confirmOneLive(o);
+    };
+    const trend = trendLabel && (
+      <span
+        className={`whitespace-nowrap ${canConfirm ? 'cursor-pointer hover:text-slate-300' : ''}`}
+        onClick={canConfirm ? askLive : undefined}
+        title={
+          canConfirm
+            ? 'Snapshot trend — click for Cardmarket’s live From / Trend'
+            : live
+              ? 'Cardmarket live trend'
+              : undefined
+        }
+      >
+        trend {trendLabel}
+        {!live && snap != null ? <span className="text-slate-600"> ~</span> : null}
         {ratio != null && ratio <= 1.0 && <span className="text-emerald-400"> ✓</span>}
       </span>
     );
@@ -1423,12 +1521,28 @@ export const WantsPanel = () => {
     if (inline) {
       return (
         <div className="flex items-center justify-end gap-1.5">
-          {(guide?.trend || guide?.from || spinner) && (
+          {(trendLabel || guide?.from || spinner) && (
             <span className="grid grid-cols-[auto_1fr_0.6rem] items-baseline gap-x-1 text-[9px] leading-[1.3] text-slate-500">
-              {guide?.trend && (
+              {trendLabel && (
                 <>
-                  <span>trend</span>
-                  <span className="text-right tabular-nums">{guide.trend}</span>
+                  <span
+                    className={canConfirm ? 'cursor-pointer hover:text-slate-300' : undefined}
+                    onClick={canConfirm ? askLive : undefined}
+                    title={
+                      canConfirm
+                        ? 'Snapshot trend — click for Cardmarket’s live From / Trend'
+                        : undefined
+                    }
+                  >
+                    trend
+                  </span>
+                  <span
+                    className={`text-right tabular-nums ${canConfirm ? 'cursor-pointer hover:text-slate-300' : ''}`}
+                    onClick={canConfirm ? askLive : undefined}
+                  >
+                    {trendLabel}
+                    {!live && snap != null ? <span className="text-slate-600"> ~</span> : null}
+                  </span>
                   <span className="text-emerald-400">
                     {ratio != null && ratio <= 1.0 ? '✓' : ''}
                   </span>
@@ -2751,42 +2865,7 @@ export const WantsPanel = () => {
                       )}
                     </span>
                     <div className="ml-auto flex items-center gap-1.5">
-                      <div
-                        className="flex overflow-hidden rounded border border-slate-700"
-                        role="group"
-                        title="Switch between list and box view"
-                      >
-                        <button
-                          aria-label="List view"
-                          aria-pressed={resultsView === 'list'}
-                          className={`flex h-6 w-7 items-center justify-center ${
-                            resultsView === 'list'
-                              ? 'bg-slate-700 text-slate-100'
-                              : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                          }`}
-                          onClick={() => setResultsView('list')}
-                          type="button"
-                        >
-                          <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M3 4.5h14v2H3v-2Zm0 4.5h14v2H3v-2Zm0 4.5h14v2H3v-2Z" />
-                          </svg>
-                        </button>
-                        <button
-                          aria-label="Box view"
-                          aria-pressed={resultsView === 'box'}
-                          className={`flex h-6 w-7 items-center justify-center ${
-                            resultsView === 'box'
-                              ? 'bg-slate-700 text-slate-100'
-                              : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                          }`}
-                          onClick={() => setResultsView('box')}
-                          type="button"
-                        >
-                          <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M3 3.5h6v6H3v-6Zm8 0h6v6h-6v-6ZM3 11.5h6v6H3v-6Zm8 0h6v6h-6v-6Z" />
-                          </svg>
-                        </button>
-                      </div>
+                      <ViewToggle onChange={setResultsView} value={resultsView} />
                       {/* Wide, the filters are permanently in the sidebar. */}
                       {!wide && (
                         <Button
@@ -2825,15 +2904,30 @@ export const WantsPanel = () => {
                             {priceProgress?.name ? ` · ${priceProgress.name}` : ''}
                           </Button>
                         ) : (
-                          <Button
-                            className="font-semibold"
-                            onClick={loadPrices}
-                            size="xs"
-                            title="Fetch From / Price Trend for each card (one request per product)"
-                            variant="neutral"
-                          >
-                            Load prices
-                          </Button>
+                          (() => {
+                            const close = liveTargets('close').filter(
+                              t => !liveAttempted.current.has(t.url),
+                            ).length;
+                            const rest = liveTargets('all').filter(
+                              t => !liveAttempted.current.has(t.url),
+                            ).length;
+                            if (close === 0 && rest === 0) return null;
+                            return (
+                              <Button
+                                className="font-semibold"
+                                onClick={() => void loadPrices(close > 0 ? 'close' : 'all')}
+                                size="xs"
+                                title={
+                                  close > 0
+                                    ? 'Snapshot already colours every row. Fetches Cardmarket’s live From/Trend only for offers near market.'
+                                    : 'Fetch Cardmarket’s live From/Trend for every visible card (on demand).'
+                                }
+                                variant="neutral"
+                              >
+                                {close > 0 ? `Confirm ${close} live` : 'Check all live'}
+                              </Button>
+                            );
+                          })()
                         ))}
                       {flags.devTools && (
                         <>

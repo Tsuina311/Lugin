@@ -10,6 +10,7 @@ import { EmptyState } from './EmptyState';
 import { TextInput, SearchInput, Select } from './Field';
 import { IconButton } from './IconButton';
 import { SelectionBar } from './Selection';
+import { ViewToggle } from './ViewToggle';
 import { useCardPreview } from './cardPreview';
 import {
   ArrowDownWideNarrow,
@@ -19,8 +20,6 @@ import {
   ClipboardList,
   Columns2,
   ExternalLink,
-  LayoutGrid,
-  List,
   Loader2,
   Pencil,
   RefreshCw,
@@ -796,22 +795,7 @@ export const WantListsPanel = () => {
     if (cards.length > 0) runBulk(source, { kind: copy ? 'copy' : 'move', target }, cards);
   };
 
-  const shapeToggle = (
-    <span className="flex items-center gap-0.5">
-      <IconButton
-        active={shape === 'list'}
-        icon={List}
-        label="Show as rows"
-        onClick={() => chooseShape('list')}
-      />
-      <IconButton
-        active={shape === 'box'}
-        icon={LayoutGrid}
-        label="Show as card images"
-        onClick={() => chooseShape('box')}
-      />
-    </span>
-  );
+  const shapeToggle = <ViewToggle onChange={chooseShape} value={shape} />;
 
   return (
     // `h-full`, not `flex-1`: the tab wrapper is a plain block, so a flex child

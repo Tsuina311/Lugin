@@ -133,6 +133,12 @@ const CACHE = 'lugin-shell-${BUILD.id}';
 const INBOX = 'lugin-share-inbox';
 const INBOX_KEY = SHELL + 'shared-import';
 
+// The card price table, ~1.2 MB over the wire and re-fetched daily on its own
+// schedule. It survives the sweep below for the same reason the inbox does: it
+// isn't a stale copy of the app, and throwing it away every deploy would make a
+// code fix cost the user a download they didn't ask for.
+const PRICES = 'lugin-prices';
+
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(caches.open(CACHE).then(cache => cache.add(SHELL)).catch(() => {}));
@@ -142,7 +148,9 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys.filter(key => key !== CACHE && key !== INBOX).map(key => caches.delete(key)),
+        keys
+          .filter(key => key !== CACHE && key !== INBOX && key !== PRICES)
+          .map(key => caches.delete(key)),
       ))
       .then(() => self.clients.claim()),
   );

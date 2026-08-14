@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
+import { Badge } from './Badge';
 import { Button } from './Button';
+import { SearchInput } from './Field';
+import { IconButton } from './IconButton';
 import { ImportReview } from './ImportReview';
+import { PriceCheck } from './PriceCheck';
 import { SelectionBar } from './Selection';
+import { ViewToggle } from './ViewToggle';
+import { Pencil, RefreshCw } from './icons';
 import { useSequentialImages } from './useSequentialImages';
 
 import { cardImageOverrideStore } from '@/content/cardImageOverrideStore';
@@ -12,9 +18,11 @@ import { expansionIconStore, normalizeSetName } from '@/content/expansionIconSto
 import { previewStore } from '@/content/previewStore';
 import { purchaseStore } from '@/content/purchaseStore';
 import { cardKey, stripVersion } from '@/lib/cardName';
+import { flags } from '@/lib/flags';
 import { inspectImport, type ImportDecision, type ImportInspection } from '@/lib/import';
-import { requestScryfall, requestScryfallCached } from '@/lib/messaging';
+import { requestPrices, requestScryfall, requestScryfallCached } from '@/lib/messaging';
 import { MANA_VALUE_BUCKETS, manaValueBucket, manaValueLabel, type CardMetadata } from '@/lib/mtg';
+import { collectionValue, money, signedMoney } from '@/lib/prices';
 import { fetchCardPrints, type CardPrint } from '@/lib/prints';
 import {
   currentLang,
@@ -22,6 +30,7 @@ import {
   isNonCardName,
   type PurchaseRecord,
 } from '@/sites/cardmarket/wants';
+import { usePrices } from '@/ui/usePrices';
 import { useRowSelection } from '@/ui/useRowSelection';
 
 // Quick primary-type toggles that filter the collection directly.
@@ -373,6 +382,16 @@ export const CollectionPanel = () => {
     return map;
   }, [purchases]);
 
+  // Market value, from the price table the background worker keeps. A sum over
+  // rows, so it costs nothing to keep current — unlike the per-card trend lookups
+  // in the Cards tab, which are one page fetch each and exist for a different
+  // question (is this particular offer a good price?).
+  const prices = usePrices(requestPrices);
+  const worth = useMemo(
+    () => collectionValue(collection?.cards ?? [], prices.snapshot),
+    [collection, prices.snapshot],
+  );
+
   // Total paid across all Cardmarket orders (unit price × line quantity), with
   // shipping tracked separately. Older indexes may lack per-line qty; fall back
   // to 1 there until the next re-sync.
@@ -417,13 +436,10 @@ export const CollectionPanel = () => {
           .join('\n')
       : 'You bought this card before';
     return (
-      <span
-        className="rounded bg-violet-500/25 px-1 text-[9px] font-semibold text-violet-200"
-        title={tip}
-      >
+      <Badge title={tip} tone="accent">
         {label}
-        {entry.count > 1 && <span className="ml-1 opacity-70">×{entry.count}</span>}
-      </span>
+        {entry.count > 1 ? ` ×${entry.count}` : ''}
+      </Badge>
     );
   };
 
@@ -789,43 +805,6 @@ export const CollectionPanel = () => {
     );
   };
 
-  const imageIcon = (row: CollectionRow) => {
-    const meta = metaByName[cardKey(row.name)];
-    const faces = meta?.faceImages;
-    const flippable = !!faces && faces.length >= 2;
-    const url = rowImageUrl(row);
-    if (!url) return null;
-    const show = openPreview(row.key, url, row.name, flippable, faces);
-    return (
-      <span
-        aria-label={flippable ? 'Preview card image — click to flip' : 'Preview card image'}
-        className={`inline-flex h-4 w-4 flex-none items-center justify-center rounded hover:text-sky-300 ${
-          flippable ? 'cursor-pointer text-sky-400' : 'cursor-zoom-in text-slate-400'
-        }`}
-        onClick={e => {
-          if (!flippable) return;
-          e.preventDefault();
-          e.stopPropagation();
-          previewStore.flip();
-        }}
-        onMouseEnter={show}
-        onMouseLeave={() => previewStore.hide()}
-        onMouseMove={e => previewStore.move(e.clientX, e.clientY)}
-        title={flippable ? 'Click to flip to the other side' : undefined}
-      >
-        {flippable ? (
-          <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M10 3.5a6.5 6.5 0 015.9 3.8l1.2-1.2v3.9h-3.9l1.5-1.5A5 5 0 0010 5V3.5zm0 13a6.5 6.5 0 01-5.9-3.8L2.9 13.9V10h3.9l-1.5 1.5A5 5 0 0010 15v1.5z" />
-          </svg>
-        ) : (
-          <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M4 3.5h12a1.5 1.5 0 011.5 1.5v10A1.5 1.5 0 0116 16.5H4A1.5 1.5 0 012.5 15V5A1.5 1.5 0 014 3.5zm0 1.5v6.2l3.2-3.2 3 3 3.3-3.3L16 10.4V5H4zm3 1.6a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4z" />
-          </svg>
-        )}
-      </span>
-    );
-  };
-
   // Box view: resolve each visible row's image and load them one at a time so
   // the grid fills in progressively instead of firing every request at once.
   const boxSrcs = useMemo(
@@ -890,6 +869,30 @@ export const CollectionPanel = () => {
             </Button>
           )}
         </div>
+        {/* What the cards are worth now, which is a different question from what
+            they cost — and answered without a single request per card, from the
+            daily price table the worker keeps. */}
+        {worth.copies > 0 && (
+          <div className="mt-1 text-[10px] text-slate-400">
+            <span className="font-semibold text-slate-200">Worth: {money(worth.cents)}</span>
+            {worth.gain !== null && (
+              <span
+                className={`ml-1 font-semibold ${worth.gain >= 0 ? 'text-emerald-300' : 'text-red-300'}`}
+                title={`Against ${money(worth.cost)} paid for ${worth.costCopies} card${
+                  worth.costCopies === 1 ? '' : 's'
+                }`}
+              >
+                {signedMoney(worth.gain)}
+              </span>
+            )}
+            <span className="ml-1 text-slate-500">
+              · {worth.copies} priced
+              {worth.approxCopies > 0 && ` · ${worth.approxCopies} estimated`}
+              {worth.unpricedCopies > 0 && ` · ${worth.unpricedCopies} without a price`}
+              {prices.stale && ' · from an older download'}
+            </span>
+          </div>
+        )}
         {totalSpent.grand > 0 && (
           <div className="mt-1 text-[10px] text-slate-400">
             <span className="font-semibold text-emerald-300">
@@ -904,6 +907,11 @@ export const CollectionPanel = () => {
               {totalSpent.unpriced > 0 && ` · ${totalSpent.unpriced} without a price`}
             </span>
           </div>
+        )}
+        {/* Before trusting the snapshot to judge a single offer, measure it
+            against the numbers Cardmarket shows for the same printings. */}
+        {flags.devTools && collection && (
+          <PriceCheck cards={collection.cards} snapshot={prices.snapshot} />
         )}
         <div className="mt-1 text-[10px] text-slate-500">
           Export from ManaBox (Collection → Export → CSV) and upload it here — a whole collection,
@@ -920,11 +928,11 @@ export const CollectionPanel = () => {
       </div>
 
       {collection && (
-        <div className="border-b border-slate-800 p-2">
+        <div className="border-b border-line p-2">
           <div className="flex items-center gap-2">
-            <input
-              className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-200 outline-none focus:border-sky-500"
+            <SearchInput
               onChange={e => setSearch(e.target.value)}
+              onClear={() => setSearch('')}
               placeholder="Search your collection…"
               value={search}
             />
@@ -963,14 +971,14 @@ export const CollectionPanel = () => {
               </Button>
             ))}
             {fType && metaState === 'loading' && (
-              <span className="text-[10px] text-slate-500">loading card data…</span>
+              <span className="text-[10px] text-ink-faint">loading card data…</span>
             )}
           </div>
 
           {showFilters && (
-            <div className="mt-2 space-y-2 rounded border border-slate-800 bg-slate-950/60 p-2">
+            <div className="mt-2 space-y-2 rounded border border-line bg-panel p-2">
               <input
-                className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-200 outline-none focus:border-sky-500"
+                className="h-6 w-full rounded border border-line-strong bg-raised px-2 text-xs text-ink outline-none placeholder:text-ink-faint focus:border-accent"
                 onChange={e => setFQuery(e.target.value)}
                 placeholder="Combine words, e.g. elf legendary black…"
                 value={fQuery}
@@ -998,7 +1006,7 @@ export const CollectionPanel = () => {
                   <button
                     key={code}
                     className={`h-5 w-5 rounded-full text-[10px] font-bold ${cls} ${
-                      fColors.has(code) ? 'ring-2 ring-sky-400' : 'opacity-60 hover:opacity-100'
+                      fColors.has(code) ? 'ring-2 ring-accent' : 'opacity-60 hover:opacity-100'
                     }`}
                     onClick={() => toggleColor(code)}
                     title={code === 'C' ? 'Colorless' : code}
@@ -1009,7 +1017,7 @@ export const CollectionPanel = () => {
                 ))}
                 {availableSubtypes.length > 0 && (
                   <select
-                    className="ml-1 rounded border border-slate-700 bg-slate-950 px-1 py-0.5 text-[11px] text-slate-200 outline-none focus:border-sky-500"
+                    className="ml-1 h-6 rounded border border-line-strong bg-raised px-1 text-xs text-ink outline-none focus:border-accent"
                     onChange={e => setFSubtype(e.target.value)}
                     value={fSubtype}
                   >
@@ -1039,14 +1047,14 @@ export const CollectionPanel = () => {
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-1">
-                <span className="text-[10px] text-slate-500">Mana:</span>
+                <span className="text-[10px] text-ink-faint">Mana:</span>
                 {MANA_VALUE_BUCKETS.map(v => (
                   <button
                     key={v}
                     className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
                       fCmc.has(v)
-                        ? 'bg-slate-600 text-slate-100 ring-2 ring-sky-400'
-                        : 'bg-slate-800 text-slate-300 opacity-60 hover:opacity-100'
+                        ? 'bg-tint-strong text-ink ring-2 ring-accent'
+                        : 'bg-tint text-ink-muted opacity-60 hover:opacity-100'
                     }`}
                     onClick={() =>
                       setFCmc(prev => {
@@ -1063,7 +1071,7 @@ export const CollectionPanel = () => {
                   </button>
                 ))}
               </div>
-              <div className="text-[10px] text-slate-500">
+              <div className="text-[10px] text-ink-faint">
                 {metaState === 'loading'
                   ? 'Loading card data from Scryfall…'
                   : metaState === 'error'
@@ -1094,46 +1102,13 @@ export const CollectionPanel = () => {
           </div>
         ) : (
           <>
-            <div className="sticky top-0 z-10 flex items-center gap-2 bg-slate-900 px-2 py-1 text-[10px] text-slate-500">
+            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-line/60 bg-panel px-2 py-1 text-[10px] text-ink-faint">
               <span>
                 {visibleRows.length} card{visibleRows.length === 1 ? '' : 's'}
               </span>
-              <div
-                className="ml-auto flex overflow-hidden rounded border border-slate-700"
-                role="group"
-                title="Switch between list and box view"
-              >
-                <button
-                  aria-label="List view"
-                  aria-pressed={resultsView === 'list'}
-                  className={`flex h-6 w-7 items-center justify-center ${
-                    resultsView === 'list'
-                      ? 'bg-slate-700 text-slate-100'
-                      : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                  }`}
-                  onClick={() => setResultsView('list')}
-                  type="button"
-                >
-                  <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M3 4.5h14v2H3v-2Zm0 4.5h14v2H3v-2Zm0 4.5h14v2H3v-2Z" />
-                  </svg>
-                </button>
-                <button
-                  aria-label="Box view"
-                  aria-pressed={resultsView === 'box'}
-                  className={`flex h-6 w-7 items-center justify-center ${
-                    resultsView === 'box'
-                      ? 'bg-slate-700 text-slate-100'
-                      : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                  }`}
-                  onClick={() => setResultsView('box')}
-                  type="button"
-                >
-                  <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M3 3.5h6v6H3v-6Zm8 0h6v6h-6v-6ZM3 11.5h6v6H3v-6Zm8 0h6v6h-6v-6Z" />
-                  </svg>
-                </button>
-              </div>
+              <span className="ml-auto">
+                <ViewToggle onChange={setResultsView} value={resultsView} />
+              </span>
             </div>
             {resultsView === 'box' ? (
               <div
@@ -1283,112 +1258,94 @@ export const CollectionPanel = () => {
                 })}
               </div>
             ) : (
-              <ul
-                className="list-none divide-y divide-slate-800/60 outline-none"
-                {...selection.listProps}
-              >
+              <ul className="outline-none" {...selection.listProps}>
                 {visibleRows.map(r => {
-                  const boughtEds = boughtEditions(r.name);
                   const override = overrides[r.key];
+                  const url = rowImageUrl(r);
+                  const meta = metaByName[cardKey(r.name)];
+                  const faces = meta?.faceImages;
+                  const flippable = !!faces && faces.length >= 2;
+                  const primary = r.editions[0];
+                  const setTip = r.editions
+                    .map(
+                      e =>
+                        `${e.setName ?? e.setCode ?? '?'}${
+                          e.collectorNumber ? ` #${e.collectorNumber}` : ''
+                        }${e.foil ? ' · foil' : ''} · ×${e.qty}`,
+                    )
+                    .join('\n');
+                  const show = url
+                    ? openPreview(r.key, url, r.name, flippable, faces)
+                    : undefined;
                   return (
                     <li
                       key={r.key}
                       {...selection.rowProps(
                         r.key,
-                        'flex items-center gap-2 px-2 py-1.5 text-[12px]',
+                        'flex items-center gap-1.5 border-b border-line/60 px-2 py-1 hover:bg-tint',
                       )}
                     >
-                      {imageIcon(r)}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate text-slate-100">{r.name}</span>
-                          {r.foil > 0 && (
-                            <span className="rounded bg-amber-500/20 px-1 text-[9px] font-semibold text-amber-300">
-                              {r.foil} foil
-                            </span>
-                          )}
-                          {purchasedTag(r.name)}
-                          {override && (
-                            <span
-                              className="rounded bg-sky-500/20 px-1 text-[9px] font-semibold text-sky-200"
-                              title={`Version set to ${override.setName ?? override.setCode ?? 'a chosen printing'}${
-                                override.collectorNumber ? ` #${override.collectorNumber}` : ''
-                              }`}
-                            >
-                              {override.setCode?.toUpperCase() ?? 'custom'}
-                              {override.collectorNumber ? ` #${override.collectorNumber}` : ''}
-                            </span>
-                          )}
-                          <Button
-                            className="ml-auto flex-none"
-                            onClick={() => openPicker(r)}
-                            size="xs"
-                            title="Pick the exact printing you own"
-                            variant="subtle"
-                          >
-                            not this version?
-                          </Button>
-                          {override && (
-                            <Button
-                              className="flex-none"
-                              onClick={() => void cardImageOverrideStore.clear(r.key)}
-                              size="xs"
-                              title="Reset to the automatic version"
-                              variant="subtle"
-                            >
-                              reset
-                            </Button>
-                          )}
-                        </div>
-                        {r.editions.length > 1 ? (
-                          // Multiple printings owned — give each edition its own line
-                          // with its exact image, set + number, finish and quantity.
-                          <ul className="mt-0.5 list-none space-y-0.5">
-                            {r.editions.map((e, i) => (
-                              <li
-                                key={`${e.setCode ?? e.setName ?? '?'}|${e.collectorNumber ?? ''}|${
-                                  e.foil ? 'f' : 'n'
-                                }|${i}`}
-                                className="flex items-center gap-1.5 text-[10px] text-slate-400"
-                              >
-                                {editionImageIcon(r, e, i)}
-                                {expansionIcon(e.setName ?? e.setCode) ?? (
-                                  <span className="truncate">
-                                    {e.setName ?? e.setCode ?? 'Unknown set'}
-                                  </span>
-                                )}
-                                {e.collectorNumber && (
-                                  <span className="flex-none text-slate-500">
-                                    #{e.collectorNumber}
-                                  </span>
-                                )}
-                                {e.foil && (
-                                  <span className="rounded bg-amber-500/20 px-1 text-[9px] font-semibold text-amber-300">
-                                    foil
-                                  </span>
-                                )}
-                                <span className="ml-auto flex-none tabular-nums text-slate-400">
-                                  ×{e.qty}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          r.editions.length === 1 && (
-                            <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                              {editionBadge(r, r.editions[0], 0)}
-                            </div>
-                          )
-                        )}
-                        {boughtEds.length > 0 && (
-                          <div className="mt-0.5 text-[10px] text-violet-300/80">
-                            bought: <span className="text-violet-200">{boughtEds.join(', ')}</span>
-                          </div>
-                        )}
-                      </div>
-                      <span className="w-8 flex-none text-right font-semibold tabular-nums text-slate-300">
-                        ×{r.total}
+                      <span
+                        className={`min-w-0 flex-1 truncate text-xs text-ink ${
+                          url ? 'cursor-zoom-in' : ''
+                        }`}
+                        onClick={
+                          flippable
+                            ? e => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                previewStore.flip();
+                              }
+                            : undefined
+                        }
+                        onMouseEnter={show}
+                        onMouseLeave={url ? () => previewStore.hide() : undefined}
+                        onMouseMove={
+                          url ? e => previewStore.move(e.clientX, e.clientY) : undefined
+                        }
+                        title={flippable ? 'Click to flip to the other side' : undefined}
+                      >
+                        {r.name}
                       </span>
+                      {r.foil > 0 && (
+                        <Badge title={`${r.foil} foil`} tone="warn">
+                          {r.foil}f
+                        </Badge>
+                      )}
+                      {purchasedTag(r.name)}
+                      {override && (
+                        <Badge
+                          title={`Version set to ${override.setName ?? override.setCode ?? 'a chosen printing'}${
+                            override.collectorNumber ? ` #${override.collectorNumber}` : ''
+                          }`}
+                          tone="accent"
+                        >
+                          {override.setCode?.toUpperCase() ?? 'custom'}
+                          {override.collectorNumber ? ` #${override.collectorNumber}` : ''}
+                        </Badge>
+                      )}
+                      {r.editions.length > 1 ? (
+                        <Badge title={setTip} tone="neutral">
+                          +{r.editions.length - 1}
+                        </Badge>
+                      ) : primary?.setCode || primary?.setName ? (
+                        <Badge title={setTip} tone="neutral">
+                          {(primary.setCode ?? primary.setName ?? '?').toString().toUpperCase()}
+                        </Badge>
+                      ) : null}
+                      <Badge className="ml-auto">{r.total}</Badge>
+                      <IconButton
+                        icon={Pencil}
+                        label="Pick the exact printing you own"
+                        onClick={() => openPicker(r)}
+                      />
+                      {override && (
+                        <IconButton
+                          icon={RefreshCw}
+                          label="Reset to the automatic version"
+                          onClick={() => void cardImageOverrideStore.clear(r.key)}
+                        />
+                      )}
                     </li>
                   );
                 })}

@@ -27,6 +27,7 @@ await writeFile(
    export * from '${root}src/lib/deck';
    export * from '${root}src/lib/duplicates';
    export * from '${root}src/lib/export';
+   export * from '${root}src/lib/prices';
    export * from '${root}src/lib/table';`,
 );
 
@@ -44,13 +45,16 @@ const {
   applyImport,
   collectionFile,
   collectionToCsv,
+  collectionValue,
   deckFile,
   deckToText,
   findDuplicates,
   inspectImport,
+  money,
   parseCardLine,
   parseDeckList,
   parseTable,
+  priceOf,
   sectionHeader,
 } = await import(pathToFileURL(bundle).href);
 
@@ -520,6 +524,155 @@ check('a deck filename is the deck name, safe for a phone', () => {
     name: 'Talrand / Sky: Summoner!',
   });
   assert.equal(file.name, 'talrand-sky-summoner.txt');
+});
+
+// --- what it cost, and what it's worth ---------------------------------------
+
+check('ManaBox CSV: the purchase price is kept, not dropped', () => {
+  const binder = inspectImport(MANABOX_CSV).parts.find(p => p.label === 'Main binder');
+  const sol = binder.cards.find(c => c.name === 'Sol Ring');
+  assert.equal(sol.purchasePrice, 1.2, 'the column ManaBox writes on every scanned row');
+  const erayo = binder.cards.find(c => c.name.startsWith('Erayo'));
+  assert.equal(erayo.purchasePrice, 0.5);
+});
+
+check('a price written the European way is still a number', () => {
+  const part = only(
+    inspectImport('Name,Quantity,Purchase price\nSol Ring,1,"1,20 €"\n'),
+  );
+  assert.equal(part.cards[0].purchasePrice, 1.2);
+});
+
+check('a cost basis survives the round trip out and back', () => {
+  const before = [
+    { foil: false, name: 'Sol Ring', purchasePrice: 1.2, quantity: 2, setCode: 'ltr' },
+  ];
+  const back = only(inspectImport(collectionToCsv(before))).cards;
+  assert.equal(back[0].purchasePrice, 1.2);
+});
+
+// A snapshot in the shape scripts/build-prices.mjs writes: cents, and 0 for
+// "no price" — which is unambiguous, since no card is free.
+const SNAPSHOT = {
+  currency: ['eur', 'eur_foil', 'usd', 'usd_foil'],
+  generated: '2026-08-14T09:05:00.000Z',
+  names: { solring: [80, 450, 95, 500] },
+  printings: {
+    'dtk|71': [30, 0, 40, 0],
+    'ltr|123': [120, 450, 140, 500],
+  },
+  source: 'scryfall:default_cards',
+  unit: 'cents',
+  version: 1,
+};
+
+const owned = (over = {}) => ({ foil: false, name: 'Sol Ring', quantity: 1, ...over });
+
+check('a printing is priced by its own printing', () => {
+  const price = priceOf(owned({ collectorNumber: '123', setCode: 'ltr' }), SNAPSHOT);
+  assert.deepEqual(price, { cents: 120, exact: true });
+});
+
+check('a foil is priced as a foil', () => {
+  const price = priceOf(owned({ collectorNumber: '123', foil: true, setCode: 'ltr' }), SNAPSHOT);
+  assert.equal(price.cents, 450);
+});
+
+check('a foil with no foil price falls back, and says it is not exact', () => {
+  // Better a low number than none: dropping the card would understate the total
+  // by more than quoting the non-foil does.
+  const price = priceOf(
+    owned({ collectorNumber: '71', foil: true, name: 'Talrand, Sky Summoner', setCode: 'dtk' }),
+    SNAPSHOT,
+  );
+  assert.deepEqual(price, { cents: 30, exact: false });
+});
+
+check('a bare name is priced by name, and flagged as a guess', () => {
+  const price = priceOf(owned(), SNAPSHOT);
+  assert.deepEqual(price, { cents: 80, exact: false }, 'the cheapest printing, so a floor');
+});
+
+check('a card nobody has a price for is not priced', () => {
+  assert.equal(priceOf(owned({ name: 'Not A Real Card' }), SNAPSHOT), null);
+});
+
+check('the same card costs more in dollars', () => {
+  const card = owned({ collectorNumber: '123', setCode: 'ltr' });
+  assert.equal(priceOf(card, SNAPSHOT, 'usd').cents, 140);
+});
+
+check('quantities count: four copies are worth four', () => {
+  const value = collectionValue(
+    [owned({ collectorNumber: '123', quantity: 4, setCode: 'ltr' })],
+    SNAPSHOT,
+  );
+  assert.equal(value.cents, 480);
+  assert.equal(value.copies, 4);
+  assert.equal(value.unpricedCopies, 0);
+});
+
+check('what could not be priced is reported, not silently dropped', () => {
+  const value = collectionValue(
+    [
+      owned({ collectorNumber: '123', setCode: 'ltr' }),
+      owned({ name: 'Not A Real Card', quantity: 3 }),
+      owned({ name: 'Sol Ring', quantity: 2 }),
+    ],
+    SNAPSHOT,
+  );
+  assert.equal(value.cents, 120 + 160);
+  assert.equal(value.unpricedCopies, 3, 'the three nobody can price');
+  assert.equal(value.approxCopies, 2, 'and the two priced by name only');
+});
+
+check('the gain compares only the copies that recorded a price paid', () => {
+  // One card bought at 1,00 and now worth 1,20; another with no recorded cost.
+  // Counting the second card's value against the first card's cost would invent
+  // a profit out of a card nobody knows the price of.
+  const value = collectionValue(
+    [
+      owned({ collectorNumber: '123', purchasePrice: 1, setCode: 'ltr' }),
+      owned({ collectorNumber: '123', quantity: 5, setCode: 'ltr' }),
+    ],
+    SNAPSHOT,
+  );
+  assert.equal(value.cents, 120 * 6, 'the whole lot is still valued');
+  assert.equal(value.cost, 100);
+  assert.equal(value.costValue, 120);
+  assert.equal(value.gain, 20, 'only the copy with a basis');
+  assert.equal(value.costCopies, 1);
+});
+
+check('a collection nobody recorded a cost for has no gain, rather than a gain of everything', () => {
+  const value = collectionValue([owned({ collectorNumber: '123', setCode: 'ltr' })], SNAPSHOT);
+  assert.equal(value.gain, null);
+});
+
+check('no snapshot yet means no numbers, not zeroes that look like an answer', () => {
+  const value = collectionValue([owned({ collectorNumber: '123', setCode: 'ltr' })], null);
+  assert.equal(value.cents, 0);
+  assert.equal(value.copies, 0);
+});
+
+check('merging two lots of one printing blends what they cost', () => {
+  // Two at 1,00 plus three at 2,00 is five at 1,60 — not five at either price.
+  const existing = [owned({ purchasePrice: 1, quantity: 2, setCode: 'ltr', source: 'import' })];
+  const merged = applyImport(existing, [owned({ purchasePrice: 2, quantity: 3, setCode: 'ltr' })], []);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].quantity, 5);
+  assert.equal(merged[0].purchasePrice, 1.6);
+});
+
+check('merging into a lot with no recorded cost adopts the one there is', () => {
+  const existing = [owned({ quantity: 1, setCode: 'ltr', source: 'import' })];
+  const merged = applyImport(existing, [owned({ purchasePrice: 2, quantity: 1, setCode: 'ltr' })], []);
+  assert.equal(merged[0].purchasePrice, 2);
+});
+
+check('money reads as money', () => {
+  assert.equal(money(1234), '12,34 €');
+  assert.equal(money(1234, 'usd'), '$12.34');
 });
 
 await rm(out, { force: true, recursive: true });

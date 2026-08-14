@@ -117,6 +117,15 @@ Versions are `MAJOR.MINOR.<commit count>` from `build/version.ts`, shared by bot
 builds so the phone and the extension can't disagree about which commit they are.
 See [docs/VERSIONING.md](docs/VERSIONING.md).
 
+**Collection value** is a sum, not a lookup. CI distils Scryfall's daily bulk dump
+into a 3.5 MB table of every paper price (`scripts/build-prices.mjs`), deploys it
+beside the app, and both surfaces hold it locally: value and gain-since-purchase
+are then arithmetic that works offline. The same table colours offers on the
+Cards tab (it tracks Cardmarket's Price Trend closely); live page fetches are
+kept only for close calls and on demand, for the live *From* price. The gain
+leans on `purchasePrice`, which ManaBox writes into every scanned row and we no
+longer throw away. See [docs/PRICES.md](docs/PRICES.md).
+
 What makes all this nearly free is that `src/core/sync` never knew about Chrome —
 `createDriveRepository` takes an injected `fetch` and a `TokenProvider`, so the
 only genuinely new platform code is `src/platform/web/googleAuth.ts`, which gets

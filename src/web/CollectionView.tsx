@@ -8,15 +8,63 @@
 import { useMemo, useState } from 'react';
 
 import { ExportBar } from './ExportBar';
+import { loadPrices } from './priceStore';
 
 import { cardKey } from '@/lib/cardName';
 import type { Collection } from '@/lib/collection';
 import { collectionFile } from '@/lib/export';
+import { collectionValue, money, signedMoney, type CollectionValue } from '@/lib/prices';
+import { usePrices } from '@/ui/usePrices';
 
 const VISIBLE_LIMIT = 150;
 
+/**
+ * What it's worth, and what it has done since you bought it.
+ *
+ * Both numbers come with the size of the population they cover, because a total
+ * over a collection that is partly unpriced is otherwise a confident lie. The gain
+ * only ever speaks for the copies whose cost is recorded — ManaBox writes one on
+ * every scanned row, so for a scanned collection that is most of them, and for a
+ * hand-typed list it is none.
+ */
+const Worth = ({ value, stale }: { stale: boolean; value: CollectionValue }) => {
+  if (value.copies === 0) return null;
+
+  const caveats = [
+    value.approxCopies > 0 ? `${value.approxCopies.toLocaleString()} estimated` : null,
+    value.unpricedCopies > 0 ? `${value.unpricedCopies.toLocaleString()} without a price` : null,
+    stale ? 'prices from an older download' : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="mt-2 flex items-baseline gap-2">
+      <span className="text-base font-semibold tabular-nums text-ink">{money(value.cents)}</span>
+      {value.gain === null ? null : (
+        <span
+          className={`text-[11px] font-medium tabular-nums ${
+            value.gain >= 0 ? 'text-pos' : 'text-neg'
+          }`}
+          title={`Against ${money(value.cost)} paid for ${value.costCopies.toLocaleString()} cards`}
+        >
+          {signedMoney(value.gain)}
+        </span>
+      )}
+      {caveats.length > 0 ? (
+        <span className="min-w-0 flex-1 truncate text-right text-[10px] text-ink-faint">
+          {caveats.join(' · ')}
+        </span>
+      ) : null}
+    </div>
+  );
+};
+
 export const CollectionView = ({ collection }: { collection: Collection | null }) => {
   const [query, setQuery] = useState('');
+  const { snapshot, stale } = usePrices(loadPrices);
+  const value = useMemo(
+    () => collectionValue(collection?.cards ?? [], snapshot),
+    [collection, snapshot],
+  );
 
   const rows = useMemo(() => {
     if (!collection) return [];
@@ -62,6 +110,7 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
               anyway. */}
           <ExportBar actions={['save', 'share']} file={() => collectionFile(collection)} />
         </div>
+        <Worth stale={stale} value={value} />
       </div>
 
       <ul className="divide-y divide-line">

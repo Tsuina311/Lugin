@@ -6,6 +6,9 @@ release
 *.local
 .DS_Store
 
+# Local price snapshot used while Pages does not yet serve prices.json.
+.lugin-prices/
+
 # The extension's own signing key. Losing it changes the extension id, which
 # turns every existing install into a stranger — keep a backup off the repo.
 .extension-key.pem

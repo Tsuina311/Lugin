@@ -22,7 +22,10 @@
     "key": "node scripts/make-key.mjs",
     "package": "yarn build && node scripts/package.mjs",
     "package:testers": "yarn build && node scripts/package.mjs --testers",
+    "test": "yarn test:import && yarn test:prices && yarn test:scan && yarn test:sync && yarn test:web",
     "test:import": "node scripts/import-test.mjs",
+    "test:prices": "node scripts/prices-test.mjs",
+    "test:scan": "node scripts/scan-test.mjs",
     "test:sync": "node scripts/sync-test.mjs",
     "test:web": "vite build --config vite.web.config.ts --ssr smoke.tsx --outDir ../dist-smoke --emptyOutDir && node dist-smoke/smoke.js",
     "stylelint": "stylelint \"src/**/*.{css,tsx}\"",
@@ -31,7 +34,8 @@
   "dependencies": {
     "lucide-react": "^1.31.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.0.0-beta.28",

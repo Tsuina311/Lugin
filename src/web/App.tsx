@@ -16,13 +16,14 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { CollectionView } from './CollectionView';
 import { DeckList } from './DeckList';
 import { ImportScreen } from './ImportScreen';
+import { ScanScreen } from './ScanScreen';
 import { takeSharedImport, type SharedImport } from './sharedImport';
 import { syncStore } from './syncStore';
 
 import type { DomainKey } from '@/core/sync/model';
 import { buildCollection } from '@/lib/collection';
 
-type Tab = 'collection' | 'decks' | 'import';
+type Tab = 'collection' | 'decks' | 'import' | 'scan';
 
 const asset = (path: string): string => `${import.meta.env.BASE_URL}${path}`;
 
@@ -219,6 +220,13 @@ export const App = () => {
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {tab === 'collection' ? <CollectionView collection={collection} /> : null}
         {tab === 'decks' ? <DeckList collection={collection} decks={decks} /> : null}
+        {tab === 'scan' ? (
+          <ScanScreen
+            onAdd={async card => {
+              await syncStore.addCards([card]);
+            }}
+          />
+        ) : null}
         {tab === 'import' ? (
           <ImportScreen
             // Remount for each new share, so its file becomes the screen's
@@ -242,6 +250,7 @@ export const App = () => {
           [
             ['collection', 'Collection', collection?.uniqueCards ?? 0],
             ['decks', 'Decks', decks.length],
+            ['scan', 'Scan', null],
             ['import', 'Import', null],
           ] as const
         ).map(([id, label, count]) => (

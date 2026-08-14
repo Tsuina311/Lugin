@@ -97,7 +97,7 @@ const detectCommander = (
   oracle: string,
   parts: Pick<CardMetadata, 'subtypes' | 'supertypes' | 'types'>,
 ): CommanderInfo | undefined => {
-  const text = oracle.toLowerCase().replace(/[’']/g, "'");
+  const text = oracle.toLowerCase().replace(/[’']/g, '\'');
   const isLegendary = parts.supertypes.includes('Legendary');
   const isCreature = parts.types.includes('Creature');
   const canBeCommander = (isLegendary && isCreature) || /can be your commander/.test(text);
