@@ -10,4 +10,12 @@ export const flags = {
    * scattered through the Cards panel. Keep false for a clean end-user build.
    */
   devTools: false,
+
+  /**
+   * Scanner diagnostics: per-stage timings, the perspective-corrected card, every
+   * OCR crop with its confidence, and the candidate ranking. Essential while
+   * tuning recognition, meaningless noise for an end user. Everything it shows
+   * stays on the device.
+   */
+  scanDebug: false,
 };

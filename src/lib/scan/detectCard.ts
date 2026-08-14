@@ -6,19 +6,17 @@ import {
   type Pt,
   type Quad,
 } from './geometry';
+import type { ScanImage } from './types';
 
 export interface DetectResult {
+  quad: Quad | null;
   /** Confidence-ish score from scoreCardQuad; 0 if none. */
   score: number;
-  quad: Quad | null;
 }
 
 /** Downscale / grayscale / blur / edges → best card quad, or null. */
-export const detectCardQuad = (
-  rgba: Uint8ClampedArray | Uint8Array,
-  width: number,
-  height: number,
-): DetectResult => {
+export const detectCardQuad = (image: ScanImage): DetectResult => {
+  const { data: rgba, height, width } = image;
   // Work on a small raster for speed on phones.
   const maxW = 320;
   const scale = width > maxW ? maxW / width : 1;

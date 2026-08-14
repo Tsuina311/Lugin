@@ -1,12 +1,26 @@
 // Geometry helpers for card detection + perspective correction.
 
-export interface Pt {
-  x: number;
-  y: number;
-}
+import { blankImage, type CardCorners, type Point, type ScanImage } from './types';
+
+export type Pt = Point;
 
 /** Corners in order: top-left, top-right, bottom-right, bottom-left. */
 export type Quad = readonly [Pt, Pt, Pt, Pt];
+
+/** Positional quad → named corners, for anything crossing a module boundary. */
+export const quadToCorners = (quad: Quad): CardCorners => ({
+  bottomLeft: quad[3],
+  bottomRight: quad[2],
+  topLeft: quad[0],
+  topRight: quad[1],
+});
+
+export const cornersToQuad = (corners: CardCorners): Quad => [
+  corners.topLeft,
+  corners.topRight,
+  corners.bottomRight,
+  corners.bottomLeft,
+];
 
 /** Physical Magic card aspect (mm): width / height. */
 export const CARD_ASPECT = 63 / 88;
@@ -96,18 +110,14 @@ const solve8 = (A: number[][], b: number[]): number[] => {
  * Samples with bilinear interpolation (inverse mapping).
  */
 export const warpQuadToCard = (
-  src: {
-    data: Uint8ClampedArray | Uint8Array;
-    height: number;
-    width: number;
-  },
+  src: ScanImage,
   quad: Quad,
   outW = CARD_WIDTH,
   outH = CARD_HEIGHT,
-): { data: Uint8ClampedArray; height: number; width: number } => {
+): ScanImage => {
   const dest = rectQuad(0, 0, outW - 1, outH - 1);
   const H = homographyDestToSrc(quad, dest);
-  const out = new Uint8ClampedArray(outW * outH * 4);
+  const { data: out } = blankImage(outW, outH);
   const sw = src.width;
   const sh = src.height;
   const sdata = src.data;

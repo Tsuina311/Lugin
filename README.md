@@ -97,6 +97,34 @@ It renders that local copy rather than a fetch, so the collection is there befor
 any network call and an import made in a shop with no signal is kept and pushed
 later.
 
+### Measuring the card scanner
+
+```bash
+yarn scan:fixtures   # resolve the test corpus from Scryfall (writes scripts/fixtures/cards.json)
+yarn scan:eval       # run the corpus, print accuracy and timings
+yarn scan:variants   # benchmark preprocessing chains against each other
+```
+
+The scanner is the one feature where "that feels better" is worthless: a change
+that rescues the card on your desk routinely breaks five others, and nobody
+notices until a shop trip. So `scripts/scan-eval.mjs` runs the real pipeline —
+the same `src/lib/scan/` modules the phone runs, which is why none of them may
+touch the DOM — over a fixed set of cards under synthetic tilt, blur, glare, dim
+light and filmed-screen conditions, and reports detection rate, title accuracy
+and per-stage time.
+
+The corpus is a committed manifest of **Scryfall ids only**; the card images are
+downloaded on demand into a gitignored `.scan-fixtures/`. Card art is
+copyrighted and has no business in the repository.
+
+Synthetic abuse is not photography. It exercises geometry and preprocessing
+honestly, and it will tell you nothing true about foils, sleeves or a real
+autofocus hunting in bad light — those need actual phone photos.
+
+`flags.scanDebug` turns on the on-device counterpart: detected corners, the
+perspective-corrected card, every OCR crop with its confidence, and where the
+time went.
+
 Traffic with ManaBox goes both ways, but not by the same door in each direction,
 because it has no API and its two importers disagree. Inbound, the manifest
 registers Lugin as a share target, so a scan can be sent straight from ManaBox's

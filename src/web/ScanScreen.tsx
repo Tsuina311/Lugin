@@ -6,30 +6,27 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { ScanDebugPanel } from './scan/ScanDebugPanel';
 import {
-  canvasFromFile,
   capturePreparedCard,
+  imageFromFile,
   openCamera,
   type CameraSession,
+  type Capture,
 } from './scan/camera';
-import { enhanceForOcr } from './scan/enhance';
-import {
-  COLLECTOR_WHITELIST,
-  SET_SYMBOL_WHITELIST,
-  disposeOcr,
-  readText,
-  readTitleLine,
-} from './scan/ocr';
+import { disposeOcr, tesseractRecognizer } from './scan/tesseractRecognizer';
 
 import type { CollectionCard } from '@/lib/collection';
-import { guessFoil, imageStats, type FoilHint } from '@/lib/scan/foil';
+import { flags } from '@/lib/flags';
 import {
-  bestName,
-  mergePartsForScan,
-  parseCollectorParts,
-  parseSetSymbolText,
-  type CollectorParts,
-} from '@/lib/scan/parseCollector';
+  ScanTimer,
+  emptyDiagnostics,
+  type ScanDiagnostics,
+} from '@/lib/scan/diagnostics';
+import { guessFoil, imageStats, type FoilHint } from '@/lib/scan/foil';
+import { mergePartsForScan, type CollectorParts } from '@/lib/scan/parseCollector';
+import { glareRatio } from '@/lib/scan/quality';
+import { readCollector, readTitle } from '@/lib/scan/readCard';
 import {
   CLASSIC_NUMBER_REGION,
   COLLECTOR_REGION,
@@ -39,7 +36,6 @@ import {
   SET_SYMBOL_REGION,
   TITLE_LINE_REGION,
   TITLE_ZOOM_REGION,
-  cropRegion,
   type Region,
 } from '@/lib/scan/regions';
 import {
@@ -51,6 +47,7 @@ import {
   pickPrinting,
   type ScryfallPrinting,
 } from '@/lib/scan/resolve';
+import { cropImage, type ScanImage } from '@/lib/scan/types';
 import { Check, Hash, Library, List, Type, type LucideIcon } from '@/ui/components/icons';
 
 type Phase = 'camera' | 'working' | 'pick' | 'review' | 'error';
@@ -143,10 +140,12 @@ export const ScanScreen = ({
   const [busy, setBusy] = useState(false);
 
   const [detected, setDetected] = useState(false);
-  const [focusRing, setFocusRing] = useState<{ x: number; y: number; key: number } | null>(
+  const [focusRing, setFocusRing] = useState<{ key: number, x: number; y: number; } | null>(
     null,
   );
   const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [diagnostics, setDiagnostics] = useState<ScanDiagnostics | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -201,6 +200,8 @@ export const ScanScreen = ({
     setPhase('camera');
     setMessage(null);
     setDetected(false);
+    setDiagnostics(null);
+    setShowDebug(false);
   };
 
   const enterReview = (
@@ -280,23 +281,19 @@ export const ScanScreen = ({
 
   /** Step 1: only title OCR — full-card name bar OR a title-only zoom. */
   const runTitlePass = async (
-    card: HTMLCanvasElement,
+    card: ScanImage,
     base: Progress,
-    wasDetected: boolean,
+    timer: ScanTimer,
+    diag: ScanDiagnostics,
   ) => {
     setMessage('Reading title…');
-    const ocr = (region: Region) => enhanceForOcr(cropRegion(card, region));
+    const { name: ocrName, samples } = await timer.measureAsync('ocr:title', () =>
+      readTitle(card, tesseractRecognizer, { keepCrops: flags.scanDebug }),
+    );
+    diag.ocr.push(...samples);
 
-    const [bar, line, zoom] = await Promise.all([
-      readTitleLine(ocr(NAME_REGION)),
-      readTitleLine(ocr(TITLE_LINE_REGION)),
-      readTitleLine(ocr(TITLE_ZOOM_REGION)),
-    ]);
-    // Also try a block read on the zoom — helps when the title wraps two lines.
-    const zoomBlock = await readText(ocr(TITLE_ZOOM_REGION));
-
-    const ocrName = bestName(bar, line, zoom, zoomBlock);
     if (!ocrName) {
+      diag.outcome = 'no title text read';
       setPhase('camera');
       setMessage(
         'Couldn’t read a title. Frame the card (or fill the guide with the name) and Scan again.',
@@ -304,17 +301,20 @@ export const ScanScreen = ({
       return;
     }
 
-    const next = await lockTitle(ocrName, base);
+    const next = await timer.measureAsync('scryfall:name', () => lockTitle(ocrName, base));
     if (!next?.name) {
+      diag.outcome = `read "${ocrName}" but no card matched`;
       setPhase('camera');
       setMessage(`Read “${ocrName}” but couldn’t match a card. Try a clearer shot.`);
       return;
     }
 
+    diag.outcome = `title locked: ${next.name}`;
+    diag.candidates = [{ name: next.name, score: 1 }];
     setProgress(next);
     setStep('details');
     setPhase('camera');
-    const how = wasDetected
+    const how = diag.source === 'detected'
       ? 'Card detected & straightened.'
       : 'Using the guide frame (no card edges found).';
     setMessage(
@@ -325,61 +325,49 @@ export const ScanScreen = ({
   };
 
   /** Step 2: set / number / symbol only (name already locked). */
-  const runDetailsPass = async (card: HTMLCanvasElement, base: Progress) => {
+  const runDetailsPass = async (
+    card: ScanImage,
+    base: Progress,
+    timer: ScanTimer,
+    diag: ScanDiagnostics,
+  ) => {
     setMessage('Reading set & number…');
-    const ocr = (region: Region) => enhanceForOcr(cropRegion(card, region));
+    const stats = imageStats(cropImage(card, COLLECTOR_REGION).data);
 
-    const rawStrip = cropRegion(card, COLLECTOR_REGION);
-    const rawData = rawStrip
-      .getContext('2d')
-      ?.getImageData(0, 0, rawStrip.width, rawStrip.height);
-    const stats = rawData ? imageStats(rawData.data) : null;
-
-    const [numberText, classicNumberText, setText, setSymbolText, collectorText] =
-      await Promise.all([
-        readText(ocr(NUMBER_REGION), COLLECTOR_WHITELIST),
-        readText(ocr(CLASSIC_NUMBER_REGION), COLLECTOR_WHITELIST),
-        readText(ocr(SET_REGION), COLLECTOR_WHITELIST),
-        readText(ocr(SET_SYMBOL_REGION), SET_SYMBOL_WHITELIST),
-        readText(ocr(COLLECTOR_REGION), COLLECTOR_WHITELIST),
-      ]);
-
-    let next: Progress = { ...base, collector: { ...base.collector } };
-    if (next.name && next.printings.length === 0) {
-      next = { ...next, printings: await fetchPrintingsByName(next.name) };
-    }
-
-    next.collector = mergePartsForScan(next.collector, parseCollectorParts(numberText), {
-      nameLocked: true,
-    });
-    next.collector = mergePartsForScan(
-      next.collector,
-      parseCollectorParts(classicNumberText),
-      { nameLocked: true },
+    const { parts, samples } = await timer.measureAsync('ocr:collector', () =>
+      readCollector(
+        card,
+        tesseractRecognizer,
+        (into, incoming) => mergePartsForScan(into, incoming, { nameLocked: true }),
+        { keepCrops: flags.scanDebug },
+      ),
     );
-    next.collector = mergePartsForScan(next.collector, parseCollectorParts(setText), {
-      nameLocked: true,
-    });
-    next.collector = mergePartsForScan(next.collector, parseCollectorParts(collectorText), {
-      nameLocked: true,
-    });
+    diag.ocr.push(...samples);
 
-    const symbolSet = parseSetSymbolText(setSymbolText);
-    if (symbolSet) {
-      next.collector = mergePartsForScan(
-        next.collector,
-        { foilMarker: null, raw: setSymbolText, setCode: symbolSet },
-        { nameLocked: true },
-      );
+    let next: Progress = {
+      ...base,
+      collector: mergePartsForScan(base.collector, parts, { nameLocked: true }),
+    };
+    if (next.name && next.printings.length === 0) {
+      next = {
+        ...next,
+        printings: await timer.measureAsync('scryfall:printings', () =>
+          fetchPrintingsByName(next.name as string),
+        ),
+      };
     }
 
     setProgress(next);
-    if (await tryResolve(next, stats)) return;
+    if (await timer.measureAsync('scryfall:resolve', () => tryResolve(next, stats))) {
+      diag.outcome = 'printing resolved';
+      return;
+    }
 
     const missing = [
       !next.collector.setCode ? 'edition' : null,
       !next.collector.collectorNumber ? 'number' : null,
     ].filter(Boolean);
+    diag.outcome = missing.length ? `missing ${missing.join(' & ')}` : 'no unique printing';
     setPhase('camera');
     setMessage(
       missing.length
@@ -388,18 +376,37 @@ export const ScanScreen = ({
     );
   };
 
-  const runOnCard = async (card: HTMLCanvasElement, wasDetected: boolean) => {
-    setDetected(wasDetected);
+  const runOnCard = async (capture: Capture, fromPhoto: boolean) => {
+    const timer = new ScanTimer();
+    const diag: ScanDiagnostics = {
+      ...emptyDiagnostics(),
+      ...(flags.scanDebug ? { cardImage: capture.card.image } : {}),
+      corners: capture.card.corners,
+      detectionScore: capture.card.score,
+      frameHeight: capture.frame.height,
+      frameWidth: capture.frame.width,
+      glare: glareRatio(capture.card.image),
+      sharpness: capture.sharpness,
+      source: fromPhoto ? 'photo' : capture.card.source,
+    };
+
+    setDetected(capture.card.detected);
     setPhase('working');
     try {
       if (step === 'title' || !progress.name) {
-        await runTitlePass(card, progress, wasDetected);
+        await runTitlePass(capture.card.image, progress, timer, diag);
       } else {
-        await runDetailsPass(card, progress);
+        await runDetailsPass(capture.card.image, progress, timer, diag);
       }
     } catch (err) {
+      const text = err instanceof Error ? err.message : String(err);
+      diag.outcome = `error: ${text}`;
       setPhase('camera');
-      setMessage(err instanceof Error ? err.message : String(err));
+      setMessage(text);
+    } finally {
+      diag.timings = timer.timings;
+      diag.totalMs = timer.totalMs;
+      setDiagnostics(diag);
     }
   };
 
@@ -414,13 +421,13 @@ export const ScanScreen = ({
     try {
       const guide = frame.getBoundingClientRect();
       const host = video.getBoundingClientRect();
-      const prepared = await capturePreparedCard(video, {
+      const capture = await capturePreparedCard(video, {
         height: guide.height,
         left: guide.left - host.left,
         top: guide.top - host.top,
         width: guide.width,
       });
-      await runOnCard(prepared.canvas, prepared.detected);
+      await runOnCard(capture, false);
     } catch (err) {
       setPhase('camera');
       setMessage(err instanceof Error ? err.message : String(err));
@@ -430,8 +437,7 @@ export const ScanScreen = ({
   const onPickPhoto = async (file: File | undefined) => {
     if (!file) return;
     try {
-      const prepared = await canvasFromFile(file);
-      await runOnCard(prepared.canvas, prepared.detected);
+      await runOnCard(await imageFromFile(file), true);
     } catch (err) {
       setPhase('camera');
       setMessage(err instanceof Error ? err.message : String(err));
@@ -616,7 +622,7 @@ export const ScanScreen = ({
                 key={focusRing.key}
                 aria-hidden
                 className="pointer-events-none absolute h-16 w-16 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border-2 border-white/90 opacity-80"
-                style={{ left: focusRing.x, top: focusRing.y, animationDuration: '0.7s' }}
+                style={{ animationDuration: '0.7s', left: focusRing.x, top: focusRing.y }}
               />
             ) : null}
             {focusRing ? (
@@ -625,6 +631,20 @@ export const ScanScreen = ({
                 className="pointer-events-none absolute h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70"
                 style={{ left: focusRing.x, top: focusRing.y }}
               />
+            ) : null}
+
+            {flags.scanDebug && diagnostics ? (
+              <button
+                className="absolute right-2 top-2 rounded border border-amber-300/60 bg-black/60 px-2 py-1 text-[10px] font-medium text-amber-200"
+                data-scan-controls
+                onClick={() => setShowDebug(true)}
+                type="button"
+              >
+                Debug · {diagnostics.totalMs.toFixed(0)}ms
+              </button>
+            ) : null}
+            {flags.scanDebug && showDebug && diagnostics ? (
+              <ScanDebugPanel diagnostics={diagnostics} onClose={() => setShowDebug(false)} />
             ) : null}
 
             <div

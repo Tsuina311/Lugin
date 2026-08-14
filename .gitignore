@@ -9,6 +9,11 @@ release
 # Local price snapshot used while Pages does not yet serve prices.json.
 .lugin-prices/
 
+# Scanner test corpus: Scryfall card art plus tesseract traineddata, both
+# downloaded on demand from the committed manifest in scripts/fixtures. Card
+# images are copyrighted and have no business in the repository.
+.scan-fixtures/
+
 # The extension's own signing key. Losing it changes the extension id, which
 # turns every existing install into a stranger — keep a backup off the repo.
 .extension-key.pem

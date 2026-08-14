@@ -1,6 +1,17 @@
 // Camera access for the phone scanner.
+//
+// Acquisition only: getUserMedia, focus, and mapping the on-screen guide onto
+// source pixels. Anything that inspects pixels lives in `src/lib/scan/**`.
 
-import { prepareCard, prepareCardWithGuideFallback, type PreparedCard } from '@/lib/scan/prepareCard';
+import { drawToScanImage } from './canvasBridge';
+
+import {
+  prepareCard,
+  prepareCardWithGuideFallback,
+  type PreparedCard,
+} from '@/lib/scan/prepareCard';
+import { sharpnessScore } from '@/lib/scan/quality';
+import type { Rect, ScanImage } from '@/lib/scan/types';
 
 export interface CameraSession {
   focusAt: (clientX: number, clientY: number) => Promise<boolean>;
@@ -37,20 +48,13 @@ export const openCamera = async (video: HTMLVideoElement): Promise<CameraSession
   // Best-effort focus / exposure — ignored when the browser doesn't support them.
   const [track] = stream.getVideoTracks();
   if (track?.getCapabilities && track.applyConstraints) {
-    const caps = track.getCapabilities() as MediaTrackCapabilities & {
-      focusMode?: string[];
-      exposureMode?: string[];
-    };
-    const advanced: MediaTrackConstraintSet = {};
-    if (caps.focusMode?.includes('continuous')) {
-      (advanced as { focusMode?: string }).focusMode = 'continuous';
-    }
-    if (caps.exposureMode?.includes('continuous')) {
-      (advanced as { exposureMode?: string }).exposureMode = 'continuous';
-    }
+    const caps = track.getCapabilities() as TrackCaps;
+    const advanced: Record<string, string> = {};
+    if (caps.focusMode?.includes('continuous')) advanced.focusMode = 'continuous';
+    if (caps.exposureMode?.includes('continuous')) advanced.exposureMode = 'continuous';
     if (Object.keys(advanced).length) {
       try {
-        await track.applyConstraints({ advanced: [advanced] });
+        await track.applyConstraints({ advanced: [advanced as MediaTrackConstraintSet] });
       } catch {
         // Capabilities lie on some Android WebViews — ignore.
       }
@@ -175,17 +179,12 @@ export const focusAtPoint = async (
  * Map a CSS-pixel rect on a video element (object-fit: cover) onto source-frame
  * pixels. A naive width/clientWidth scale is wrong when the feed is cropped.
  */
-export const guideToSource = (
-  video: HTMLVideoElement,
-  guide: GuideRect,
-): { sx: number; sy: number; sw: number; sh: number } => {
+export const guideToSource = (video: HTMLVideoElement, guide: GuideRect): Rect => {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   const ew = video.clientWidth;
   const eh = video.clientHeight;
-  if (!vw || !vh || !ew || !eh) {
-    return { sx: 0, sy: 0, sw: 0, sh: 0 };
-  }
+  if (!vw || !vh || !ew || !eh) return { h: 1, w: 1, x: 0, y: 0 };
 
   const videoAspect = vw / vh;
   const elemAspect = ew / eh;
@@ -209,57 +208,25 @@ export const guideToSource = (
 
   const scaleX = vw / renderW;
   const scaleY = vh / renderH;
-  const sx = Math.max(0, Math.round((guide.left - offsetX) * scaleX));
-  const sy = Math.max(0, Math.round((guide.top - offsetY) * scaleY));
-  const sw = Math.min(vw - sx, Math.round(guide.width * scaleX));
-  const sh = Math.min(vh - sy, Math.round(guide.height * scaleY));
-  return { sx, sy, sw: Math.max(1, sw), sh: Math.max(1, sh) };
+  const x = Math.max(0, Math.round((guide.left - offsetX) * scaleX));
+  const y = Math.max(0, Math.round((guide.top - offsetY) * scaleY));
+  return {
+    h: Math.max(1, Math.min(vh - y, Math.round(guide.height * scaleY))),
+    w: Math.max(1, Math.min(vw - x, Math.round(guide.width * scaleX))),
+    x,
+    y,
+  };
 };
 
-/**
- * Snapshot the current frame, cropped to the card guide.
- *
- * `guide` is the on-screen card rectangle in video-element CSS pixels.
- */
-export const captureCard = (
-  video: HTMLVideoElement,
-  guide: GuideRect,
-): HTMLCanvasElement => {
-  const { sx, sy, sw, sh } = guideToSource(video, guide);
-  const canvas = document.createElement('canvas');
-  canvas.width = sw;
-  canvas.height = sh;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Could not open a canvas for the capture');
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-  return canvas;
-};
+/** Snapshot the current frame, cropped to the card guide. */
+export const captureCard = (video: HTMLVideoElement, guide: GuideRect): ScanImage =>
+  drawToScanImage(video, guideToSource(video, guide));
 
-/** Rough focus score — higher = sharper. Used to pick the best of a few frames. */
-export const sharpnessScore = (canvas: HTMLCanvasElement): number => {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return 0;
-  const { width, height } = canvas;
-  // Sample a mid band; full-frame Laplacian is expensive on 4K.
-  const sampleH = Math.max(32, Math.floor(height * 0.35));
-  const sampleY = Math.floor((height - sampleH) / 2);
-  const { data } = ctx.getImageData(0, sampleY, width, sampleH);
-  let prev = 0;
-  let sum = 0;
-  let sumSq = 0;
-  let n = 0;
-  for (let i = 0; i < data.length; i += 16) {
-    const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    const d = y - prev;
-    sum += d;
-    sumSq += d * d;
-    prev = y;
-    n += 1;
-  }
-  if (n < 2) return 0;
-  const mean = sum / n;
-  return sumSq / n - mean * mean;
-};
+export interface BestFrame {
+  frames: number;
+  image: ScanImage;
+  sharpness: number;
+}
 
 /**
  * Grab a few frames ~90ms apart and keep the sharpest. Helps when autofocus is
@@ -269,8 +236,8 @@ export const captureBestCard = async (
   video: HTMLVideoElement,
   guide: GuideRect,
   frames = 3,
-): Promise<HTMLCanvasElement> => {
-  let best: HTMLCanvasElement | null = null;
+): Promise<BestFrame> => {
+  let best: ScanImage | null = null;
   let bestScore = -1;
   for (let i = 0; i < frames; i++) {
     if (i > 0) await wait(90);
@@ -281,8 +248,15 @@ export const captureBestCard = async (
       best = shot;
     }
   }
-  return best ?? captureCard(video, guide);
+  const image = best ?? captureCard(video, guide);
+  return { frames, image, sharpness: Math.max(0, bestScore) };
 };
+
+export interface Capture {
+  card: PreparedCard;
+  frame: ScanImage;
+  sharpness: number;
+}
 
 /**
  * Capture around the guide, detect the card quad, perspective-correct, and
@@ -292,34 +266,38 @@ export const captureBestCard = async (
 export const capturePreparedCard = async (
   video: HTMLVideoElement,
   guide: GuideRect,
-): Promise<PreparedCard> => {
+): Promise<Capture> => {
   const padded: GuideRect = {
     height: guide.height * (1 + 2 * GUIDE_PAD),
     left: guide.left - guide.width * GUIDE_PAD,
     top: guide.top - guide.height * GUIDE_PAD,
     width: guide.width * (1 + 2 * GUIDE_PAD),
   };
-  const frame = await captureBestCard(video, padded);
+  const { image, sharpness } = await captureBestCard(video, padded);
   const inset = GUIDE_PAD / (1 + 2 * GUIDE_PAD);
-  return prepareCardWithGuideFallback(frame, {
+  const card = prepareCardWithGuideFallback(image, {
     h: 1 - 2 * inset,
     w: 1 - 2 * inset,
     x: inset,
     y: inset,
   });
+  return { card, frame: image, sharpness };
 };
 
 /** Load a still and run the same detect → warp pipeline. */
-export const canvasFromFile = async (file: File): Promise<PreparedCard> => {
+export const imageFromFile = async (file: File): Promise<Capture> => {
   const bitmap = await createImageBitmap(file);
-  const canvas = document.createElement('canvas');
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Could not open a canvas for the photo');
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close();
-  return prepareCard(canvas);
+  try {
+    const frame = drawToScanImage(bitmap, {
+      h: bitmap.height,
+      w: bitmap.width,
+      x: 0,
+      y: 0,
+    });
+    return { card: prepareCard(frame), frame, sharpness: sharpnessScore(frame) };
+  } finally {
+    bitmap.close();
+  }
 };
 
 const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms));

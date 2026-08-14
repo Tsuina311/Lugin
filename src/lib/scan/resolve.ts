@@ -74,7 +74,7 @@ export const fetchNamedFuzzy = async (name: string): Promise<ScryfallPrinting | 
 
   // Foreign printed names / near-misses: search across languages.
   const searchUrl =
-    `https://api.scryfall.com/cards/search?unique=cards&include_multilingual=true&q=` +
+    'https://api.scryfall.com/cards/search?unique=cards&include_multilingual=true&q=' +
     encodeURIComponent(`name:"${q.replace(/"/g, '')}"`);
   const searchRes = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
   if (searchRes.status === 404) return null;
@@ -90,7 +90,7 @@ export const fetchPrintingsByName = async (name: string): Promise<ScryfallPrinti
   if (!exact) return [];
   const query = `!"${exact.replace(/"/g, '')}"`;
   let url: string | null =
-    `https://api.scryfall.com/cards/search?order=released&dir=desc&unique=prints&q=` +
+    'https://api.scryfall.com/cards/search?order=released&dir=desc&unique=prints&q=' +
     encodeURIComponent(query);
 
   const out: ScryfallPrinting[] = [];

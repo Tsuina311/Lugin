@@ -1,0 +1,227 @@
+{
+  "generated": "2026-08-14T14:19:50.848Z",
+  "note": "Scryfall ids only. Images are downloaded to .scan-fixtures/ and never committed.",
+  "version": 1,
+  "cards": [
+    {
+      "collectorNumber": "7",
+      "expectedName": "Sol Ring",
+      "id": "acce65cc-9093-45a6-8c86-97edce545050",
+      "image": "https://cards.scryfall.io/png/front/a/c/acce65cc-9093-45a6-8c86-97edce545050.png?1783924133",
+      "lang": "en",
+      "layout": "normal",
+      "printedName": "Sol Ring",
+      "set": "cc2",
+      "tag": "modern-frame"
+    },
+    {
+      "collectorNumber": "233",
+      "expectedName": "Command Tower",
+      "id": "0548fb60-c843-4f8f-a029-6f10efc63a41",
+      "image": "https://cards.scryfall.io/png/front/0/5/0548fb60-c843-4f8f-a029-6f10efc63a41.png?1783903206",
+      "lang": "en",
+      "layout": "normal",
+      "printedName": "Command Tower",
+      "set": "msc",
+      "tag": "modern-common"
+    },
+    {
+      "collectorNumber": "54",
+      "expectedName": "Swords to Plowshares",
+      "id": "375fd2cb-443b-4be4-ad60-6d1a8e74f510",
+      "image": "https://cards.scryfall.io/png/front/3/7/375fd2cb-443b-4be4-ad60-6d1a8e74f510.png?1783947519",
+      "lang": "en",
+      "layout": "normal",
+      "printedName": "Swords to Plowshares",
+      "set": "ice",
+      "tag": "old-frame-1993"
+    },
+    {
+      "collectorNumber": "1P",
+      "expectedName": "Arcane Signet",
+      "id": "13ce3ecf-5dd6-4ab3-8e79-d3cd33f00ad5",
+      "image": "https://cards.scryfall.io/png/front/1/3/13ce3ecf-5dd6-4ab3-8e79-d3cd33f00ad5.png?1783916408",
+      "lang": "en",
+      "layout": "normal",
+      "printedName": "Arcane Signet",
+      "set": "p30m",
+      "tag": "frame-1997"
+    },
+    {
+      "collectorNumber": "117",
+      "expectedName": "Exotic Orchard",
+      "id": "73885326-b2e4-430d-ae21-3e9d95c73ac6",
+      "image": "https://cards.scryfall.io/png/front/7/3/73885326-b2e4-430d-ae21-3e9d95c73ac6.png?1783940588",
+      "lang": "en",
+      "layout": "normal",
+      "printedName": "Exotic Orchard",
+      "set": "pc2",
+      "tag": "frame-2003"
+    },
+    {
+      "collectorNumber": "7104",
+      "expectedName": "Reliquary Tower",
+      "id": "c9e9c8f1-6dbd-4c53-9be2-06f5205c0e3e",
+      "image": "https://cards.scryfall.io/png/front/c/9/c9e9c8f1-6dbd-4c53-9be2-06f5205c0e3e.png?1783904225",
+      "lang": "en",
+      "layout": "normal",
+      "printedName": "Reliquary Tower",
+      "set": "sld",
+      "tag": "borderless"
+    },
+    {
+      "collectorNumber": "317",
+      "expectedName": "Swiftfoot Boots",
+      "id": "aff074f2-6ad9-4c0c-88e2-fc622772d2a1",
+      "image": "https://cards.scryfall.io/png/front/a/f/aff074f2-6ad9-4c0c-88e2-fc622772d2a1.png?1783904750",
+      "lang": "en",
+      "layout": "normal",
+      "printedName": "Swiftfoot Boots",
+      "set": "tle",
+      "tag": "showcase"
+    },
+    {
+      "collectorNumber": "708",
+      "expectedName": "Path of Ancestry",
+      "id": "9c198ffd-50c8-46ae-a4bd-75c9d39f40de",
+      "image": "https://cards.scryfall.io/png/front/9/c/9c198ffd-50c8-46ae-a4bd-75c9d39f40de.png?1783928596",
+      "lang": "en",
+      "layout": "normal",
+      "printedName": "Path of Ancestry",
+      "set": "cmr",
+      "tag": "extended-art"
+    },
+    {
+      "collectorNumber": "11",
+      "expectedName": "Elspeth, Storm Slayer",
+      "id": "73a065e3-b530-4e62-ab3c-4f6f908184ec",
+      "image": "https://cards.scryfall.io/png/front/7/3/73a065e3-b530-4e62-ab3c-4f6f908184ec.png?1783907414",
+      "lang": "en",
+      "layout": "normal",
+      "printedName": "Elspeth, Storm Slayer",
+      "set": "tdm",
+      "tag": "planeswalker"
+    },
+    {
+      "collectorNumber": "259",
+      "expectedName": "Urza's Saga",
+      "id": "c1e0f201-42cb-46a1-901a-65bb4fc18f6c",
+      "image": "https://cards.scryfall.io/png/front/c/1/c1e0f201-42cb-46a1-901a-65bb4fc18f6c.png?1783926791",
+      "lang": "en",
+      "layout": "saga",
+      "printedName": "Urza's Saga",
+      "set": "mh2",
+      "tag": "saga"
+    },
+    {
+      "collectorNumber": "188",
+      "expectedName": "Growing Rites of Itlimoc // Itlimoc, Cradle of the Sun",
+      "id": "004524bf-b249-4dac-9c10-44d57143feb9",
+      "image": "https://cards.scryfall.io/png/front/0/0/004524bf-b249-4dac-9c10-44d57143feb9.png?1783913751",
+      "lang": "en",
+      "layout": "transform",
+      "printedName": "Growing Rites of Itlimoc",
+      "set": "lci",
+      "tag": "double-faced"
+    },
+    {
+      "collectorNumber": "241",
+      "expectedName": "Sink into Stupor // Soporific Springs",
+      "id": "5358b87a-1a29-426d-b165-40c97da2c14d",
+      "image": "https://cards.scryfall.io/png/front/5/3/5358b87a-1a29-426d-b165-40c97da2c14d.png?1783911236",
+      "lang": "en",
+      "layout": "modal_dfc",
+      "printedName": "Sink into Stupor",
+      "set": "mh3",
+      "tag": "modal-dfc"
+    },
+    {
+      "collectorNumber": "61",
+      "expectedName": "Dusk // Dawn",
+      "id": "5f2facfb-dfde-4e5b-8f6d-4fabb4c85519",
+      "image": "https://cards.scryfall.io/png/front/5/f/5f2facfb-dfde-4e5b-8f6d-4fabb4c85519.png?1783913033",
+      "lang": "en",
+      "layout": "split",
+      "printedName": "Dusk",
+      "set": "mkc",
+      "tag": "split"
+    },
+    {
+      "collectorNumber": "286",
+      "expectedName": "Midgar, City of Mako // Reactor Raid",
+      "id": "8a837256-6bb4-4a60-962d-d2793548d26c",
+      "image": "https://cards.scryfall.io/png/front/8/a/8a837256-6bb4-4a60-962d-d2793548d26c.png?1783906547",
+      "lang": "en",
+      "layout": "adventure",
+      "printedName": "Midgar, City of Mako",
+      "set": "fin",
+      "tag": "adventure"
+    },
+    {
+      "collectorNumber": "190",
+      "expectedName": "Joraga Treespeaker",
+      "id": "1132218d-56cd-441e-9006-df3c50344491",
+      "image": "https://cards.scryfall.io/png/front/1/1/1132218d-56cd-441e-9006-df3c50344491.png?1783941963",
+      "lang": "en",
+      "layout": "leveler",
+      "printedName": "Joraga Treespeaker",
+      "set": "roe",
+      "tag": "leveler"
+    },
+    {
+      "collectorNumber": "190",
+      "expectedName": "Invasion of Ikoria // Zilortha, Apex of Ikoria",
+      "id": "5d59c8f2-f6af-40a6-8dfe-8cc45bf231ce",
+      "image": "https://cards.scryfall.io/png/front/5/d/5d59c8f2-f6af-40a6-8dfe-8cc45bf231ce.png?1783916974",
+      "lang": "en",
+      "layout": "transform",
+      "printedName": "Invasion of Ikoria",
+      "set": "mom",
+      "tag": "battle"
+    },
+    {
+      "collectorNumber": "261",
+      "expectedName": "Yavimaya, Cradle of Growth",
+      "id": "4e4b6e22-93b2-4896-bba5-0ceaa5d8ea3c",
+      "image": "https://cards.scryfall.io/png/front/4/e/4e4b6e22-93b2-4896-bba5-0ceaa5d8ea3c.png?1783926791",
+      "lang": "en",
+      "layout": "normal",
+      "printedName": "Yavimaya, Cradle of Growth",
+      "set": "mh2",
+      "tag": "long-name"
+    },
+    {
+      "collectorNumber": "47",
+      "expectedName": "Negate",
+      "id": "52d58fe4-6070-4022-9cd7-c35a11b44525",
+      "image": "https://cards.scryfall.io/png/front/5/2/52d58fe4-6070-4022-9cd7-c35a11b44525.png?1783904112",
+      "lang": "en",
+      "layout": "normal",
+      "printedName": "Negate",
+      "set": "tmt",
+      "tag": "short-name"
+    },
+    {
+      "collectorNumber": "128",
+      "expectedName": "Sol Ring",
+      "id": "a1050a55-fb9e-4530-aec3-4eae3353bbef",
+      "image": "https://cards.scryfall.io/png/front/a/1/a1050a55-fb9e-4530-aec3-4eae3353bbef.png?1782759558",
+      "lang": "fr",
+      "layout": "normal",
+      "printedName": "Anneau solaire",
+      "set": "soc",
+      "tag": "french"
+    },
+    {
+      "collectorNumber": "128",
+      "expectedName": "Sol Ring",
+      "id": "ae35f8bd-3a7e-475e-80bb-a6facfb4e44d",
+      "image": "https://cards.scryfall.io/png/front/a/e/ae35f8bd-3a7e-475e-80bb-a6facfb4e44d.png?1782759557",
+      "lang": "de",
+      "layout": "normal",
+      "printedName": "Sonnenring",
+      "set": "soc",
+      "tag": "german"
+    }
+  ]
+}

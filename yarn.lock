@@ -3728,6 +3728,7 @@ __metadata:
     eslint-plugin-testing-library: ^7.16.2
     eslint-plugin-typescript-sort-keys: ^3.3.0
     lucide-react: ^1.31.0
+    pngjs: ^7.0.0
     postcss: ^8.4.49
     postcss-styled-syntax: ^0.7.2
     prettier: ^3.9.6
@@ -4215,6 +4216,13 @@ __metadata:
   version: 4.0.7
   resolution: "pirates@npm:4.0.7"
   checksum: 3dcbaff13c8b5bc158416feb6dc9e49e3c6be5fddc1ea078a05a73ef6b85d79324bbb1ef59b954cdeff000dbf000c1d39f32dc69310c7b78fbada5171b583e40
+  languageName: node
+  linkType: hard
+
+"pngjs@npm:^7.0.0":
+  version: 7.0.0
+  resolution: "pngjs@npm:7.0.0"
+  checksum: b19a018930d27de26229c1b3ff250b3a25d09caa22cbb0b0459987d91eb0a560a18ab5d67da45a38ed7514140f26d1db58de83c31159ec101f2bb270a3c707f1
   languageName: node
   linkType: hard
 

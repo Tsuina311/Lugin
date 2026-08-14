@@ -7,12 +7,13 @@
 //
 // Coordinates are { x, y, w, h } in 0–1 of the card frame, origin top-left.
 
-export interface Region {
-  h: number;
-  w: number;
-  x: number;
-  y: number;
-}
+import type { RelativeRegion } from './types';
+
+/**
+ * Regions are fractions of the *normalized* card, so they survive any camera
+ * angle or distance once `prepareCard` has straightened the card.
+ */
+export type Region = RelativeRegion;
 
 /**
  * Large centre band for step 1 when the user fills the guide with only the
@@ -53,20 +54,17 @@ export const SET_REGION: Region = { h: 0.035, w: 0.28, x: 0.035, y: 0.928 };
  */
 export const COLLECTOR_REGION: Region = { h: 0.085, w: 0.94, x: 0.03, y: 0.875 };
 
-/** Crop a region out of a source canvas into a new one (1:1 — OCR enhance upscales). */
-export const cropRegion = (
-  source: HTMLCanvasElement | OffscreenCanvas,
-  region: Region,
-): HTMLCanvasElement => {
-  const sx = Math.round(region.x * source.width);
-  const sy = Math.round(region.y * source.height);
-  const sw = Math.max(1, Math.round(region.w * source.width));
-  const sh = Math.max(1, Math.round(region.h * source.height));
-  const out = document.createElement('canvas');
-  out.width = sw;
-  out.height = sh;
-  const ctx = out.getContext('2d');
-  if (!ctx) throw new Error('Could not open a 2D canvas for the crop');
-  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
-  return out;
-};
+/**
+ * Every region the scanner reads, in the order the debug view lists them.
+ * Named so diagnostics can label a crop without a second lookup table.
+ */
+export const NAMED_REGIONS: ReadonlyArray<{ name: string; region: Region }> = [
+  { name: 'title-bar', region: NAME_REGION },
+  { name: 'title-line', region: TITLE_LINE_REGION },
+  { name: 'title-zoom', region: TITLE_ZOOM_REGION },
+  { name: 'set-symbol', region: SET_SYMBOL_REGION },
+  { name: 'number', region: NUMBER_REGION },
+  { name: 'number-classic', region: CLASSIC_NUMBER_REGION },
+  { name: 'set', region: SET_REGION },
+  { name: 'collector', region: COLLECTOR_REGION },
+];
