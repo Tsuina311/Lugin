@@ -20,6 +20,7 @@ await esbuild.build({
     contents: `
       export * from '${join(root, 'src/lib/scan/parseCollector.ts')}';
       export * from '${join(root, 'src/lib/scan/foil.ts')}';
+      export * from '${join(root, 'src/lib/scan/geometry.ts')}';
     `,
     resolveDir: root,
     sourcefile: 'entry.ts',
@@ -27,14 +28,20 @@ await esbuild.build({
 });
 
 const {
+  applyH,
   bestName,
   guessFoil,
+  homographyDestToSrc,
   mergeParts,
   mergePartsForScan,
+  orderCorners,
   parseCollectorLine,
   parseCollectorParts,
   parseSetSymbolText,
+  rectQuad,
+  scoreCardQuad,
   tidyName,
+  warpQuadToCard,
 } = await import(pathToFileURL(bundle).href);
 
 let failed = 0;
@@ -152,6 +159,54 @@ check('bullet means non-foil even if the strip looks shiny', () => {
     { brightRatio: 0.2, colorVariance: 0.4, darkRatio: 0.1, midtoneRatio: 0.6 },
   );
   assert.equal(g.foil, false);
+});
+
+check('orderCorners puts TL TR BR BL', () => {
+  const q = orderCorners([
+    { x: 10, y: 10 },
+    { x: 0, y: 10 },
+    { x: 10, y: 0 },
+    { x: 0, y: 0 },
+  ]);
+  assert.deepEqual(q, [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+    { x: 0, y: 10 },
+  ]);
+});
+
+check('homography maps dest corners back to source', () => {
+  const src = rectQuad(10, 20, 100, 140);
+  const dest = rectQuad(0, 0, 50, 70);
+  const H = homographyDestToSrc(src, dest);
+  for (let i = 0; i < 4; i++) {
+    const p = applyH(H, dest[i]);
+    assert.ok(Math.abs(p.x - src[i].x) < 1e-6);
+    assert.ok(Math.abs(p.y - src[i].y) < 1e-6);
+  }
+});
+
+check('scoreCardQuad likes a 63:88 rectangle', () => {
+  const good = rectQuad(20, 10, 63, 88);
+  const bad = rectQuad(20, 10, 88, 63);
+  assert.ok(scoreCardQuad(good, 200, 200) > scoreCardQuad(bad, 200, 200));
+});
+
+check('warpQuadToCard samples the source colour at centre', () => {
+  const w = 40;
+  const h = 56;
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 200;
+    data[i + 1] = 40;
+    data[i + 2] = 40;
+    data[i + 3] = 255;
+  }
+  const out = warpQuadToCard({ data, height: h, width: w }, rectQuad(0, 0, w - 1, h - 1), 20, 28);
+  const mid = (14 * 20 + 10) * 4;
+  assert.ok(out.data[mid] > 150);
+  assert.ok(out.data[mid + 1] < 80);
 });
 
 await rm(dir, { force: true, recursive: true });

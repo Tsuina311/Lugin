@@ -1,6 +1,9 @@
 // Camera access for the phone scanner.
 
+import { prepareCard, prepareCardWithGuideFallback, type PreparedCard } from '@/lib/scan/prepareCard';
+
 export interface CameraSession {
+  focusAt: (clientX: number, clientY: number) => Promise<boolean>;
   stop: () => void;
   stream: MediaStream;
   video: HTMLVideoElement;
@@ -12,6 +15,9 @@ export interface GuideRect {
   top: number;
   width: number;
 }
+
+/** How far past the on-screen guide we capture so card edges are visible. */
+const GUIDE_PAD = 0.22;
 
 /** Open the rear camera into a video element. Caller must stop() when done. */
 export const openCamera = async (video: HTMLVideoElement): Promise<CameraSession> => {
@@ -56,13 +62,113 @@ export const openCamera = async (video: HTMLVideoElement): Promise<CameraSession
   video.muted = true;
   await video.play();
   return {
+    focusAt: (clientX, clientY) => focusAtPoint(stream, video, clientX, clientY),
     stop: () => {
-      for (const track of stream.getTracks()) track.stop();
+      for (const t of stream.getTracks()) t.stop();
       video.srcObject = null;
     },
     stream,
     video,
   };
+};
+
+type TrackCaps = MediaTrackCapabilities & {
+  exposureMode?: string[];
+  focusMode?: string[];
+  pointsOfInterest?: boolean | number;
+};
+
+/**
+ * Map a tap on the video element (object-fit: cover) to normalized 0–1
+ * coordinates in the underlying video frame.
+ */
+export const clientToVideoNorm = (
+  video: HTMLVideoElement,
+  clientX: number,
+  clientY: number,
+): { x: number; y: number } | null => {
+  const rect = video.getBoundingClientRect();
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!vw || !vh || rect.width <= 0 || rect.height <= 0) return null;
+
+  const videoAspect = vw / vh;
+  const elemAspect = rect.width / rect.height;
+  let renderW: number;
+  let renderH: number;
+  let offsetX: number;
+  let offsetY: number;
+  if (videoAspect > elemAspect) {
+    renderH = rect.height;
+    renderW = rect.height * videoAspect;
+    offsetX = (rect.width - renderW) / 2;
+    offsetY = 0;
+  } else {
+    renderW = rect.width;
+    renderH = rect.width / videoAspect;
+    offsetX = 0;
+    offsetY = (rect.height - renderH) / 2;
+  }
+
+  const lx = clientX - rect.left - offsetX;
+  const ly = clientY - rect.top - offsetY;
+  if (lx < 0 || ly < 0 || lx > renderW || ly > renderH) return null;
+
+  return {
+    x: Math.min(1, Math.max(0, lx / renderW)),
+    y: Math.min(1, Math.max(0, ly / renderH)),
+  };
+};
+
+/**
+ * Ask the camera to focus (and meter) at a tap point.
+ * Best-effort — many desktop cameras ignore pointsOfInterest; phones often honour it.
+ */
+export const focusAtPoint = async (
+  stream: MediaStream,
+  video: HTMLVideoElement,
+  clientX: number,
+  clientY: number,
+): Promise<boolean> => {
+  const point = clientToVideoNorm(video, clientX, clientY);
+  if (!point) return false;
+  const [track] = stream.getVideoTracks();
+  if (!track?.applyConstraints) return false;
+
+  const caps = (track.getCapabilities?.() ?? {}) as TrackCaps;
+  const focusModes = caps.focusMode ?? [];
+  const exposureModes = caps.exposureMode ?? [];
+  const focusMode = focusModes.includes('single-shot')
+    ? 'single-shot'
+    : focusModes.includes('manual')
+      ? 'manual'
+      : focusModes.includes('continuous')
+        ? 'continuous'
+        : undefined;
+  const exposureMode = exposureModes.includes('manual')
+    ? 'manual'
+    : exposureModes.includes('continuous')
+      ? 'continuous'
+      : undefined;
+
+  const attempts: Record<string, unknown>[] = [
+    {
+      ...(focusMode ? { focusMode } : {}),
+      ...(exposureMode ? { exposureMode } : {}),
+      pointsOfInterest: [{ x: point.x, y: point.y }],
+    },
+    { pointsOfInterest: [{ x: point.x, y: point.y }] },
+  ];
+
+  for (const advanced of attempts) {
+    try {
+      await track.applyConstraints({ advanced: [advanced as MediaTrackConstraintSet] });
+      return true;
+    } catch {
+      // try next shape
+    }
+  }
+  return false;
 };
 
 /**
@@ -178,8 +284,33 @@ export const captureBestCard = async (
   return best ?? captureCard(video, guide);
 };
 
-/** Load a still (screenshot / photo library) into a card-sized canvas. */
-export const canvasFromFile = async (file: File): Promise<HTMLCanvasElement> => {
+/**
+ * Capture around the guide, detect the card quad, perspective-correct, and
+ * emit a normalized upright card. Falls back to the guide rectangle if
+ * detection fails.
+ */
+export const capturePreparedCard = async (
+  video: HTMLVideoElement,
+  guide: GuideRect,
+): Promise<PreparedCard> => {
+  const padded: GuideRect = {
+    height: guide.height * (1 + 2 * GUIDE_PAD),
+    left: guide.left - guide.width * GUIDE_PAD,
+    top: guide.top - guide.height * GUIDE_PAD,
+    width: guide.width * (1 + 2 * GUIDE_PAD),
+  };
+  const frame = await captureBestCard(video, padded);
+  const inset = GUIDE_PAD / (1 + 2 * GUIDE_PAD);
+  return prepareCardWithGuideFallback(frame, {
+    h: 1 - 2 * inset,
+    w: 1 - 2 * inset,
+    x: inset,
+    y: inset,
+  });
+};
+
+/** Load a still and run the same detect → warp pipeline. */
+export const canvasFromFile = async (file: File): Promise<PreparedCard> => {
   const bitmap = await createImageBitmap(file);
   const canvas = document.createElement('canvas');
   canvas.width = bitmap.width;
@@ -188,7 +319,9 @@ export const canvasFromFile = async (file: File): Promise<HTMLCanvasElement> => 
   if (!ctx) throw new Error('Could not open a canvas for the photo');
   ctx.drawImage(bitmap, 0, 0);
   bitmap.close();
-  return canvas;
+  return prepareCard(canvas);
 };
 
 const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+export type { PreparedCard };

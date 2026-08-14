@@ -1,14 +1,14 @@
-// Two-step phone scanner.
+// Point the phone at a card; build name + set + number across snaps.
 //
-// Step 1 — Title only. OCR is optimised for the name bar / a title-only zoom.
-// Step 2 — Once the name is locked (and printings loaded), gather set + number,
-//          and Pick manually is available immediately as the last resort.
+// Pipeline: capture (padded guide) → detect card quad → perspective warp to a
+// canonical card raster → step-1 title OCR → Scryfall fuzzy name → step-2
+// set/number (or Pick manually).
 
 import { useEffect, useRef, useState } from 'react';
 
 import {
   canvasFromFile,
-  captureBestCard,
+  capturePreparedCard,
   openCamera,
   type CameraSession,
 } from './scan/camera';
@@ -142,6 +142,12 @@ export const ScanScreen = ({
   const [foil, setFoil] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const [detected, setDetected] = useState(false);
+  const [focusRing, setFocusRing] = useState<{ x: number; y: number; key: number } | null>(
+    null,
+  );
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -162,9 +168,31 @@ export const ScanScreen = ({
       alive = false;
       session.current?.stop();
       session.current = null;
+      if (focusTimer.current) clearTimeout(focusTimer.current);
       void disposeOcr();
     };
   }, []);
+
+  const onTapFocus = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Ignore taps on the bottom controls (buttons / copy).
+    if ((e.target as HTMLElement).closest('[data-scan-controls]')) return;
+    if (phase === 'working' || phase === 'error') return;
+
+    const video = videoRef.current;
+    const cam = session.current;
+    if (!video || !cam) return;
+
+    const host = e.currentTarget.getBoundingClientRect();
+    setFocusRing({
+      key: Date.now(),
+      x: e.clientX - host.left,
+      y: e.clientY - host.top,
+    });
+    if (focusTimer.current) clearTimeout(focusTimer.current);
+    focusTimer.current = setTimeout(() => setFocusRing(null), 900);
+
+    void cam.focusAt(e.clientX, e.clientY);
+  };
 
   const reset = () => {
     setProgress(emptyProgress());
@@ -172,6 +200,7 @@ export const ScanScreen = ({
     setStep('title');
     setPhase('camera');
     setMessage(null);
+    setDetected(false);
   };
 
   const enterReview = (
@@ -250,7 +279,11 @@ export const ScanScreen = ({
   };
 
   /** Step 1: only title OCR — full-card name bar OR a title-only zoom. */
-  const runTitlePass = async (card: HTMLCanvasElement, base: Progress) => {
+  const runTitlePass = async (
+    card: HTMLCanvasElement,
+    base: Progress,
+    wasDetected: boolean,
+  ) => {
     setMessage('Reading title…');
     const ocr = (region: Region) => enhanceForOcr(cropRegion(card, region));
 
@@ -266,7 +299,7 @@ export const ScanScreen = ({
     if (!ocrName) {
       setPhase('camera');
       setMessage(
-        'Couldn’t read a title. Fill the guide with the name bar (or just the title text) and Scan again.',
+        'Couldn’t read a title. Frame the card (or fill the guide with the name) and Scan again.',
       );
       return;
     }
@@ -281,10 +314,13 @@ export const ScanScreen = ({
     setProgress(next);
     setStep('details');
     setPhase('camera');
+    const how = wasDetected
+      ? 'Card detected & straightened.'
+      : 'Using the guide frame (no card edges found).';
     setMessage(
       next.printings.length
-        ? `Title locked: ${next.name}. Scan set & number, or Pick manually (${next.printings.length} printings).`
-        : `Title locked: ${next.name}. Scan set & number, or Pick manually.`,
+        ? `${how} Title: ${next.name}. Scan set & number, or Pick manually (${next.printings.length}).`
+        : `${how} Title: ${next.name}. Scan set & number, or Pick manually.`,
     );
   };
 
@@ -352,11 +388,12 @@ export const ScanScreen = ({
     );
   };
 
-  const runOnCard = async (card: HTMLCanvasElement) => {
+  const runOnCard = async (card: HTMLCanvasElement, wasDetected: boolean) => {
+    setDetected(wasDetected);
     setPhase('working');
     try {
       if (step === 'title' || !progress.name) {
-        await runTitlePass(card, progress);
+        await runTitlePass(card, progress, wasDetected);
       } else {
         await runDetailsPass(card, progress);
       }
@@ -371,17 +408,19 @@ export const ScanScreen = ({
     const frame = frameRef.current;
     if (!video || !frame || video.readyState < 2) return;
     setPhase('working');
-    setMessage(step === 'title' ? 'Focusing on title…' : 'Focusing…');
+    setMessage(
+      step === 'title' ? 'Detecting card & reading title…' : 'Detecting card…',
+    );
     try {
       const guide = frame.getBoundingClientRect();
       const host = video.getBoundingClientRect();
-      const card = await captureBestCard(video, {
+      const prepared = await capturePreparedCard(video, {
         height: guide.height,
         left: guide.left - host.left,
         top: guide.top - host.top,
         width: guide.width,
       });
-      await runOnCard(card);
+      await runOnCard(prepared.canvas, prepared.detected);
     } catch (err) {
       setPhase('camera');
       setMessage(err instanceof Error ? err.message : String(err));
@@ -391,8 +430,8 @@ export const ScanScreen = ({
   const onPickPhoto = async (file: File | undefined) => {
     if (!file) return;
     try {
-      const card = await canvasFromFile(file);
-      await runOnCard(card);
+      const prepared = await canvasFromFile(file);
+      await runOnCard(prepared.canvas, prepared.detected);
     } catch (err) {
       setPhase('camera');
       setMessage(err instanceof Error ? err.message : String(err));
@@ -539,7 +578,10 @@ export const ScanScreen = ({
         </div>
       ) : (
         <>
-          <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
+          <div
+            className="relative min-h-0 flex-1 touch-manipulation overflow-hidden bg-black"
+            onPointerDown={onTapFocus}
+          >
             <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4 pb-24">
               <div
@@ -569,7 +611,26 @@ export const ScanScreen = ({
               </div>
             </div>
 
-            <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-4 pb-3 pt-10">
+            {focusRing ? (
+              <div
+                key={focusRing.key}
+                aria-hidden
+                className="pointer-events-none absolute h-16 w-16 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border-2 border-white/90 opacity-80"
+                style={{ left: focusRing.x, top: focusRing.y, animationDuration: '0.7s' }}
+              />
+            ) : null}
+            {focusRing ? (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70"
+                style={{ left: focusRing.x, top: focusRing.y }}
+              />
+            ) : null}
+
+            <div
+              className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-4 pb-3 pt-10"
+              data-scan-controls
+            >
               {phase === 'error' ? (
                 <p className="text-center text-xs text-red-300">
                   {message ?? 'Camera unavailable.'}
@@ -578,11 +639,13 @@ export const ScanScreen = ({
                 <p className="text-center text-xs text-white/90">{message}</p>
               ) : onTitleStep ? (
                 <p className="text-center text-[11px] text-white/70">
-                  Step 1 — fill the guide with the card title, then tap Scan.
+                  Step 1 — tap to focus, frame the card, then Scan title.
                 </p>
               ) : (
                 <p className="text-center text-[11px] text-white/70">
-                  Step 2 — scan set & number, or Pick manually below.
+                  Step 2 — tap to focus, scan set & number
+                  {detected ? ' (perspective locked)' : ''}
+                  , or Pick manually.
                 </p>
               )}
               <div className="flex items-center gap-2">
