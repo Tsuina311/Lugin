@@ -58,14 +58,30 @@ const toPrinting = (card: ScryfallCard): ScryfallPrinting => {
 
 /**
  * Fuzzy name lookup — turns messy OCR ("Liesa Shroud of Dusk") into Scryfall's
- * canonical name before we list printings.
+ * canonical English name. Also tries multilingual `name:` search so Latin-script
+ * foreign printed names can resolve when OCR reads them.
+ *
+ * Non-Latin prints (JP/KR/ZH/RU) still need matching OCR languages — not loaded yet.
  */
 export const fetchNamedFuzzy = async (name: string): Promise<ScryfallPrinting | null> => {
-  const url = `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name.trim())}`;
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Scryfall responded ${res.status}`);
-  return toPrinting((await res.json()) as ScryfallCard);
+  const q = name.trim();
+  if (!q) return null;
+
+  const namedUrl = `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(q)}`;
+  const namedRes = await fetch(namedUrl, { headers: { Accept: 'application/json' } });
+  if (namedRes.ok) return toPrinting((await namedRes.json()) as ScryfallCard);
+  if (namedRes.status !== 404) throw new Error(`Scryfall responded ${namedRes.status}`);
+
+  // Foreign printed names / near-misses: search across languages.
+  const searchUrl =
+    `https://api.scryfall.com/cards/search?unique=cards&include_multilingual=true&q=` +
+    encodeURIComponent(`name:"${q.replace(/"/g, '')}"`);
+  const searchRes = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
+  if (searchRes.status === 404) return null;
+  if (!searchRes.ok) throw new Error(`Scryfall responded ${searchRes.status}`);
+  const json = (await searchRes.json()) as { data?: ScryfallCard[] };
+  const hit = json.data?.[0];
+  return hit ? toPrinting(hit) : null;
 };
 
 /** Every printing of an exact card name — used once OCR locks the name. */
@@ -73,14 +89,49 @@ export const fetchPrintingsByName = async (name: string): Promise<ScryfallPrinti
   const exact = name.trim();
   if (!exact) return [];
   const query = `!"${exact.replace(/"/g, '')}"`;
-  const url =
+  let url: string | null =
     `https://api.scryfall.com/cards/search?order=released&dir=desc&unique=prints&q=` +
     encodeURIComponent(query);
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (res.status === 404) return [];
-  if (!res.ok) throw new Error(`Scryfall responded ${res.status}`);
-  const json = (await res.json()) as { data?: ScryfallCard[] };
-  return (json.data ?? []).map(toPrinting);
+
+  const out: ScryfallPrinting[] = [];
+  // Cap pages so a mega-reprint like Lightning Bolt stays usable on phone.
+  for (let page = 0; url && page < 4; page++) {
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (res.status === 404) break;
+    if (!res.ok) throw new Error(`Scryfall responded ${res.status}`);
+    const json = (await res.json()) as {
+      data?: ScryfallCard[];
+      has_more?: boolean;
+      next_page?: string;
+    };
+    out.push(...(json.data ?? []).map(toPrinting));
+    url = json.has_more && json.next_page ? json.next_page : null;
+    if (url) await new Promise(r => setTimeout(r, 100));
+  }
+  return out;
+};
+
+/** Filter printings by whatever set/number we already have (may be many left). */
+export const filterPrintings = (
+  printings: readonly ScryfallPrinting[],
+  parts: { collectorNumber?: string; setCode?: string },
+): ScryfallPrinting[] => {
+  let pool = [...printings];
+  if (parts.setCode) {
+    const set = parts.setCode.toLowerCase();
+    const narrowed = pool.filter(p => p.setCode.toLowerCase() === set);
+    if (narrowed.length) pool = narrowed;
+  }
+  if (parts.collectorNumber) {
+    const num = parts.collectorNumber.toLowerCase();
+    const stripped = num.replace(/^0+/, '') || '0';
+    const narrowed = pool.filter(p => {
+      const c = p.collectorNumber.toLowerCase();
+      return c === num || c.replace(/^0+/, '') === stripped || c === stripped.padStart(c.length, '0');
+    });
+    if (narrowed.length) pool = narrowed;
+  }
+  return pool;
 };
 
 /**
@@ -91,20 +142,15 @@ export const pickPrinting = (
   printings: readonly ScryfallPrinting[],
   parts: { collectorNumber?: string; setCode?: string },
 ): ScryfallPrinting | null => {
-  let pool = [...printings];
-  if (parts.setCode) {
-    const set = parts.setCode.toLowerCase();
-    pool = pool.filter(p => p.setCode.toLowerCase() === set);
-  }
-  if (parts.collectorNumber) {
-    const num = parts.collectorNumber.toLowerCase();
-    const stripped = num.replace(/^0+/, '') || '0';
-    pool = pool.filter(p => {
-      const c = p.collectorNumber.toLowerCase();
-      return c === num || c.replace(/^0+/, '') === stripped || c === stripped.padStart(c.length, '0');
-    });
-  }
-  return pool.length === 1 ? pool[0] : null;
+  const pool = filterPrintings(printings, parts);
+  // Only auto-pick when filters actually narrowed (or the card has a single print).
+  const filtered =
+    parts.setCode || parts.collectorNumber
+      ? pool
+      : printings.length === 1
+        ? [...printings]
+        : [];
+  return filtered.length === 1 ? filtered[0] : null;
 };
 
 /** Build the collection row a successful scan should add. */

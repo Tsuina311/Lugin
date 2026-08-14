@@ -7,22 +7,37 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { captureCard, openCamera, type CameraSession } from './scan/camera';
-import { COLLECTOR_WHITELIST, disposeOcr, readText } from './scan/ocr';
+import {
+  canvasFromFile,
+  captureBestCard,
+  openCamera,
+  type CameraSession,
+} from './scan/camera';
+import { enhanceForOcr } from './scan/enhance';
+import {
+  COLLECTOR_WHITELIST,
+  SET_SYMBOL_WHITELIST,
+  disposeOcr,
+  readText,
+} from './scan/ocr';
 
 import type { CollectionCard } from '@/lib/collection';
 import { guessFoil, imageStats, type FoilHint } from '@/lib/scan/foil';
 import {
-  mergeParts,
+  bestName,
+  mergePartsForScan,
   parseCollectorParts,
-  tidyName,
+  parseSetSymbolText,
   type CollectorParts,
 } from '@/lib/scan/parseCollector';
 import {
+  CLASSIC_NUMBER_REGION,
   COLLECTOR_REGION,
+  NAME_FOCUS_REGION,
   NAME_REGION,
   NUMBER_REGION,
   SET_REGION,
+  SET_SYMBOL_REGION,
   cropRegion,
 } from '@/lib/scan/regions';
 import {
@@ -30,12 +45,13 @@ import {
   fetchNamedFuzzy,
   fetchPrinting,
   fetchPrintingsByName,
+  filterPrintings,
   pickPrinting,
   type ScryfallPrinting,
 } from '@/lib/scan/resolve';
-import { Check, Hash, Library, Type, type LucideIcon } from '@/ui/components/icons';
+import { Check, Hash, Library, List, Type, type LucideIcon } from '@/ui/components/icons';
 
-type Phase = 'camera' | 'working' | 'review' | 'error';
+type Phase = 'camera' | 'working' | 'pick' | 'review' | 'error';
 
 interface Progress {
   collector: CollectorParts;
@@ -127,6 +143,23 @@ export const ScanScreen = ({
     setMessage(null);
   };
 
+  const enterReview = (
+    printing: ScryfallPrinting,
+    collector: CollectorParts,
+    stripStats: ReturnType<typeof imageStats> | null,
+  ) => {
+    const hint = guessFoil(collector, stripStats);
+    const canFoil = printing.finishes.includes('foil');
+    setReview({
+      card: cardFromScan(printing, hint),
+      foil: hint,
+      printing,
+    });
+    setFoil(canFoil ? hint.foil : false);
+    setPhase('review');
+    setMessage(null);
+  };
+
   const tryResolve = async (
     next: Progress,
     stripStats: ReturnType<typeof imageStats> | null,
@@ -145,62 +178,69 @@ export const ScanScreen = ({
     // Name known but disagrees with this printing — keep gathering, don't lock.
     if (next.name && !namesLooselyMatch(next.name, printing.name)) return false;
 
-    const hint = guessFoil(collector, stripStats);
-    const canFoil = printing.finishes.includes('foil');
-    setReview({
-      card: cardFromScan(printing, hint),
-      foil: hint,
-      printing,
-    });
-    setFoil(canFoil ? hint.foil : false);
-    setPhase('review');
-    setMessage(null);
+    enterReview(printing, collector, stripStats);
     return true;
   };
 
-  const snap = async () => {
-    const video = videoRef.current;
-    const frame = frameRef.current;
-    if (!video || !frame || video.readyState < 2) return;
+  const openManualPick = async () => {
+    if (!progress.name) return;
+    setPhase('working');
+    setMessage('Loading printings…');
+    try {
+      let printings = progress.printings;
+      if (printings.length === 0) {
+        printings = await fetchPrintingsByName(progress.name);
+        setProgress(p => ({ ...p, printings }));
+      }
+      if (printings.length === 0) {
+        setPhase('camera');
+        setMessage(`No Scryfall printings found for “${progress.name}”.`);
+        return;
+      }
+      setPhase('pick');
+      setMessage(null);
+    } catch (err) {
+      setPhase('camera');
+      setMessage(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const pickPrintingManual = (printing: ScryfallPrinting) => {
+    enterReview(printing, progress.collector, null);
+  };
+
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const runOnCard = async (card: HTMLCanvasElement) => {
     setPhase('working');
     setMessage('Reading…');
     try {
-      const guide = frame.getBoundingClientRect();
-      const host = video.getBoundingClientRect();
-      const card = captureCard(video, {
-        height: guide.height,
-        left: guide.left - host.left,
-        top: guide.top - host.top,
-        width: guide.width,
-      });
+      const ocrCrop = (region: Parameters<typeof cropRegion>[1]) =>
+        enhanceForOcr(cropRegion(card, region));
 
-      const nameCanvas = cropRegion(card, NAME_REGION);
-      const numberCanvas = cropRegion(card, NUMBER_REGION);
-      const setCanvas = cropRegion(card, SET_REGION);
-      const collectorCanvas = cropRegion(card, COLLECTOR_REGION);
-      const strip = collectorCanvas.getContext('2d')?.getImageData(
-        0,
-        0,
-        collectorCanvas.width,
-        collectorCanvas.height,
-      );
-      const stats = strip ? imageStats(strip.data) : null;
+      const nameCanvas = ocrCrop(NAME_REGION);
+      const nameFocusCanvas = ocrCrop(NAME_FOCUS_REGION);
+      const numberCanvas = ocrCrop(NUMBER_REGION);
+      const classicNumberCanvas = ocrCrop(CLASSIC_NUMBER_REGION);
+      const setCanvas = ocrCrop(SET_REGION);
+      const setSymbolCanvas = ocrCrop(SET_SYMBOL_REGION);
+      const collectorCanvas = ocrCrop(COLLECTOR_REGION);
+      // Foil stats from the raw (unenhanced) strip colour.
+      const rawStrip = cropRegion(card, COLLECTOR_REGION);
+      const rawData = rawStrip
+        .getContext('2d')
+        ?.getImageData(0, 0, rawStrip.width, rawStrip.height);
+      const stats = rawData ? imageStats(rawData.data) : null;
 
-      const [nameText, numberText, setText, collectorText] = await Promise.all([
+      // Name first: title bar + wide focus so a name-only zoom still locks.
+      const [nameText, nameFocusText] = await Promise.all([
         readText(nameCanvas),
-        readText(numberCanvas, COLLECTOR_WHITELIST),
-        readText(setCanvas, COLLECTOR_WHITELIST),
-        readText(collectorCanvas, COLLECTOR_WHITELIST),
+        readText(nameFocusCanvas),
       ]);
 
       let next: Progress = { ...progress, collector: { ...progress.collector } };
+      const ocrName = bestName(nameText, nameFocusText);
 
-      // Merge every OCR pass — split regions first, then the wide fallback.
-      next.collector = mergeParts(next.collector, parseCollectorParts(numberText));
-      next.collector = mergeParts(next.collector, parseCollectorParts(setText));
-      next.collector = mergeParts(next.collector, parseCollectorParts(collectorText));
-
-      const ocrName = tidyName(nameText);
       if (ocrName && !next.name) {
         const named = await fetchNamedFuzzy(ocrName);
         if (named) {
@@ -209,12 +249,49 @@ export const ScanScreen = ({
             name: named.name,
             printings: await fetchPrintingsByName(named.name),
           };
-        } else if (ocrName.length >= 5) {
-          // Keep the raw OCR so the chip can show progress even before Scryfall agrees.
+        } else if (ocrName.length >= 3) {
           next = { ...next, name: ocrName, printings: [] };
         }
       } else if (next.name && next.printings.length === 0) {
         next = { ...next, printings: await fetchPrintingsByName(next.name) };
+      }
+
+      const [numberText, classicNumberText, setText, setSymbolText, collectorText] =
+        await Promise.all([
+          readText(numberCanvas, COLLECTOR_WHITELIST),
+          readText(classicNumberCanvas, COLLECTOR_WHITELIST),
+          readText(setCanvas, COLLECTOR_WHITELIST),
+          readText(setSymbolCanvas, SET_SYMBOL_WHITELIST),
+          readText(collectorCanvas, COLLECTOR_WHITELIST),
+        ]);
+
+      const nameLocked = Boolean(next.name);
+      next.collector = mergePartsForScan(
+        next.collector,
+        parseCollectorParts(numberText),
+        { nameLocked },
+      );
+      next.collector = mergePartsForScan(
+        next.collector,
+        parseCollectorParts(classicNumberText),
+        { nameLocked },
+      );
+      next.collector = mergePartsForScan(next.collector, parseCollectorParts(setText), {
+        nameLocked,
+      });
+      next.collector = mergePartsForScan(
+        next.collector,
+        parseCollectorParts(collectorText),
+        { nameLocked },
+      );
+
+      const symbolSet = parseSetSymbolText(setSymbolText);
+      if (symbolSet) {
+        next.collector = mergePartsForScan(
+          next.collector,
+          { foilMarker: null, raw: setSymbolText, setCode: symbolSet },
+          { nameLocked },
+        );
       }
 
       setProgress(next);
@@ -227,11 +304,52 @@ export const ScanScreen = ({
         !next.collector.collectorNumber ? 'number' : null,
       ].filter(Boolean);
       setPhase('camera');
-      setMessage(
-        missing.length
-          ? `Got a pass — still need ${missing.join(', ')}. Move closer to the missing band and scan again.`
-          : 'Name, set and number are in, but Scryfall couldn’t pin one printing. Try another angle.',
-      );
+      if (next.name && (!next.collector.setCode || !next.collector.collectorNumber)) {
+        setMessage(
+          `Name locked: ${next.name}. Frame the set symbol (type-line, right) and the bottom number, then scan again.`,
+        );
+      } else if (missing.length) {
+        setMessage(
+          `Got a pass — still need ${missing.join(', ')}. Zoom the missing band sharp and scan again.`,
+        );
+      } else {
+        setMessage(
+          'Name, set and number are in, but Scryfall couldn’t pin one printing. Try another angle.',
+        );
+      }
+    } catch (err) {
+      setPhase('camera');
+      setMessage(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const snap = async () => {
+    const video = videoRef.current;
+    const frame = frameRef.current;
+    if (!video || !frame || video.readyState < 2) return;
+    setPhase('working');
+    setMessage('Focusing…');
+    try {
+      const guide = frame.getBoundingClientRect();
+      const host = video.getBoundingClientRect();
+      const card = await captureBestCard(video, {
+        height: guide.height,
+        left: guide.left - host.left,
+        top: guide.top - host.top,
+        width: guide.width,
+      });
+      await runOnCard(card);
+    } catch (err) {
+      setPhase('camera');
+      setMessage(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const onPickPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const card = await canvasFromFile(file);
+      await runOnCard(card);
     } catch (err) {
       setPhase('camera');
       setMessage(err instanceof Error ? err.message : String(err));
@@ -256,9 +374,62 @@ export const ScanScreen = ({
   const haveName = Boolean(progress.name);
   const haveSet = Boolean(progress.collector.setCode);
   const haveNumber = Boolean(progress.collector.collectorNumber);
+  const pickList = filterPrintings(progress.printings, progress.collector);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-canvas">
+      {phase === 'pick' ? (
+        <div className="flex min-h-0 flex-1 flex-col bg-panel">
+          <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+            <button
+              className="rounded-lg border border-line-strong px-3 py-2 text-sm text-ink-muted"
+              onClick={() => setPhase('camera')}
+              type="button"
+            >
+              Back
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-ink">{progress.name}</p>
+              <p className="text-[11px] text-ink-faint">
+                {pickList.length} printing{pickList.length === 1 ? '' : 's'}
+                {haveSet || haveNumber ? ' (filtered by what we scanned)' : ''}
+              </p>
+            </div>
+          </div>
+          <ul className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+            {pickList.map(p => (
+              <li key={p.id}>
+                <button
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-raised active:bg-raised"
+                  onClick={() => pickPrintingManual(p)}
+                  type="button"
+                >
+                  {p.imageUrl ? (
+                    <img
+                      alt=""
+                      className="h-14 w-auto shrink-0 rounded border border-line"
+                      loading="lazy"
+                      src={p.imageUrl}
+                    />
+                  ) : (
+                    <div className="h-14 w-10 shrink-0 rounded border border-line bg-raised" />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-ink">
+                      {p.setCode.toUpperCase()} #{p.collectorNumber}
+                    </span>
+                    <span className="block truncate text-[11px] text-ink-faint">
+                      {p.setName}
+                      {p.rarity ? ` · ${p.rarity}` : ''}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <>
       <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
         <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
@@ -276,6 +447,17 @@ export const ScanScreen = ({
                 width: `${NAME_REGION.w * 100}%`,
               }}
             />
+            {!haveName ? (
+              <div
+                className="absolute border border-dashed border-sky-200/50 bg-sky-400/5"
+                style={{
+                  height: `${NAME_FOCUS_REGION.h * 100}%`,
+                  left: `${NAME_FOCUS_REGION.x * 100}%`,
+                  top: `${NAME_FOCUS_REGION.y * 100}%`,
+                  width: `${NAME_FOCUS_REGION.w * 100}%`,
+                }}
+              />
+            ) : null}
             <div
               className={`absolute border ${haveNumber ? 'border-pos/80 bg-pos/20' : 'border-amber-300/90 bg-amber-400/20'}`}
               style={{
@@ -286,12 +468,30 @@ export const ScanScreen = ({
               }}
             />
             <div
+              className={`absolute border ${haveNumber ? 'border-pos/80 bg-pos/20' : 'border-amber-300/50 bg-amber-400/10'}`}
+              style={{
+                height: `${CLASSIC_NUMBER_REGION.h * 100}%`,
+                left: `${CLASSIC_NUMBER_REGION.x * 100}%`,
+                top: `${CLASSIC_NUMBER_REGION.y * 100}%`,
+                width: `${CLASSIC_NUMBER_REGION.w * 100}%`,
+              }}
+            />
+            <div
               className={`absolute border ${haveSet ? 'border-pos/80 bg-pos/20' : 'border-violet-300/90 bg-violet-400/20'}`}
               style={{
                 height: `${SET_REGION.h * 100}%`,
                 left: `${SET_REGION.x * 100}%`,
                 top: `${SET_REGION.y * 100}%`,
                 width: `${SET_REGION.w * 100}%`,
+              }}
+            />
+            <div
+              className={`absolute border ${haveSet ? 'border-pos/80 bg-pos/20' : 'border-violet-300/70 bg-violet-400/15'}`}
+              style={{
+                height: `${SET_SYMBOL_REGION.h * 100}%`,
+                left: `${SET_SYMBOL_REGION.x * 100}%`,
+                top: `${SET_SYMBOL_REGION.y * 100}%`,
+                width: `${SET_SYMBOL_REGION.w * 100}%`,
               }}
             />
           </div>
@@ -315,8 +515,8 @@ export const ScanScreen = ({
           />
         </div>
         <p className="text-[11px] leading-snug text-ink-faint">
-          Each scan tries all three. Green checks stick — nudge the card so the missing band is
-          sharp, then scan again. A locked name narrows Scryfall to that card’s printings.
+          Name first (EN/FR/DE/IT). Edition from bottom text or the set symbol. Once the name
+          is locked, Pick manually lists every printing if OCR can’t finish the job.
         </p>
         {message ? <p className="text-xs text-ink-muted">{message}</p> : null}
 
@@ -371,28 +571,62 @@ export const ScanScreen = ({
             </div>
           </div>
         ) : (
-          <div className="flex gap-2">
-            {(haveName || haveSet || haveNumber) && (
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              {(haveName || haveSet || haveNumber) && (
+                <button
+                  className="rounded-lg border border-line-strong px-3 py-3.5 text-sm font-medium text-ink-muted"
+                  disabled={phase === 'working'}
+                  onClick={reset}
+                  type="button"
+                >
+                  Reset
+                </button>
+              )}
               <button
-                className="rounded-lg border border-line-strong px-3 py-3.5 text-sm font-medium text-ink-muted"
+                className="flex-1 rounded-lg bg-accent py-3.5 text-sm font-semibold text-accent-ink disabled:opacity-50"
                 disabled={phase === 'working'}
-                onClick={reset}
+                onClick={() => void snap()}
                 type="button"
               >
-                Reset
+                {phase === 'working' ? 'Reading…' : 'Scan'}
               </button>
-            )}
+            </div>
+            {haveName ? (
+              <button
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-line-strong py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+                disabled={phase === 'working'}
+                onClick={() => void openManualPick()}
+                type="button"
+              >
+                <List aria-hidden size={14} />
+                Pick manually
+              </button>
+            ) : null}
             <button
-              className="flex-1 rounded-lg bg-accent py-3.5 text-sm font-semibold text-accent-ink disabled:opacity-50"
+              className="rounded-lg border border-line-strong py-2.5 text-sm font-medium text-ink-muted disabled:opacity-50"
               disabled={phase === 'working'}
-              onClick={() => void snap()}
+              onClick={() => fileRef.current?.click()}
               type="button"
             >
-              {phase === 'working' ? 'Reading…' : 'Scan'}
+              Use photo instead
             </button>
+            <input
+              ref={fileRef}
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                void onPickPhoto(file);
+              }}
+              type="file"
+            />
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 };

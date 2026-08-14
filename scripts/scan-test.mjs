@@ -26,9 +26,16 @@ await esbuild.build({
   },
 });
 
-const { guessFoil, mergeParts, parseCollectorLine, parseCollectorParts } = await import(
-  pathToFileURL(bundle).href,
-);
+const {
+  bestName,
+  guessFoil,
+  mergeParts,
+  mergePartsForScan,
+  parseCollectorLine,
+  parseCollectorParts,
+  parseSetSymbolText,
+  tidyName,
+} = await import(pathToFileURL(bundle).href);
 
 let failed = 0;
 const check = (name, fn) => {
@@ -80,6 +87,46 @@ check('merge fills gaps across snaps', () => {
   );
   assert.equal(merged.collectorNumber, '286');
   assert.equal(merged.setCode, 'CMR');
+});
+
+check('name-first ignores bare set codes', () => {
+  const merged = mergePartsForScan(
+    { foilMarker: null, raw: '' },
+    parseCollectorParts('DUS'),
+    { nameLocked: false },
+  );
+  assert.equal(merged.setCode, undefined);
+});
+
+check('name-first still keeps classic number', () => {
+  const merged = mergePartsForScan(
+    { foilMarker: null, raw: '' },
+    parseCollectorParts('286/361'),
+    { nameLocked: false },
+  );
+  assert.equal(merged.collectorNumber, '286');
+});
+
+check('tidyName prefers the title line', () => {
+  assert.equal(tidyName('Liesa, Shroud of Dusk\nLegendary Creature'), 'Liesa, Shroud of Dusk');
+});
+
+check('bestName picks the longer title pass', () => {
+  assert.equal(bestName('Lie', 'Liesa, Shroud of Dusk'), 'Liesa, Shroud of Dusk');
+});
+
+check('set symbol OCR reads M11', () => {
+  assert.equal(parseSetSymbolText('M11'), 'M11');
+  assert.equal(parseSetSymbolText('M 11'), 'M11');
+});
+
+check('classic bottom number without set text', () => {
+  const p = parseCollectorParts('134/249');
+  assert.equal(p.collectorNumber, '134');
+});
+
+check('tidyName keeps French accents', () => {
+  assert.equal(tidyName('Léonin, Protecteur'), 'Léonin, Protecteur');
 });
 
 check('noise does not invent a full card', () => {
