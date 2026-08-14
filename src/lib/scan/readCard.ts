@@ -5,7 +5,14 @@
 // evaluation harness. No Scryfall, no React, no canvas.
 
 import { emptyDiagnostics, type OcrSample, ScanTimer } from './diagnostics';
-import { bestName, parseCollectorParts, parseSetSymbolText, type CollectorParts } from './parseCollector';
+import type { Reading } from './matchName';
+import {
+  bestName,
+  parseCollectorParts,
+  parseSetSymbolText,
+  tidyName,
+  type CollectorParts,
+} from './parseCollector';
 import { PRODUCTION_VARIANT, enhanceForOcr } from './preprocess';
 import { STANDARD_PROFILE, type NamedRegion, type ScanProfile } from './regions';
 import { type TextRecognitionResult, type TextRecognizer } from './textRecognizer';
@@ -65,27 +72,44 @@ const runPass = async (
 };
 
 export interface TitleReading {
-  /** Tidied OCR name — a candidate string, not a card identity. */
+  /**
+   * Longest tidied string, kept only as a last resort for callers with no index
+   * loaded. Length is not a quality signal: see `readings` and `matchReadings`.
+   */
   name: string | null;
+  /**
+   * Every tidied reading, one per title framing.
+   *
+   * Returned rather than reduced to a winner because nothing here is in a
+   * position to choose. Picking a string first and identifying it second throws
+   * away the only evidence that separates a good read from a bad one — whether
+   * the string names a card that exists — and that evidence lives in the index,
+   * which is the caller's to hold.
+   */
+  readings: Reading[];
   samples: OcrSample[];
 }
 
-/** Read every title framing and tidy the best-looking result. */
+/** Read the title from every framing in the profile and tidy each result. */
 export const readTitle = async (
   card: ScanImage,
   recognizer: TextRecognizer,
   options: ReadOptions = {},
 ): Promise<TitleReading> => {
   const samples: OcrSample[] = [];
+  const readings: Reading[] = [];
   const texts: string[] = [];
+
   for (const pass of (options.profile ?? STANDARD_PROFILE).title) {
     const { result, sample } = await runPass(card, pass, recognizer, options);
     samples.push(sample);
     texts.push(result.text);
+    const tidied = tidyName(result.text);
+    sample.normalizedText = tidied ?? '';
+    if (tidied) readings.push({ source: pass.name, text: tidied });
   }
-  const name = bestName(...texts);
-  for (const sample of samples) sample.normalizedText = name ?? '';
-  return { name, samples };
+
+  return { name: bestName(...texts), readings, samples };
 };
 
 export interface CollectorReading {

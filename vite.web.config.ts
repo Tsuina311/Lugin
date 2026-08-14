@@ -139,6 +139,12 @@ const INBOX_KEY = SHELL + 'shared-import';
 // code fix cost the user a download they didn't ask for.
 const PRICES = 'lugin-prices';
 
+// The card-name index the scanner matches OCR against, ~1.2 MB over the wire and
+// fetched on first scan. Survives the sweep for the same reason as the prices,
+// and more so: card names barely age, so an old copy is a perfectly good answer
+// and re-downloading it per deploy would be pure waste.
+const CARD_INDEX = 'lugin-card-index';
+
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(caches.open(CACHE).then(cache => cache.add(SHELL)).catch(() => {}));
@@ -149,7 +155,9 @@ self.addEventListener('activate', event => {
     caches.keys()
       .then(keys => Promise.all(
         keys
-          .filter(key => key !== CACHE && key !== INBOX && key !== PRICES)
+          .filter(
+            key => key !== CACHE && key !== INBOX && key !== PRICES && key !== CARD_INDEX,
+          )
           .map(key => caches.delete(key)),
       ))
       .then(() => self.clients.claim()),

@@ -1,7 +1,8 @@
 // Parser tests for the phone scanner — no camera required.
 
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -29,6 +30,7 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/readCard.ts')}';
       export * from '${join(root, 'src/lib/scan/detectCard.ts')}';
       export * from '${join(root, 'src/lib/scan/regions.ts')}';
+      export * from '${join(root, 'src/lib/scan/matchName.ts')}';
     `,
     resolveDir: root,
     sourcefile: 'entry.ts',
@@ -45,18 +47,24 @@ const {
   bestName,
   binarize,
   blankImage,
+  buildNameIndex,
+  candidateMargin,
   contrastStretch,
   convexHull,
   cornersToQuad,
   cropImage,
   detectCardQuad,
+  editDistance,
   extremalCorners,
+  foldName,
   glareRatio,
   grayscale,
   guessFoil,
   homographyDestToSrc,
   isLightOnDark,
   largestComponent,
+  matchName,
+  matchReadings,
   mergeParts,
   mergePartsForScan,
   minAreaRectAngle,
@@ -75,7 +83,9 @@ const {
   regionToRect,
   resize,
   scoreCardQuad,
+  shapeFold,
   sharpnessScore,
+  similarity,
   tidyName,
   trimToTextBand,
   upscaleFactorFor,
@@ -406,6 +416,175 @@ check('corners round-trip through the named form', () => {
   assert.deepEqual(cornersToQuad(quadToCorners(quad)), quad);
   assert.deepEqual(quadToCorners(quad).topLeft, quad[0]);
   assert.deepEqual(quadToCorners(quad).bottomRight, quad[2]);
+});
+
+// --- name matching --------------------------------------------------------
+
+/** A small stand-in for the shipped index, with names chosen to collide. */
+const testIndex = (fold) =>
+  buildNameIndex(
+    {
+      names: [
+        'Sol Ring',
+        'Soul Warden',
+        'Lightning Bolt',
+        'Llanowar Elves',
+        'Yavimaya, Cradle of Growth',
+        'Reliquary Tower',
+        'Swords to Plowshares',
+        'Fog',
+        'Ow',
+        'Nicol Bolas, Dragon-God',
+        'Elvish Mystic',
+      ],
+      printed: {
+        de: [
+          [0, 'Sonnenring'],
+          [2, 'Blitzschlag'],
+        ],
+        fr: [
+          [0, 'Anneau solaire'],
+          [2, 'Foudre'],
+          [6, 'Épées contre socs'],
+        ],
+        it: [[0, 'Anello del Sole']],
+      },
+      version: 1,
+    },
+    fold,
+  );
+
+check('foldName strips punctuation and accents but keeps letters', () => {
+  assert.equal(foldName("Lim-Dûl's Vault"), 'limdulsvault');
+  assert.equal(foldName('Épées contre socs'), 'epeescontresocs');
+  assert.equal(foldName('Nicol Bolas, Dragon-God'), 'nicolbolasdragongod');
+});
+
+check('shapeFold collapses the characters OCR cannot tell apart', () => {
+  // Same handful of pixels in a title font, so the distinction carries no
+  // information and is removed from both sides.
+  assert.equal(shapeFold('Sol Ring'), shapeFold('So1 R1ng'));
+  assert.equal(shapeFold('Bolt'), shapeFold('8olt'));
+  assert.equal(shapeFold('Sworn'), shapeFold('Swom'), 'rn and m collapse');
+  assert.equal(shapeFold('Warden'), shapeFold('VVarden'), 'vv reads as w');
+});
+
+check('editDistance and similarity agree with the obvious cases', () => {
+  assert.equal(editDistance('', ''), 0);
+  assert.equal(editDistance('abc', 'abc'), 0);
+  assert.equal(editDistance('abc', 'abd'), 1);
+  assert.equal(editDistance('abc', ''), 3);
+  assert.equal(similarity('solring', 'solring'), 1);
+  assert.ok(similarity('solring', 'solrinq') > 0.8);
+  assert.equal(similarity('solring', ''), 0);
+});
+
+check('matchName finds the card behind a misread title', () => {
+  const index = testIndex();
+  const [top] = matchName('Sol Rinq', index);
+  assert.equal(top.name, 'Sol Ring');
+  assert.ok(top.score > 0.8, `score ${top.score}`);
+});
+
+check('matchName recovers a title clipped by the crop', () => {
+  // Scoring only the whole string would rate this ~0.6 purely for the missing
+  // tail, which is the difference between an answer and nothing.
+  const [top] = matchName('Yavimaya, Cradle', testIndex());
+  assert.equal(top.name, 'Yavimaya, Cradle of Growth');
+  assert.ok(top.score > 0.8, `score ${top.score}`);
+});
+
+check('matchName resolves French, German and Italian titles to the English name', () => {
+  const index = testIndex();
+  for (const printed of ['Anneau solaire', 'Sonnenring', 'Anello del Sole']) {
+    const [top] = matchName(printed, index);
+    assert.equal(top.name, 'Sol Ring', `${printed} did not resolve`);
+    assert.equal(top.printedName, printed, 'the matching localized title is reported');
+    assert.ok(top.lang, 'so the scan can record which language was held up');
+  }
+});
+
+check('matchName still resolves a misread foreign title', () => {
+  const [top] = matchName('Anneau solaire'.replace('l', '1'), testIndex());
+  assert.equal(top.name, 'Sol Ring');
+});
+
+check('matchName finds very short names, which have no useful trigrams', () => {
+  const index = testIndex();
+  assert.equal(matchName('Fog', index)[0].name, 'Fog');
+  assert.equal(matchName('Ow', index)[0].name, 'Ow');
+});
+
+check('matchName reports one entry per card, not one per language', () => {
+  const names = matchName('Sol Ring', testIndex()).map(c => c.name);
+  assert.equal(new Set(names).size, names.length, 'no duplicate cards in the list');
+});
+
+check('matchName returns nothing for text that is not a card name', () => {
+  // Rules text and flavour text land in the title crop often enough that
+  // answering confidently here would be worse than answering not at all.
+  assert.deepEqual(matchName('Deep within the forsaken cavern', testIndex()), []);
+  assert.deepEqual(matchName('', testIndex()), []);
+  assert.deepEqual(matchName('x', testIndex()), []);
+});
+
+check('matchReadings picks the reading that names a real card', () => {
+  // The defect this whole module exists to fix. bestName takes the longest
+  // string, so with equal lengths the garbled pass wins; only the index knows
+  // that one of them is a card.
+  assert.equal(bestName('Sol Rinq', 'Sol Ring'), 'Sol Rinq');
+
+  const candidates = matchReadings(
+    [
+      { source: 'title', text: 'Sol Rinq' },
+      { source: 'title-wide', text: 'Sol Ring' },
+    ],
+    testIndex(),
+  );
+  assert.equal(candidates[0].name, 'Sol Ring');
+  assert.equal(candidates[0].score, 1, 'the exact reading wins outright');
+  assert.equal(candidates[0].source, 'title-wide', 'and reports which pass found it');
+});
+
+check('matchReadings ignores passes that read nothing', () => {
+  const candidates = matchReadings(
+    [
+      { source: 'title', text: '   ' },
+      { source: 'title-wide', text: 'Lightning Bolt' },
+    ],
+    testIndex(),
+  );
+  assert.equal(candidates[0].name, 'Lightning Bolt');
+});
+
+check('candidateMargin separates a clear answer from a coin toss', () => {
+  const clear = candidateMargin([
+    { name: 'a', score: 0.7 },
+    { name: 'b', score: 0.5 },
+  ]);
+  const tie = candidateMargin([
+    { name: 'a', score: 0.9 },
+    { name: 'b', score: 0.89 },
+  ]);
+  assert.ok(clear > tie, 'a lower top score can still be the safer answer');
+  assert.equal(candidateMargin([]), 0);
+  assert.equal(candidateMargin([{ name: 'a', score: 0.8 }]), 0.8);
+});
+
+check('buildNameIndex does not store a localized title identical to the English one', () => {
+  const index = buildNameIndex(
+    { names: ['Fog'], printed: { fr: [[0, 'Fog']] }, version: 1 },
+    shapeFold,
+  );
+  assert.equal(index.entries.length, 1, 'the duplicate adds postings and changes nothing');
+});
+
+check('buildNameIndex ignores localized titles pointing outside the name list', () => {
+  const index = buildNameIndex(
+    { names: ['Fog'], printed: { fr: [[7, 'Brouillard']] }, version: 1 },
+    shapeFold,
+  );
+  assert.equal(index.entries.length, 1);
 });
 
 // --- polarity and trimming ------------------------------------------------
@@ -777,11 +956,12 @@ check('every title region stays inside the card and above the artwork', () => {
   }
 });
 
-check('bestName breaks ties by length, not by quality (known defect)', () => {
-  // Documents current behaviour rather than endorsing it: with equal-length
-  // candidates the first pass wins, so a garbled read beats a clean one. Length
-  // is not a quality signal at all — Phase C replaces this with scoring against
-  // the local card index, and this assertion should flip then.
+check('bestName still breaks ties by length, and is now only a fallback', () => {
+  // Length is not a quality signal, so with equal-length readings the garbled one
+  // can win. That is no longer on the main path: `matchReadings` scores every
+  // reading against the card index and gets this right (see above). bestName
+  // survives only for the case where no index has loaded yet, where "longest" is
+  // at least better than "first".
   assert.equal(bestName('Sol Rinq', 'Sol Ring'), 'Sol Rinq');
   assert.equal(bestName('Sol', 'Sol Ring'), 'Sol Ring');
 });
@@ -828,6 +1008,75 @@ await checkAsync('keepCrops is off by default so scans stay cheap', async () => 
     { keepCrops: true },
   );
   assert.ok(debug.samples.every(s => s.crop && s.crop.width > 0));
+});
+
+// --- the shipped index ----------------------------------------------------
+//
+// The generator runs in CI against a 392 MB dump, so nobody re-runs it to check a
+// refactor. A wrong shape here does not throw: the matcher just quietly stops
+// finding cards.
+
+const BULK = [
+  { games: ['paper'], lang: 'en', name: 'Sol Ring', set: 'cmr' },
+  // A second printing of a card already seen must not duplicate the name.
+  { games: ['paper'], lang: 'en', name: 'Sol Ring', set: 'ltc' },
+  { games: ['paper'], lang: 'fr', name: 'Sol Ring', printed_name: 'Anneau solaire', set: 'soc' },
+  { games: ['paper'], lang: 'de', name: 'Sol Ring', printed_name: 'Sonnenring', set: 'soc' },
+  // A language nobody has an OCR model for is not worth the bytes.
+  { games: ['paper'], lang: 'ja', name: 'Sol Ring', printed_name: '太陽の指輪', set: 'soc' },
+  {
+    games: ['paper'],
+    lang: 'en',
+    name: 'Delver of Secrets // Insectile Aberration',
+    set: 'isd',
+  },
+  // Digital-only and oversized printings are not cards anybody scans.
+  { games: ['arena'], lang: 'en', name: 'Alchemy Oddity', set: 'y22' },
+  { games: ['paper'], lang: 'en', name: 'Big Furry Monster', oversized: true, set: 'ugl' },
+];
+
+const indexInput = join(dir, 'bulk.jsonl');
+const indexOut = join(dir, 'card-names.json');
+await writeFile(indexInput, `${BULK.map(c => JSON.stringify(c)).join('\n')}\n`);
+execFileSync(
+  'node',
+  [join(root, 'scripts/build-card-index.mjs'), '--input', indexInput, '--out', indexOut],
+  { stdio: 'ignore' },
+);
+const shipped = JSON.parse(await readFile(indexOut, 'utf8'));
+
+check('the index lists every paper card name once', () => {
+  assert.deepEqual(shipped.names, ['Delver of Secrets // Insectile Aberration', 'Sol Ring']);
+});
+
+check('the index leaves out digital-only and oversized printings', () => {
+  assert.ok(!shipped.names.includes('Alchemy Oddity'));
+  assert.ok(!shipped.names.includes('Big Furry Monster'));
+});
+
+check('the index maps localized titles to the English name by position', () => {
+  const at = shipped.names.indexOf('Sol Ring');
+  assert.deepEqual(shipped.printed.fr, [[at, 'Anneau solaire']]);
+  assert.deepEqual(shipped.printed.de, [[at, 'Sonnenring']]);
+  assert.ok(!shipped.printed.ja, 'no OCR model, no entry');
+});
+
+check('the index records the front face of a multi-face card', () => {
+  // The title bar only ever shows the front face, so that is what OCR reads.
+  const at = shipped.names.indexOf('Delver of Secrets // Insectile Aberration');
+  assert.ok(
+    shipped.printed.en.some(([i, title]) => i === at && title === 'Delver of Secrets'),
+    'front face missing from the English aliases',
+  );
+});
+
+check('the shipped index resolves through the real matcher', () => {
+  // End to end: the generator's output shape and the matcher's expectations have
+  // to agree, and they are in different languages in different files.
+  const index = buildNameIndex(shipped);
+  assert.equal(matchName('Anneau solaire', index)[0].name, 'Sol Ring');
+  assert.equal(matchName('Delver of Secrets', index)[0].name, 'Delver of Secrets // Insectile Aberration');
+  assert.equal(matchName('Sol Rinq', index)[0].name, 'Sol Ring');
 });
 
 await rm(dir, { force: true, recursive: true });

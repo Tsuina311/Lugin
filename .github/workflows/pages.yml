@@ -84,6 +84,18 @@ jobs:
         continue-on-error: true
         run: node scripts/build-prices.mjs --out dist-web/prices.json
 
+      # Every card name, plus the French, German and Italian titles they are
+      # printed under, so the scanner can identify a card against the real list
+      # instead of asking Scryfall what it just read. ~1.2 MB over the wire,
+      # downloaded on first scan rather than at launch.
+      #
+      # Same bargain as the prices above: not fatal. Without it the scanner falls
+      # back to Scryfall's fuzzy endpoint, which works but needs signal and cannot
+      # offer alternatives.
+      - name: Card name index
+        continue-on-error: true
+        run: node scripts/build-card-index.mjs --out dist-web/card-names.json
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

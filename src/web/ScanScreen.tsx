@@ -1,11 +1,12 @@
 // Point the phone at a card; build name + set + number across snaps.
 //
 // Pipeline: capture (padded guide) → detect card quad → perspective warp to a
-// canonical card raster → step-1 title OCR → Scryfall fuzzy name → step-2
-// set/number (or Pick manually).
+// canonical card raster → step-1 title OCR → match against the local card-name
+// index → step-2 set/number (or Pick manually).
 
 import { useEffect, useRef, useState } from 'react';
 
+import { loadCardIndex } from './cardIndexStore';
 import { ScanDebugPanel } from './scan/ScanDebugPanel';
 import {
   capturePreparedCard,
@@ -24,6 +25,7 @@ import {
   type ScanDiagnostics,
 } from '@/lib/scan/diagnostics';
 import { guessFoil, imageStats, type FoilHint } from '@/lib/scan/foil';
+import { matchReadings, type NameCandidate, type Reading } from '@/lib/scan/matchName';
 import { mergePartsForScan, type CollectorParts } from '@/lib/scan/parseCollector';
 import { glareRatio } from '@/lib/scan/quality';
 import { readCollector, readTitle } from '@/lib/scan/readCard';
@@ -53,6 +55,11 @@ type Phase = 'camera' | 'working' | 'pick' | 'review' | 'error';
 type Step = 'title' | 'details';
 
 interface Progress {
+  /**
+   * Runners-up from the name match, best first, so "Pick manually" can offer the
+   * other cards it nearly was instead of only other printings of this one.
+   */
+  candidates: NameCandidate[];
   collector: CollectorParts;
   name: string | null;
   printings: ScryfallPrinting[];
@@ -65,10 +72,21 @@ interface Review {
 }
 
 const emptyProgress = (): Progress => ({
+  candidates: [],
   collector: { foilMarker: null, raw: '' },
   name: null,
   printings: [],
 });
+
+/**
+ * Longest tidied reading — the pre-index heuristic, kept only for the fallback
+ * path. Length is not evidence of quality; the index is.
+ */
+const bestReading = (readings: readonly Reading[]): string | null =>
+  readings.reduce<string | null>(
+    (best, r) => (!best || r.text.length > best.length ? r.text : best),
+    null,
+  );
 
 const Guide = ({
   active,
@@ -262,19 +280,43 @@ export const ScanScreen = ({
     }
   };
 
+  /**
+   * Settle on a card name, preferring the local index.
+   *
+   * The index answers with a *ranked* list, which the Scryfall fuzzy endpoint
+   * cannot: it returns one card and no score, so an ambiguous read is
+   * indistinguishable from a certain one. Ranking is what lets an unsure scan
+   * offer a choice instead of guessing, and it works with no signal.
+   *
+   * Scryfall stays as the fallback for a card too new for the cached index, and
+   * for the first scan before the download lands.
+   */
   const lockTitle = async (
-    ocrName: string,
+    readings: Reading[],
     base: Progress,
+    diag: ScanDiagnostics,
   ): Promise<Progress | null> => {
+    const { index } = await loadCardIndex();
+    if (index) {
+      const ranked = matchReadings(readings, index, { limit: 8 });
+      diag.candidates = ranked.map(c => ({ name: c.name, score: c.score }));
+      if (ranked.length) {
+        const printings = await fetchPrintingsByName(ranked[0].name);
+        return { ...base, candidates: ranked, name: ranked[0].name, printings };
+      }
+    }
+
+    // No index, or nothing in it came close enough.
+    const ocrName = bestReading(readings);
+    if (!ocrName) return null;
     const named = await fetchNamedFuzzy(ocrName);
     if (named) {
       const printings = await fetchPrintingsByName(named.name);
-      return { ...base, name: named.name, printings };
+      return { ...base, candidates: [], name: named.name, printings };
     }
-    if (ocrName.length >= 3) {
-      return { ...base, name: ocrName, printings: [] };
-    }
-    return null;
+    return ocrName.length >= 3
+      ? { ...base, candidates: [], name: ocrName, printings: [] }
+      : null;
   };
 
   /** Step 1: only title OCR — full-card name bar OR a title-only zoom. */
@@ -285,12 +327,12 @@ export const ScanScreen = ({
     diag: ScanDiagnostics,
   ) => {
     setMessage('Reading title…');
-    const { name: ocrName, samples } = await timer.measureAsync('ocr:title', () =>
+    const { readings, samples } = await timer.measureAsync('ocr:title', () =>
       readTitle(card, tesseractRecognizer, { keepCrops: flags.scanDebug }),
     );
     diag.ocr.push(...samples);
 
-    if (!ocrName) {
+    if (!readings.length) {
       diag.outcome = 'no title text read';
       setPhase('camera');
       setMessage(
@@ -299,16 +341,16 @@ export const ScanScreen = ({
       return;
     }
 
-    const next = await timer.measureAsync('scryfall:name', () => lockTitle(ocrName, base));
+    const next = await timer.measureAsync('match:name', () => lockTitle(readings, base, diag));
     if (!next?.name) {
-      diag.outcome = `read "${ocrName}" but no card matched`;
+      const tried = bestReading(readings) ?? '';
+      diag.outcome = `read "${tried}" but no card matched`;
       setPhase('camera');
-      setMessage(`Read “${ocrName}” but couldn’t match a card. Try a clearer shot.`);
+      setMessage(`Read “${tried}” but couldn’t match a card. Try a clearer shot.`);
       return;
     }
 
     diag.outcome = `title locked: ${next.name}`;
-    diag.candidates = [{ name: next.name, score: 1 }];
     setProgress(next);
     setStep('details');
     setPhase('camera');
@@ -457,11 +499,32 @@ export const ScanScreen = ({
     }
   };
 
+  /**
+   * Switch to a runner-up from the name match.
+   *
+   * Worth offering because the failure it recovers from is invisible otherwise: a
+   * confident match on the wrong card looks exactly like a right one until the
+   * user reads the printing list and finds nothing they recognize.
+   */
+  const switchToCard = async (candidate: NameCandidate) => {
+    setBusy(true);
+    try {
+      const printings = await fetchPrintingsByName(candidate.name);
+      setProgress(p => ({ ...p, name: candidate.name, printings }));
+      setMessage(`Switched to ${candidate.name}.`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const haveName = Boolean(progress.name);
   const haveSet = Boolean(progress.collector.setCode);
   const haveNumber = Boolean(progress.collector.collectorNumber);
   const pickList = filterPrintings(progress.printings, progress.collector);
   const onTitleStep = step === 'title' || !haveName;
+  const otherCards = progress.candidates.filter(c => c.name !== progress.name).slice(0, 5);
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col bg-canvas">
@@ -483,7 +546,32 @@ export const ScanScreen = ({
               </p>
             </div>
           </div>
-          <ul className="min-h-0 flex-1 overflow-y-auto px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            {otherCards.length ? (
+              <div className="mb-2 rounded-lg border border-line bg-raised/40 p-2">
+                <p className="px-1 pb-1 text-[11px] font-medium text-ink-faint">
+                  Not this card? The title also looked like:
+                </p>
+                <ul className="flex flex-wrap gap-1">
+                  {otherCards.map(c => (
+                    <li key={c.name}>
+                      <button
+                        className="rounded-md border border-line-strong px-2 py-1 text-[12px] text-ink disabled:opacity-50"
+                        disabled={busy}
+                        onClick={() => void switchToCard(c)}
+                        type="button"
+                      >
+                        {c.name}
+                        {c.printedName ? (
+                          <span className="text-ink-faint"> · {c.printedName}</span>
+                        ) : null}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <ul>
             {pickList.map(p => (
               <li key={p.id}>
                 <button
@@ -513,7 +601,8 @@ export const ScanScreen = ({
                 </button>
               </li>
             ))}
-          </ul>
+            </ul>
+          </div>
         </div>
       ) : phase === 'review' && review ? (
         <div className="flex min-h-0 flex-1 flex-col bg-panel px-4 py-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">

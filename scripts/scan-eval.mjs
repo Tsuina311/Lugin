@@ -67,12 +67,47 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/quality.ts')}';
       export * from '${join(root, 'src/lib/scan/readCard.ts')}';
       export * from '${join(root, 'src/lib/scan/regions.ts')}';
+      export * from '${join(root, 'src/lib/scan/matchName.ts')}';
     `,
     resolveDir: root,
     sourcefile: 'entry.ts',
   },
 });
 const scan = await import(pathToFileURL(bundle).href);
+
+// ---------------------------------------------------------------------------
+// The card-name index
+// ---------------------------------------------------------------------------
+
+const INDEX_PATH = opt('index') ?? join(root, '.scan-fixtures/card-names.json');
+
+/**
+ * Load the real index if it has been built.
+ *
+ * Optional on purpose: geometry and preprocessing work can be measured without a
+ * 3.5 MB download, and the report says plainly when identification is unavailable
+ * rather than quietly reporting 0%.
+ */
+const loadIndex = async (fold = scan.shapeFold) => {
+  try {
+    const data = JSON.parse(await readFile(INDEX_PATH, 'utf8'));
+    const began = performance.now();
+    const built = scan.buildNameIndex(data, fold);
+    console.log(
+      `index: ${data.names.length.toLocaleString()} names, ` +
+        `${built.entries.length.toLocaleString()} titles, ` +
+        `built in ${(performance.now() - began).toFixed(0)}ms`,
+    );
+    return built;
+  } catch (err) {
+    if (err?.code !== 'ENOENT') throw err;
+    console.log(
+      `no card index at ${INDEX_PATH} — run \`yarn scan:index\`.\n` +
+        'Identification will be reported as unavailable.',
+    );
+    return null;
+  }
+};
 
 // ---------------------------------------------------------------------------
 // PNG <-> ScanImage
@@ -679,7 +714,72 @@ const runVariants = async (fixtures, recognizer) => {
   return rows;
 };
 
-const runCorpus = async (fixtures, recognizer) => {
+/**
+ * Compare normalization strategies for the matcher.
+ *
+ * `shapeFold` collapses characters OCR confuses (`l`/`1`/`I`, `rn`/`m`) on both
+ * sides. That should help, but it also destroys real distinctions and so could
+ * make two different cards collide — which is worse than a near miss, because it
+ * is confidently wrong. Cheap to settle by measurement: OCR each title once, then
+ * match the same readings through each strategy.
+ */
+const runFolds = async (fixtures, recognizer) => {
+  const strategies = [
+    { fold: scan.foldName, name: 'foldName (accents + punctuation only)' },
+    { fold: scan.shapeFold, name: 'shapeFold (also OCR-confusable characters)' },
+  ];
+
+  const indexes = [];
+  for (const strategy of strategies) {
+    const built = await loadIndex(strategy.fold);
+    if (!built) {
+      console.log('Cannot compare folds without an index. Run `yarn scan:index` first.');
+      return [];
+    }
+    indexes.push({ ...strategy, index: built });
+  }
+
+  // OCR is the expensive part and does not depend on the fold, so read once.
+  const readings = [];
+  for (const fixture of fixtures) {
+    const card = await fixtureImage(fixture);
+    for (const condition of conditions) {
+      const prepared = scan.prepareCard(condition.render(card));
+      const read = await scan.readTitle(prepared.image, recognizer);
+      readings.push({ expected: fixture.expectedName, readings: read.readings ?? [] });
+    }
+  }
+
+  console.log('\nMatcher normalization\n');
+  console.log('  strategy                                     top1   top5   titles');
+  const rows = [];
+  for (const { fold, index, name } of indexes) {
+    void fold;
+    let top1 = 0;
+    let top5 = 0;
+    for (const item of readings) {
+      const ranked = scan.matchReadings(item.readings, index, { limit: 5 });
+      const rank = ranked.findIndex(c => c.name === item.expected);
+      if (rank === 0) top1 += 1;
+      if (rank >= 0) top5 += 1;
+    }
+    const row = {
+      name,
+      titles: index.entries.length,
+      top1: top1 / readings.length,
+      top5: top5 / readings.length,
+    };
+    rows.push(row);
+    console.log(
+      `  ${name.padEnd(44)} ${pct(row.top1).padStart(4)}   ${pct(row.top5).padStart(4)}` +
+        `   ${index.entries.length.toLocaleString().padStart(7)}`,
+    );
+  }
+  await recognizer.dispose?.();
+  return rows;
+};
+
+const runCorpus = async (fixtures, recognizer, index) => {
   const results = [];
 
   for (const fixture of fixtures) {
@@ -693,13 +793,21 @@ const runCorpus = async (fixtures, recognizer) => {
 
       const reading = withOcr
         ? await scan.readTitle(prepared.image, recognizer)
-        : { name: null, samples: [] };
+        : { name: null, readings: [], samples: [] };
       const tOcr = performance.now();
 
       const expected = [fixture.expectedName, fixture.printedName].filter(Boolean);
       const score = reading.name
         ? Math.max(...expected.map(e => similarity(reading.name, e)))
         : 0;
+
+      // What actually matters: did the matcher name the right card? Similarity is
+      // only a proxy, and a pessimistic one — it has no idea that "Sol Rinq" is
+      // one edit from a real card and zero cards from anything else.
+      const candidates = index
+        ? scan.matchReadings(reading.readings ?? [], index, { limit: 5 })
+        : [];
+      const rank = candidates.findIndex(c => c.name === fixture.expectedName);
       // Which individual pass came closest, to tell "wrong crop" from "bad OCR".
       const bestPass = reading.samples
         .map(s => ({
@@ -709,6 +817,7 @@ const runCorpus = async (fixtures, recognizer) => {
         .sort((a, b) => b.score - a.score)[0];
 
       const record = {
+        candidates: candidates.map(c => ({ name: c.name, score: c.score })),
         condition: condition.name,
         confidence: mean(reading.samples.map(s => s.confidence)),
         detected: prepared.source === 'detected',
@@ -716,6 +825,9 @@ const runCorpus = async (fixtures, recognizer) => {
         expected: fixture.expectedName,
         glare: scan.glareRatio(prepared.image),
         id: fixture.id,
+        identified: rank === 0,
+        inTopFive: rank >= 0,
+        margin: scan.candidateMargin(candidates),
         matchable: score >= MATCHABLE,
         ms: { ocr: tOcr - tPrepare, prepare: tPrepare - tRender, total: tOcr - t0 },
         read: reading.name,
@@ -747,7 +859,7 @@ const runCorpus = async (fixtures, recognizer) => {
   return results;
 };
 
-const summarize = results => {
+const summarize = (results, hasIndex) => {
   const groupBy = (key, rows) => {
     const out = new Map();
     for (const r of rows) {
@@ -758,13 +870,23 @@ const summarize = results => {
     return out;
   };
 
-  const rate = rows => rows.filter(r => r.matchable).length / rows.length;
-  const detRate = rows => rows.filter(r => r.detected).length / rows.length;
+  const share = (rows, key) => rows.filter(r => r[key]).length / rows.length;
+  const detRate = rows => share(rows, 'detected');
+  // Identification is the real outcome; similarity is only a proxy for it. Where
+  // no index is loaded, fall back to the proxy rather than reporting a flat 0%.
+  const rate = rows => (hasIndex ? share(rows, 'identified') : share(rows, 'matchable'));
 
   console.log('\n' + '='.repeat(72));
   console.log(`cases                  ${results.length}`);
   console.log(`card detected          ${pct(detRate(results))}`);
-  console.log(`title matchable        ${pct(rate(results))}  (similarity >= ${MATCHABLE})`);
+  if (hasIndex) {
+    console.log(`CARD IDENTIFIED        ${pct(share(results, 'identified'))}  (top match is correct)`);
+    console.log(`correct in top 5       ${pct(share(results, 'inTopFive'))}  (a pick list would work)`);
+    console.log(`mean margin            ${pct(mean(results.map(r => r.margin)))}  (lead over runner-up)`);
+  } else {
+    console.log('card identified        no index loaded');
+  }
+  console.log(`title matchable        ${pct(share(results, 'matchable'))}  (raw similarity >= ${MATCHABLE})`);
   console.log(`mean title similarity  ${pct(mean(results.map(r => r.similarity)))}`);
   console.log(`mean ocr confidence    ${pct(mean(results.map(r => r.confidence)))}`);
   console.log(
@@ -773,23 +895,18 @@ const summarize = results => {
       ` ocr ${mean(results.map(r => r.ms.ocr)).toFixed(0)}ms)`,
   );
 
+  const heading = hasIndex ? 'identified' : 'matchable';
+  const row = (name, rows) =>
+    `  ${name.padEnd(16)} detected ${pct(detRate(rows)).padStart(4)}` +
+    `   ${heading} ${pct(rate(rows)).padStart(4)}` +
+    (hasIndex ? `   top5 ${pct(share(rows, 'inTopFive')).padStart(4)}` : '') +
+    `   similarity ${pct(mean(rows.map(r => r.similarity))).padStart(4)}`;
+
   console.log('\nby condition');
-  for (const [name, rows] of groupBy('condition', results)) {
-    console.log(
-      `  ${name.padEnd(16)} detected ${pct(detRate(rows)).padStart(4)}` +
-        `   matchable ${pct(rate(rows)).padStart(4)}` +
-        `   similarity ${pct(mean(rows.map(r => r.similarity))).padStart(4)}`,
-    );
-  }
+  for (const [name, rows] of groupBy('condition', results)) console.log(row(name, rows));
 
   console.log('\nby card category');
-  for (const [name, rows] of groupBy('tag', results)) {
-    console.log(
-      `  ${name.padEnd(16)} detected ${pct(detRate(rows)).padStart(4)}` +
-        `   matchable ${pct(rate(rows)).padStart(4)}` +
-        `   similarity ${pct(mean(rows.map(r => r.similarity))).padStart(4)}`,
-    );
-  }
+  for (const [name, rows] of groupBy('tag', results)) console.log(row(name, rows));
 
   const bestPasses = groupBy('bestPass', results.filter(r => r.bestPass));
   if (bestPasses.size) {
@@ -799,12 +916,20 @@ const summarize = results => {
     }
   }
 
-  const failures = results.filter(r => !r.matchable);
+  const failures = hasIndex
+    ? results.filter(r => !r.identified)
+    : results.filter(r => !r.matchable);
   if (failures.length) {
     console.log(`\n${failures.length} failing case(s)`);
     const geometry = failures.filter(r => !r.detected);
     console.log(`  detection failed        ${geometry.length}`);
-    console.log(`  detected but unreadable ${failures.length - geometry.length}`);
+    if (hasIndex) {
+      const rescuable = failures.filter(r => r.inTopFive).length;
+      console.log(`  right card in top 5     ${rescuable}  (manual pick recovers these)`);
+      console.log(`  card not in the list    ${failures.length - geometry.length - rescuable}`);
+    } else {
+      console.log(`  detected but unreadable ${failures.length - geometry.length}`);
+    }
   }
   console.log('='.repeat(72));
 };
@@ -844,13 +969,20 @@ console.log(
     `${withOcr ? '' : ', OCR disabled'}\n`,
 );
 
+if (flag('folds')) {
+  await runFolds(fixtures, await makeRecognizer());
+  await rm(bundleDir, { force: true, recursive: true });
+  process.exit(0);
+}
+
+const index = withOcr ? await loadIndex() : null;
 const recognizer = await makeRecognizer();
 let report;
 try {
   report = flag('variants')
     ? { variants: await runVariants(fixtures, recognizer) }
-    : { cases: await runCorpus(fixtures, recognizer) };
-  if (report.cases) summarize(report.cases);
+    : { cases: await runCorpus(fixtures, recognizer, index) };
+  if (report.cases) summarize(report.cases, Boolean(index));
 } finally {
   await recognizer.dispose?.();
   await rm(bundleDir, { force: true, recursive: true });

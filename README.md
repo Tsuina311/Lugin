@@ -101,9 +101,11 @@ later.
 
 ```bash
 yarn scan:fixtures   # resolve the test corpus from Scryfall (writes scripts/fixtures/cards.json)
+yarn scan:index      # build the card-name index the matcher needs
 yarn scan:eval       # run the corpus, print accuracy and timings
 yarn scan:variants   # benchmark preprocessing chains against each other
 yarn scan:calibrate  # measure where the title actually sits on each layout
+yarn scan:folds      # compare name-normalization strategies
 ```
 
 The scanner is the one feature where "that feels better" is worthless: a change
@@ -132,16 +134,48 @@ looked reasonable:
 - The shipping preprocessing chain came **last of fifteen** candidates, below
   handing Tesseract the untouched crop, because it ended in a sharpening pass.
 
-Title accuracy is 75% of the corpus and, more usefully, roughly even across every
-camera condition: tilt, blur, glare and filmed screens are no longer what limits
-it. The remaining failures are layouts and typography, not photography — battle
-cards are landscape and split cards print their names sideways, so both need their
-own `ScanProfile` rather than looser regions on the standard one, and the 1993
-frame's typeface defeats Tesseract's stock model.
+The corpus currently identifies **86% of cards correctly** from the title alone,
+and the number that matters more is that it is roughly even across every camera
+condition: tilt, blur, glare and filmed screens are no longer what limits it. What
+remains is layouts and typography, not photography — battle cards are landscape and
+split cards print their names sideways, so both need their own `ScanProfile` rather
+than looser regions on the standard one, and the 1993 frame's typeface defeats
+Tesseract's stock model.
 
-Treat that 75% as pessimistic. It is raw edit distance against the printed name,
-whereas identification gets to match against a finite list of real card names, so
-much of the 60–75% band is recoverable by the matcher rather than lost.
+The gap between that 86% and the 77% raw title similarity is the whole argument for
+matching against an index (below). Similarity is a proxy, and a badly pessimistic
+one: short names scored 69% similar and identify 100% of the time, because "Fog" is
+either a card or it isn't.
+
+### Identifying the card, not transcribing it
+
+OCR does not have to spell a name correctly. It only has to get close enough that
+the right card wins against ~37,000 others, which makes this identification rather
+than transcription — "Sol Rinq" costs nothing, because it is not a card.
+
+`yarn scan:index` distils Scryfall's bulk dump into every paper card name plus the
+French, German and Italian titles they are printed under: 3.5 MB, 1.2 MB over the
+wire, downloaded on first scan and kept in the Cache API like the price table. The
+localized titles are what make a non-English card resolve at all offline — Scryfall
+knows "Anneau solaire" is Sol Ring, but only over the network.
+
+Two things fall out of having a list, and neither is available from Scryfall's fuzzy
+endpoint, which answers with one card and no score:
+
+- **Choosing between OCR passes and identifying the card are the same decision.**
+  The old code picked the longest reading and then looked it up, which cannot work:
+  the only evidence separating "Sol Rinq" from "Sol Ring" is that one of them is a
+  card. So `matchReadings` scores every pass against the index at once.
+- **The answer is a ranked list.** A near-tie between two real cards is the honest
+  outcome for a smudged title, and "Pick manually" can offer both — far more
+  useful than recovering from one silently wrong pick.
+
+`shapeFold` folds the characters OCR confuses (`l`/`1`/`I`, `rn`/`m`) on *both*
+sides, which sounds like cheating and is really the removal of a distinction that
+carries no information at title resolution. `yarn scan:folds` says it is worth 86%
+against 81%, and both reach the same 86% within the top five — so what it buys is
+promoting the right card from "in the list" to "first", which is exactly what an
+automatic scanner needs.
 
 Region coordinates are measured, not eyeballed. `yarn scan:calibrate` locates the
 title on every fixture and prints the spread, which is how the numbers in
