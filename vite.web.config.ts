@@ -45,7 +45,14 @@ const buildStamp = (): { id: string; label: string } => {
   // that triggered the run, which is the same thing here but wrong the moment a
   // workflow builds anything else.
   const commit = git('rev-parse --short=7 HEAD') || process.env.GITHUB_SHA?.slice(0, 7) || 'unknown';
-  const dirty = git('status --porcelain') !== '';
+
+  // `-uno` because untracked files aren't uncommitted *source*: a build output,
+  // an .env.local or an editor's scratch file would otherwise mark every build
+  // local. And a CI build is never local by definition — it builds a commit from
+  // a fresh checkout, and whatever install steps leave lying around are not the
+  // user's edits. (The deployed stamp said "+local" until this second clause
+  // existed, which is precisely the sort of lie the marker is meant to prevent.)
+  const dirty = process.env.GITHUB_ACTIONS !== 'true' && git('status --porcelain -uno') !== '';
   const id = `${commit}${dirty ? '+local' : ''}`;
   return { id, label: `v${version} · ${id}` };
 };
