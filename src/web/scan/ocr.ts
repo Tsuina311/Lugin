@@ -3,10 +3,16 @@
 // Languages: English + French + German + Italian (Latin script). First open downloads
 // the traineddata packs; later scans reuse the same worker.
 
-import { createWorker, type Worker } from 'tesseract.js';
+import { createWorker, PSM, type Worker } from 'tesseract.js';
 
 /** EN / FR / DE / IT — matches the print languages we care about most. */
 export const OCR_LANGS = 'eng+fra+deu+ita';
+
+export type ReadTextOptions = {
+  /** Page segmentation — titles use a single-line/block mode. */
+  psm?: string | number;
+  whitelist?: string;
+};
 
 let worker: Worker | null = null;
 let starting: Promise<Worker> | null = null;
@@ -24,22 +30,31 @@ const getWorker = async (): Promise<Worker> => {
   return starting;
 };
 
-/** Read text from a canvas. `whitelist` narrows what Tesseract will invent. */
+/** Read text from a canvas. */
 export const readText = async (
   canvas: HTMLCanvasElement,
-  whitelist?: string,
+  opts?: string | ReadTextOptions,
 ): Promise<string> => {
+  const options: ReadTextOptions =
+    typeof opts === 'string' ? { whitelist: opts } : (opts ?? {});
   const w = await getWorker();
-  if (whitelist) {
-    await w.setParameters({
-      tessedit_char_whitelist: whitelist,
-    });
-  } else {
-    await w.setParameters({ tessedit_char_whitelist: '' });
-  }
+  await w.setParameters({
+    tessedit_char_whitelist: options.whitelist ?? '',
+    ...(options.psm != null
+      ? { tessedit_pageseg_mode: options.psm as typeof PSM.AUTO }
+      : { tessedit_pageseg_mode: PSM.AUTO }),
+  });
   const { data } = await w.recognize(canvas);
   return data.text ?? '';
 };
+
+/** Single-line title OCR — best when the name bar fills the crop. */
+export const readTitleLine = (canvas: HTMLCanvasElement): Promise<string> =>
+  readText(canvas, {
+    psm: PSM.SINGLE_LINE,
+    whitelist:
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝàáâãäåæçèéêëìíîïñòóôõöùúûüýÿ0123456789,',. -",
+  });
 
 /** Collector strip: digits, letters, and the foil markers OCR might emit. */
 export const COLLECTOR_WHITELIST =

@@ -111,6 +111,13 @@ check('tidyName prefers the title line', () => {
   assert.equal(tidyName('Liesa, Shroud of Dusk\nLegendary Creature'), 'Liesa, Shroud of Dusk');
 });
 
+check('tidyName joins a wrapped subtitle', () => {
+  assert.equal(
+    tidyName('Living Lightning,\nCharged Up'),
+    'Living Lightning, Charged Up',
+  );
+});
+
 check('bestName picks the longer title pass', () => {
   assert.equal(bestName('Lie', 'Liesa, Shroud of Dusk'), 'Liesa, Shroud of Dusk');
 });

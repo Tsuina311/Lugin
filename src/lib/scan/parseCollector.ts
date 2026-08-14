@@ -42,7 +42,7 @@ export const tidyOcr = (raw: string): string =>
     .trim()
     .toUpperCase();
 
-/** A card name OCR hit: prefer the first line (title), lightly cleaned. */
+/** A card name OCR hit: prefer the title, join a wrapped second line. */
 export const tidyName = (raw: string): string | null => {
   const lines = raw
     .split(/\n+/)
@@ -55,14 +55,31 @@ export const tidyName = (raw: string): string | null => {
     )
     .filter(Boolean);
 
-  for (const name of lines) {
-    if (name.length < 3) continue;
-    if (!/\p{L}/u.test(name)) continue;
-    if (/^\d/.test(name)) continue;
-    if (TYPE_LINE.test(name)) continue;
-    return name;
+  const titleLines: string[] = [];
+  for (const line of lines) {
+    if (line.length < 2) continue;
+    if (!/\p{L}/u.test(line)) continue;
+    if (/^\d/.test(line)) break;
+    if (TYPE_LINE.test(line)) break;
+    // Rules text / flavour usually longer sentences — stop joining.
+    if (titleLines.length > 0 && line.length > 40 && !/,[\s]*$/.test(titleLines.at(-1)!)) {
+      break;
+    }
+    titleLines.push(line);
+    const joined = titleLines.join(' ');
+    // Most Magic names fit in one or two short lines.
+    if (titleLines.length >= 2 && !/,[\s]*$/.test(line) && joined.length >= 12) break;
+    if (joined.length >= 70) break;
   }
-  return null;
+
+  if (!titleLines.length) return null;
+  const name = titleLines
+    .join(' ')
+    .replace(/\s+,/g, ',')
+    .replace(/,\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return name.length >= 3 ? name : null;
 };
 
 /** Pick the best title candidate from several OCR passes (title bar + focus zoom). */

@@ -14,14 +14,17 @@ export interface Region {
   y: number;
 }
 
+/**
+ * Large centre band for step 1 when the user fills the guide with only the
+ * title (name zoom). Nearly the whole frame — not the tiny top strip.
+ */
+export const TITLE_ZOOM_REGION: Region = { h: 0.7, w: 0.96, x: 0.02, y: 0.15 };
+
+/** Mid-frame title line when the name bar alone is held across the guide. */
+export const TITLE_LINE_REGION: Region = { h: 0.28, w: 0.96, x: 0.02, y: 0.36 };
+
 /** Title bar — name sits in the same band on almost every modern frame. */
 export const NAME_REGION: Region = { h: 0.085, w: 0.82, x: 0.06, y: 0.035 };
-
-/**
- * Large upper band for name-only zooms: fill the guide with the title and we
- * still read it even when the rest of the card is off-frame.
- */
-export const NAME_FOCUS_REGION: Region = { h: 0.4, w: 0.92, x: 0.04, y: 0.05 };
 
 /**
  * Expansion symbol on the type line (right). Core sets like M11 print the code
