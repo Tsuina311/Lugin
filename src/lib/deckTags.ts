@@ -32,6 +32,9 @@ export const DECK_TAG_CATEGORIES = [
   'Triggers',
 ] as const;
 
+/** Creatures of a tribe plus payoffs that reference it in oracle text. */
+const tribeQuery = (type: string): string => `(t:${type} or o:${type})`;
+
 export const DECK_TAGS: DeckTag[] = [
   // Card advantage
   { category: 'Card advantage', id: 'draw', label: 'Draw cards', query: 'o:"draw"', terms: ['cantrip', 'card advantage'] },
@@ -185,20 +188,20 @@ export const DECK_TAGS: DeckTag[] = [
     terms: ['lord of the rings', 'the ring'],
   },
 
-  // Tribal
-  { category: 'Tribal', id: 'tribe-elf', label: 'Elves', query: 't:elf', terms: ['tribal'] },
-  { category: 'Tribal', id: 'tribe-goblin', label: 'Goblins', query: 't:goblin' },
-  { category: 'Tribal', id: 'tribe-zombie', label: 'Zombies', query: 't:zombie' },
-  { category: 'Tribal', id: 'tribe-vampire', label: 'Vampires', query: 't:vampire' },
-  { category: 'Tribal', id: 'tribe-dragon', label: 'Dragons', query: 't:dragon' },
-  { category: 'Tribal', id: 'tribe-merfolk', label: 'Merfolk', query: 't:merfolk' },
-  { category: 'Tribal', id: 'tribe-wizard', label: 'Wizards', query: 't:wizard' },
-  { category: 'Tribal', id: 'tribe-soldier', label: 'Soldiers', query: 't:soldier' },
-  { category: 'Tribal', id: 'tribe-angel', label: 'Angels', query: 't:angel' },
-  { category: 'Tribal', id: 'tribe-demon', label: 'Demons', query: 't:demon' },
-  { category: 'Tribal', id: 'tribe-cat', label: 'Cats', query: 't:cat' },
-  { category: 'Tribal', id: 'tribe-dinosaur', label: 'Dinosaurs', query: 't:dinosaur' },
-  { category: 'Tribal', id: 'tribe-sliver', label: 'Slivers', query: 't:sliver' },
+  // Tribal — creatures of the type plus oracle payoffs (e.g. sacrifice a Goblin).
+  { category: 'Tribal', id: 'tribe-elf', label: 'Elves', query: tribeQuery('elf'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-goblin', label: 'Goblins', query: tribeQuery('goblin'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-zombie', label: 'Zombies', query: tribeQuery('zombie'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-vampire', label: 'Vampires', query: tribeQuery('vampire'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-dragon', label: 'Dragons', query: tribeQuery('dragon'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-merfolk', label: 'Merfolk', query: tribeQuery('merfolk'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-wizard', label: 'Wizards', query: tribeQuery('wizard'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-soldier', label: 'Soldiers', query: tribeQuery('soldier'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-angel', label: 'Angels', query: tribeQuery('angel'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-demon', label: 'Demons', query: tribeQuery('demon'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-cat', label: 'Cats', query: tribeQuery('cat'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-dinosaur', label: 'Dinosaurs', query: tribeQuery('dinosaur'), terms: ['tribal', 'tribe matters'] },
+  { category: 'Tribal', id: 'tribe-sliver', label: 'Slivers', query: tribeQuery('sliver'), terms: ['tribal', 'tribe matters'] },
 
   // Triggers
   { category: 'Triggers', id: 'etb', label: 'Enter the battlefield', query: 'o:"enters the battlefield"', terms: ['etb', 'blink'] },

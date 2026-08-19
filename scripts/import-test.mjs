@@ -1631,6 +1631,7 @@ check('deck tags combine into a Scryfall query with optional identity', () => {
     buildTagsQuery(['draw-two-payoff']),
     '((o:"second card" o:"each turn") or (o:"drawn two or more cards this turn"))',
   );
+  assert.equal(buildTagsQuery(['tribe-goblin']), '((t:goblin or o:goblin))');
   assert.equal(buildTagsQuery(['draw'], ['U', 'R']), '(o:"draw") id<=ur');
   assert.equal(buildTagsQuery(['draw'], []), '(o:"draw") id=c');
   assert.equal(deckTagById('nope'), undefined);
