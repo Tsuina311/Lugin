@@ -74,6 +74,8 @@ const slugify = (name: string): string =>
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+    // Goldfish keeps possessive s: "Legion's" -> "legion-s", not "legions".
+    .replace(/['’]s\b/g, '-s')
     .replace(/['’]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');

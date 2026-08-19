@@ -289,14 +289,6 @@ const asserts: [string, () => void][] = [
     },
   ],
   [
-    'the worker proxies MTGGoldfish for the phone app',
-    () => {
-      const sw = emitted('sw.js');
-      if (!sw.includes('/api/fetch')) throw new Error('the remote proxy route is gone');
-      if (!sw.includes('www.mtggoldfish.com')) throw new Error('Goldfish is no longer allowlisted');
-    },
-  ],
-  [
     'the app shows which build it is',
     () => {
       // End to end: the config computed a stamp, `define` replaced it, and a

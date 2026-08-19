@@ -1,20 +1,33 @@
 // HTTP fetch for APIs that block page CORS in the extension build.
 //
-// The extension routes through its background worker; the phone build calls
-// directly when the target sends permissive CORS headers (Scryfall, EDHREC JSON),
-// or through the PWA service worker for hosts that don't (MTGGoldfish).
+// The extension routes through its background worker (host_permissions). The phone
+// build calls Scryfall and EDHREC directly; MTGGoldfish goes through an optional
+// Cloudflare Worker proxy (VITE_LUGIN_GOLDFISH_PROXY_URL) because neither direct
+// fetch nor a service-worker relay can read its HTML in modern browsers.
 
 import { requestApi } from './messaging';
 import type { ApiResult } from './types';
 
-/** Hosts the phone build proxies via its service worker (`/api/fetch`). */
-const PROXY_HOSTS = ['https://www.mtggoldfish.com/'] as const;
+const GOLDFISH = 'https://www.mtggoldfish.com/';
 
-const needsProxy = (url: string): boolean => PROXY_HOSTS.some(prefix => url.startsWith(prefix));
+const isExtension = (): boolean =>
+  typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id);
 
-const fetchViaServiceWorkerProxy = async (url: string, accept?: string): Promise<ApiResult> => {
-  const base = typeof import.meta.env?.BASE_URL === 'string' ? import.meta.env.BASE_URL : '/';
-  const proxyUrl = `${base}api/fetch?url=${encodeURIComponent(url)}`;
+const goldfishProxyUrl = (): string | undefined => {
+  const raw = import.meta.env.VITE_LUGIN_GOLDFISH_PROXY_URL;
+  return typeof raw === 'string' && raw.trim() ? raw.trim().replace(/\/$/, '') : undefined;
+};
+
+const isGoldfish = (url: string): boolean => url.startsWith(GOLDFISH);
+
+const fetchViaGoldfishProxy = async (url: string, accept?: string): Promise<ApiResult> => {
+  const base = goldfishProxyUrl();
+  if (!base) {
+    throw new Error(
+      'MTGGoldfish is not configured for the phone app yet. Use the extension, or open the page on Goldfish.',
+    );
+  }
+  const proxyUrl = `${base}?url=${encodeURIComponent(url)}`;
   const res = await fetch(proxyUrl, {
     headers: accept ? { Accept: accept } : {},
   });
@@ -29,14 +42,14 @@ const fetchViaServiceWorkerProxy = async (url: string, accept?: string): Promise
 };
 
 export const fetchRemote = async (url: string, accept?: string): Promise<ApiResult> => {
-  try {
-    if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-      return await requestApi({ url });
-    }
-  } catch {
-    // Unpacked builds can throw when the runtime is gone — fall through to fetch.
+  if (isExtension()) {
+    return requestApi({ url });
   }
-  if (needsProxy(url)) return fetchViaServiceWorkerProxy(url, accept);
+
+  if (isGoldfish(url)) {
+    return fetchViaGoldfishProxy(url, accept);
+  }
+
   const res = await fetch(url, {
     headers: { Accept: accept ?? 'application/json, text/html;q=0.9,*/*;q=0.8' },
   });

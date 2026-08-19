@@ -40,7 +40,8 @@ await writeFile(
    export { sellerFrom, sellerSlugFromHref, timelineFrom } from '${root}src/sites/cardmarket/order';
    export { shouldWelcome } from '${root}src/ui/firstRun';
    export * from '${root}src/lib/table';
-   export * from '${root}src/lib/deckTags';`,
+   export * from '${root}src/lib/deckTags';
+   export { goldfishArchetypeSlug } from '${root}src/lib/mtggoldfish';`,
 );
 
 const bundle = join(out, 'import.mjs');
@@ -108,6 +109,7 @@ const {
   filterDeckTags,
   buildTagsQuery,
   deckTagById,
+  goldfishArchetypeSlug,
 } = await import(pathToFileURL(bundle).href);
 
 let failed = 0;
@@ -1613,16 +1615,32 @@ check('an expansion read off a URL resolves to a dated set', () => {
 check('deck tags filter by label, category, and synonyms', () => {
   const draw = filterDeckTags('draw');
   assert.ok(draw.some(t => t.id === 'draw'));
-  assert.ok(draw.some(t => t.id === 'draw-on-cast'));
+  assert.ok(draw.some(t => t.id === 'draw-two-payoff'));
+  assert.ok(filterDeckTags('draw two').some(t => t.id === 'draw-two-payoff'));
   assert.ok(filterDeckTags('evasion').some(t => t.id === 'flying'));
   assert.ok(filterDeckTags('elf').some(t => t.id === 'tribe-elf'));
+  assert.ok(filterDeckTags('storied').some(t => t.id === 'storied'));
+  assert.ok(filterDeckTags("city's blessing").some(t => t.id === 'city-blessing'));
+  assert.ok(filterDeckTags('dungeon').some(t => t.id === 'dungeon'));
+  assert.ok(filterDeckTags('initiative').some(t => t.id === 'dungeon'));
 });
 
 check('deck tags combine into a Scryfall query with optional identity', () => {
   assert.equal(buildTagsQuery(['draw', 'flying']), '(o:"draw") (keyword:flying)');
+  assert.equal(
+    buildTagsQuery(['draw-two-payoff']),
+    '((o:"second card" o:"each turn") or (o:"drawn two or more cards this turn"))',
+  );
   assert.equal(buildTagsQuery(['draw'], ['U', 'R']), '(o:"draw") id<=ur');
   assert.equal(buildTagsQuery(['draw'], []), '(o:"draw") id=c');
   assert.equal(deckTagById('nope'), undefined);
+});
+
+check('goldfish slugs keep possessive s', () => {
+  assert.equal(
+    goldfishArchetypeSlug(["Caesar, Legion's Emperor"]),
+    'commander-caesar-legion-s-emperor',
+  );
 });
 
 await rm(out, { force: true, recursive: true });

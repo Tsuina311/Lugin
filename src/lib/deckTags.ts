@@ -27,6 +27,7 @@ export const DECK_TAG_CATEGORIES = [
   'Life',
   'Spells',
   'Artifacts & enchantments',
+  'Permanent effects',
   'Tribal',
   'Triggers',
 ] as const;
@@ -34,6 +35,13 @@ export const DECK_TAG_CATEGORIES = [
 export const DECK_TAGS: DeckTag[] = [
   // Card advantage
   { category: 'Card advantage', id: 'draw', label: 'Draw cards', query: 'o:"draw"', terms: ['cantrip', 'card advantage'] },
+  {
+    category: 'Card advantage',
+    id: 'draw-two-payoff',
+    label: 'Draw-two payoffs',
+    query: '(o:"second card" o:"each turn") or (o:"drawn two or more cards this turn")',
+    terms: ['draw two', 'second card', 'izzet', 'omnious seas'],
+  },
   { category: 'Card advantage', id: 'draw-on-cast', label: 'Draw when you cast', query: 'o:"whenever you cast" o:"draw"', terms: ['spellslinger'] },
   { category: 'Card advantage', id: 'wheel', label: 'Wheel', query: 'o:"each player discards" o:"draw"', terms: ['mass discard'] },
   { category: 'Card advantage', id: 'loot', label: 'Loot / rummage', query: 'o:"draw" o:"discard"', terms: ['filter'] },
@@ -130,6 +138,52 @@ export const DECK_TAGS: DeckTag[] = [
   { category: 'Artifacts & enchantments', id: 'equipment', label: 'Equipment', query: 't:equipment', terms: ['voltron'] },
   { category: 'Artifacts & enchantments', id: 'aura', label: 'Auras', query: 't:aura', terms: ['voltron'] },
   { category: 'Artifacts & enchantments', id: 'sacrifice-outlet', label: 'Sacrifice outlets', query: 'o:"sacrifice" o:":"', terms: ['aristocrats'] },
+
+  // Permanent player designations & threshold markers (City's Blessing, storied, …)
+  { category: 'Permanent effects', id: 'ascend', label: 'Ascend', query: 'keyword:ascend', terms: ["city's blessing", 'tenth land'] },
+  {
+    category: 'Permanent effects',
+    id: 'city-blessing',
+    label: "City's Blessing",
+    query: 'o:"City\'s Blessing"',
+    terms: ['ascend', 'ixalan'],
+  },
+  {
+    category: 'Permanent effects',
+    id: 'storied',
+    label: 'Storied',
+    query: '(keyword:storied or o:"enduring story")',
+    terms: ['hobbit', 'historic', 'legendary matters'],
+  },
+  {
+    category: 'Permanent effects',
+    id: 'monarch',
+    label: 'Monarch',
+    query: 'o:monarch',
+    terms: ['multiplayer', 'politics'],
+  },
+  {
+    category: 'Permanent effects',
+    id: 'dungeon',
+    label: 'Dungeons',
+    query:
+      '(o:dungeon or o:"venture into the dungeon" or o:"completed a dungeon" or o:"complete a dungeon" or o:initiative or o:Undercity)',
+    terms: ['venture', 'initiative', 'undercity', 'acererak', 'dungeon descent'],
+  },
+  {
+    category: 'Permanent effects',
+    id: 'day-night',
+    label: 'Day / night',
+    query: '(o:daybound or o:nightbound or o:"it becomes day" or o:"it becomes night")',
+    terms: ['innistrad', 'transform'],
+  },
+  {
+    category: 'Permanent effects',
+    id: 'ring-bearer',
+    label: 'Ring-bearer',
+    query: 'o:"Ring-bearer"',
+    terms: ['lord of the rings', 'the ring'],
+  },
 
   // Tribal
   { category: 'Tribal', id: 'tribe-elf', label: 'Elves', query: 't:elf', terms: ['tribal'] },

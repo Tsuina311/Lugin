@@ -70,6 +70,9 @@ jobs:
           # quietly break the deploy.
           LUGIN_BASE_PATH: /${{ github.event.repository.name }}/
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          # CORS proxy for MTGGoldfish (see workers/goldfish-proxy.js). Deploy the
+          # worker once with `npx wrangler deploy`, then set this to its URL.
+          VITE_LUGIN_GOLDFISH_PROXY_URL: ${{ vars.VITE_LUGIN_GOLDFISH_PROXY_URL }}
         run: yarn build:web
 
       # Every paper price in Magic, distilled to ~3.5 MB (about 1.2 MB over the

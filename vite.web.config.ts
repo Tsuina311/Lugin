@@ -190,35 +190,6 @@ const receiveShare = async request => {
   return Response.redirect(new URL(SHELL + '?shared=1', self.location.href).href, 303);
 };
 
-const proxyRemote = async request => {
-  const params = new URL(request.url).searchParams;
-  const target = params.get('url');
-  if (!target) return new Response('missing url', { status: 400 });
-  let parsed;
-  try {
-    parsed = new URL(target);
-  } catch {
-    return new Response('bad url', { status: 400 });
-  }
-  // Only hosts the phone app cannot fetch directly (no CORS). Keep the list tight.
-  if (parsed.protocol !== 'https:' || parsed.hostname !== 'www.mtggoldfish.com') {
-    return new Response('host not allowed', { status: 403 });
-  }
-  const accept = request.headers.get('Accept');
-  const headers = accept ? { Accept: accept } : {};
-  try {
-    const res = await fetch(parsed.href, { headers });
-    const body = await res.text();
-    return new Response(body, {
-      status: res.status,
-      statusText: res.statusText,
-      headers: { 'Content-Type': res.headers.get('Content-Type') || 'text/html; charset=utf-8' },
-    });
-  } catch {
-    return new Response('upstream fetch failed', { status: 502 });
-  }
-};
-
 self.addEventListener('fetch', event => {
   const request = event.request;
   const pathname = new URL(request.url).pathname;
@@ -226,11 +197,6 @@ self.addEventListener('fetch', event => {
   // which would otherwise put a multipart POST to a static host and get a 405.
   if (request.method === 'POST' && pathname.endsWith('/share')) {
     event.respondWith(receiveShare(request));
-    return;
-  }
-  // MTGGoldfish has no CORS headers; the page routes through here instead.
-  if (request.method === 'GET' && pathname.endsWith('/api/fetch')) {
-    event.respondWith(proxyRemote(request));
     return;
   }
   if (request.mode !== 'navigate') return;
