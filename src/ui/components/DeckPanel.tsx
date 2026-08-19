@@ -756,6 +756,7 @@ const DeckEditor = ({
           )}
           {showCommanderSearch && (
             <AddCardBox
+              deckFormat={deck.format}
               inDeck={inDeck}
               onPick={name => void addCommander(name)}
               placeholder={
@@ -783,6 +784,7 @@ const DeckEditor = ({
             <TagsPanel
               collectionByKey={collectionByKey}
               commanderIdentity={commanderIdentity}
+              deckFormat={deck.format}
               inDeck={inDeck}
               onAdd={names => void deckStore.addCards(deck.id, names, 'main')}
             />
@@ -818,6 +820,7 @@ const DeckEditor = ({
         <>
           <AddCardBox
             commanderIdentity={commanderIdentity}
+            deckFormat={deck.format}
             filters
             inDeck={inDeck}
             onPick={name => void deckStore.addCard(deck.id, name, 'main', 1)}
@@ -1160,6 +1163,7 @@ const previewUrls = (c: CardSearchResult): string[] =>
 
 const AddCardBox = ({
   commanderIdentity,
+  deckFormat,
   filters = false,
   inDeck,
   onPick,
@@ -1171,6 +1175,8 @@ const AddCardBox = ({
    * filter so searches only turn up cards that are legal in the deck.
    */
   commanderIdentity?: string[];
+  /** Deck format — restricts results to format-legal cards. */
+  deckFormat?: DeckFormat;
   /** Show the type/color/mana-value filters (the main add box, not commander search). */
   filters?: boolean;
   /**
@@ -1218,12 +1224,13 @@ const AddCardBox = ({
     () => ({
       cmcMax: filters ? num(cmcMax) : undefined,
       cmcMin: filters ? num(cmcMin) : undefined,
+      format: deckFormat,
       identity: filters && useIdentity ? sortWubrg([...identity]) : undefined,
       subtype: filters ? subtype : undefined,
       text,
       types: filters ? [...types] : undefined,
     }),
-    [filters, text, useIdentity, identity, types, subtype, cmcMin, cmcMax],
+    [deckFormat, filters, text, useIdentity, identity, types, subtype, cmcMin, cmcMax],
   );
 
   const runnable = hasSearchCriteria(query);

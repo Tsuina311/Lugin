@@ -8,6 +8,7 @@ import { useCardPreview } from './cardPreview';
 
 import { cardKey } from '@/lib/cardName';
 import { buildTagsQuery, deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
+import type { DeckFormat } from '@/lib/deck';
 import { sortWubrg } from '@/lib/mtg';
 import { searchScryfallQuery, type CardSearchResult } from '@/lib/search';
 import { useRowSelection, type RowSelection } from '@/ui/useRowSelection';
@@ -28,6 +29,7 @@ const toggleIn = (set: Set<string>, value: string, apply: (s: Set<string>) => vo
 export const TagsPanel = ({
   collectionByKey,
   commanderIdentity,
+  deckFormat,
   inDeck,
   onAdd,
 }: {
@@ -35,6 +37,8 @@ export const TagsPanel = ({
   collectionByKey: Record<string, { total: number }>;
   /** Commander color identity — restricts results when set. */
   commanderIdentity?: string[];
+  /** Deck format — restricts results to format-legal cards. */
+  deckFormat?: DeckFormat;
   /** cardKey -> copies already in this deck. */
   inDeck: Record<string, number>;
   onAdd: (names: string[]) => void;
@@ -98,11 +102,12 @@ export const TagsPanel = ({
     setError(null);
     const query = buildTagsQuery(selectedIds, identityFilter);
     setQueryText(query);
-    void searchScryfallQuery(query, RESULT_LIMIT)
+    void searchScryfallQuery(query, RESULT_LIMIT, deckFormat)
       .then(resp => {
         if (cancelled) return;
         setResults(resp.cards);
         setTotal(resp.total);
+        setQueryText(resp.query);
         setStatus('idle');
       })
       .catch((e: unknown) => {
@@ -115,7 +120,7 @@ export const TagsPanel = ({
     return () => {
       cancelled = true;
     };
-  }, [identityFilter, selectedIds]);
+  }, [deckFormat, identityFilter, selectedIds]);
 
   const ownedOf = (name: string): number => collectionByKey[cardKey(name)]?.total ?? 0;
   const deckQtyOf = (name: string): number => inDeck[cardKey(name)] ?? 0;

@@ -288,7 +288,7 @@ export const DeckEditor = ({
     }
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void searchCards({ text: needle }, SUGGESTIONS)
+      void searchCards({ format: deck.format, text: needle }, SUGGESTIONS)
         .then(resp => {
           if (!cancelled) setRemote(resp.cards.map(c => c.name));
         })
@@ -300,7 +300,7 @@ export const DeckEditor = ({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [canSuggest, needle]);
+  }, [canSuggest, deck.format, needle]);
 
   // Scryfall, collection, EDHREC and Goldfish — deduped, then sorted A→Z.
   // Owned cards get a green tint in the UI but don't jump to the front.
@@ -457,6 +457,7 @@ export const DeckEditor = ({
         <TagsPanel
           collectionByKey={collectionByKey}
           commanderIdentity={commanderIdentity}
+          deckFormat={deck.format}
           inDeck={inDeck}
           onAdd={addToMain}
         />

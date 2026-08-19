@@ -9,6 +9,7 @@
 // result set is small enough to show card images.
 
 import { fetchRemote } from './fetchRemote';
+import type { DeckFormat } from './deck';
 
 export interface CardSearchResult {
   cmc?: number;
@@ -44,6 +45,8 @@ export interface CardQuery {
    * `undefined` means no restriction.
    */
   identity?: string[];
+  /** Restrict to cards legal in this deck format; omitted or freeform = no restriction. */
+  format?: DeckFormat;
   /** A subtype — creature type, land type, … ("Wolf"). */
   subtype?: string;
   /** Free text: bare words match names, Scryfall operators pass through. */
@@ -69,6 +72,29 @@ interface ScryfallList {
 }
 
 const SEARCH_URL = 'https://api.scryfall.com/cards/search';
+
+/** Exclude Arena-only printings unless the query already picks a game. */
+const PAPER_ONLY_FILTER = 'game:paper';
+
+export interface DefaultSearchFilterOptions {
+  format?: DeckFormat;
+}
+
+export const applyDefaultSearchFilters = (
+  query: string,
+  options: DefaultSearchFilterOptions = {},
+): string => {
+  const trimmed = query.trim();
+  if (!trimmed) return trimmed;
+
+  const parts = [trimmed];
+  if (!/\bgame:/i.test(trimmed)) parts.push(PAPER_ONLY_FILTER);
+
+  const format = options.format;
+  if (format && format !== 'freeform' && !/\bf:/i.test(trimmed)) parts.push(`f:${format}`);
+
+  return parts.join(' ');
+};
 
 const toResult = (c: ScryfallCard): CardSearchResult => {
   const images = c.image_uris ?? c.card_faces?.[0]?.image_uris;
@@ -166,8 +192,9 @@ export const hasSearchCriteria = (q: CardQuery): boolean =>
 export const searchScryfallQuery = async (
   query: string,
   limit = 50,
+  format?: DeckFormat,
 ): Promise<CardSearchResponse> => {
-  const trimmed = query.trim();
+  const trimmed = applyDefaultSearchFilters(query, { format });
   if (!trimmed) return { cards: [], query: '', total: 0 };
 
   const url = `${SEARCH_URL}?order=name&unique=cards&dir=asc&q=${encodeURIComponent(trimmed)}`;
@@ -195,5 +222,5 @@ export const searchScryfallQuery = async (
 export const searchCards = async (q: CardQuery, limit = 12): Promise<CardSearchResponse> => {
   const query = buildScryfallQuery(q);
   if (!query || !hasSearchCriteria(q)) return { cards: [], query, total: 0 };
-  return searchScryfallQuery(query, limit);
+  return searchScryfallQuery(query, limit, q.format);
 };

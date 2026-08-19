@@ -41,6 +41,7 @@ await writeFile(
    export { shouldWelcome } from '${root}src/ui/firstRun';
    export * from '${root}src/lib/table';
    export * from '${root}src/lib/deckTags';
+   export { applyDefaultSearchFilters } from '${root}src/lib/search';
    export { goldfishArchetypeSlug } from '${root}src/lib/mtggoldfish';`,
 );
 
@@ -109,6 +110,7 @@ const {
   filterDeckTags,
   buildTagsQuery,
   deckTagById,
+  applyDefaultSearchFilters,
   goldfishArchetypeSlug,
 } = await import(pathToFileURL(bundle).href);
 
@@ -1623,6 +1625,23 @@ check('deck tags filter by label, category, and synonyms', () => {
   assert.ok(filterDeckTags("city's blessing").some(t => t.id === 'city-blessing'));
   assert.ok(filterDeckTags('dungeon').some(t => t.id === 'dungeon'));
   assert.ok(filterDeckTags('initiative').some(t => t.id === 'dungeon'));
+});
+
+check('Scryfall search excludes Arena-only cards by default', () => {
+  assert.equal(applyDefaultSearchFilters('(o:"draw")'), '(o:"draw") game:paper');
+  assert.equal(applyDefaultSearchFilters('  t:elf  '), 't:elf game:paper');
+  assert.equal(applyDefaultSearchFilters('game:arena t:elf'), 'game:arena t:elf');
+  assert.equal(applyDefaultSearchFilters(''), '');
+});
+
+check('Scryfall search restricts to the deck format by default', () => {
+  assert.equal(
+    applyDefaultSearchFilters('(o:"draw")', { format: 'commander' }),
+    '(o:"draw") game:paper f:commander',
+  );
+  assert.equal(applyDefaultSearchFilters('t:elf', { format: 'modern' }), 't:elf game:paper f:modern');
+  assert.equal(applyDefaultSearchFilters('t:elf', { format: 'freeform' }), 't:elf game:paper');
+  assert.equal(applyDefaultSearchFilters('f:vintage t:elf'), 'f:vintage t:elf game:paper');
 });
 
 check('deck tags combine into a Scryfall query with optional identity', () => {
