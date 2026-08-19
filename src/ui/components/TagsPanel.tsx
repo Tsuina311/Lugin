@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { Button } from './Button';
+import { CardResultThumb } from './CardResultThumb';
 import { SelectionBar } from './Selection';
-import { useCardPreview } from './cardPreview';
 
 import { cardKey } from '@/lib/cardName';
 import { buildTagsQuery, deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
@@ -348,9 +348,7 @@ const TagRow = ({
   rowId: string;
   selection: RowSelection;
 }) => {
-  const preview = useCardPreview();
   const urls = card.faceImages ?? (card.imageUrl ? [card.imageUrl] : []);
-  const { flippable, handlers } = preview(`tags|${card.id}`, card.name, urls);
   return (
     <li
       {...selection.rowProps(
@@ -360,19 +358,7 @@ const TagRow = ({
         }`,
       )}
     >
-      <div className="h-8 w-8 flex-none overflow-hidden rounded bg-raised" {...handlers}>
-        {urls[0] ? (
-          <img
-            alt={card.name}
-            className={`h-full w-full object-cover ${flippable ? 'cursor-pointer' : 'cursor-zoom-in'}`}
-            decoding="async"
-            loading="lazy"
-            src={urls[0]}
-            style={{ objectPosition: '50% 18%' }}
-            title={flippable ? 'Click to flip to the other side' : undefined}
-          />
-        ) : null}
-      </div>
+      <CardResultThumb name={card.name} previewKey={`tags|${card.id}`} urls={urls} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-ink" title={card.name}>
           {card.name}

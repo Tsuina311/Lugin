@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSPro
 
 import { Badge } from './Badge';
 import { Button } from './Button';
+import { CardResultThumb } from './CardResultThumb';
 import { EditionFilter } from './EditionFilter';
 import { SearchInput } from './Field';
 import { Hint } from './Hint';
@@ -11,7 +12,7 @@ import { PriceCheck } from './PriceCheck';
 import { PurchaseDuplicates } from './PurchaseDuplicates';
 import { SelectionBar } from './Selection';
 import { ViewToggle } from './ViewToggle';
-import { rememberFaces, useCardPreview } from './cardPreview';
+import { rememberFaces } from './cardPreview';
 import { Library, Loader2, Pencil, ReceiptEuro, RefreshCw } from './icons';
 import { useFirstLoadedImage } from './useFirstLoadedImage';
 
@@ -109,12 +110,11 @@ interface CollectionRow {
   total: number;
 }
 
-/** Miniature card art with the same hover + click-to-enlarge preview as deck rows. */
+/** Tag-search-style thumbnail with collection image fallbacks. */
 const CollectionThumb = ({
   candidates,
-  className = 'h-7 w-7 flex-none overflow-hidden rounded-sm bg-raised',
+  className = 'h-8 w-8 flex-none overflow-hidden rounded bg-raised',
   faceImages,
-  imgClassName,
   imgStyle,
   name,
   previewKey,
@@ -122,40 +122,27 @@ const CollectionThumb = ({
   candidates: readonly string[];
   className?: string;
   faceImages?: string[];
-  imgClassName?: string;
   imgStyle?: CSSProperties;
   name: string;
   previewKey: string;
 }) => {
   const { ready, src } = useFirstLoadedImage(candidates);
-  const preview = useCardPreview();
   const urls =
     src && faceImages && faceImages.length >= 2
       ? [src, ...faceImages.slice(1)]
       : src
         ? [src]
         : [];
-  const { flippable, handlers } = preview(previewKey, name, urls);
 
   return (
-    <div className={className} {...handlers}>
-      {ready && src ? (
-        <img
-          alt={name}
-          className={
-            imgClassName ??
-            `h-full w-full object-cover ${flippable ? 'cursor-pointer' : 'cursor-zoom-in'}`
-          }
-          src={src}
-          style={imgStyle ?? { objectPosition: '50% 18%' }}
-          title={flippable ? 'Click to flip to the other side' : undefined}
-        />
-      ) : candidates.length > 0 ? (
-        <div className="flex h-full w-full items-center justify-center">
-          <Loader2 aria-hidden className="h-3 w-3 animate-spin text-ink-faint" />
-        </div>
-      ) : null}
-    </div>
+    <CardResultThumb
+      className={className}
+      imgStyle={imgStyle}
+      loading={!ready && candidates.length > 0}
+      name={name}
+      previewKey={previewKey}
+      urls={urls}
+    />
   );
 };
 
