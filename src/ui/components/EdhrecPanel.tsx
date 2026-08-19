@@ -347,12 +347,12 @@ const EdhrecRow = ({
         {card.imageUrl && (
           <img
             alt={card.name}
-            className={`h-full w-full object-cover ${flippable ? 'cursor-pointer' : 'cursor-zoom-in'}`}
+            className="h-full w-full cursor-zoom-in object-cover"
             decoding="async"
             loading="lazy"
             src={card.imageUrl}
             style={{ objectPosition: '50% 18%' }}
-            title={flippable ? 'Click to flip to the other side' : undefined}
+            title={flippable ? 'Click to enlarge; click again to flip' : 'Click to enlarge'}
           />
         )}
       </div>

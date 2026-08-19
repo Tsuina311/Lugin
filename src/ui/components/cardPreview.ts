@@ -115,21 +115,32 @@ export const useCardPreview = (): ((key: string, name: string, urls: string[]) =
       flippable,
       handlers: {
         onClick: (e: MouseEvent) => {
-          // Ask the live preview rather than trusting `flippable`: a lookup that
-          // resolved during this very hover has already handed it the back face.
-          // Letting non-flippable clicks through keeps thumbnails that sit
-          // inside a button triggering their button.
-          const shown = previewStore.getSnapshot();
-          if (shown?.key !== key || shown.urls.length < 2) return;
           e.preventDefault();
           e.stopPropagation();
-          previewStore.flip();
+          const shown = previewStore.getSnapshot();
+          if (shown?.key === key) {
+            if (shown.pinned) {
+              if (shown.urls.length >= 2) previewStore.flip();
+              else previewStore.hide();
+              return;
+            }
+            previewStore.pin();
+            return;
+          }
+          previewStore.show(
+            { index: 0, key, pinned: true, urls: faces },
+            window.innerWidth / 2,
+            window.innerHeight / 2,
+          );
+          if (!flippable) resolveFaces(name, key);
         },
         onMouseEnter: (e: MouseEvent) => {
           previewStore.show({ index: 0, key, urls: faces }, e.clientX, e.clientY);
           if (!flippable) resolveFaces(name, key);
         },
-        onMouseLeave: () => previewStore.hide(),
+        onMouseLeave: () => {
+          if (!previewStore.getSnapshot()?.pinned) previewStore.hide();
+        },
         onMouseMove: (e: MouseEvent) => previewStore.move(e.clientX, e.clientY),
       },
     };

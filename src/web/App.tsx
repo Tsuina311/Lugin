@@ -22,6 +22,7 @@ import { syncStore } from './syncStore';
 
 import type { DomainKey } from '@/core/sync/model';
 import { buildCollection } from '@/lib/collection';
+import { PreviewLayer } from '@/ui/components/PreviewLayer';
 
 type Tab = 'collection' | 'decks' | 'import' | 'scan';
 
@@ -282,6 +283,7 @@ export const App = () => {
           Sign out
         </button>
       </nav>
+      <PreviewLayer />
     </div>
   );
 };

@@ -18,6 +18,8 @@ export interface PreviewState {
   index: number;
   /** Identifies the hovered card so async face lookups can target it. */
   key: string;
+  /** When true, the preview stays open enlarged until dismissed. */
+  pinned?: boolean;
   /** One entry for single-faced cards, two for double-faced. */
   urls: string[];
 }
@@ -55,6 +57,13 @@ export const previewStore = {
   hide() {
     if (!state) return;
     state = null;
+    emit();
+  },
+
+  /** Keep the current preview open, enlarged and centered, until dismissed. */
+  pin() {
+    if (!state) return;
+    state = { ...state, pinned: true };
     emit();
   },
 
