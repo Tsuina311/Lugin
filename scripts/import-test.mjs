@@ -59,9 +59,11 @@ const {
   addPaid,
   applyImport,
   cardImageUrl,
+  cardImageCandidates,
   cardKey,
   imageUrlFor,
   imagesByName,
+  normalizeCardmarketImageUrl,
   collectionFile,
   collectionToCsv,
   collectionValue,
@@ -1223,6 +1225,19 @@ check('a Scryfall id goes straight to the image CDN, not the API', () => {
   const url = cardImageUrl({ name: 'Sol Ring', scryfallId: ID });
   assert.match(url, /^https:\/\/cards\.scryfall\.io\/normal\/front\/0\/1\//);
   assert.ok(url.endsWith(`${ID}.jpg`));
+});
+
+check('image candidates fall back when the CDN URL might fail', () => {
+  const urls = cardImageCandidates({ name: 'Sol Ring', scryfallId: ID });
+  assert.equal(urls[0], `https://cards.scryfall.io/normal/front/0/1/${ID}.jpg`);
+  assert.match(urls[1], new RegExp(`/cards/${ID}\\?format=image`));
+});
+
+check('Cardmarket image paths are normalized to absolute URLs', () => {
+  assert.equal(
+    normalizeCardmarketImageUrl('/1/C21/123/123.jpg'),
+    'https://product-images.s3.cardmarket.com/1/C21/123/123.jpg',
+  );
 });
 
 check('a malformed Scryfall id is ignored rather than built into a broken URL', () => {

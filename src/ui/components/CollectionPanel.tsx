@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 
 import { Badge } from './Badge';
 import { Button } from './Button';
+import { CardImage } from './CardImage';
 import { EditionFilter } from './EditionFilter';
 import { SearchInput } from './Field';
 import { Hint } from './Hint';
@@ -12,7 +13,6 @@ import { PurchaseDuplicates } from './PurchaseDuplicates';
 import { SelectionBar } from './Selection';
 import { ViewToggle } from './ViewToggle';
 import { Library, Loader2, Pencil, ReceiptEuro, RefreshCw } from './icons';
-import { useSequentialImages } from './useSequentialImages';
 
 import { cardImageOverrideStore } from '@/content/cardImageOverrideStore';
 import {
@@ -27,9 +27,9 @@ import { purchaseStore } from '@/content/purchaseStore';
 import { taskQueue } from '@/content/taskQueue';
 import { arrivedOnly, inTransitCopies } from '@/lib/arrivedPurchases';
 import {
+  cardImageCandidates,
   cdnImageFromId,
   imageFromProductId,
-  imageUrlFor,
   imageUrlForPrinting,
 } from '@/lib/cardImage';
 import { cardKey, stripVersion } from '@/lib/cardName';
@@ -857,41 +857,44 @@ export const CollectionPanel = () => {
     );
   };
 
-  // The best image URL for a row's representative printing. A user-picked "the
-  // version I own" override always wins. Otherwise prefer the exact printing's
-  // CDN image (ManaBox gives a Scryfall id), then the exact printing by
-  // Cardmarket product id / captured image (purchases), then by set + collector
-  // number (so #279 shows #279, not the default #1), then the edition you
-  // actually bought (from purchase history), then the cached metadata image, and
-  // only fall back to a name-only lookup last.
-  const rowImageUrl = (row: CollectionRow): string | undefined => {
+  const rowImageCandidates = (row: CollectionRow): string[] => {
     const override = overrides[row.key];
-    return (
-      cdnImageFromId(override?.scryfallId) ??
-      override?.imageUrl ??
-      cdnImageFromId(row.scryfallId) ??
-      imageFromProductId(row.productId) ??
-      row.imageUrl ??
-      imageUrlForPrinting(row.setCode, row.collectorNumber) ??
-      purchaseImageFor(row.name) ??
-      metaByName[cardKey(row.name)]?.imageUrl ??
-      imageUrlFor(undefined, row.name)
+    const meta = metaByName[cardKey(row.name)];
+    const out: string[] = [];
+    const pushAll = (candidates: readonly string[]) => {
+      for (const url of candidates) {
+        if (!out.includes(url)) out.push(url);
+      }
+    };
+
+    if (override) {
+      pushAll(
+        cardImageCandidates({
+          collectorNumber: override.collectorNumber,
+          imageUrl: override.imageUrl,
+          name: row.name,
+          scryfallId: override.scryfallId,
+          setCode: override.setCode,
+        }),
+      );
+    }
+    pushAll(
+      cardImageCandidates({
+        collectorNumber: row.collectorNumber,
+        imageUrl: row.imageUrl,
+        name: row.name,
+        productId: row.productId,
+        scryfallId: row.scryfallId,
+        setCode: row.setCode,
+      }),
     );
+    const purchase = purchaseImageFor(row.name);
+    if (purchase && !out.includes(purchase)) out.push(purchase);
+    if (meta?.imageUrl && !out.includes(meta.imageUrl)) out.push(meta.imageUrl);
+    return out;
   };
 
-  // Box view: resolve each visible row's image and load them one at a time so
-  // the grid fills in progressively instead of firing every request at once.
-  const boxSrcs = useMemo(
-    () =>
-      resultsView === 'box'
-        ? visibleRows.map(r => rowImageUrl(r)).filter((u): u is string => !!u)
-        : [],
-    // rowImageUrl reads overrides + metaByName; list them so newly-resolved
-    // images enqueue as they become available.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [resultsView, visibleRows, overrides, metaByName],
-  );
-  const loadedImages = useSequentialImages(boxSrcs);
+  const rowImageUrl = (row: CollectionRow): string | undefined => rowImageCandidates(row)[0];
 
   // In box view, prefer real Scryfall metadata images (direct CDN, browser
   // cached) over the name-only API redirect, so load metadata for the rows.
@@ -1465,8 +1468,8 @@ export const CollectionPanel = () => {
                   const meta = metaByName[cardKey(r.name)];
                   const faces = meta?.faceImages;
                   const flippable = !!faces && faces.length >= 2;
-                  const src = rowImageUrl(r);
-                  const ready = !!src && loadedImages.has(src);
+                  const candidates = rowImageCandidates(r);
+                  const src = candidates[0];
                   const show = src ? openPreview(r.key, src, r.name, flippable, faces) : undefined;
                   return (
                     <div
@@ -1491,18 +1494,12 @@ export const CollectionPanel = () => {
                           onMouseLeave={() => previewStore.hide()}
                           onMouseMove={e => previewStore.move(e.clientX, e.clientY)}
                         >
-                          {ready ? (
-                            <img
-                              alt={r.name}
-                              className="h-full w-full object-cover"
-                              src={src}
-                              style={{ objectPosition: '50% 17%' }}
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center">
-                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
-                            </div>
-                          )}
+                          <CardImage
+                            alt={r.name}
+                            candidates={candidates}
+                            className="h-full w-full object-cover"
+                            style={{ objectPosition: '50% 17%' }}
+                          />
                         </div>
                         <span className="text-center text-[11px] font-semibold tabular-nums text-slate-300">
                           ×{r.total}

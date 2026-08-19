@@ -33,7 +33,7 @@ export const useSequentialImages = (urls: string[]): Set<string> => {
         pump();
       };
       img.onload = done;
-      img.onerror = done;
+      img.onerror = () => pump();
       img.src = next;
     };
     if (!s.active) pump();

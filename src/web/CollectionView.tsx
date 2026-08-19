@@ -21,16 +21,15 @@ import { ExportBar } from './ExportBar';
 import { loadPrices } from './priceStore';
 import { syncStore } from './syncStore';
 
-import { cardImageUrl, printingRank } from '@/lib/cardImage';
+import { cardImageCandidates, printingRank } from '@/lib/cardImage';
 import { cardKey, stripVersion } from '@/lib/cardName';
 import type { Collection, CollectionCard } from '@/lib/collection';
 import { parseDeckList } from '@/lib/deck';
 import { collectionFile } from '@/lib/export';
 import { collectionValue, money, signedMoney, type CollectionValue } from '@/lib/prices';
-import { Picture } from '@/ui/components/Picture';
+import { CardImage } from '@/ui/components/CardImage';
 import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
 import { Image as ImageIcon } from '@/ui/components/icons';
-import { useSequentialImages } from '@/ui/components/useSequentialImages';
 import { usePrices } from '@/ui/usePrices';
 
 const VISIBLE_LIMIT = 150;
@@ -68,14 +67,20 @@ const Stepper = ({
   </span>
 );
 
-/** A card name, and the best picture of the printing you own of it. */
+/** A card name, and fallback URLs for the printing you own. */
 interface Row {
+  candidates: string[];
   foil: number;
   key: string;
   name: string;
-  src?: string;
   total: number;
 }
+
+const CollectionPicture = ({ alt, candidates }: { alt: string; candidates: readonly string[] }) => (
+  <div className="flex aspect-[488/680] w-full items-center justify-center overflow-hidden rounded-lg bg-raised">
+    <CardImage alt={alt} candidates={candidates} className="h-full w-full object-cover" />
+  </div>
+);
 
 /**
  * Roll the raw rows up per card, keeping one printing to show a picture of.
@@ -95,7 +100,7 @@ const rollUp = (collection: Collection): Row[] => {
     if (!key) continue;
     let row = map.get(key);
     if (!row) {
-      row = { foil: 0, key, name: stripVersion(card.name), rank: 0, total: 0 };
+      row = { candidates: [], foil: 0, key, name: stripVersion(card.name), rank: 0, total: 0 };
       map.set(key, row);
     }
     const qty = card.quantity || 0;
@@ -103,10 +108,10 @@ const rollUp = (collection: Collection): Row[] => {
     if (card.foil) row.foil += qty;
 
     const rank = printingRank(card);
-    if (rank > row.rank || !row.src) {
-      const src = cardImageUrl(card);
-      if (src) {
-        row.src = src;
+    if (rank > row.rank || row.candidates.length === 0) {
+      const candidates = cardImageCandidates(card);
+      if (candidates.length) {
+        row.candidates = candidates;
         row.rank = rank;
       }
     }
@@ -199,18 +204,6 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
 
   const shown = rows.slice(0, view === 'box' ? BOX_LIMIT : VISIBLE_LIMIT);
 
-  // One at a time, so a grid on a slow connection fills in from the top instead
-  // of stalling on forty simultaneous requests.
-  const wanted = useMemo(
-    () =>
-      shown
-        .filter(row => view === 'box' || opened.has(row.key))
-        .map(row => row.src)
-        .filter((src): src is string => !!src),
-    [opened, shown, view],
-  );
-  const loaded = useSequentialImages(wanted);
-
   const add = (text: string) => {
     const { cards } = parseDeckList(text);
     if (cards.length === 0) return;
@@ -288,7 +281,7 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
         <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3">
           {shown.map(row => (
             <div key={row.key} className="flex flex-col gap-1">
-              <Picture alt={row.name} ready={!!row.src && loaded.has(row.src)} src={row.src} />
+              <CollectionPicture alt={row.name} candidates={row.candidates} />
               <span className="truncate text-xs text-ink" title={row.name}>
                 {row.name}
               </span>
@@ -327,11 +320,7 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
                 </div>
                 {open ? (
                   <div className="mb-2 ml-2 w-44">
-                    <Picture
-                      alt={row.name}
-                      ready={!!row.src && loaded.has(row.src)}
-                      src={row.src}
-                    />
+                    <CollectionPicture alt={row.name} candidates={row.candidates} />
                   </div>
                 ) : null}
               </li>

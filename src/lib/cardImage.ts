@@ -13,6 +13,26 @@
 
 import { cardKey } from './cardName';
 
+const SCRYFALL_ID_RE = /^[0-9a-f-]{36}$/i;
+
+/** Normalize Cardmarket image URLs scraped from purchase rows. */
+export const normalizeCardmarketImageUrl = (raw?: string): string | undefined => {
+  if (!raw?.trim()) return undefined;
+  const cleaned = raw.replace(/\\\//g, '/').replace(/&amp;/g, '&').trim();
+  if (/^https?:\/\//i.test(cleaned)) return cleaned;
+  // Cardmarket stores bare `/1/SET/id/id.jpg` paths as well as full S3 URLs.
+  if (/^\/\d+\/[A-Za-z0-9]/i.test(cleaned) || /product-images/i.test(cleaned)) {
+    const path = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+    return `https://product-images.s3.cardmarket.com${path}`;
+  }
+  return cleaned;
+};
+
+const pushUnique = (out: string[], url?: string): void => {
+  if (!url || out.includes(url)) return;
+  out.push(url);
+};
+
 /**
  * Direct Scryfall image-CDN URL for a printing id. Scryfall lays images out at
  * `/normal/front/<a>/<b>/<id>.jpg` (a/b = first two id chars). Hitting the CDN
@@ -21,7 +41,7 @@ import { cardKey } from './cardName';
  * (redirect) every time and is what Scryfall asks us not to hammer.
  */
 export const cdnImageFromId = (scryfallId?: string): string | undefined => {
-  if (!scryfallId || !/^[0-9a-f-]{36}$/i.test(scryfallId)) return undefined;
+  if (!scryfallId || !SCRYFALL_ID_RE.test(scryfallId)) return undefined;
   return `https://cards.scryfall.io/normal/front/${scryfallId[0]}/${scryfallId[1]}/${scryfallId}.jpg`;
 };
 
@@ -74,6 +94,23 @@ export interface ImageableCard {
 }
 
 /**
+ * Ordered image URLs for a row, best printing first, with fallbacks when the
+ * preferred URL fails to load (CDN 404, Cardmarket hotlink block, …).
+ */
+export const cardImageCandidates = (card: ImageableCard): string[] => {
+  const out: string[] = [];
+  if (card.scryfallId && SCRYFALL_ID_RE.test(card.scryfallId)) {
+    pushUnique(out, cdnImageFromId(card.scryfallId));
+    pushUnique(out, imageUrlFor(card.scryfallId));
+  }
+  pushUnique(out, imageFromProductId(card.productId));
+  pushUnique(out, normalizeCardmarketImageUrl(card.imageUrl));
+  pushUnique(out, imageUrlForPrinting(card.setCode, card.collectorNumber));
+  pushUnique(out, imageUrlFor(undefined, card.name));
+  return out;
+};
+
+/**
  * Best image for a row, most exact source first.
  *
  * The name-only fallback at the bottom always resolves for a real card, so
@@ -81,12 +118,7 @@ export interface ImageableCard {
  * sources of their own (a printing the user picked by hand, an image scraped
  * from a Cardmarket page) should consult those before falling back to this.
  */
-export const cardImageUrl = (card: ImageableCard): string | undefined =>
-  cdnImageFromId(card.scryfallId) ??
-  imageFromProductId(card.productId) ??
-  card.imageUrl ??
-  imageUrlForPrinting(card.setCode, card.collectorNumber) ??
-  imageUrlFor(undefined, card.name);
+export const cardImageUrl = (card: ImageableCard): string | undefined => cardImageCandidates(card)[0];
 
 /**
  * How hard a row pins down *which* printing it is. Higher wins.
