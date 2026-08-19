@@ -6,7 +6,8 @@
 // picks rows but can't finish a drag is worse than no convention at all. ⌥ does
 // both, and is already what macOS uses to copy a drag.
 
-export const IS_MAC = /mac/i.test(navigator.userAgent);
+export const IS_MAC =
+  typeof navigator !== 'undefined' && /mac/i.test(navigator.userAgent);
 
 /** The key, as this machine writes it. */
 export const PICK_KEY = IS_MAC ? '⌥' : 'Ctrl';

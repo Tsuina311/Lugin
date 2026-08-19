@@ -11,17 +11,22 @@ import type { RowSelection } from '@/ui/useRowSelection';
 // many are picked, and a home for the list's bulk actions. Rows have no
 // checkboxes — `useRowSelection` owns the click, long-press and keyboard rules.
 
-const isTouch = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+const isTouchDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia?.('(pointer: coarse)').matches ?? false;
+};
 
 /** How to get the first row selected, in the words of the device in hand. */
-const HINT = isTouch
-  ? 'Long-press a row to select it, then tap others'
-  : `${PICK_KEY}-click a row to select it, then click others`;
+const selectionHint = (): string =>
+  isTouchDevice()
+    ? 'Long-press a row to select it, then tap others'
+    : `${PICK_KEY}-click a row to select it, then click others`;
 
 /** The tooltip is where the rest of the shortcuts are written down. */
-const SHORTCUTS = `${HINT}. Shift-click takes a range. In the list: ↑↓ to move, shift+↑↓ to extend, space to toggle, ${
-  IS_MAC ? '⌘' : 'ctrl'
-}+A for all, esc to clear.`;
+const selectionShortcuts = (): string =>
+  `${selectionHint()}. Shift-click takes a range. In the list: ↑↓ to move, shift+↑↓ to extend, space to toggle, ${
+    IS_MAC ? '⌘' : 'ctrl'
+  }+A for all, esc to clear.`;
 
 /**
  * It only takes on the accent wash — and only shows the actions — once something
@@ -38,7 +43,7 @@ export const SelectionBar = ({
     className={`flex flex-none flex-wrap items-center gap-1.5 border-b border-line px-2 py-1 text-2xs transition-colors ${
       selection.active ? 'bg-accent-soft' : 'bg-panel'
     }`}
-    title={SHORTCUTS}
+    title={selectionShortcuts()}
   >
     {selection.active ? (
       <>
@@ -56,7 +61,7 @@ export const SelectionBar = ({
         />
       </>
     ) : (
-      <span className="text-ink-faint">{HINT}</span>
+      <span className="text-ink-faint">{selectionHint()}</span>
     )}
   </div>
 );
