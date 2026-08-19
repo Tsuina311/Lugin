@@ -898,7 +898,7 @@ export const WantListsPanel = () => {
       </div>
 
       {/* What the sync knows, and the two fields every new want is created with.
-          Both used to live under "Tools" in the Cards tab, which is where you
+          Both used to live under "Tools" in the Search tab, which is where you
           would look for neither of them. */}
       {!open && (
         <div className="flex flex-none flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-2 py-1 text-2xs text-ink-muted">

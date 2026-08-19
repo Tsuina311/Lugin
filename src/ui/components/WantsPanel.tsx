@@ -5,11 +5,14 @@ import { useWideLayout } from '../useWideLayout';
 
 import { Badge } from './Badge';
 import { Button } from './Button';
+import { CardSearch } from './CardSearch';
+import { EditionFilter } from './EditionFilter';
 import { IconButton } from './IconButton';
 import { SelectionBar } from './Selection';
 import { ViewToggle } from './ViewToggle';
 import {
   ChevronDown,
+  ExternalLink,
   Info,
   Library,
   Loader2,
@@ -33,7 +36,9 @@ import { flags } from '@/lib/flags';
 import { requestPrices, requestScryfall, requestScryfallCached } from '@/lib/messaging';
 import { MANA_VALUE_BUCKETS, manaValueBucket, manaValueLabel, type CardMetadata } from '@/lib/mtg';
 import { money, priceOf } from '@/lib/prices';
+import { editionIdOf, groupEditionsByYear, tallyEditions } from '@/lib/sets';
 import { addArticleToCart, findCmToken } from '@/sites/cardmarket/cart';
+import type { ProductSuggestion } from '@/sites/cardmarket/search';
 import {
   COUNTRIES,
   countryId,
@@ -48,6 +53,7 @@ import {
   deleteWant,
   fetchAllWantLists,
   fetchCardEditions,
+  fetchDoc,
   fetchPriceGuide,
   fetchProductIds,
   fetchSellerListOffers,
@@ -71,6 +77,7 @@ import {
 import { timeAgo } from '@/ui/format';
 import { usePrices } from '@/ui/usePrices';
 import { useRowSelection } from '@/ui/useRowSelection';
+import { useSetIndex } from '@/ui/useSetIndex';
 import { useStickySet, useStickyValue } from '@/ui/useStickyState';
 
 /**
@@ -270,6 +277,22 @@ const initialScan: ScanState = {
   totalScanned: 0,
 };
 
+/**
+ * A printing the user searched for, and the offers on its product page.
+ *
+ * The third source of rows for this panel, beside the page you're on and a
+ * seller scan. All three end up as `ScanMatch[]`, which is why searching gets
+ * the price comparison, cart buttons and owned/purchased tags for free.
+ */
+interface SearchState {
+  error: string | null;
+  matches: ScanMatch[];
+  product: ProductSuggestion | null;
+  status: 'idle' | 'loading' | 'done' | 'error';
+}
+
+const initialSearch: SearchState = { error: null, matches: [], product: null, status: 'idle' };
+
 export const WantsPanel = () => {
   const { index: rawIndex } = useWants();
   const pageData = usePageData();
@@ -394,8 +417,8 @@ export const WantsPanel = () => {
     : null;
 
   // Parse the current page's offer rows directly (rich: price/foil/edition/id),
-  // re-running whenever the extracted page data changes. This is the default
-  // view — the old "Cards" tab, now with the same UI as the wants results.
+  // re-running whenever the extracted page data changes. This is the resting
+  // state of the panel: what you get before you search or scan for anything.
   const pageMatches = useMemo<ScanMatch[]>(() => {
     void pageData; // re-parse when the page's extracted data updates
     const offers = parseOffers(document.body);
@@ -428,6 +451,45 @@ export const WantsPanel = () => {
       lists: index?.cards[cardKey(o.name)]?.lists ?? [],
     }));
   }, [index, pageData]);
+
+  // ---- Search Cardmarket for a card ----------------------------------------
+  // The other two sources describe wherever the user already is. This one lets
+  // them look somewhere else without leaving the panel: pick a printing out of
+  // Cardmarket's own autocomplete, and we fetch that product page and read it
+  // with the same parser the live page goes through.
+  const [search, setSearch] = useState<SearchState>(initialSearch);
+  const searchAbort = useRef<AbortController | null>(null);
+
+  const openProduct = async (product: ProductSuggestion) => {
+    searchAbort.current?.abort();
+    const controller = new AbortController();
+    searchAbort.current = controller;
+    setSearch({ error: null, matches: [], product, status: 'loading' });
+    try {
+      const { doc } = await fetchDoc(product.href, controller.signal);
+      const offers = parseOffers(doc.body);
+      setSearch({
+        error: null,
+        matches: offers.map(o => ({ ...o, lists: index?.cards[cardKey(o.name)]?.lists ?? [] })),
+        product,
+        status: 'done',
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setSearch({
+        error: err instanceof Error ? err.message : String(err),
+        matches: [],
+        product,
+        status: 'error',
+      });
+    }
+  };
+
+  const clearSearch = () => {
+    searchAbort.current?.abort();
+    searchAbort.current = null;
+    setSearch(initialSearch);
+  };
 
   // ---- Seller scan (find everything a seller has on my want lists) ---------
   const seller = useMemo(() => detectSeller(), []);
@@ -708,10 +770,16 @@ export const WantsPanel = () => {
     }
   };
 
-  // What the results area shows: scan results once a scan is done, otherwise
-  // the current page's offers.
-  const showingScan = scan.status === 'done';
-  const displayMatches = showingScan ? scan.matches : pageMatches;
+  // What the results area shows, most deliberate choice first: a card the user
+  // went looking for, then a finished seller scan, then — the resting state —
+  // whatever is on the page behind the panel.
+  const showingSearch = search.product != null;
+  const showingScan = !showingSearch && scan.status === 'done';
+  const displayMatches = showingSearch
+    ? search.matches
+    : showingScan
+      ? scan.matches
+      : pageMatches;
   const wantedCount = displayMatches.filter(m => m.lists.length > 0).length;
 
   // ---- Hide non-wanted rows on the Cardmarket page itself -------------------
@@ -723,9 +791,10 @@ export const WantsPanel = () => {
   // Filter tab.
   const [hidePageRows, setHidePageRows] = useStickyValue('lugin:cards:hidePageRows', false);
 
-  // Only meaningful against the live page: scan results describe other pages of
-  // the seller's stock, so there are no rows here to match them to.
-  const canHidePageRows = !showingScan && !!index;
+  // Only meaningful against the live page. Scan results describe other pages of
+  // the seller's stock and a search describes another product entirely, so in
+  // both cases there are no rows here to match them to.
+  const canHidePageRows = !showingScan && !showingSearch && !!index;
 
   useEffect(() => {
     // Withheld until the want index has loaded. Before then every card looks
@@ -744,11 +813,41 @@ export const WantsPanel = () => {
   // Withdraw only our own filter; the Filter tab may have one too.
   useEffect(() => () => setPageFilter(PAGE_FILTER_OWNER, null), []);
 
+  // ---- Filter by edition ----------------------------------------------------
+  // Offers off a Cardmarket page name their expansion but never date it, so the
+  // set catalogue turns those names into years. Applied to the offers *before*
+  // they group by card name, because a card printed in five sets should keep
+  // only the printings you asked for, not vanish or arrive whole.
+  const { index: setIndex, status: setStatus } = useSetIndex();
+  const [fEditions, setFEditions] = useStickySet<string>('lugin:cards:editions');
+
+  // Options come from every offer on screen rather than the ones surviving this
+  // filter: derive them from the filtered list and picking one set would erase
+  // all the others, leaving no way back.
+  const editionYears = useMemo(
+    () =>
+      groupEditionsByYear(
+        tallyEditions(
+          displayMatches.map(m => ({ setName: m.edition })),
+          setIndex,
+        ),
+      ),
+    [displayMatches, setIndex],
+  );
+
+  const editionMatches = useMemo(() => {
+    if (fEditions.size === 0) return displayMatches;
+    return displayMatches.filter(m => {
+      const key = editionIdOf(setIndex, { setName: m.edition });
+      return key != null && fEditions.has(key);
+    });
+  }, [displayMatches, fEditions, setIndex]);
+
   // Group offers by card name: a card with several editions collapses into one
   // row, cheapest offer first. Single-offer cards render flat.
   const grouped = useMemo(() => {
     const map = new Map<string, { lists: Set<string>; name: string; offers: ScanMatch[] }>();
-    for (const m of displayMatches) {
+    for (const m of editionMatches) {
       const key = cardKey(m.name);
       const g = map.get(key) ?? { lists: new Set<string>(), name: m.name, offers: [] };
       g.offers.push(m);
@@ -764,7 +863,7 @@ export const WantsPanel = () => {
           .sort((a, b) => (a.priceValue ?? Infinity) - (b.priceValue ?? Infinity)),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [displayMatches]);
+  }, [editionMatches]);
 
   // ---- Sub-tabs: split the results by want list ----------------------------
   // "All" plus one tab per want list that actually has a matching card here
@@ -870,7 +969,12 @@ export const WantsPanel = () => {
   const fTerms = useMemo(() => fQuery.trim().toLowerCase().split(/\s+/).filter(Boolean), [fQuery]);
   const removeTerm = (term: string) => setFQuery(fTerms.filter(t => t !== term).join(' '));
 
-  const filtersActive = fTerms.length > 0 || fColors.size > 0 || fCmc.size > 0 || fSubtype !== '';
+  const filtersActive =
+    fTerms.length > 0 ||
+    fColors.size > 0 ||
+    fCmc.size > 0 ||
+    fSubtype !== '' ||
+    fEditions.size > 0;
 
   const metaMatch = (name: string): boolean => {
     if (!filtersActive) return true;
@@ -1952,6 +2056,7 @@ export const WantsPanel = () => {
               setFColors(new Set());
               setFCmc(new Set());
               setFSubtype('');
+              setFEditions(new Set());
             }}
             size="xs"
             variant="subtle"
@@ -2046,6 +2151,20 @@ export const WantsPanel = () => {
           ))}
         </select>
       )}
+      <EditionFilter
+        onClear={() => setFEditions(new Set())}
+        onToggle={key =>
+          setFEditions(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+          })
+        }
+        selected={fEditions}
+        status={setStatus}
+        years={editionYears}
+      />
       <div className="text-slate-500">
         {metaState === 'loading'
           ? 'Loading card data from Scryfall…'
@@ -2060,6 +2179,39 @@ export const WantsPanel = () => {
 
   return (
     <div ref={panelRef} className="flex h-full flex-col">
+      <CardSearch busy={search.status === 'loading'} onPick={openProduct} />
+
+      {/* Which card the rows below belong to, and the way back to the page. */}
+      {showingSearch && (
+        <div className="flex items-center gap-2 border-b border-line bg-raised px-2 py-1 text-2xs">
+          <span className="min-w-0 flex-1 truncate text-ink">
+            {search.product?.name}
+            {search.product?.expansion && (
+              <span className="text-ink-faint"> · {search.product.expansion}</span>
+            )}
+          </span>
+          {search.status === 'error' && (
+            <span className="flex-none text-neg" title={search.error ?? undefined}>
+              Couldn’t load the offers
+            </span>
+          )}
+          {search.product?.href && (
+            <a
+              className="flex flex-none items-center gap-1 text-accent hover:underline"
+              href={search.product.href}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open
+              <ExternalLink aria-hidden size={10} />
+            </a>
+          )}
+          <Button onClick={clearSearch} size="xs" variant="subtle">
+            Back to this page
+          </Button>
+        </div>
+      )}
+
       {/* Shipping cost tiers for the seller you're browsing (always visible) */}
       {seller &&
         (() => {
@@ -2274,7 +2426,7 @@ export const WantsPanel = () => {
             </div>
           )}
 
-          {/* Seller scan controls — the Cards tab's own headline action, so it is
+          {/* Seller scan controls — this tab's other headline action, so it is
               always in view when there is a seller to scan. */}
           {index && seller && (
             <div className="border-b border-slate-800 p-2 text-[11px]">
@@ -2563,7 +2715,14 @@ export const WantsPanel = () => {
                 <div className="sticky top-0 z-10 bg-slate-900">
                   <div className="flex items-center gap-2 px-2 py-1 text-[10px] text-slate-500">
                     <span>
-                      {showingScan ? (
+                      {showingSearch ? (
+                        <>
+                          {search.status === 'loading'
+                            ? 'Loading offers…'
+                            : `${displayMatches.length} offer${displayMatches.length === 1 ? '' : 's'}`}
+                          {search.status === 'done' && ' for this printing'}
+                        </>
+                      ) : showingScan ? (
                         <>
                           {visibleGrouped.length} card{visibleGrouped.length === 1 ? '' : 's'}
                           {effectiveList ? ` in "${effectiveList}"` : ' on your want lists'}

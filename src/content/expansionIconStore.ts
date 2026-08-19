@@ -10,6 +10,8 @@
 //
 // Persisted to chrome.storage.local; mirrors the useSyncExternalStore contract.
 
+import { normalizeSetName } from '@/lib/sets';
+
 const STORAGE_KEY = 'lugin:expansionIcons';
 
 /** Everything needed to paint one set's sprite slice. */
@@ -27,15 +29,10 @@ type IconMap = Record<string, ExpansionIcon>;
 
 /**
  * Loose set-name key so Cardmarket's naming and imported (ManaBox) naming line
- * up: diacritics stripped, lowercased, punctuation collapsed to single spaces.
+ * up. Shared with the edition filter, which has to reconcile the same two
+ * spellings against Scryfall's.
  */
-export const normalizeSetName = (name: string): string =>
-  name
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
+export { normalizeSetName };
 
 let icons: IconMap = {};
 let loading = true;

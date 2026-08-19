@@ -3,37 +3,44 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePageData } from '../usePageData';
 
 import { Button } from './Button';
+import { EditionFilter } from './EditionFilter';
 import { COLOR_PIPS } from './colorPips';
 
 import { setPageFilter } from '@/content/pageFilter';
 import { cardKey } from '@/lib/cardName';
 import { requestScryfall } from '@/lib/messaging';
 import type { CardMetadata } from '@/lib/mtg';
+import { editionIdOf, groupEditionsByYear, tallyEditions } from '@/lib/sets';
+import { useSetIndex } from '@/ui/useSetIndex';
 import { useStickySet, useStickyValue } from '@/ui/useStickyState';
 
 const norm = (s: string) => s.trim().toLowerCase();
 
-/** Identifies this panel's page filter, so the Cards tab's is independent. */
+/** Identifies this panel's page filter, so the Search tab's is independent. */
 const FILTER_OWNER = 'metadata';
 
 interface Row {
   meta?: CardMetadata;
   name: string;
+  setName?: string;
 }
 
 export const MetadataFilter = () => {
   const pageData = usePageData();
-  const pageNames = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          [...(pageData?.listings ?? []).map(l => l.name), pageData?.listing?.name].filter(
-            (n): n is string => !!n,
-          ),
-        ),
-      ),
-    [pageData],
-  );
+  // Rows rather than bare names, because the expansion each row belongs to is
+  // what the edition filter works on. A search page lists one row per printing,
+  // so the same card can legitimately appear several times here.
+  const pageRows = useMemo<Row[]>(() => {
+    const seen = new Map<string, Row>();
+    const add = (name?: string, setName?: string) => {
+      if (!name) return;
+      const key = `${name.toLowerCase()}|${setName?.toLowerCase() ?? ''}`;
+      if (!seen.has(key)) seen.set(key, { name, ...(setName ? { setName } : {}) });
+    };
+    for (const l of pageData?.listings ?? []) add(l.name, l.setName);
+    add(pageData?.listing?.name, pageData?.listing?.setName);
+    return [...seen.values()];
+  }, [pageData]);
 
   const [source, setSource] = useState<'page' | 'manual'>('page');
   const [manual, setManual] = useState('');
@@ -49,15 +56,23 @@ export const MetadataFilter = () => {
   const [subtype, setSubtype] = useStickyValue('lugin:filter:subtype', '');
   const [cmcMin, setCmcMin] = useStickyValue('lugin:filter:cmcMin', '');
   const [cmcMax, setCmcMax] = useStickyValue('lugin:filter:cmcMax', '');
+  const [editions, setEditions] = useStickySet<string>('lugin:filter:editions');
   const [applyToPage, setApplyToPage] = useStickyValue('lugin:filter:applyToPage', false);
 
-  const active =
+  /**
+   * Filters that cross-reference Scryfall, so they mean nothing until metadata
+   * has landed. The edition filter is deliberately not one of them: the page
+   * already says which expansion each row belongs to.
+   */
+  const needsMeta =
     search.trim() !== '' ||
     colors.size > 0 ||
     types.size > 0 ||
     subtype !== '' ||
     cmcMin !== '' ||
     cmcMax !== '';
+
+  const active = needsMeta || editions.size > 0;
 
   const clearFilters = () => {
     setSearch('');
@@ -66,12 +81,13 @@ export const MetadataFilter = () => {
     setSubtype('');
     setCmcMin('');
     setCmcMax('');
+    setEditions(new Set());
   };
 
-  const names = useMemo(
+  const sourceRows = useMemo<Row[]>(
     () =>
       source === 'page'
-        ? pageNames
+        ? pageRows
         : Array.from(
             new Set(
               manual
@@ -79,8 +95,14 @@ export const MetadataFilter = () => {
                 .map(s => s.trim())
                 .filter(Boolean),
             ),
-          ),
-    [source, pageNames, manual],
+          ).map(name => ({ name })),
+    [source, pageRows, manual],
+  );
+
+  /** Distinct names, which is what Scryfall is asked about. */
+  const names = useMemo(
+    () => Array.from(new Set(sourceRows.map(r => r.name))),
+    [sourceRows],
   );
 
   const load = async () => {
@@ -99,8 +121,8 @@ export const MetadataFilter = () => {
   };
 
   const rows: Row[] = useMemo(
-    () => names.map(name => ({ meta: metaByName[cardKey(name)], name })),
-    [names, metaByName],
+    () => sourceRows.map(row => ({ ...row, meta: metaByName[cardKey(row.name)] })),
+    [sourceRows, metaByName],
   );
 
   const availableTypes = useMemo(() => {
@@ -115,12 +137,24 @@ export const MetadataFilter = () => {
     return [...set].sort();
   }, [rows]);
 
+  // Options come from every row on the page, not the surviving ones — otherwise
+  // picking a set would erase the choices beside it.
+  const { index: setIndex, status: setStatus } = useSetIndex();
+  const editionYears = useMemo(
+    () => groupEditionsByYear(tallyEditions(rows, setIndex)),
+    [rows, setIndex],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const min = cmcMin === '' ? null : Number(cmcMin);
     const max = cmcMax === '' ? null : Number(cmcMax);
 
-    return rows.filter(({ name, meta }) => {
+    return rows.filter(({ name, meta, setName }) => {
+      if (editions.size > 0) {
+        const key = editionIdOf(setIndex, { setName });
+        if (key == null || !editions.has(key)) return false;
+      }
       if (q) {
         const hay =
           `${name} ${meta?.typeLine ?? ''} ${meta?.subtypes.join(' ') ?? ''}`.toLowerCase();
@@ -142,7 +176,7 @@ export const MetadataFilter = () => {
       if (max != null && (meta?.cmc == null || meta.cmc > max)) return false;
       return true;
     });
-  }, [rows, search, colors, types, subtype, cmcMin, cmcMax]);
+  }, [rows, search, colors, types, subtype, cmcMin, cmcMax, editions, setIndex]);
 
   const loaded = Object.keys(metaByName).length > 0;
   const matchedCount = rows.filter(r => r.meta?.found).length;
@@ -160,19 +194,23 @@ export const MetadataFilter = () => {
 
   // Hide/show the real rows on the Cardmarket page to mirror the filter.
   //
-  // Gated on `loaded`, and that guard is load-bearing now that the filter is
-  // remembered: on a fresh page no metadata has arrived yet, so every row looks
-  // colourless and typeless. A restored "red only" filter would match nothing and
-  // blank the entire page — a spectacular way to look broken.
+  // Held back until metadata arrives, and that guard is load-bearing now that the
+  // filter is remembered: on a fresh page nothing has been looked up yet, so every
+  // row looks colourless and typeless. A restored "red only" filter would match
+  // nothing and blank the entire page — a spectacular way to look broken.
+  //
+  // Only the Scryfall-backed filters need that protection, hence `needsMeta`
+  // rather than a blanket wait: an edition filter can be honoured immediately,
+  // since the page itself said which expansion each row is from.
   useEffect(() => {
-    if (!applyToPage || !loaded) {
+    if (!applyToPage || (needsMeta && !loaded)) {
       setPageFilter(FILTER_OWNER, null);
       return;
     }
     setPageFilter(FILTER_OWNER, matchKey ? matchKey.split('|') : []);
-  }, [applyToPage, loaded, matchKey]);
+  }, [applyToPage, needsMeta, loaded, matchKey]);
 
-  // Withdraw only this panel's filter when it unmounts; the Cards tab may have
+  // Withdraw only this panel's filter when it unmounts; the Search tab may have
   // one of its own.
   useEffect(() => () => setPageFilter(FILTER_OWNER, null), []);
 
@@ -185,7 +223,7 @@ export const MetadataFilter = () => {
   const attempted = useRef('');
   const fingerprint = useMemo(() => names.join('|'), [names]);
   useEffect(() => {
-    if (!active || loaded || loading || !fingerprint) return;
+    if (!needsMeta || loaded || loading || !fingerprint) return;
     // One attempt per set of names, so a page of cards Scryfall has never heard of
     // is asked about once rather than on every render.
     if (attempted.current === fingerprint) return;
@@ -193,7 +231,7 @@ export const MetadataFilter = () => {
     void load();
     // `load` is rebuilt every render; the ref above is what stops repeats.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, loaded, loading, fingerprint]);
+  }, [needsMeta, loaded, loading, fingerprint]);
 
   const toggle = (set: Set<string>, value: string, setter: (s: Set<string>) => void) => {
     const next = new Set(set);
@@ -209,7 +247,7 @@ export const MetadataFilter = () => {
         <div className="mb-2 flex items-center gap-2 text-[11px]">
           <label className="flex items-center gap-1">
             <input checked={source === 'page'} onChange={() => setSource('page')} type="radio" />
-            Page ({pageNames.length})
+            Page ({pageRows.length})
           </label>
           <label className="flex items-center gap-1">
             <input
@@ -247,10 +285,26 @@ export const MetadataFilter = () => {
           symptom would be a short list. */}
       {active && (
         <div className="flex items-center gap-2 border-b border-slate-800 bg-sky-500/10 px-2 py-1 text-[10px] text-sky-200">
-          <span>Filter active{!loaded && (loading ? ' · loading metadata…' : ' · waiting')}</span>
+          <span>
+            Filter active{needsMeta && !loaded && (loading ? ' · loading metadata…' : ' · waiting')}
+          </span>
           <Button className="ml-auto" onClick={clearFilters} size="xs" variant="subtle">
             Clear
           </Button>
+        </div>
+      )}
+
+      {/* Outside the `loaded` gate below: the page names each row's expansion,
+          so this one works before anything has been looked up on Scryfall. */}
+      {editionYears.length > 0 && (
+        <div className="border-b border-slate-800 p-2 text-[11px]">
+          <EditionFilter
+            onClear={() => setEditions(new Set())}
+            onToggle={key => toggle(editions, key, setEditions)}
+            selected={editions}
+            status={setStatus}
+            years={editionYears}
+          />
         </div>
       )}
 
@@ -357,7 +411,7 @@ export const MetadataFilter = () => {
               </span>
             </div>
             <ul className="divide-y divide-slate-800/60">
-              {filtered.map(({ name, meta }, i) => (
+              {filtered.map(({ name, meta, setName }, i) => (
                 <li key={i} className="flex items-center gap-2 px-2 py-1.5">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12px] text-slate-100">
@@ -377,8 +431,13 @@ export const MetadataFilter = () => {
                         <span className="ml-1 text-[10px] text-amber-400">(not found)</span>
                       )}
                     </div>
-                    {meta?.typeLine && (
-                      <div className="truncate text-[10px] text-slate-500">{meta.typeLine}</div>
+                    {/* The set is worth naming here: a search page lists the
+                        same card once per printing, and without it those rows
+                        would be indistinguishable. */}
+                    {(meta?.typeLine ?? setName) && (
+                      <div className="truncate text-[10px] text-slate-500">
+                        {[meta?.typeLine, setName].filter(Boolean).join(' · ')}
+                      </div>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">

@@ -1,5 +1,6 @@
 import type { CardMetadata } from './mtg';
 import type { PriceState } from './prices';
+import type { SetInfo } from './sets';
 
 import type { DomainKey, SyncedApplicationState } from '@/core/sync/model';
 import type { RemoteSnapshot } from '@/core/sync/repository';
@@ -83,7 +84,9 @@ export type RuntimeMessage =
   | { kind: 'ping' }
   // The card price table. Fetched by the worker because the overlay sits inside a
   // page with its own CSP, and cached there because it is megabytes.
-  | { kind: 'prices:get' };
+  | { kind: 'prices:get' }
+  // Scryfall's expansion catalogue, for dating an edition. Same reasoning.
+  | { kind: 'sets:get' };
 
 export type RuntimeResponse =
   | { kind: 'api:result'; result: ApiResult }
@@ -93,6 +96,7 @@ export type RuntimeResponse =
   | { kind: 'ok' }
   | { kind: 'pong' }
   | { kind: 'prices:state'; state: PriceState }
+  | { kind: 'sets:list'; sets: SetInfo[] }
   | { code?: RuntimeErrorCode; error: string; kind: 'error' };
 
 /**

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 
 import { Badge } from './Badge';
 import { Button } from './Button';
+import { EditionFilter } from './EditionFilter';
 import { SearchInput } from './Field';
 import { Hint } from './Hint';
 import { IconButton } from './IconButton';
@@ -39,6 +40,7 @@ import { MANA_VALUE_BUCKETS, manaValueBucket, manaValueLabel, type CardMetadata 
 import { collectionValue, money, signedMoney } from '@/lib/prices';
 import { fetchCardPrints, type CardPrint } from '@/lib/prints';
 import type { PurchaseVerdict } from '@/lib/purchaseDuplicates';
+import { editionIdOf, groupEditionsByYear, tallyEditions } from '@/lib/sets';
 import {
   currentLang,
   fetchDoc,
@@ -49,6 +51,7 @@ import {
 import { timeAgo } from '@/ui/format';
 import { usePrices } from '@/ui/usePrices';
 import { useRowSelection } from '@/ui/useRowSelection';
+import { useSetIndex } from '@/ui/useSetIndex';
 import { useStickySet, useStickyValue } from '@/ui/useStickyState';
 
 // Quick primary-type toggles that filter the collection directly.
@@ -118,7 +121,7 @@ export const CollectionPanel = () => {
   const purchases = useSyncExternalStore(purchaseStore.subscribe, purchaseStore.getSnapshot);
 
   // ---- Past purchases as a source of collection rows ------------------------
-  // The preference existed, but only in the Cards tab, and it only took effect on
+  // The preference existed, but only in the Search tab, and it only took effect on
   // the *next* purchase sync — so someone with a year of history could tick "add
   // purchases to my collection" and watch nothing happen. Here it is where the
   // cards would land, and the button acts on the history already downloaded.
@@ -427,7 +430,7 @@ export const CollectionPanel = () => {
 
   // Market value, from the price table the background worker keeps. A sum over
   // rows, so it costs nothing to keep current — unlike the per-card trend lookups
-  // in the Cards tab, which are one page fetch each and exist for a different
+  // in the Search tab, which are one page fetch each and exist for a different
   // question (is this particular offer a good price?).
   const prices = usePrices(requestPrices);
   const worth = useMemo(
@@ -521,6 +524,16 @@ export const CollectionPanel = () => {
   const [fSubtype, setFSubtype] = useStickyValue('lugin:collection:subtype', '');
   // Quick primary-type toggle ('' = all). Single-select segmented control.
   const [fType, setFType] = useStickyValue('lugin:collection:type', '');
+  const [fEditions, setFEditions] = useStickySet<string>('lugin:collection:editions');
+
+  // Rows imported from ManaBox carry Scryfall's own set code, so those date
+  // exactly; printings folded in from purchases only have Cardmarket's spelling
+  // of the expansion and go through name matching.
+  const { index: setIndex, status: setStatus } = useSetIndex();
+  const editionYears = useMemo(
+    () => groupEditionsByYear(tallyEditions(rows.flatMap(r => r.editions), setIndex)),
+    [rows, setIndex],
+  );
 
   const rowNames = useMemo(() => rows.map(r => r.name), [rows]);
 
@@ -579,7 +592,21 @@ export const CollectionPanel = () => {
   const removeTerm = (term: string) => setFQuery(fTerms.filter(t => t !== term).join(' '));
 
   const filtersActive =
-    fTerms.length > 0 || fColors.size > 0 || fCmc.size > 0 || fSubtype !== '' || fType !== '';
+    fTerms.length > 0 ||
+    fColors.size > 0 ||
+    fCmc.size > 0 ||
+    fSubtype !== '' ||
+    fType !== '' ||
+    fEditions.size > 0;
+
+  /** A card stays if any printing you own comes from one of the chosen sets. */
+  const editionMatch = (editions: readonly { setCode?: string; setName?: string }[]): boolean => {
+    if (fEditions.size === 0) return true;
+    return editions.some(e => {
+      const key = editionIdOf(setIndex, e);
+      return key != null && fEditions.has(key);
+    });
+  };
 
   const metaMatch = (name: string): boolean => {
     if (!filtersActive) return true;
@@ -606,11 +633,14 @@ export const CollectionPanel = () => {
   const visibleRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows
-      .filter(r => (!q || r.name.toLowerCase().includes(q)) && metaMatch(r.name))
+      .filter(
+        r =>
+          (!q || r.name.toLowerCase().includes(q)) && metaMatch(r.name) && editionMatch(r.editions),
+      )
       .sort((a, b) => a.name.localeCompare(b.name));
-    // metaMatch reads the filter state; list it so the memo stays correct.
+    // metaMatch and editionMatch read the filter state; list it so the memo stays correct.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, search, metaByName, fQuery, fColors, fCmc, fSubtype, fType]);
+  }, [rows, search, metaByName, fQuery, fColors, fCmc, fSubtype, fType, fEditions, setIndex]);
 
   // ---- Multi-select ---------------------------------------------------------
   // Both views show the same rows in the same order, so one selection serves
@@ -1337,6 +1367,7 @@ export const CollectionPanel = () => {
                       setFCmc(new Set());
                       setFSubtype('');
                       setFType('');
+                      setFEditions(new Set());
                     }}
                     size="xs"
                     variant="subtle"
@@ -1345,6 +1376,20 @@ export const CollectionPanel = () => {
                   </Button>
                 )}
               </div>
+              <EditionFilter
+                onClear={() => setFEditions(new Set())}
+                onToggle={key =>
+                  setFEditions(prev => {
+                    const next = new Set(prev);
+                    if (next.has(key)) next.delete(key);
+                    else next.add(key);
+                    return next;
+                  })
+                }
+                selected={fEditions}
+                status={setStatus}
+                years={editionYears}
+              />
               <div className="flex flex-wrap items-center gap-1">
                 <span className="text-[10px] text-ink-faint">Mana:</span>
                 {MANA_VALUE_BUCKETS.map(v => (

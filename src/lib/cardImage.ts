@@ -11,6 +11,8 @@
 // Portable on purpose: the extension and the phone build show the same cards, and
 // a rule about which image is the right one has no business existing twice.
 
+import { cardKey } from './cardName';
+
 /**
  * Direct Scryfall image-CDN URL for a printing id. Scryfall lays images out at
  * `/normal/front/<a>/<b>/<id>.jpg` (a/b = first two id chars). Hitting the CDN
@@ -85,3 +87,41 @@ export const cardImageUrl = (card: ImageableCard): string | undefined =>
   card.imageUrl ??
   imageUrlForPrinting(card.setCode, card.collectorNumber) ??
   imageUrlFor(undefined, card.name);
+
+/**
+ * How hard a row pins down *which* printing it is. Higher wins.
+ *
+ * Deliberately the same ladder as `cardImageUrl`, rung for rung, so a row can
+ * never outrank another and then hand back a worse picture. A set code on its own
+ * scores nothing, because on its own it resolves to nothing: `imageUrlForPrinting`
+ * needs the collector number too, and without it the row falls all the way
+ * through to a lookup by name.
+ */
+export const printingRank = (card: ImageableCard): number => {
+  if (card.scryfallId) return 4;
+  if (card.productId) return 3;
+  if (card.imageUrl) return 2;
+  if (card.setCode && card.collectorNumber) return 1;
+  return 0;
+};
+
+/**
+ * The best picture of each card named in a set of rows, keyed by `cardKey`.
+ *
+ * For when something knows a card only by name — a deck list — and a collection
+ * is sitting there that knows the exact copy you own. Four copies from four sets
+ * collapse to the one that pins its printing down hardest, so the picture is of
+ * a card in your binder rather than Scryfall's default printing of that name.
+ */
+export const imagesByName = (cards: readonly ImageableCard[]): Map<string, string> => {
+  const best = new Map<string, { rank: number; src: string }>();
+  for (const card of cards) {
+    const key = cardKey(card.name ?? '');
+    if (!key) continue;
+    const rank = printingRank(card);
+    if ((best.get(key)?.rank ?? -1) >= rank) continue;
+    const src = cardImageUrl(card);
+    if (src) best.set(key, { rank, src });
+  }
+  return new Map([...best].map(([key, { src }]) => [key, src]));
+};

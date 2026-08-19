@@ -138,6 +138,16 @@ phone keyboard is the worst place to spell Lim-Dûl's Vault. What is deliberatel
 land balancing, EDHREC suggestions — which wants a big screen and a sitting-down
 kind of attention.
 
+The editor shows pictures on the same terms as the collection screen: rows stay
+text with a picture icon on each, and a box view turns the whole deck into a grid
+of card images. A deck card is only ever a name, though, so the picture is looked
+up in your collection first — that way it's the copy you own, right printing and
+all — and only falls back to Scryfall's default printing for cards you haven't
+got yet, which while a deck is being built is most of them. The lookup is built
+once per collection rather than searched per row, since a hundred-card deck
+against a twenty-thousand-row collection is otherwise two million comparisons on
+every render.
+
 Three operations moved into `src/lib/deck.ts` rather than being written twice:
 `newDeck` (both platforms have a "New deck" button, and a disagreement about the
 default format or fallback name would surface days later on whichever device
@@ -161,6 +171,14 @@ each source pins down the *printing* — a name-only lookup returns Scryfall's
 default printing, which for a card like Sol Ring is a picture of somebody else's
 copy. The extension keeps its own extra rungs above these (a printing the user
 picked by hand, an image scraped from a Cardmarket page).
+
+`printingRank` scores a row against that same ladder, rung for rung, for when
+several rows name one card and only one of them can supply the picture — four
+copies of Sol Ring from four sources collapse to the best-identified one. Keeping
+it in step with the ladder matters: it used to give a bare set code a rank it
+could not cash in, and a set code without a collector number resolves to nothing
+better than a name lookup, so such a row could outrank one carrying a real image
+URL and hand back the worse picture.
 
 ### Measuring the card scanner
 
@@ -275,7 +293,7 @@ See [docs/VERSIONING.md](docs/VERSIONING.md).
 into a 3.5 MB table of every paper price (`scripts/build-prices.mjs`), deploys it
 beside the app, and both surfaces hold it locally: value and gain-since-purchase
 are then arithmetic that works offline. The same table colours offers on the
-Cards tab (it tracks Cardmarket's Price Trend closely); live page fetches are
+Search tab (it tracks Cardmarket's Price Trend closely); live page fetches are
 kept only for close calls and on demand, for the live *From* price.
 
 The gain needs a cost basis, and there are two sources. ManaBox writes
@@ -309,11 +327,12 @@ src/core/sync  ──┬──►  src/platform/chrome  ──►  extension  (d
 The overlay docks to either side of any Cardmarket page, or takes the full screen.
 Its tabs are the feature list:
 
-- **Cards** — the offers on the page in front of you, or a seller's entire stock
-  after a scan, cross-referenced against your want lists. Per-offer price,
-  condition, language and foil status; edition and foil price breakdown;
-  add-to-cart and add-to-want-list; shipping tiers per seller. **Wants only on
-  page** hides rows for cards you don't want, on Cardmarket's own table.
+- **Search** — a card you went looking for, the offers on the page in front of
+  you, or a seller's entire stock after a scan, all cross-referenced against your
+  want lists. Per-offer price, condition, language and foil status; edition and
+  foil price breakdown; add-to-cart and add-to-want-list; shipping tiers per
+  seller. **Wants only on page** hides rows for cards you don't want, on
+  Cardmarket's own table.
 - **Collection** — what you own, valued from the local price table, with
   gain-since-purchase. Imports and exports ManaBox's own formats, and can build
   itself from what you have already bought (see **Past purchases**, below).
@@ -323,22 +342,85 @@ Its tabs are the feature list:
 - **Filter** — the gameplay metadata Cardmarket won't filter on: colour, type,
   creature type, mana value. Optionally hides non-matching rows on the page.
 
+The Search, Collection and Filter tabs also filter by **edition**, arranged as a
+timeline rather than an alphabet (see below).
+
 **Traffic** and **API** are development tools and stay behind `flags.devTools`.
 
 Each tab owns the sync that fills it: want lists are read from the Wants tab,
 order history from the Collection tab. Both used to live together under a
-**Tools** disclosure in the Cards tab, which meant the two most important buttons
-in the app were collapsed by default, in a tab about neither of them. What is
+**Tools** disclosure in the Search tab, which meant the two most important
+buttons in the app were collapsed by default, in a tab about neither of them. What is
 *running* is not a tab's business at all — the queue is global and survives page
 changes — so it moved to a header icon that appears only when something is
 happening and lists it on hover (`TaskIndicator`).
+
+### Finding a card
+
+The Search tab draws its rows from three sources, and they are the same kind of
+row: whatever is on the page behind the panel, a seller's whole stock after a
+scan, or a printing you searched for. All three end as `ParsedOffer[]` and go
+through one renderer, which is why a searched card arrives with price comparison,
+the cart button, and the owned/purchased tags already working rather than as a
+second, poorer list.
+
+Typing hits Cardmarket's own autocomplete, which answers with every *printing* of
+a match — expansion, product id and live offer count — in one small reply. That
+matters for a picker: "Abrupt Decay" is fourteen different products, and choosing
+between them by expansion is the whole job. Picking one fetches its product page
+and reads it with the same parser the live page goes through.
+
+That endpoint takes some explaining, because it does not look like the others
+(`src/sites/cardmarket/search.ts`). Cardmarket posts to a single unnamed
+`/AjaxAction` with one parameter:
+
+```
+args=<obfuscated>***<base64 of the search parameters>
+```
+
+The half before the `***` is the action name and the session's CSRF token with
+each character XORed against a counter that starts at `0x58` and steps by one, so
+the plaintext reads `Product_Search***<64 hex characters>`. There is no secret in
+it — the token is the same `__cmtkn` every other Cardmarket AJAX call sends in the
+clear — so it is a wire format to reproduce rather than a lock to pick.
+
+Two things follow from that, and both are in `searchArgs.ts` with tests against a
+real captured request. The scramble is length-sensitive, so the bytes must go out
+raw: `encodeURIComponent` would UTF-8 a high byte into two and shift everything
+after it. And the JSON's field order is Cardmarket's own rather than alphabetical,
+which needs an `eslint-disable` to survive `sort-keys-fix` — a request that is
+byte-identical to the search box's cannot be rejected for a reason we failed to
+imagine. The test asserts that byte-identity, because the failure mode here is not
+an error; it is a search that quietly returns nothing.
+
+If the format ever moves, `searchProducts` throws rather than reporting "no
+results" for a card the user can plainly see, and the dropdown offers Cardmarket's
+own search page instead.
+
+A missing catalogue has to announce itself. Without release dates every edition
+files under "Year unknown", which is indistinguishable from a shelf of expansions
+Scryfall has never heard of — the filter goes on looking like it works, and the
+obvious conclusion is that the data source is wrong when in fact nothing was
+fetched. So `useSetIndex` reports `loading` / `ready` / `failed` rather than just
+handing back an empty index, and the filter says "release dates unavailable"
+when the fetch fell over.
+
+The token has to be asked for rather than read off the page. Most of Cardmarket —
+product pages, search results, expansion listings — prints no `__cmtkn` at all, so
+the first cut of this used `findCmToken()` and worked on almost none of the pages
+you would actually be browsing when you want to look a card up. `cmToken()` in
+`src/content/session.ts` is the right door: this page if it has one, otherwise
+borrowed from a page that does. It now remembers a borrowed token, because search
+asks on every keystroke and the borrow costs a page load. Only successful borrows
+are cached — caching the failure would mean signing in and still being told to
+sign in.
 
 ### The first run
 
 Every one of those tabs is a view over two things Lugin reads from your account:
 your want lists and your order history. Until they are read, each tab is an empty
 box — and the buttons that fill them were behind a **Tools** disclosure in the
-Cards tab, so the first impression was a set of empty rooms with the light switch
+Search tab, so the first impression was a set of empty rooms with the light switch
 in a cupboard. A new install now opens on a welcome screen instead, which asks for
 the two syncs, says what each one buys you and roughly how long it takes, and
 offers **Skip** just as plainly.
@@ -361,7 +443,7 @@ knows every card you bought, which is a collection you have typed in once
 already. The control sits with the cards it creates, and it does two separate
 things on purpose — a button that folds in the history **already downloaded**, and
 **Auto add new purchases** for whether to keep doing it. The preference existed
-before, in the Cards tab, and it only took effect on the *next* sync: you could
+before, in the Search tab, and it only took effect on the *next* sync: you could
 tick it with a year of history indexed and watch nothing happen. Rebuilding
 replaces the purchased rows wholesale and leaves uploaded rows alone, so it can be
 run again without doubling anything.
@@ -414,6 +496,47 @@ complaint people make about Cardmarket's own filter panel. Six hours rather than
 forever because a filter is a statement about what you are shopping for now;
 restoring last week's would hide most of a fresh page with no visible cause.
 
+### Filtering by edition, chronologically
+
+Cardmarket orders expansions alphabetically, which files "Alliances" beside
+"Alchemy Horizons" and tells you nothing about either. Lugin's edition filter
+(`src/ui/components/EditionFilter.tsx`) groups by release year, newest first, and
+lists each year's printings the same way — newest at the top.
+
+Options are always derived from the rows on screen, never from the whole
+catalogue: a collection spanning thirty sets offers thirty choices, not the nine
+hundred Magic has released. They are also derived *before* the edition filter
+applies, or picking one set would erase the choices beside it.
+
+Dating a set means reconciling three catalogues. Scryfall's `/sets` supplies the
+release dates — one request of about a thousand entries, held by the worker for a
+week (`src/background/sets.ts`), since new sets appear about monthly and old ones
+never move. Rows imported from ManaBox carry Scryfall's own set code and match
+exactly. Rows read off Cardmarket only have a display name, and Cardmarket's
+names are its own, so `src/lib/sets.ts` tries the name as written first and only
+then loosens: dropping a "Universes Beyond:" label, folding every Secret Lair
+superdrop back into the one set Scryfall keeps, stripping a ": Extras" or
+": Tokens" suffix to reach the parent set, and translating the handful Cardmarket
+renames outright — "Alpha" for "Limited Edition Alpha" and the other early
+printings, which being the expensive ones are the sets people most want to filter
+down to. The exact name always wins, so a set genuinely called "Guilds of Ravnica
+Promos" resolves to itself rather than its parent.
+
+A few will never match: Scryfall calls Cardmarket's "Guilds of Ravnica: Guild
+Kits" the "GRN Guild Kit", and no textual rule bridges that. Those collect in a
+trailing "Year unknown" group instead of being dropped, because hiding them would
+quietly shorten the list the filter claims to describe. The same group holds
+everything before the catalogue arrives, where it degrades to a plain alphabetical
+list rather than an empty filter.
+
+One consequence worth noting: list pages now record which expansion each row
+belongs to, read from the product URL rather than the markup
+(`src/sites/cardmarket/productUrl.ts`). Every single links to
+`/Products/Singles/<Expansion>/<Card>`, and that path has survived every layout
+change, while the expansion icon has moved between an anchor, a span and a
+tooltip. It also means a search page lists one row per printing rather than
+collapsing them by name, which is what makes an edition filter meaningful there.
+
 Preferences for new wants — the condition floor and a maximum price — sit in the
 Wants tab, beside the lists they apply to. They are Cardmarket's own fields, and
 the single-add button and the bulk "add missing cards" task read one stored
@@ -431,6 +554,7 @@ and the seller-side ones are not addressed at all.**
 | Filter a seller's stock by my want lists | **Solved.** Scan a seller's whole stock and see only your wants; on the page in front of you, non-wanted rows can be hidden outright. |
 | Wants management / a "shopping wizard" | **Partly.** Deep list management, any-printing wants, best-single-seller ranking with shipping. No multi-seller basket optimisation. |
 | Filters that persist and don't collapse | **Solved** for Lugin's own filters. Cardmarket's panel is untouched. |
+| An edition list you can navigate | **Solved.** Grouped by release year, newest first, instead of alphabetically. |
 | Favourite or followed sellers | **No.** |
 | Prices broken down by language and condition | **Partly.** Captured per offer; not aggregated, and no history. |
 | Bulk listing cards for sale | **No.** |
@@ -520,7 +644,7 @@ that are load-bearing rather than incidental:
   not an active filter. A restored filter also fetches its metadata unprompted,
   or persistence would preserve the checkboxes without preserving the filter.
 - Row hiding is **registered per owner** and the registrations intersect
-  (`src/content/pageFilter.ts`). The Cards tab hides rows too, and every panel
+  (`src/content/pageFilter.ts`). The Search tab hides rows too, and every panel
   stays mounted at once, so a single apply/clear pair meant the last effect to
   run took the page and a re-render of an idle panel cleared the active one's
   work.
@@ -561,17 +685,23 @@ src/
       wants.ts            #   want lists, seller scans, purchase history
       wantDefaults.ts     #   condition/price/language for new wants
       language.ts         #   reading an offer's language off a row
+      search.ts           #   the site's own autocomplete, called the way it is
+      searchArgs.ts       #     its wire format, kept pure so it can be tested
+      productUrl.ts       #   the expansion hiding in a /Products/Singles/ path
+      ajax.ts             #   decoding the <ajaxResponse> envelope
       cart.ts, shipping.ts
   lib/                    # portable: no DOM, no Chrome, no React
     mtg.ts                #   card/offer data model
     prices.ts             #   valuation and gain
     purchaseCost.ts       #   cost basis from order lines
+    sets.ts               #   dating an expansion across three catalogues
     import.ts, export.ts  #   ManaBox formats, both directions
     scan/                 #   the card scanner (see below)
   core/sync/              # platform-free sync engine (Drive + conflict copies)
   platform/               # the only Chrome-vs-web difference
     chrome/, web/         #   local + remote repositories, auth
-  background/             # service worker: toolbar, CORS-free fetches, prices
+  background/             # service worker: toolbar, CORS-free fetches, prices,
+                          # Scryfall metadata and the expansion catalogue
   ui/                     # the extension overlay
     App.tsx               #   shell: tabs, docking, theme
     components/           #   WantsPanel, CollectionPanel, DeckPanel, …

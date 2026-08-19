@@ -29,21 +29,44 @@ const lang = (): string => {
 export const loginUrl = (): string => `${location.origin}/${lang()}/Magic/Wants`;
 
 /**
- * The session token: from this page if it carries one, otherwise from a page that
- * would. `null` means the session isn't logged in.
+ * A token borrowed from another page, kept for the life of this content script.
+ *
+ * The token is per-session, so it is worth asking for once. Search types into
+ * this on every keystroke, and fetching a whole page each time to read the same
+ * string back would be a page load per search.
+ *
+ * Only a *successful* borrow is remembered. A null means either signed out or a
+ * failed fetch, and both are things the user can go and fix — caching them would
+ * mean signing in and still being told to sign in.
  */
-export const cmToken = async (): Promise<string | null> => {
-  const here = findCmToken();
-  if (here) return here;
+let borrowed: Promise<string | null> | null = null;
+
+const borrow = async (): Promise<string | null> => {
   try {
     const res = await replayInPage({ method: 'GET', url: `/${lang()}/Magic/Wants` });
     // The login form carries a token too, and it opens nothing else — so the page
     // has to be one served to someone signed in for its token to be worth having.
-    if (!looksSignedIn(res.body)) return null;
-    return res.body.match(TOKEN)?.[1] ?? null;
+    const token = looksSignedIn(res.body) ? (res.body.match(TOKEN)?.[1] ?? null) : null;
+    if (!token) borrowed = null;
+    return token;
   } catch {
+    borrowed = null;
     return null;
   }
+};
+
+/**
+ * The session token: from this page if it carries one, otherwise from a page that
+ * would. `null` means the session isn't logged in.
+ *
+ * The second half is not a rare path. Most of Cardmarket — product pages, search
+ * results, expansion listings — carries no token at all, so anything that reads
+ * one straight off the page works only on the handful of pages that do.
+ */
+export const cmToken = async (): Promise<string | null> => {
+  const here = findCmToken();
+  if (here) return here;
+  return (borrowed ??= borrow());
 };
 
 /** Hand the tab to Cardmarket's login, with the overlay out of the way. */

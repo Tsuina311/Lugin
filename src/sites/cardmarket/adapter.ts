@@ -1,6 +1,7 @@
 import type { Diagnostic, ExtractionResult, PageContext, SiteAdapter } from '../types';
 
 import { languageOfRow } from './language';
+import { expansionFromProductUrl } from './productUrl';
 import { SELECTORS } from './selectors';
 
 import { attrOf, collectJsonLd, jsonLdType, parseMoney, textOf } from '@/lib/extract';
@@ -105,10 +106,16 @@ const extractList = (doc: Document, diagnostics: Diagnostic[]): CardListing[] =>
   for (const a of anchors) {
     const name = a.textContent?.trim();
     if (!name || name.length < 2) continue; // skip image-only / icon links
-    const key = name.toLowerCase();
+    const href = a.getAttribute('href') ?? undefined;
+    // The URL names the expansion, which is what lets the overlay offer an
+    // edition filter on a search page spanning a dozen sets.
+    const setName = expansionFromProductUrl(href);
+    // Keyed on the set too: a search for "Abrupt Decay" lists one row per
+    // expansion, and those are different printings, not a repeat of one.
+    const key = `${name.toLowerCase()}|${setName?.toLowerCase() ?? ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    listings.push({ href: a.getAttribute('href') ?? undefined, name });
+    listings.push({ href, name, ...(setName ? { setName } : {}) });
   }
 
   diagnostics.push({

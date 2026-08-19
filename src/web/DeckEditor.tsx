@@ -11,12 +11,19 @@
 // because it hands the string to `parseDeckList` — the parser the desktop uses
 // for the same job. Names already in your collection are offered as you type,
 // since a phone keyboard is the worst possible place to spell Lim-Dûl's Vault.
+//
+// Pictures follow the collection screen's bargain exactly: the list stays text
+// and you tap a row to see one card, or switch to box view and ask for all of
+// them. A deck card is only ever a name, so the picture is looked up in your
+// collection first — that way it's the copy you own, right printing and all —
+// and only falls back to Scryfall's default printing for cards you don't have.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { ExportBar } from './ExportBar';
 import { syncStore } from './syncStore';
 
+import { imageUrlFor, imagesByName } from '@/lib/cardImage';
 import { cardKey } from '@/lib/cardName';
 import type { Collection } from '@/lib/collection';
 import {
@@ -32,6 +39,10 @@ import {
   type DeckSection,
 } from '@/lib/deck';
 import { deckFile } from '@/lib/export';
+import { Picture } from '@/ui/components/Picture';
+import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
+import { Image as ImageIcon } from '@/ui/components/icons';
+import { useSequentialImages } from '@/ui/components/useSequentialImages';
 
 const SECTIONS: readonly { id: DeckSection; label: string }[] = [
   { id: 'commander', label: 'Commander' },
@@ -47,6 +58,11 @@ const same = (a: DeckCard, b: DeckCard): boolean =>
 
 /** How many collection names to offer. A phone dropdown past this is a wall. */
 const SUGGESTIONS = 8;
+
+const VIEW_KEY = 'lugin:webDeckView';
+
+/** Identifies a row across sections, since the same card can sit in two. */
+const rowKey = (card: DeckCard): string => `${card.section}:${cardKey(card.name)}`;
 
 const Stepper = ({
   onChange,
@@ -90,6 +106,41 @@ export const DeckEditor = ({
   const [into, setInto] = useState<DeckSection>('main');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  const [view, setView] = useState<ViewShape>(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'box' ? 'box' : 'list';
+    } catch {
+      return 'list';
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_KEY, view);
+    } catch {
+      // a browser refusing storage still gets a working screen, just a forgetful one
+    }
+  }, [view]);
+
+  /** Rows whose picture has been asked for, in list view. */
+  const [opened, setOpened] = useState<Set<string>>(() => new Set());
+  const toggle = (key: string) =>
+    setOpened(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  // Built from the whole collection once, rather than searched per row: a
+  // hundred-card deck against a twenty-thousand-row collection is otherwise two
+  // million comparisons every render.
+  const owned = useMemo(
+    () => (collection ? imagesByName(collection.cards) : new Map<string, string>()),
+    [collection],
+  );
+  const pictureOf = (cardName: string): string | undefined =>
+    owned.get(cardKey(cardName)) ?? imageUrlFor(undefined, cardName);
+
   const missing = useMemo(
     () => (collection ? deckShortfall(deck.cards, collection.byKey) : []),
     [collection, deck],
@@ -99,6 +150,20 @@ export const DeckEditor = ({
     () => SECTIONS.filter(s => s.id !== 'commander' || formatInfo(deck.format).commanderZone),
     [deck.format],
   );
+
+  // One at a time, so a deck's worth of pictures fills in from the top rather
+  // than stalling on a hundred simultaneous requests over a phone connection.
+  const wanted = useMemo(
+    () =>
+      deck.cards
+        .filter(card => view === 'box' || opened.has(rowKey(card)))
+        .map(card => pictureOf(card.name))
+        .filter((src): src is string => !!src),
+    // `pictureOf` closes over `owned`, which is the part that can change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deck.cards, opened, owned, view],
+  );
+  const loaded = useSequentialImages(wanted);
 
   // Straight from what you own, so it costs no network and is exactly the set of
   // cards you can actually build with today.
@@ -166,11 +231,12 @@ export const DeckEditor = ({
               </option>
             ))}
           </select>
-          <span className="flex-1 text-[11px] tabular-nums text-ink-faint">
+          <span className="min-w-0 flex-1 truncate text-[11px] tabular-nums text-ink-faint">
             {copies(deck, 'main') + copies(deck, 'commander')}
             {formatInfo(deck.format).targetSize ? `/${formatInfo(deck.format).targetSize}` : ''}{' '}
             cards
           </span>
+          {deck.cards.length > 0 ? <ViewToggle onChange={setView} size="md" value={view} /> : null}
           {/* Two taps, like the desktop's Clear: a deck is somebody's evening,
               and there is no undo for it on this device. */}
           <button
@@ -298,25 +364,75 @@ export const DeckEditor = ({
               {section.label}
               <span className="ml-2 tabular-nums opacity-70">{copies(deck, section.id)}</span>
             </h2>
-            <ul className="divide-y divide-line">
-              {cards.map(card => (
-                <li key={`${section.id}:${card.name}`} className="flex items-center gap-2 px-2 py-1">
-                  <Stepper
-                    onChange={quantity => setQuantity(card, quantity)}
-                    quantity={card.quantity}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm text-ink">{card.name}</span>
-                  <button
-                    aria-label={`Remove ${card.name}`}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
-                    onClick={() => setQuantity(card, 0)}
-                    type="button"
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {view === 'box' ? (
+              <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3">
+                {cards.map(card => {
+                  const src = pictureOf(card.name);
+                  return (
+                    <div key={rowKey(card)} className="flex flex-col gap-1">
+                      <Picture alt={card.name} ready={!!src && loaded.has(src)} src={src} />
+                      <span className="truncate text-xs text-ink" title={card.name}>
+                        {card.name}
+                      </span>
+                      {/* No separate remove button here: stepping to zero already
+                          takes the card out, and a picture is a big enough target
+                          that an extra × beside it invites the wrong tap. */}
+                      <Stepper
+                        onChange={quantity => setQuantity(card, quantity)}
+                        quantity={card.quantity}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <ul className="divide-y divide-line">
+                {cards.map(card => {
+                  const key = rowKey(card);
+                  const open = opened.has(key);
+                  const src = open ? pictureOf(card.name) : undefined;
+                  return (
+                    <li key={key} className="px-2 py-1">
+                      <div className="flex items-center gap-2">
+                        <Stepper
+                          onChange={quantity => setQuantity(card, quantity)}
+                          quantity={card.quantity}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                          {card.name}
+                        </span>
+                        {/* Self-anchored rather than in a toolbar: it's about this
+                            card, and on a phone the thumb is already at the row. */}
+                        <button
+                          aria-expanded={open}
+                          aria-label={open ? `Hide the picture of ${card.name}` : `Show ${card.name}`}
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg active:bg-raised ${
+                            open ? 'text-accent' : 'text-ink-faint'
+                          }`}
+                          onClick={() => toggle(key)}
+                          type="button"
+                        >
+                          <ImageIcon aria-hidden size={18} />
+                        </button>
+                        <button
+                          aria-label={`Remove ${card.name}`}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
+                          onClick={() => setQuantity(card, 0)}
+                          type="button"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      {open ? (
+                        <div className="mb-2 ml-2 w-44">
+                          <Picture alt={card.name} ready={!!src && loaded.has(src)} src={src} />
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
         );
       })}

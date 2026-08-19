@@ -17,7 +17,7 @@ import { wantsStore } from '@/content/wantsStore';
 // Every panel in Lugin is a view *over* two things it reads from Cardmarket: your
 // want lists and your order history. Until those are read, every tab is an empty
 // box with a button in it, and the buttons that would fill them were behind a
-// "Tools" disclosure in the Cards tab — so the app's first impression was a set of
+// "Tools" disclosure in the Search tab — so the app's first impression was a set of
 // empty rooms, with the light switch in a cupboard.
 //
 // So this screen exists to do one thing: ask for the two syncs, say plainly why

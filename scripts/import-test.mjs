@@ -33,6 +33,10 @@ await writeFile(
    export * from '${root}src/lib/purchaseCost';
    export * from '${root}src/lib/purchaseDuplicates';
    export * from '${root}src/lib/sellerStats';
+   export * from '${root}src/sites/cardmarket/searchArgs';
+   export * from '${root}src/sites/cardmarket/productUrl';
+   export * from '${root}src/lib/sets';
+   export { cardKey } from '${root}src/lib/cardName';
    export { sellerFrom, sellerSlugFromHref, timelineFrom } from '${root}src/sites/cardmarket/order';
    export { shouldWelcome } from '${root}src/ui/firstRun';
    export * from '${root}src/lib/table';`,
@@ -52,6 +56,9 @@ const {
   addPaid,
   applyImport,
   cardImageUrl,
+  cardKey,
+  imageUrlFor,
+  imagesByName,
   collectionFile,
   collectionToCsv,
   collectionValue,
@@ -79,6 +86,17 @@ const {
   inTransitCopies,
   daysSince,
   ordersWithoutSeller,
+  buildArgs,
+  encodeArgs,
+  obfuscate,
+  productFactsFromImage,
+  expansionFromProductUrl,
+  buildSetIndex,
+  editionIdOf,
+  groupEditionsByYear,
+  normalizeSetName,
+  resolveSet,
+  tallyEditions,
   sellerFrom,
   sellerSlugFromHref,
   sellerStats,
@@ -1230,6 +1248,49 @@ check('a card known only by name still has a picture', () => {
   assert.match(cardImageUrl({ name: 'Lim-Dûl’s Vault' }), /named\?exact=Lim-D/);
 });
 
+check('a deck card borrows the picture of the copy you own', () => {
+  // A deck row is only ever a name; the collection is what knows which printing
+  // of it is in your binder.
+  const images = imagesByName([
+    { collectorNumber: '263', name: 'Sol Ring', setCode: 'c21' },
+    { name: 'Llanowar Elves', scryfallId: '0000a0a0-0000-4000-8000-000000000000' },
+  ]);
+  assert.match(images.get(cardKey('Sol Ring')), /\/cards\/c21\/263\?/);
+  assert.match(images.get(cardKey('Llanowar Elves')), /^https:\/\/cards\.scryfall\.io\//);
+});
+
+check('a rank a row cannot cash in does not beat one that can', () => {
+  // A bare set code resolves to nothing better than a name lookup, so it must not
+  // outrank a row carrying a real image URL.
+  const images = imagesByName([
+    { name: 'Sol Ring', setCode: 'c21' },
+    { imageUrl: 'https://product-images.s3.cardmarket.com/1/C21/1.jpg', name: 'Sol Ring' },
+  ]);
+  assert.equal(images.get(cardKey('Sol Ring')), 'https://product-images.s3.cardmarket.com/1/C21/1.jpg');
+});
+
+check('the printing that pins itself down hardest supplies the picture', () => {
+  // Four copies of one card from four sources: the Scryfall id wins, whatever
+  // order the rows happen to arrive in.
+  const rows = [
+    { name: 'Sol Ring' },
+    { name: 'Sol Ring', scryfallId: '0000a0a0-0000-4000-8000-000000000000' },
+    { name: 'Sol Ring', productId: '265584' },
+    { name: 'Sol Ring', setCode: 'c21', collectorNumber: '263' },
+  ];
+  const forward = imagesByName(rows).get(cardKey('Sol Ring'));
+  const backward = imagesByName([...rows].reverse()).get(cardKey('Sol Ring'));
+  assert.match(forward, /^https:\/\/cards\.scryfall\.io\//);
+  assert.equal(forward, backward);
+});
+
+check('a card you do not own is still worth a name-only picture', () => {
+  // Which is the whole point of the fallback: most of a deck being built is not
+  // in the collection yet.
+  assert.equal(imagesByName([{ name: 'Sol Ring' }]).get(cardKey('Rhystic Study')), undefined);
+  assert.match(imageUrlFor(undefined, 'Rhystic Study'), /cards\/named\?exact=Rhystic%20Study/);
+});
+
 check('a row that identifies nothing at all yields no URL', () => {
   assert.equal(cardImageUrl({}), undefined);
 });
@@ -1311,6 +1372,236 @@ check('a pasted list becomes a deck through the same parser the desktop uses', (
     4,
     'and a card listed twice is one row',
   );
+});
+
+// --- speaking Cardmarket's search protocol -----------------------------------
+//
+// Every check below is anchored to one real request captured from the site's own
+// search box while typing "abru". Reproducing it byte for byte is the whole
+// contract: there is no error we would recognise if we got it subtly wrong, only
+// a search that silently returns nothing.
+
+const CAPTURED_TOKEN = '383c7b04684168c6f3d5012a88c08c0d5060059da4cc386cd85ac8cf021f5175';
+const CAPTURED_ARGS =
+  '%08%2B5%3F%29%3E%2A%003%04%03%11%07%0DLMBZRX%0FZ%0C_DGJGECN%14N%1FI%1FIMOM%E1%B9%BA%E0%B4' +
+  '%BD%E5%B7%EC%BC%BA%BD%BC%BD%BB%B6%F4%F0%A6%F0%F7%A6%AE%A1%FB%FD%A2%AE%FD%FE%A6%FC%C6%91%90' +
+  '%92%C2%90%97%90%9D%2A%2A%2AeyJzZWFyY2hTdHJpbmciOiJhYnJ1Iiwic2VhcmNoTW9kZSI6InYyIiwicHJvZHV' +
+  'jdENhdGVnb3J5SWRzIjpudWxsLCJyZXNwb25zaXZlIjoiMSJ9';
+
+/** The scrambled half of an `args` value, back as the bytes that were sent. */
+const scrambledHalf = args =>
+  args
+    .slice(0, args.indexOf('%2A%2A%2A'))
+    .replace(/%([0-9A-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+
+check('a built search request is byte-identical to the one the site sends', () => {
+  assert.equal(buildArgs(CAPTURED_TOKEN, { searchString: 'abru' }), CAPTURED_ARGS);
+});
+
+check('the scramble is its own inverse', () => {
+  const plain = 'Product_Search***deadbeef';
+  assert.equal(obfuscate(obfuscate(plain)), plain);
+});
+
+check('the scrambled half really is the action name and the session token', () => {
+  // Documents what the format *is*, so the next person does not have to break it
+  // again to find out.
+  assert.equal(obfuscate(scrambledHalf(CAPTURED_ARGS)), `Product_Search***${CAPTURED_TOKEN}`);
+});
+
+check('high bytes go out raw, not as UTF-8', () => {
+  // The trap: encodeURIComponent turns this one byte into two (%C3%A1), which
+  // shifts every later character of the scramble and voids the token.
+  assert.equal(encodeArgs(String.fromCharCode(0xe1)), '%E1');
+  assert.equal(encodeURIComponent(String.fromCharCode(0xe1)), '%C3%A1');
+});
+
+check('base64 padding and symbols survive form encoding', () => {
+  // A raw '+' in a form body arrives at the server as a space, so a search whose
+  // parameters happened to encode with one would silently lose it.
+  assert.equal(encodeArgs('a+b/c='), 'a%2Bb%2Fc%3D');
+});
+
+check('a search term with an accent still produces a token the server accepts', () => {
+  // Only the scrambled half is length-sensitive; the term rides in base64. This
+  // guards the seam between the two.
+  const args = buildArgs(CAPTURED_TOKEN, { searchString: 'Æther' });
+  assert.equal(obfuscate(scrambledHalf(args)), `Product_Search***${CAPTURED_TOKEN}`);
+});
+
+check('a suggestion is pinned to its printing through the image URL', () => {
+  assert.deepEqual(
+    productFactsFromImage('https://product-images.s3.cardmarket.com/1/RTR/258288/258288.jpg'),
+    { productId: '258288', setCode: 'RTR' },
+  );
+});
+
+check('promo set codes with digits survive', () => {
+  assert.equal(
+    productFactsFromImage('https://product-images.s3.cardmarket.com/1/MB2/784551/784551.jpg')
+      .setCode,
+    'MB2',
+  );
+});
+
+check('a thumbnail we cannot read leaves the printing unpinned rather than guessed', () => {
+  // Better a suggestion that only knows its name than one confidently attached
+  // to the wrong expansion.
+  assert.deepEqual(productFactsFromImage(undefined), {});
+  assert.deepEqual(productFactsFromImage('/img/placeholder.svg'), {});
+});
+
+// ---------------------------------------------------------------------------
+// Editions: dating a set, and reconciling three catalogues' spellings of it
+// ---------------------------------------------------------------------------
+
+// A slice of Scryfall's catalogue, chosen for the cases that actually caused
+// trouble: a colon in a real name, a set with a Cardmarket-only offshoot, and a
+// year with several releases to order.
+const SETS = buildSetIndex([
+  { code: 'lea', name: 'Limited Edition Alpha', releasedAt: '1993-08-05' },
+  { code: 'rtr', name: 'Return to Ravnica', releasedAt: '2012-10-05' },
+  { code: 'grn', name: 'Guilds of Ravnica', releasedAt: '2018-10-05' },
+  { code: 'pgrn', name: 'Guilds of Ravnica Promos', releasedAt: '2018-10-05' },
+  { code: 'sld', name: 'Secret Lair Drop', releasedAt: '2019-12-02' },
+  { code: 'tsr', name: 'Time Spiral Remastered', releasedAt: '2021-03-19' },
+  { code: 'vow', name: 'Innistrad: Crimson Vow', releasedAt: '2021-11-19' },
+  { code: 'mkm', name: 'Murders at Karlov Manor', releasedAt: '2024-02-09' },
+  { code: 'pip', name: 'Fallout', releasedAt: '2024-03-08' },
+  { code: 'otj', name: 'Outlaws of Thunder Junction', releasedAt: '2024-04-19' },
+  { code: 'blb', name: 'Bloomburrow', releasedAt: '2024-08-02' },
+]);
+
+check('normalising a set name folds case, accents and punctuation', () => {
+  // Shared with expansionIconStore, which keys its sprites on this.
+  assert.equal(normalizeSetName('Innistrad: Crimson Vow'), 'innistrad crimson vow');
+  assert.equal(normalizeSetName('Jumpstart 2022'), 'jumpstart 2022');
+});
+
+check('a set code beats whatever the row calls the expansion', () => {
+  // A localised Cardmarket page names the set in German; the code still pins it.
+  assert.equal(
+    resolveSet(SETS, { setCode: 'MKM', setName: 'Mord im Karlov Manor' })?.name,
+    'Murders at Karlov Manor',
+  );
+});
+
+check('punctuation does not stop a name matching', () => {
+  // Cardmarket writes the colon, ManaBox exports drop it.
+  assert.equal(resolveSet(SETS, { setName: 'Innistrad Crimson Vow' })?.code, 'vow');
+});
+
+check('a Cardmarket sub-expansion falls back to its parent set', () => {
+  assert.equal(resolveSet(SETS, { setName: 'Time Spiral Remastered: Extras' })?.code, 'tsr');
+});
+
+check('printings of one set file together however the row spells it', () => {
+  assert.equal(editionIdOf(SETS, { setName: 'Time Spiral Remastered' }), 'tsr');
+  assert.equal(editionIdOf(SETS, { setName: 'Time Spiral Remastered: Extras' }), 'tsr');
+});
+
+check('the oldest sets, which Cardmarket renames outright, still date', () => {
+  // "Alpha" and "Limited Edition Alpha" share no words to match on, and these
+  // are the expensive printings people most want to filter down to.
+  assert.equal(resolveSet(SETS, { setName: 'Alpha' })?.code, 'lea');
+});
+
+check('a crossover set matches once its Cardmarket label comes off', () => {
+  assert.equal(resolveSet(SETS, { setName: 'Universes Beyond: Fallout' })?.code, 'pip');
+});
+
+check('every Secret Lair superdrop leads back to the one Scryfall set', () => {
+  // Cardmarket sells each drop as its own expansion; Scryfall keeps one.
+  const drop = 'Secret Lair Drop Series: Back to School Superdrop';
+  assert.equal(resolveSet(SETS, { setName: drop })?.code, 'sld');
+});
+
+check('a set genuinely named "Promos" is itself, not its parent', () => {
+  // The loosening rules must never outrank the name as written.
+  assert.equal(resolveSet(SETS, { setName: 'Guilds of Ravnica: Promos' })?.code, 'pgrn');
+  assert.equal(resolveSet(SETS, { setName: 'Guilds of Ravnica: Tokens' })?.code, 'grn');
+});
+
+check('an expansion Scryfall has never heard of stays filterable', () => {
+  const odd = { setName: 'Some Cardmarket Oddity' };
+  assert.equal(resolveSet(SETS, odd), undefined);
+  assert.equal(editionIdOf(SETS, odd), 'some cardmarket oddity');
+});
+
+check('editions group by year, newest first within each year', () => {
+  const years = groupEditionsByYear(
+    tallyEditions(
+      [
+        { setName: 'Bloomburrow' },
+        { setName: 'Return to Ravnica' },
+        { setName: 'Murders at Karlov Manor' },
+        { setName: 'Outlaws of Thunder Junction' },
+        { setName: 'Murders at Karlov Manor' },
+      ],
+      SETS,
+    ),
+  );
+  assert.deepEqual(
+    years.map(y => y.year),
+    [2024, 2012],
+  );
+  assert.deepEqual(
+    years[0].editions.map(e => `${e.label} ${e.count}`),
+    ['Bloomburrow 1', 'Outlaws of Thunder Junction 1', 'Murders at Karlov Manor 2'],
+  );
+  assert.equal(years[0].count, 4);
+});
+
+check('editions we cannot date sort last rather than disappearing', () => {
+  const years = groupEditionsByYear(
+    tallyEditions([{ setName: 'Some Cardmarket Oddity' }, { setName: 'Bloomburrow' }], SETS),
+  );
+  assert.deepEqual(
+    years.map(y => y.year),
+    [2024, null],
+  );
+  assert.equal(years[1].editions[0].label, 'Some Cardmarket Oddity');
+});
+
+check('an empty catalogue degrades to one alphabetical group, not an empty filter', () => {
+  // What the UI shows before the worker's copy of the catalogue arrives.
+  const none = buildSetIndex([]);
+  const years = groupEditionsByYear(
+    tallyEditions([{ setName: 'Bloomburrow' }, { setName: 'Alliances' }], none),
+  );
+  assert.deepEqual(
+    years.map(y => y.year),
+    [null],
+  );
+  assert.deepEqual(
+    years[0].editions.map(e => e.label),
+    ['Bloomburrow', 'Alliances'],
+  );
+});
+
+check('a product URL names its expansion', () => {
+  assert.equal(
+    expansionFromProductUrl('/en/Magic/Products/Singles/Return-to-Ravnica/Abrupt-Decay?language=1'),
+    'Return to Ravnica',
+  );
+  assert.equal(
+    expansionFromProductUrl('/en/Magic/Products/Singles/Guilds-of-Ravnica-Guild-Kits/Abrupt-Decay'),
+    'Guilds of Ravnica Guild Kits',
+  );
+});
+
+check('an expansion page is not mistaken for a card in a set', () => {
+  assert.equal(expansionFromProductUrl('/en/Magic/Products/Singles/Return-to-Ravnica'), undefined);
+  assert.equal(expansionFromProductUrl(undefined), undefined);
+});
+
+check('an expansion read off a URL resolves to a dated set', () => {
+  // The whole chain a search-results row goes through: href to slug to set.
+  const setName = expansionFromProductUrl(
+    '/en/Magic/Products/Singles/Time-Spiral-Remastered-Extras/Abrupt-Decay?language=1,2,5',
+  );
+  assert.equal(setName, 'Time Spiral Remastered Extras');
+  assert.equal(resolveSet(SETS, { setName })?.releasedAt, '2021-03-19');
 });
 
 await rm(out, { force: true, recursive: true });

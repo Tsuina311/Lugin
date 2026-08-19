@@ -16,11 +16,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { ExportBar } from './ExportBar';
 import { loadPrices } from './priceStore';
 
-import { cardImageUrl } from '@/lib/cardImage';
+import { cardImageUrl, printingRank } from '@/lib/cardImage';
 import { cardKey, stripVersion } from '@/lib/cardName';
 import type { Collection } from '@/lib/collection';
 import { collectionFile } from '@/lib/export';
 import { collectionValue, money, signedMoney, type CollectionValue } from '@/lib/prices';
+import { Picture } from '@/ui/components/Picture';
 import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
 import { Image as ImageIcon } from '@/ui/components/icons';
 import { useSequentialImages } from '@/ui/components/useSequentialImages';
@@ -67,7 +68,7 @@ const rollUp = (collection: Collection): Row[] => {
     row.total += qty;
     if (card.foil) row.foil += qty;
 
-    const rank = card.scryfallId ? 3 : card.productId ? 2 : card.setCode ? 1 : 0;
+    const rank = printingRank(card);
     if (rank > row.rank || !row.src) {
       const src = cardImageUrl(card);
       if (src) {
@@ -121,17 +122,6 @@ const Worth = ({ value, stale }: { stale: boolean; value: CollectionValue }) => 
     </div>
   );
 };
-
-/** A card's picture, or the space it will occupy, so the layout doesn't jump. */
-const Picture = ({ alt, ready, src }: { alt: string; ready: boolean; src?: string }) => (
-  <div className="flex aspect-[488/680] w-full items-center justify-center overflow-hidden rounded-lg bg-raised">
-    {ready && src ? (
-      <img alt={alt} className="h-full w-full object-cover" src={src} />
-    ) : (
-      <span className="h-5 w-5 animate-spin rounded-full border-2 border-line-strong border-t-accent" />
-    )}
-  </div>
-);
 
 export const CollectionView = ({ collection }: { collection: Collection | null }) => {
   const [query, setQuery] = useState('');

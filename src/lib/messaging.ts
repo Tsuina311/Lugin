@@ -1,5 +1,6 @@
 import type { CardMetadata } from './mtg';
 import type { PriceState } from './prices';
+import type { SetInfo } from './sets';
 import type {
   ApiRequest,
   ApiResult,
@@ -111,6 +112,19 @@ export const requestPrices = async (): Promise<PriceState> => {
   const message: RuntimeMessage = { kind: 'prices:get' };
   const response = (await chrome.runtime.sendMessage(message)) as RuntimeResponse;
   if (response.kind === 'prices:state') return response.state;
+  if (response.kind === 'error') throw new Error(response.error);
+  throw new Error(`Unexpected response from background: ${response.kind}`);
+};
+
+/**
+ * Scryfall's expansion catalogue, from the worker's weekly copy. Empty when it
+ * has never been reachable, which callers should read as "no release dates yet"
+ * rather than "no sets exist".
+ */
+export const requestSets = async (): Promise<SetInfo[]> => {
+  const message: RuntimeMessage = { kind: 'sets:get' };
+  const response = (await chrome.runtime.sendMessage(message)) as RuntimeResponse;
+  if (response.kind === 'sets:list') return response.sets;
   if (response.kind === 'error') throw new Error(response.error);
   throw new Error(`Unexpected response from background: ${response.kind}`);
 };

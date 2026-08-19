@@ -12,7 +12,7 @@ import { taskProgress } from '@/ui/format';
 // The long jobs — reading want lists, walking order history, scanning a seller —
 // run one at a time in a queue that survives page changes, so at any moment there
 // may be something happening that no tab is showing. That list used to live inside
-// a "Tools" disclosure in the Cards tab: to find out whether your purchase sync
+// a "Tools" disclosure in the Search tab: to find out whether your purchase sync
 // was still running, you opened an unrelated tab and expanded a panel.
 //
 // It belongs in the header, where "is it doing something" is a glance and the

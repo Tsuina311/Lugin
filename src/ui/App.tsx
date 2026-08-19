@@ -30,8 +30,8 @@ import {
   Minimize2,
   PanelLeft,
   PanelRight,
+  Search,
   ShoppingCart,
-  Sparkles,
   SunMoon,
   TrendingUp,
   X,
@@ -46,11 +46,11 @@ import { flags } from '@/lib/flags';
 import { PREFS_APPLIED_EVENT } from '@/platform/chrome/localRepository';
 import { useFirstRun } from '@/ui/useFirstRun';
 
-type Tab = 'wants' | 'collection' | 'wantlists' | 'decks' | 'filter' | 'traffic' | 'api';
+type Tab = 'search' | 'collection' | 'wantlists' | 'decks' | 'filter' | 'traffic' | 'api';
 
 // Dev-only tabs (Traffic + API) are hidden behind the feature flag.
 const TABS: TabItem<Tab>[] = [
-  { icon: Sparkles, id: 'wants', label: 'Cards', title: 'Card lists, prices and sellers' },
+  { icon: Search, id: 'search', label: 'Search', title: 'Find a card and see who has it' },
   { icon: Library, id: 'collection', label: 'Collection', title: 'The cards you own' },
   { icon: ClipboardList, id: 'wantlists', label: 'Wants', title: 'Your want lists' },
   { icon: Layers, id: 'decks', label: 'Decks', title: 'Build and price decks' },
@@ -144,7 +144,7 @@ export const App = () => {
   const [side, setSide] = useState<Side>(readSide);
   const [width, setWidth] = useState<number>(readWidth);
   const [resizing, setResizing] = useState(false);
-  const [tab, setTab] = useState<Tab>('wants');
+  const [tab, setTab] = useState<Tab>('search');
   const [filter, setFilter] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const cart = useSyncExternalStore(cartStore.subscribe, cartStore.getSnapshot);
@@ -419,8 +419,8 @@ export const App = () => {
                 </ErrorBoundary>
               </div>
 
-              <div className={panelClass(tab === 'wants')}>
-                <ErrorBoundary label="Cards">
+              <div className={panelClass(tab === 'search')}>
+                <ErrorBoundary label="Search">
                   <WantsPanel />
                 </ErrorBoundary>
               </div>

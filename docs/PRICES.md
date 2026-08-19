@@ -74,6 +74,6 @@ rebuild.
 Scryfall's `eur` and Cardmarket's *Price Trend* are different derivations, but a
 measured sample of exact printings tracked to a median ratio of 1.00 (every card
 within 10%). So the snapshot is the always-on reference that colours offers in
-the Cards tab. Live product-page fetches stay for two narrower jobs: the live
+the Search tab. Live product-page fetches stay for two narrower jobs: the live
 *From* price, and a printing-exact confirm when an offer sits near market (or
 when you click a row's trend). They are no longer a crawl of the whole list.
