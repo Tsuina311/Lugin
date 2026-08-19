@@ -197,21 +197,25 @@ export const DeckEditor = ({
 
   // Collection hits first — instant and usually what you own — then Scryfall
   // names to fill the rest, deduped by cardKey.
-  const suggestions = useMemo(() => {
+  const suggestions = useMemo((): { name: string; owned: boolean }[] => {
     if (!canSuggest) return [];
     const key = cardKey(needle);
+    const ownedOf = (name: string): boolean => (collection?.byKey[cardKey(name)]?.total ?? 0) > 0;
     const local = collection
       ? Object.values(collection.byKey)
           .filter(row => cardKey(row.name).includes(key))
           .map(row => row.name)
       : [];
     const seen = new Set(local.map(cardKey));
-    const merged = [...local];
+    const merged: { name: string; owned: boolean }[] = local.map(name => ({
+      name,
+      owned: true,
+    }));
     for (const name of remote) {
       const id = cardKey(name);
       if (seen.has(id)) continue;
       seen.add(id);
-      merged.push(name);
+      merged.push({ name, owned: ownedOf(name) });
       if (merged.length >= SUGGESTIONS) break;
     }
     return merged.slice(0, SUGGESTIONS);
@@ -345,13 +349,17 @@ export const DeckEditor = ({
         {suggestions.length > 0 ? (
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {suggestions.map(suggestion => (
-              <li key={suggestion}>
+              <li key={suggestion.name}>
                 <button
-                  className="rounded-full border border-line-strong px-2.5 py-1 text-xs text-ink-muted active:bg-raised"
-                  onClick={() => add(suggestion)}
+                  className={`rounded-full border px-2.5 py-1 text-xs active:bg-raised ${
+                    suggestion.owned
+                      ? 'border-pos/40 bg-pos-soft text-pos'
+                      : 'border-line-strong text-ink-muted'
+                  }`}
+                  onClick={() => add(suggestion.name)}
                   type="button"
                 >
-                  {suggestion}
+                  {suggestion.name}
                 </button>
               </li>
             ))}
@@ -366,29 +374,6 @@ export const DeckEditor = ({
         </p>
         <ExportBar actions={['copy', 'save', 'share']} file={() => deckFile(deck)} />
       </section>
-
-      {collection && deck.cards.length > 0 ? (
-        <section className="border-b border-line px-4 py-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-            {missing.length === 0 ? 'Nothing missing' : `Missing ${missing.length}`}
-          </h2>
-          {missing.length === 0 ? (
-            <p className="mt-2 text-sm text-ink-muted">You own every non-basic card in this deck.</p>
-          ) : (
-            <ul className="mt-2 space-y-1.5">
-              {missing.map(card => (
-                <li key={card.name} className="flex items-baseline gap-3 text-sm">
-                  <span className="min-w-0 flex-1 truncate text-ink">{card.name}</span>
-                  {card.owned > 0 ? (
-                    <span className="shrink-0 text-[11px] text-ink-faint">have {card.owned}</span>
-                  ) : null}
-                  <span className="shrink-0 font-semibold tabular-nums text-neg">×{card.need}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ) : null}
 
       {deck.cards.length === 0 ? (
         <p className="px-6 py-10 text-center text-sm text-ink-muted">
@@ -477,6 +462,29 @@ export const DeckEditor = ({
           </section>
         );
       })}
+
+      {collection && deck.cards.length > 0 ? (
+        <section className="border-t border-line px-4 py-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+            {missing.length === 0 ? 'Nothing missing' : `Missing ${missing.length}`}
+          </h2>
+          {missing.length === 0 ? (
+            <p className="mt-2 text-sm text-ink-muted">You own every non-basic card in this deck.</p>
+          ) : (
+            <ul className="mt-2 space-y-1.5">
+              {missing.map(card => (
+                <li key={card.name} className="flex items-baseline gap-3 text-sm">
+                  <span className="min-w-0 flex-1 truncate text-ink">{card.name}</span>
+                  {card.owned > 0 ? (
+                    <span className="shrink-0 text-[11px] text-ink-faint">have {card.owned}</span>
+                  ) : null}
+                  <span className="shrink-0 font-semibold tabular-nums text-neg">×{card.need}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 };
