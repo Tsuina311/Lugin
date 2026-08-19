@@ -40,17 +40,13 @@ import {
   type DeckFormat,
   type DeckSection,
 } from '@/lib/deck';
-import {
-  edhrecPlayRates,
-  readCutThreshold,
-  suggestCuts,
-  writeCutThreshold,
-} from '@/lib/deckCuts';
-import { fetchEdhrec, type EdhrecData } from '@/lib/edhrec';
+import { fetchEdhrec } from '@/lib/edhrec';
 import { deckFile } from '@/lib/export';
 import { fetchGoldfishArchetype } from '@/lib/mtggoldfish';
 import { searchCards } from '@/lib/search';
-import { NumberStepper } from '@/ui/components/Field';
+import { CutsPanel } from '@/ui/components/CutsPanel';
+import { EdhrecPanel } from '@/ui/components/EdhrecPanel';
+import { GoldfishPanel } from '@/ui/components/GoldfishPanel';
 import { Picture } from '@/ui/components/Picture';
 import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
 import { Image as ImageIcon } from '@/ui/components/icons';
@@ -75,6 +71,15 @@ const SUGGESTIONS = 10;
 const SEARCH_DEBOUNCE_MS = 300;
 
 const VIEW_KEY = 'lugin:webDeckView';
+
+const DECK_VIEWS = [
+  { id: 'deck', label: 'Deck', title: 'The cards in this deck' },
+  { id: 'edhrec', label: 'EDHREC', title: 'Recommended cards for this commander' },
+  { id: 'goldfish', label: 'Goldfish', title: 'Most-played cards for this commander' },
+  { id: 'cuts', label: 'Cuts', title: 'Cards few other decks play' },
+] as const;
+
+type DeckPanel = (typeof DECK_VIEWS)[number]['id'];
 
 /** Identifies a row across sections, since the same card can sit in two. */
 const rowKey = (card: DeckCard): string => `${card.section}:${cardKey(card.name)}`;
@@ -120,6 +125,9 @@ export const DeckEditor = ({
   const [adding, setAdding] = useState('');
   const [into, setInto] = useState<DeckSection>('main');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [panel, setPanel] = useState<DeckPanel>('deck');
+
+  useEffect(() => setPanel('deck'), [deck.id]);
 
   const [view, setView] = useState<ViewShape>(() => {
     try {
@@ -167,6 +175,15 @@ export const DeckEditor = ({
   );
   const commandersKey = commanders.map(name => cardKey(name)).join('|');
   const commanderRecs = formatInfo(deck.format).commanderZone && commanders.length > 0;
+  const collectionByKey = collection?.byKey ?? {};
+
+  const inDeck = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const card of deck.cards) {
+      map[cardKey(card.name)] = (map[cardKey(card.name)] ?? 0) + card.quantity;
+    }
+    return map;
+  }, [deck.cards]);
 
   const zones = useMemo(
     () => SECTIONS.filter(s => s.id !== 'commander' || formatInfo(deck.format).commanderZone),
@@ -188,15 +205,10 @@ export const DeckEditor = ({
   const loaded = useSequentialImages(wanted);
 
   const [remote, setRemote] = useState<string[]>([]);
-  const [edhrecData, setEdhrecData] = useState<EdhrecData | null>(null);
   const [recNames, setRecNames] = useState<string[]>([]);
-  const [cutThreshold, setCutThreshold] = useState(readCutThreshold);
-
-  useEffect(() => writeCutThreshold(cutThreshold), [cutThreshold]);
 
   useEffect(() => {
     if (!commanderRecs) {
-      setEdhrecData(null);
       setRecNames([]);
       return;
     }
@@ -204,7 +216,6 @@ export const DeckEditor = ({
     void Promise.allSettled([fetchEdhrec(commanders), fetchGoldfishArchetype(commanders)]).then(
       ([edhrec, goldfish]) => {
         if (cancelled) return;
-        setEdhrecData(edhrec.status === 'fulfilled' ? edhrec.value : null);
         const names: string[] = [];
         if (edhrec.status === 'fulfilled') {
           for (const list of edhrec.value.lists) {
@@ -223,12 +234,6 @@ export const DeckEditor = ({
       cancelled = true;
     };
   }, [commanderRecs, commandersKey, commanders]);
-
-  const played = useMemo(() => edhrecPlayRates(edhrecData), [edhrecData]);
-  const { candidates: cutCandidates, cuts } = useMemo(
-    () => suggestCuts(deck.cards, played, cutThreshold),
-    [cutThreshold, deck.cards, played],
-  );
 
   const needle = adding.trim();
   const canSuggest = needle.length >= 2 && !adding.includes('\n');
@@ -299,6 +304,21 @@ export const DeckEditor = ({
           : d.cards.map(c => (same(c, card) ? { ...c, quantity } : c)),
     }));
 
+  const addToMain = (names: string[]) => {
+    const placed = names.map(name => ({ name, quantity: 1, section: 'main' as const }));
+    void syncStore.updateDeck(deck.id, d => ({ ...d, cards: mergeDeckCards(d.cards, placed) }));
+  };
+
+  const cutFromMain = (names: string[]) => {
+    const doomed = new Set(names.map(cardKey));
+    void syncStore.updateDeck(deck.id, d => ({
+      ...d,
+      cards: d.cards.filter(
+        card => !(card.section === 'main' && doomed.has(cardKey(card.name))),
+      ),
+    }));
+  };
+
   return (
     <div>
       <div className="sticky top-0 z-10 border-b border-line bg-canvas/95 px-2 py-2 backdrop-blur">
@@ -361,8 +381,58 @@ export const DeckEditor = ({
             {confirmDelete ? 'Delete for good?' : 'Delete'}
           </button>
         </div>
+        {formatInfo(deck.format).commanderZone && commanders.length === 0 ? (
+          <p className="mt-1 px-2 text-[11px] text-ink-faint">
+            Add a commander to unlock EDHREC, Goldfish and cut suggestions.
+          </p>
+        ) : null}
+        {commanderRecs ? (
+          <div
+            className="mt-2 flex gap-1 overflow-x-auto px-2 pb-1"
+            role="tablist"
+          >
+            {DECK_VIEWS.map(tab => (
+              <button
+                key={tab.id}
+                aria-selected={panel === tab.id}
+                className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium ${
+                  panel === tab.id ? 'bg-accent text-accent-ink' : 'bg-raised text-ink-faint'
+                }`}
+                onClick={() => setPanel(tab.id)}
+                role="tab"
+                title={tab.title}
+                type="button"
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
+      {panel === 'edhrec' ? (
+        <EdhrecPanel
+          collectionByKey={collectionByKey}
+          commanderNames={commanders}
+          inDeck={inDeck}
+          onAdd={addToMain}
+        />
+      ) : panel === 'goldfish' ? (
+        <GoldfishPanel
+          collectionByKey={collectionByKey}
+          commanderNames={commanders}
+          inDeck={inDeck}
+          onAdd={addToMain}
+        />
+      ) : panel === 'cuts' ? (
+        <CutsPanel
+          cards={deck.cards}
+          commanderNames={commanders}
+          metaByKey={{}}
+          onCut={cutFromMain}
+        />
+      ) : (
+        <>
       {/* Adding sits above the cards: it's what this screen is for, and hunting
           for it under a hundred rows would be absurd on a phone. */}
       <section className="border-b border-line px-4 py-3">
@@ -522,78 +592,6 @@ export const DeckEditor = ({
         );
       })}
 
-      {commanderRecs && copies(deck, 'main') > 0 ? (
-        <section className="border-t border-line px-4 py-4">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              Suggested cuts
-            </h2>
-            {edhrecData?.deckCount != null ? (
-              <span className="text-[11px] text-ink-faint">vs {edhrecData.deckCount} EDHREC decks</span>
-            ) : null}
-            <span className="ml-auto flex items-center gap-1 text-[11px] text-ink-faint">
-              under
-              <NumberStepper
-                label="Cut cards played in under this share of decks"
-                max={100}
-                min={1}
-                onChange={setCutThreshold}
-                size="sm"
-                title="Suggest cutting cards that fewer than this share of EDHREC decks play"
-                value={cutThreshold}
-              />
-              %
-            </span>
-          </div>
-          {!edhrecData ? (
-            <p className="mt-2 text-sm text-ink-muted">Loading EDHREC play rates…</p>
-          ) : cuts.length === 0 ? (
-            <p className="mt-2 text-sm text-ink-muted">
-              Every main-deck card is played in at least {cutThreshold}% of decks. Raise the
-              threshold to be harsher.
-            </p>
-          ) : (
-            <>
-              <p className="mt-2 text-[11px] text-ink-faint">
-                {cuts.length} of {cutCandidates} cards fall under {cutThreshold}%
-                {played.floor < 1 ? (
-                  <span>
-                    {' '}
-                    · unlisted cards are under {Math.round(played.floor * 100)}%
-                  </span>
-                ) : null}
-              </p>
-              <ul className="mt-2 divide-y divide-line">
-                {cuts.map(cut => (
-                  <li key={cardKey(cut.card.name)} className="flex items-center gap-2 py-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm text-ink">
-                        {cut.card.quantity > 1 ? (
-                          <span className="text-ink-faint">{cut.card.quantity}× </span>
-                        ) : null}
-                        {cut.card.name}
-                      </div>
-                      <div className="text-[11px] text-ink-faint">
-                        {cut.inclusion == null
-                          ? `not listed — under ${Math.round(played.floor * 100)}%`
-                          : `in ${Math.round(cut.inclusion * 100)}% of decks`}
-                      </div>
-                    </div>
-                    <button
-                      className="shrink-0 rounded-lg bg-neg-soft px-3 py-2 text-xs font-semibold text-neg active:opacity-80"
-                      onClick={() => setQuantity(cut.card, 0)}
-                      type="button"
-                    >
-                      Cut
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </section>
-      ) : null}
-
       {collection && deck.cards.length > 0 ? (
         <section className="border-t border-line px-4 py-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
@@ -616,6 +614,8 @@ export const DeckEditor = ({
           )}
         </section>
       ) : null}
+        </>
+      )}
     </div>
   );
 };
