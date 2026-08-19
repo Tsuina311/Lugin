@@ -26,6 +26,7 @@ import { createSyncEngine } from '@/core/sync/engine';
 import type { ApplicationData, DomainKey } from '@/core/sync/model';
 import { UnsupportedSchemaError } from '@/core/sync/repository';
 import type { CollectionCard, StoredCollection } from '@/lib/collection';
+import { adjustCollectionQuantity } from '@/lib/collectionEdit';
 import { deckFromImport, newDeck, parseDeckList, type Deck, type DeckFormat } from '@/lib/deck';
 import { applyImport, findDuplicates } from '@/lib/duplicates';
 import type { ImportDecision, ImportFormat } from '@/lib/import';
@@ -187,6 +188,22 @@ const writeDecks = async (update: (decks: readonly Deck[]) => Deck[]): Promise<v
   schedulePush();
 };
 
+const writeCollection = async (
+  update: (cards: readonly CollectionCard[], prev: StoredCollection | null) => StoredCollection,
+): Promise<void> => {
+  try {
+    const before = await local.read();
+    const prev = before.collection.value ?? null;
+    const stored = update(prev?.cards ?? [], prev);
+    const data = await local.edit('collection', stored);
+    set({ data, pending: true });
+  } catch (err) {
+    set({ error: describe(err), status: 'error' });
+    return;
+  }
+  schedulePush();
+};
+
 export const syncStore = {
   /**
    * Drop scanned cards into the local collection, merging exact printings.
@@ -194,7 +211,7 @@ export const syncStore = {
    * Same path as an import without the review sheet: a scan that already matches
    * set + number + foil bumps quantity instead of adding a twin row.
    */
-async addCards(incoming: CollectionCard[], source = 'scan'): Promise<void> {
+  async addCards(incoming: CollectionCard[], source = 'scan'): Promise<void> {
     if (incoming.length === 0) return;
     set({ error: null, status: 'busy' });
     try {
@@ -208,7 +225,7 @@ async addCards(incoming: CollectionCard[], source = 'scan'): Promise<void> {
       );
       const stored: StoredCollection = {
         cards,
-        format: before.collection.value?.format ?? 'manabox',
+        format: before.collection.value?.format ?? 'list',
         importedAt: Date.now(),
         source,
       };
@@ -221,9 +238,7 @@ async addCards(incoming: CollectionCard[], source = 'scan'): Promise<void> {
     await reconcile(true);
   },
 
-  
-  
-connect(): void {
+  connect(): void {
     set({ error: null, status: 'busy' });
     // Kept in the tap's call stack: the popup is only allowed because a person
     // just touched something.
@@ -246,22 +261,15 @@ connect(): void {
     return deck.id;
   },
 
-  
-/**
-   * Sign out of Google, keeping this device's data.
-   *
-   * Deleting it here would be the one irreversible thing this app can do: an
-   * import that hasn't pushed yet exists nowhere else.
-   */
-disconnect(): void {
+  disconnect(): void {
     void webGoogleAuth.disconnect().finally(() => {
       set({ conflicted: [], error: null, status: 'disconnected', syncedAt: null });
     });
   },
 
-  
   getSnapshot: (): SyncState => state,
 
+  
   /**
    * Apply a reviewed import to this device, then try to push it.
    *
@@ -269,7 +277,7 @@ disconnect(): void {
    * user has just approved what to do with it, and whether Drive is reachable in
    * the next second has nothing to do with either.
    */
-  async importDecisions(
+async importDecisions(
     decisions: ImportDecision[],
     options: { format: ImportFormat; source: string },
   ): Promise<void> {
@@ -312,12 +320,14 @@ disconnect(): void {
     await reconcile(true);
   },
 
-  /**
+  
+  
+/**
    * File a pasted or uploaded decklist as a new deck, returning its id — or null
    * when the text held no cards, which the caller says in place rather than as a
    * sync error, because nothing about syncing went wrong.
    */
-  async importDeckList(text: string, source: string): Promise<string | null> {
+async importDeckList(text: string, source: string): Promise<string | null> {
     const { cards, name } = parseDeckList(text);
     const deck = deckFromImport(cards, { name, source });
     if (!deck) return null;
@@ -325,8 +335,20 @@ disconnect(): void {
     return deck.id;
   },
 
-  async removeDeck(id: string): Promise<void> {
+  
+  
+async removeDeck(id: string): Promise<void> {
     await writeDecks(decks => decks.filter(deck => deck.id !== id));
+  },
+
+  /** Set total copies for one card name (all printings rolled up). */
+async setCollectionQuantity(key: string, quantity: number, displayName?: string): Promise<void> {
+    await writeCollection((cards, prev) => ({
+      cards: adjustCollectionQuantity(cards, key, quantity, displayName),
+      format: prev?.format ?? 'list',
+      importedAt: prev?.importedAt ?? Date.now(),
+      source: prev?.source ?? 'manual',
+    }));
   },
 
   subscribe(listener: () => void): () => void {

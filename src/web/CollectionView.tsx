@@ -1,9 +1,13 @@
-// The collection, as a searchable list of what you own.
+// The collection, as a searchable list of what you own — editable on the phone.
 //
 // Rows are capped rather than virtualised. A real collection is tens of thousands
 // of rows and a phone will not enjoy them all in the DOM, but the way anyone
 // actually uses this screen is "do I own X" — so search narrows it, and the cap
 // keeps scrolling smooth without a windowing dependency.
+//
+// You can add cards by name and step quantities up or down per row. Printings
+// roll up to one line per card name; changing the count keeps the best-known
+// printing and writes through to sync like a deck edit.
 //
 // Pictures are opt-in per row, which is the one place this deliberately differs
 // from the desktop panel. Card images are ~100KB each and this screen is used in
@@ -15,10 +19,12 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { ExportBar } from './ExportBar';
 import { loadPrices } from './priceStore';
+import { syncStore } from './syncStore';
 
 import { cardImageUrl, printingRank } from '@/lib/cardImage';
 import { cardKey, stripVersion } from '@/lib/cardName';
-import type { Collection } from '@/lib/collection';
+import type { Collection, CollectionCard } from '@/lib/collection';
+import { parseDeckList } from '@/lib/deck';
 import { collectionFile } from '@/lib/export';
 import { collectionValue, money, signedMoney, type CollectionValue } from '@/lib/prices';
 import { Picture } from '@/ui/components/Picture';
@@ -33,6 +39,34 @@ const VISIBLE_LIMIT = 150;
 const BOX_LIMIT = 48;
 
 const VIEW_KEY = 'lugin:webCollectionView';
+
+const Stepper = ({
+  onChange,
+  quantity,
+}: {
+  onChange: (quantity: number) => void;
+  quantity: number;
+}) => (
+  <span className="flex shrink-0 items-center gap-0.5">
+    <button
+      aria-label="One fewer"
+      className="flex h-9 w-9 items-center justify-center rounded-lg text-lg leading-none text-ink-faint active:bg-raised"
+      onClick={() => onChange(quantity - 1)}
+      type="button"
+    >
+      −
+    </button>
+    <span className="w-6 text-center text-sm font-semibold tabular-nums text-ink">{quantity}</span>
+    <button
+      aria-label="One more"
+      className="flex h-9 w-9 items-center justify-center rounded-lg text-lg leading-none text-ink-faint active:bg-raised"
+      onClick={() => onChange(quantity + 1)}
+      type="button"
+    >
+      +
+    </button>
+  </span>
+);
 
 /** A card name, and the best picture of the printing you own of it. */
 interface Row {
@@ -125,6 +159,7 @@ const Worth = ({ value, stale }: { stale: boolean; value: CollectionValue }) => 
 
 export const CollectionView = ({ collection }: { collection: Collection | null }) => {
   const [query, setQuery] = useState('');
+  const [adding, setAdding] = useState('');
   const { snapshot, stale } = usePrices(loadPrices);
   const value = useMemo(
     () => collectionValue(collection?.cards ?? [], snapshot),
@@ -176,21 +211,53 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
   );
   const loaded = useSequentialImages(wanted);
 
-  if (!collection || collection.cards.length === 0) {
-    return (
-      <p className="px-6 py-10 text-center text-sm text-ink-muted">
-        No collection has been synced yet.
-      </p>
-    );
-  }
+  const add = (text: string) => {
+    const { cards } = parseDeckList(text);
+    if (cards.length === 0) return;
+    const incoming: CollectionCard[] = cards.map(card => ({
+      foil: false,
+      name: card.name,
+      quantity: card.quantity,
+      source: 'import',
+    }));
+    void syncStore.addCards(incoming, 'manual');
+    setAdding('');
+  };
+
+  const setQuantity = (row: Row, quantity: number) =>
+    void syncStore.setCollectionQuantity(row.key, quantity, row.name);
+
+  const empty = !collection || collection.cards.length === 0;
 
   return (
     <div>
       <div className="sticky top-0 z-10 border-b border-line bg-canvas/95 px-4 py-3 backdrop-blur">
+        <div className="flex gap-2">
+          <input
+            aria-label="Card to add"
+            autoCapitalize="words"
+            autoCorrect="off"
+            className="min-w-0 flex-1 rounded-lg border border-line-strong bg-raised px-3 py-2.5 text-base text-ink placeholder:text-ink-faint"
+            onChange={event => setAdding(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter') add(adding);
+            }}
+            placeholder="Add a card, or paste a list"
+            value={adding}
+          />
+          <button
+            className="shrink-0 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-40"
+            disabled={!adding.trim()}
+            onClick={() => add(adding)}
+            type="button"
+          >
+            Add
+          </button>
+        </div>
         <input
           autoCapitalize="none"
           autoCorrect="off"
-          className="w-full rounded-lg border border-line-strong bg-raised px-3 py-2.5 text-base text-ink placeholder:text-ink-faint"
+          className="mt-2 w-full rounded-lg border border-line-strong bg-raised px-3 py-2.5 text-base text-ink placeholder:text-ink-faint"
           onChange={event => setQuery(event.target.value)}
           placeholder="Search your collection"
           type="search"
@@ -198,24 +265,26 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
         />
         <div className="mt-2 flex items-center gap-3">
           <p className="min-w-0 flex-1 text-[11px] text-ink-faint">
-            {collection.totalCards.toLocaleString()} cards, {collection.uniqueCards.toLocaleString()}{' '}
-            unique
+            {empty
+              ? 'No cards yet'
+              : `${collection.totalCards.toLocaleString()} cards, ${collection.uniqueCards.toLocaleString()} unique`}
             {query ? ` · ${rows.length.toLocaleString()} matching` : ''}
           </p>
-          <ViewToggle onChange={setView} size="md" value={view} />
-          {/* The whole collection, not the search results: a filtered export would
-              quietly hand another app a fraction of what you own.
-
-              No Copy here, unlike a deck. A collection is tens of thousands of
-              rows, which is past what a phone's clipboard will carry, and the apps
-              that read a collection — ManaBox included — want a file for it
-              anyway. */}
-          <ExportBar actions={['save', 'share']} file={() => collectionFile(collection)} />
+          {!empty ? <ViewToggle onChange={setView} size="md" value={view} /> : null}
+          {!empty ? (
+            <ExportBar actions={['save', 'share']} file={() => collectionFile(collection)} />
+          ) : null}
         </div>
-        <Worth stale={stale} value={value} />
+        {!empty ? <Worth stale={stale} value={value} /> : null}
       </div>
 
-      {view === 'box' ? (
+      {empty ? (
+        <p className="px-6 py-10 text-center text-sm text-ink-muted">
+          Type a card name above, or paste a list — the same format as adding to a deck.
+        </p>
+      ) : null}
+
+      {!empty && view === 'box' ? (
         <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3">
           {shown.map(row => (
             <div key={row.key} className="flex flex-col gap-1">
@@ -223,35 +292,31 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
               <span className="truncate text-xs text-ink" title={row.name}>
                 {row.name}
               </span>
-              <span className="flex items-center gap-1.5 text-[11px] text-ink-faint">
-                <span className="font-semibold tabular-nums text-ink-muted">×{row.total}</span>
-                {row.foil > 0 ? <span className="text-accent">{row.foil} foil</span> : null}
-              </span>
+              {row.foil > 0 ? (
+                <span className="text-[11px] text-accent">{row.foil} foil</span>
+              ) : null}
+              <Stepper onChange={quantity => setQuantity(row, quantity)} quantity={row.total} />
             </div>
           ))}
         </div>
-      ) : (
+      ) : !empty ? (
         <ul className="divide-y divide-line">
           {shown.map(row => {
             const open = opened.has(row.key);
             return (
-              <li key={row.key} className="px-4 py-3">
-                <div className="flex items-baseline gap-3">
+              <li key={row.key} className="px-2 py-1">
+                <div className="flex items-center gap-2">
+                  <Stepper onChange={quantity => setQuantity(row, quantity)} quantity={row.total} />
                   <span className="min-w-0 flex-1 truncate text-sm text-ink">{row.name}</span>
                   {row.foil > 0 ? (
                     <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
                       {row.foil} foil
                     </span>
                   ) : null}
-                  <span className="shrink-0 text-sm font-semibold tabular-nums text-ink-muted">
-                    ×{row.total}
-                  </span>
-                  {/* Self-anchored rather than in a toolbar: it's about this card,
-                      and on a phone the thumb is already at the row. */}
                   <button
                     aria-expanded={open}
                     aria-label={open ? `Hide the picture of ${row.name}` : `Show ${row.name}`}
-                    className={`-my-2 -mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg active:bg-raised ${
                       open ? 'text-accent' : 'text-ink-faint'
                     }`}
                     onClick={() => toggle(row.key)}
@@ -261,7 +326,7 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
                   </button>
                 </div>
                 {open ? (
-                  <div className="mt-2 w-44">
+                  <div className="mb-2 ml-2 w-44">
                     <Picture
                       alt={row.name}
                       ready={!!row.src && loaded.has(row.src)}
@@ -273,15 +338,15 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
             );
           })}
         </ul>
-      )}
+      ) : null}
 
-      {rows.length > shown.length ? (
+      {!empty && rows.length > shown.length ? (
         <p className="px-4 py-4 text-center text-xs text-ink-faint">
           Showing {shown.length} of {rows.length.toLocaleString()} — search to narrow it down.
         </p>
       ) : null}
 
-      {rows.length === 0 ? (
+      {!empty && rows.length === 0 ? (
         <p className="px-6 py-10 text-center text-sm text-ink-muted">
           Nothing in your collection matches “{query}”.
         </p>
