@@ -89,6 +89,7 @@ const {
   buildArgs,
   encodeArgs,
   obfuscate,
+  tokenFromArgs,
   productFactsFromImage,
   expansionFromProductUrl,
   buildSetIndex,
@@ -1407,6 +1408,7 @@ check('the scrambled half really is the action name and the session token', () =
   // Documents what the format *is*, so the next person does not have to break it
   // again to find out.
   assert.equal(obfuscate(scrambledHalf(CAPTURED_ARGS)), `Product_Search***${CAPTURED_TOKEN}`);
+  assert.equal(tokenFromArgs(CAPTURED_ARGS), CAPTURED_TOKEN);
 });
 
 check('high bytes go out raw, not as UTF-8', () => {

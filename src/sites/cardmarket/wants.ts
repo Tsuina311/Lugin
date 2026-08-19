@@ -89,7 +89,8 @@ export const fetchDoc = async (url: string, signal?: AbortSignal): Promise<Fetch
  * nav / logout link. Worth asking of a page that carries a `__cmtkn`, since the
  * login form has one of its own and it works for nothing else.
  */
-export const looksSignedIn = (html: string): boolean => /User_Logout|account-dropdown/i.test(html);
+export const looksSignedIn = (html: string): boolean =>
+  /User_Logout|account-dropdown|User_Account|data-logged-in|My\s*Account|\/Account["']/i.test(html);
 
 /** Heuristic: did we get a real logged-in page, or a challenge/login shell? */
 const looksWrong = (doc: Document, html: string): string | null => {

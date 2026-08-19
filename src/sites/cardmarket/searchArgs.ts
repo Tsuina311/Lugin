@@ -76,6 +76,28 @@ export const buildArgs = (token: string, params: SearchParams): string => {
   return encodeArgs(`${scrambled}${SEPARATOR}${btoa(json)}`);
 };
 
+const ENCODED_SEP = '%2A%2A%2A';
+
+/** Scrambled bytes from the prefix of a percent-encoded `args` value. */
+const scrambledPrefix = (encodedArgs: string): string => {
+  const cut = encodedArgs.indexOf(ENCODED_SEP);
+  const head = cut === -1 ? encodedArgs : encodedArgs.slice(0, cut);
+  return head.replace(/%([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+};
+
+/**
+ * Session token embedded in a captured Product_Search `args` body.
+ *
+ * The site's own search box sends the same token we need; if the interceptor
+ * caught one of those calls, reading it back is cheaper than fetching a page.
+ */
+export const tokenFromArgs = (args: string): string | null => {
+  if (!args.includes(ENCODED_SEP) && !args.includes(SEPARATOR)) return null;
+  const plain = obfuscate(scrambledPrefix(args));
+  const match = plain.match(/\*\*\*([0-9a-f]{32,})$/i);
+  return match ? match[1] : null;
+};
+
 /**
  * Read the set code and product id out of a Cardmarket product image URL, which
  * spells both out:

@@ -11,10 +11,8 @@
 import { hideOverlay } from './overlay';
 
 import { replayInPage } from '@/lib/messaging';
-import { findCmToken } from '@/sites/cardmarket/cart';
+import { extractCmToken, findCmToken } from '@/sites/cardmarket/cart';
 import { looksSignedIn } from '@/sites/cardmarket/wants';
-
-const TOKEN = /__cmtkn['"\s:=]+([0-9a-f]{32,})/i;
 
 const lang = (): string => {
   const first = location.pathname.split('/').filter(Boolean)[0] ?? '';
@@ -40,13 +38,34 @@ export const loginUrl = (): string => `${location.origin}/${lang()}/Magic/Wants`
  * mean signing in and still being told to sign in.
  */
 let borrowed: Promise<string | null> | null = null;
+let ajaxBorrowed: Promise<string | null> | null = null;
+
+/** Pages Cardmarket tends to embed a session token on, tried in order. */
+const tokenPages = (): string[] => {
+  const l = lang();
+  const here = location.pathname;
+  const pages = [`/${l}/Magic`, `/${l}/Magic/Wants`];
+  if (here.includes('/Magic/') && !pages.includes(here)) pages.unshift(here);
+  return pages;
+};
+
+const borrowFromPages = async (signedInOnly: boolean): Promise<string | null> => {
+  for (const url of tokenPages()) {
+    try {
+      const res = await replayInPage({ method: 'GET', url });
+      if (signedInOnly && !looksSignedIn(res.body)) continue;
+      const token = extractCmToken(res.body);
+      if (token) return token;
+    } catch {
+      // Try the next page.
+    }
+  }
+  return null;
+};
 
 const borrow = async (): Promise<string | null> => {
   try {
-    const res = await replayInPage({ method: 'GET', url: `/${lang()}/Magic/Wants` });
-    // The login form carries a token too, and it opens nothing else — so the page
-    // has to be one served to someone signed in for its token to be worth having.
-    const token = looksSignedIn(res.body) ? (res.body.match(TOKEN)?.[1] ?? null) : null;
+    const token = await borrowFromPages(true);
     if (!token) borrowed = null;
     return token;
   } catch {
@@ -55,18 +74,40 @@ const borrow = async (): Promise<string | null> => {
   }
 };
 
+const borrowAjax = async (): Promise<string | null> => {
+  try {
+    const token = await borrowFromPages(false);
+    if (!token) ajaxBorrowed = null;
+    return token;
+  } catch {
+    ajaxBorrowed = null;
+    return null;
+  }
+};
+
 /**
- * The session token: from this page if it carries one, otherwise from a page that
- * would. `null` means the session isn't logged in.
- *
- * The second half is not a rare path. Most of Cardmarket — product pages, search
- * results, expansion listings — carries no token at all, so anything that reads
- * one straight off the page works only on the handful of pages that do.
+ * The session token for writes: from this page if it carries one, otherwise from
+ * a page that would — but only when that page was served to someone signed in.
+ * `null` means the session isn't logged in.
  */
 export const cmToken = async (): Promise<string | null> => {
   const here = findCmToken();
   if (here) return here;
   return (borrowed ??= borrow());
+};
+
+/**
+ * The session token for read-only AJAX such as catalogue search.
+ *
+ * Most of Cardmarket carries no token in the DOM, but nearly every page HTML
+ * includes one once fetched — including pages served to guests. Writes still
+ * need {@link cmToken}; search only needs the CSRF string the site's own box
+ * sends.
+ */
+export const ajaxToken = async (): Promise<string | null> => {
+  const here = findCmToken();
+  if (here) return here;
+  return (ajaxBorrowed ??= borrowAjax());
 };
 
 /** Hand the tab to Cardmarket's login, with the overlay out of the way. */

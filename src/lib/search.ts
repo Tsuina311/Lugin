@@ -1,6 +1,6 @@
-// Scryfall card search for the deck builder's "add a card" box. Routed through
-// the background worker (requestApi) like the rest of our Scryfall use, so it
-// sidesteps page CORS.
+// Scryfall card search for the deck builder's "add a card" box. On the
+// extension this goes through the background worker; on the phone build it
+// calls Scryfall directly (they allow CORS).
 //
 // A search combines free text with structured filters. Bare words match card
 // names, but anything that looks like Scryfall syntax (`t:wolf`, `o:"draw a
@@ -9,6 +9,27 @@
 // result set is small enough to show card images.
 
 import { requestApi } from './messaging';
+import type { ApiResult } from './types';
+
+/** Scryfall allows browser CORS; the extension routes through its worker instead. */
+const fetchScryfall = async (url: string): Promise<ApiResult> => {
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
+      return await requestApi({ url });
+    }
+  } catch {
+    // Unpacked builds can throw when the runtime is gone — fall through to fetch.
+  }
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  return {
+    body: await res.text(),
+    headers: {},
+    ok: res.ok,
+    status: res.status,
+    statusText: res.statusText,
+    url: res.url,
+  };
+};
 
 export interface CardSearchResult {
   cmc?: number;
@@ -171,7 +192,7 @@ export const searchCards = async (q: CardQuery, limit = 12): Promise<CardSearchR
   if (!query || !hasSearchCriteria(q)) return { cards: [], query, total: 0 };
 
   const url = `${SEARCH_URL}?order=name&unique=cards&dir=asc&q=${encodeURIComponent(query)}`;
-  const res = await requestApi({ url });
+  const res = await fetchScryfall(url);
   if (!res.ok) {
     if (res.status === 404) return { cards: [], query, total: 0 }; // no matches
     if (res.status === 400) throw new Error('That search isn’t valid Scryfall syntax.');

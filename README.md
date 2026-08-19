@@ -406,14 +406,14 @@ handing back an empty index, and the filter says "release dates unavailable"
 when the fetch fell over.
 
 The token has to be asked for rather than read off the page. Most of Cardmarket —
-product pages, search results, expansion listings — prints no `__cmtkn` at all, so
-the first cut of this used `findCmToken()` and worked on almost none of the pages
-you would actually be browsing when you want to look a card up. `cmToken()` in
-`src/content/session.ts` is the right door: this page if it has one, otherwise
-borrowed from a page that does. It now remembers a borrowed token, because search
-asks on every keystroke and the borrow costs a page load. Only successful borrows
-are cached — caching the failure would mean signing in and still being told to
-sign in.
+product pages, search results, expansion listings — prints no `__cmtkn` in the
+live DOM, so the first cut of this used `findCmToken()` and worked on almost none
+of the pages you would actually be browsing when you want to look a card up.
+`ajaxToken()` in `src/content/session.ts` borrows one from the current page, the
+Magic home page, or the Wants page — and also reads it back out of intercepted
+search requests if you have used Cardmarket's own search box. Writes still go
+through `cmToken()`, which insists the fetched page looked signed-in. Both cache
+a successful borrow for the life of the content script.
 
 ### The first run
 

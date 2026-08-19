@@ -1,6 +1,7 @@
 import { callStore } from '@/content/callStore';
 import { replayInPage } from '@/lib/messaging';
 import { sellerSlugFromHref } from '@/sites/cardmarket/order';
+import { tokenFromArgs } from '@/sites/cardmarket/searchArgs';
 
 // Cardmarket adds an offer to the cart with a single AJAX POST:
 //   POST /en/Magic/AjaxAction/ShoppingCart_Add_AddArticlesFromUserOffers
@@ -11,6 +12,30 @@ import { sellerSlugFromHref } from '@/sites/cardmarket/order';
 
 const ADD_URL = '/en/Magic/AjaxAction/ShoppingCart_Add_AddArticlesFromUserOffers';
 const TOKEN_HEX = /([0-9a-f]{32,})/i;
+const TOKEN_IN_HTML = /__cmtkn['"\s:=]+([0-9a-f]{32,})/i;
+
+/** Read a session token out of a page's HTML, if it carries one. */
+export const extractCmToken = (html: string): string | null => {
+  const match = html.match(TOKEN_IN_HTML);
+  return match ? match[1] : null;
+};
+
+const tokenFromCall = (call: { requestBody?: string; url?: string }): string | null => {
+  const body = call.requestBody ?? '';
+  const fromBody = body.match(/__cmtkn=([0-9a-f]{32,})/i);
+  if (fromBody) return fromBody[1];
+  const args = body.match(/(?:^|&)args=([^&]+)/)?.[1];
+  if (args) {
+    const fromArgs = tokenFromArgs(decodeURIComponent(args));
+    if (fromArgs) return fromArgs;
+  }
+  const urlArgs = call.url?.match(/[?&]args=([^&]+)/)?.[1];
+  if (urlArgs) {
+    const fromArgs = tokenFromArgs(decodeURIComponent(urlArgs));
+    if (fromArgs) return fromArgs;
+  }
+  return null;
+};
 
 /**
  * Find the session's `__cmtkn`. Prefers a token seen in a captured request body
@@ -19,15 +44,14 @@ const TOKEN_HEX = /([0-9a-f]{32,})/i;
  */
 export const findCmToken = (): string | null => {
   for (const call of callStore.getSnapshot()) {
-    const m = call.requestBody?.match(/__cmtkn=([0-9a-f]{32,})/i);
-    if (m) return m[1];
+    const token = tokenFromCall(call);
+    if (token) return token;
   }
   const input = document.querySelector<HTMLInputElement>('input[name="__cmtkn"]');
   if (input?.value && TOKEN_HEX.test(input.value)) return input.value;
   const attr = document.querySelector('[data-token], [data-cmtkn]')?.getAttribute('data-token');
   if (attr && TOKEN_HEX.test(attr)) return attr;
-  const m = document.documentElement.innerHTML.match(/__cmtkn['"\s:=]+([0-9a-f]{32,})/i);
-  return m ? m[1] : null;
+  return extractCmToken(document.documentElement.innerHTML);
 };
 
 /** Decode Cardmarket's base64 ajax payload chunks (UTF-8 safe). */

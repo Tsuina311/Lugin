@@ -9,8 +9,8 @@
 // Cards go in as text, which sounds primitive and isn't: the same box takes a
 // typed name, a "2 Lightning Bolt" line, and a whole list pasted from Moxfield,
 // because it hands the string to `parseDeckList` — the parser the desktop uses
-// for the same job. Names already in your collection are offered as you type,
-// since a phone keyboard is the worst possible place to spell Lim-Dûl's Vault.
+// for the same job. Names you own appear instantly as you type; Scryfall fills in
+// every other card name once you've typed a couple of letters.
 //
 // Pictures follow the collection screen's bargain exactly: the list stays text
 // and you tap a row to see one card, or switch to box view and ask for all of
@@ -39,6 +39,7 @@ import {
   type DeckSection,
 } from '@/lib/deck';
 import { deckFile } from '@/lib/export';
+import { searchCards } from '@/lib/search';
 import { Picture } from '@/ui/components/Picture';
 import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
 import { Image as ImageIcon } from '@/ui/components/icons';
@@ -56,8 +57,11 @@ const copies = (deck: Deck, section: DeckSection): number =>
 const same = (a: DeckCard, b: DeckCard): boolean =>
   a.section === b.section && cardKey(a.name) === cardKey(b.name);
 
-/** How many collection names to offer. A phone dropdown past this is a wall. */
-const SUGGESTIONS = 8;
+/** How many names to show. A phone dropdown past this is a wall. */
+const SUGGESTIONS = 10;
+
+/** Pause before asking Scryfall — collection matches show immediately. */
+const SEARCH_DEBOUNCE_MS = 300;
 
 const VIEW_KEY = 'lugin:webDeckView';
 
@@ -165,16 +169,53 @@ export const DeckEditor = ({
   );
   const loaded = useSequentialImages(wanted);
 
-  // Straight from what you own, so it costs no network and is exactly the set of
-  // cards you can actually build with today.
+  const [remote, setRemote] = useState<string[]>([]);
+
+  const needle = adding.trim();
+  const canSuggest = needle.length >= 2 && !adding.includes('\n');
+
+  useEffect(() => {
+    if (!canSuggest) {
+      setRemote([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void searchCards({ text: needle }, SUGGESTIONS)
+        .then(resp => {
+          if (!cancelled) setRemote(resp.cards.map(c => c.name));
+        })
+        .catch(() => {
+          if (!cancelled) setRemote([]);
+        });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [canSuggest, needle]);
+
+  // Collection hits first — instant and usually what you own — then Scryfall
+  // names to fill the rest, deduped by cardKey.
   const suggestions = useMemo(() => {
-    const needle = cardKey(adding.trim());
-    if (!collection || needle.length < 2 || adding.includes('\n')) return [];
-    return Object.values(collection.byKey)
-      .filter(row => cardKey(row.name).includes(needle))
-      .slice(0, SUGGESTIONS)
-      .map(row => row.name);
-  }, [adding, collection]);
+    if (!canSuggest) return [];
+    const key = cardKey(needle);
+    const local = collection
+      ? Object.values(collection.byKey)
+          .filter(row => cardKey(row.name).includes(key))
+          .map(row => row.name)
+      : [];
+    const seen = new Set(local.map(cardKey));
+    const merged = [...local];
+    for (const name of remote) {
+      const id = cardKey(name);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      merged.push(name);
+      if (merged.length >= SUGGESTIONS) break;
+    }
+    return merged.slice(0, SUGGESTIONS);
+  }, [canSuggest, collection, needle, remote]);
 
   const add = (text: string) => {
     const { cards } = parseDeckList(text);

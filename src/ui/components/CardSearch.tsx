@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { SearchInput } from './Field';
 import { CircleAlert, ExternalLink, Loader2 } from './icons';
 
-import { askForLogin, cmToken } from '@/content/session';
+import { askForLogin, ajaxToken } from '@/content/session';
 import { searchProducts, type ProductSuggestion } from '@/sites/cardmarket/search';
 import { MIN_SEARCH_LENGTH } from '@/sites/cardmarket/searchArgs';
 import { currentLang } from '@/sites/cardmarket/wants';
@@ -58,7 +58,7 @@ export const CardSearch = ({
         // Asked for here rather than left to `searchProducts`, so the search can
         // borrow one from another page: most of Cardmarket carries no token, and
         // reading only the page in front of us broke the box nearly everywhere.
-        const token = await cmToken();
+        const token = await ajaxToken();
         if (seq !== latest.current) return;
         if (!token) {
           fail(null);
@@ -128,19 +128,16 @@ export const CardSearch = ({
           {status === 'error' ? (
             <div className="flex flex-col gap-1 px-2 py-1.5 text-2xs text-ink-muted">
               {error === null ? (
-                // Naming the cause in the user's terms: "no session token" is a
-                // sentence about our plumbing, and the thing to do about it is
-                // sign in.
                 <>
                   <span className="text-ink">
-                    Sign in to Cardmarket to search its catalogue from here.
+                    Could not reach Cardmarket&apos;s search — reload the page and try again.
                   </span>
                   <button
                     className="self-start text-accent hover:underline"
                     onClick={askForLogin}
                     type="button"
                   >
-                    Go to the sign-in page
+                    Open Cardmarket sign-in
                   </button>
                 </>
               ) : (
