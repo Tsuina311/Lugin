@@ -16,39 +16,16 @@ import { useCardPreview } from './cardPreview';
 
 import { cardKey } from '@/lib/cardName';
 import type { DeckCard } from '@/lib/deck';
+import {
+  edhrecPlayRates,
+  readCutThreshold,
+  suggestCuts,
+  writeCutThreshold,
+  type CutCandidate,
+} from '@/lib/deckCuts';
 import { EdhrecNotFound, fetchEdhrec, type EdhrecData } from '@/lib/edhrec';
-import { isBasicLand } from '@/lib/lands';
 import type { CardMetadata } from '@/lib/mtg';
 import { useRowSelection, type RowSelection } from '@/ui/useRowSelection';
-
-const THRESHOLD_KEY = 'lugin:deckCutThreshold';
-const DEFAULT_THRESHOLD = 10;
-
-const readThreshold = (): number => {
-  try {
-    const raw = Number(localStorage.getItem(THRESHOLD_KEY));
-    return Number.isFinite(raw) && raw > 0 && raw <= 100 ? raw : DEFAULT_THRESHOLD;
-  } catch {
-    return DEFAULT_THRESHOLD;
-  }
-};
-
-const writeThreshold = (value: number): void => {
-  try {
-    localStorage.setItem(THRESHOLD_KEY, String(value));
-  } catch {
-    // ignore storage failures
-  }
-};
-
-/** One card up for the chop, with what we know about how often it's played. */
-interface CutCandidate {
-  card: DeckCard;
-  imageUrls: string[];
-  /** Share of decks playing it, 0..1. Undefined when EDHREC doesn't list it. */
-  inclusion?: number;
-  numDecks?: number;
-}
 
 export const CutsPanel = ({
   cards,
@@ -66,11 +43,11 @@ export const CutsPanel = ({
   const [data, setData] = useState<EdhrecData | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [threshold, setThreshold] = useState(readThreshold);
+  const [threshold, setThreshold] = useState(readCutThreshold);
 
   const namesKey = commanderNames.map(n => cardKey(n)).join('|');
 
-  useEffect(() => writeThreshold(threshold), [threshold]);
+  useEffect(() => writeCutThreshold(threshold), [threshold]);
 
   // Judge the deck against the commander's overall page rather than a theme, so
   // a card isn't marked weak just for being off-theme.
@@ -96,50 +73,12 @@ export const CutsPanel = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [namesKey]);
 
-  // How often EDHREC sees each card, plus the least-played card it bothered to
-  // list — the ceiling on anything missing from the data.
-  const played = useMemo(() => {
-    const byKey = new Map<string, { inclusion?: number; numDecks?: number }>();
-    let floor = 1;
-    for (const list of data?.lists ?? []) {
-      for (const c of list.cards) {
-        const key = cardKey(c.name);
-        const prev = byKey.get(key);
-        // A card can appear in several lists; keep the highest reading.
-        if (!prev || (c.inclusion ?? 0) > (prev.inclusion ?? 0)) {
-          byKey.set(key, { inclusion: c.inclusion, numDecks: c.numDecks });
-        }
-        if (c.inclusion != null) floor = Math.min(floor, c.inclusion);
-      }
-    }
-    return { byKey, floor };
-  }, [data]);
+  const played = useMemo(() => edhrecPlayRates(data), [data]);
 
-  const { candidates, cuts } = useMemo(() => {
-    const limit = threshold / 100;
-    const out: CutCandidate[] = [];
-    let candidates = 0;
-    for (const card of cards) {
-      // Basics are never a cut, and the commander can't be judged by its own page.
-      if (card.section !== 'main' || isBasicLand(card.name)) continue;
-      candidates += 1;
-      const hit = played.byKey.get(cardKey(card.name));
-      if ((hit?.inclusion ?? 0) >= limit) continue;
-      const meta = metaByKey[cardKey(card.name)];
-      const faces = meta?.faceImages;
-      out.push({
-        card,
-        imageUrls: faces && faces.length >= 2 ? faces : meta?.imageUrl ? [meta.imageUrl] : [],
-        inclusion: hit?.inclusion,
-        numDecks: hit?.numDecks,
-      });
-    }
-    // Weakest first: unlisted cards, then rising inclusion.
-    out.sort(
-      (a, b) => (a.inclusion ?? -1) - (b.inclusion ?? -1) || a.card.name.localeCompare(b.card.name),
-    );
-    return { candidates, cuts: out };
-  }, [cards, metaByKey, played, threshold]);
+  const { candidates, cuts } = useMemo(
+    () => suggestCuts(cards, played, threshold),
+    [cards, played, threshold],
+  );
 
   const byId = useMemo(
     () => new Map(cuts.map(cut => [cardKey(cut.card.name), cut] as const)),
@@ -232,6 +171,7 @@ export const CutsPanel = ({
               key={cardKey(cut.card.name)}
               cut={cut}
               floor={played.floor}
+              metaByKey={metaByKey}
               onCut={() => onCut([cut.card.name])}
               rowId={cardKey(cut.card.name)}
               selection={selection}
@@ -246,6 +186,7 @@ export const CutsPanel = ({
 const CutRow = ({
   cut,
   floor,
+  metaByKey,
   onCut,
   rowId,
   selection,
@@ -253,11 +194,15 @@ const CutRow = ({
   cut: CutCandidate;
   /** Inclusion of the least-played card EDHREC lists, for unlisted cards. */
   floor: number;
+  metaByKey: Record<string, CardMetadata>;
   onCut: () => void;
   rowId: string;
   selection: RowSelection;
 }) => {
-  const { card, imageUrls, inclusion, numDecks } = cut;
+  const { card, inclusion, numDecks } = cut;
+  const meta = metaByKey[cardKey(card.name)];
+  const faces = meta?.faceImages;
+  const imageUrls = faces && faces.length >= 2 ? faces : meta?.imageUrl ? [meta.imageUrl] : [];
   const preview = useCardPreview();
   const { flippable, handlers } = preview(`cuts|${cardKey(card.name)}`, card.name, imageUrls);
   return (

@@ -15,7 +15,8 @@
 // being imported.
 
 import { frontFaceName } from './cardName';
-import { requestApi } from './messaging';
+import { fetchRemote } from './fetchRemote';
+import { readPlatformStorage, writePlatformStorage } from './platformStorage';
 
 /** One card in the archetype's breakdown. */
 export interface GoldfishCard {
@@ -91,7 +92,7 @@ export class GoldfishNotFound extends Error {}
 
 /** Fetch a Goldfish page and return its parsed document. */
 const fetchDoc = async (path: string): Promise<Document> => {
-  const res = await requestApi({ url: `${SITE}${path}` });
+  const res = await fetchRemote(`${SITE}${path}`, 'text/html');
   if (!res.ok) {
     if (res.status === 404) throw new GoldfishNotFound('MTGGoldfish has no page for this deck.');
     if (res.status === 403) {
@@ -106,23 +107,14 @@ const fetchDoc = async (path: string): Promise<Document> => {
   return new DOMParser().parseFromString(res.body, 'text/html');
 };
 
-const readCache = async <T>(key: string): Promise<T | null> => {
-  try {
-    const stored = await chrome.storage.local.get(key);
-    const hit = stored[key] as (T & { fetchedAt: number }) | undefined;
-    if (hit && Date.now() - hit.fetchedAt < CACHE_TTL_MS) return hit;
-  } catch {
-    // ignore cache read failures
-  }
+const readCache = async <T extends { fetchedAt: number }>(key: string): Promise<T | null> => {
+  const hit = await readPlatformStorage<T>(key);
+  if (hit && Date.now() - hit.fetchedAt < CACHE_TTL_MS) return hit;
   return null;
 };
 
 const writeCache = async (key: string, value: unknown): Promise<void> => {
-  try {
-    await chrome.storage.local.set({ [key]: value });
-  } catch {
-    // ignore cache write failures
-  }
+  await writePlatformStorage(key, value);
 };
 
 /**

@@ -9,8 +9,10 @@
 // Cards go in as text, which sounds primitive and isn't: the same box takes a
 // typed name, a "2 Lightning Bolt" line, and a whole list pasted from Moxfield,
 // because it hands the string to `parseDeckList` — the parser the desktop uses
-// for the same job. Names you own appear instantly as you type; Scryfall fills in
-// every other card name once you've typed a couple of letters.
+// for the same job. Suggestions merge Scryfall, your collection, and — when a
+// commander is set — EDHREC and MTGGoldfish staples, sorted A→Z; cards you
+// own are tinted green. Suggested cuts use the same EDHREC play-rate logic as
+// the extension when a commander is set.
 //
 // Pictures follow the collection screen's bargain exactly: the list stays text
 // and you tap a row to see one card, or switch to box view and ask for all of
@@ -38,8 +40,17 @@ import {
   type DeckFormat,
   type DeckSection,
 } from '@/lib/deck';
+import {
+  edhrecPlayRates,
+  readCutThreshold,
+  suggestCuts,
+  writeCutThreshold,
+} from '@/lib/deckCuts';
+import { fetchEdhrec, type EdhrecData } from '@/lib/edhrec';
 import { deckFile } from '@/lib/export';
+import { fetchGoldfishArchetype } from '@/lib/mtggoldfish';
 import { searchCards } from '@/lib/search';
+import { NumberStepper } from '@/ui/components/Field';
 import { Picture } from '@/ui/components/Picture';
 import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
 import { Image as ImageIcon } from '@/ui/components/icons';
@@ -150,6 +161,13 @@ export const DeckEditor = ({
     [collection, deck],
   );
 
+  const commanders = useMemo(
+    () => deck.cards.filter(card => card.section === 'commander').map(card => card.name),
+    [deck.cards],
+  );
+  const commandersKey = commanders.map(name => cardKey(name)).join('|');
+  const commanderRecs = formatInfo(deck.format).commanderZone && commanders.length > 0;
+
   const zones = useMemo(
     () => SECTIONS.filter(s => s.id !== 'commander' || formatInfo(deck.format).commanderZone),
     [deck.format],
@@ -170,6 +188,47 @@ export const DeckEditor = ({
   const loaded = useSequentialImages(wanted);
 
   const [remote, setRemote] = useState<string[]>([]);
+  const [edhrecData, setEdhrecData] = useState<EdhrecData | null>(null);
+  const [recNames, setRecNames] = useState<string[]>([]);
+  const [cutThreshold, setCutThreshold] = useState(readCutThreshold);
+
+  useEffect(() => writeCutThreshold(cutThreshold), [cutThreshold]);
+
+  useEffect(() => {
+    if (!commanderRecs) {
+      setEdhrecData(null);
+      setRecNames([]);
+      return;
+    }
+    let cancelled = false;
+    void Promise.allSettled([fetchEdhrec(commanders), fetchGoldfishArchetype(commanders)]).then(
+      ([edhrec, goldfish]) => {
+        if (cancelled) return;
+        setEdhrecData(edhrec.status === 'fulfilled' ? edhrec.value : null);
+        const names: string[] = [];
+        if (edhrec.status === 'fulfilled') {
+          for (const list of edhrec.value.lists) {
+            for (const card of list.cards) names.push(card.name);
+          }
+        }
+        if (goldfish.status === 'fulfilled') {
+          for (const category of goldfish.value.categories) {
+            for (const card of category.cards) names.push(card.name);
+          }
+        }
+        setRecNames(names);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [commanderRecs, commandersKey, commanders]);
+
+  const played = useMemo(() => edhrecPlayRates(edhrecData), [edhrecData]);
+  const { candidates: cutCandidates, cuts } = useMemo(
+    () => suggestCuts(deck.cards, played, cutThreshold),
+    [cutThreshold, deck.cards, played],
+  );
 
   const needle = adding.trim();
   const canSuggest = needle.length >= 2 && !adding.includes('\n');
@@ -195,8 +254,8 @@ export const DeckEditor = ({
     };
   }, [canSuggest, needle]);
 
-  // Collection hits first — instant and usually what you own — then Scryfall
-  // names to fill the rest, deduped by cardKey.
+  // Scryfall, collection, EDHREC and Goldfish — deduped, then sorted A→Z.
+  // Owned cards get a green tint in the UI but don't jump to the front.
   const suggestions = useMemo((): { name: string; owned: boolean }[] => {
     if (!canSuggest) return [];
     const key = cardKey(needle);
@@ -206,20 +265,20 @@ export const DeckEditor = ({
           .filter(row => cardKey(row.name).includes(key))
           .map(row => row.name)
       : [];
-    const seen = new Set(local.map(cardKey));
-    const merged: { name: string; owned: boolean }[] = local.map(name => ({
-      name,
-      owned: true,
-    }));
-    for (const name of remote) {
+    const staple = recNames.filter(name => cardKey(name).includes(key));
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const name of [...local, ...remote, ...staple]) {
       const id = cardKey(name);
       if (seen.has(id)) continue;
       seen.add(id);
-      merged.push({ name, owned: ownedOf(name) });
-      if (merged.length >= SUGGESTIONS) break;
+      names.push(name);
     }
-    return merged.slice(0, SUGGESTIONS);
-  }, [canSuggest, collection, needle, remote]);
+    return names
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+      .slice(0, SUGGESTIONS)
+      .map(name => ({ name, owned: ownedOf(name) }));
+  }, [canSuggest, collection, needle, recNames, remote]);
 
   const add = (text: string) => {
     const { cards } = parseDeckList(text);
@@ -462,6 +521,78 @@ export const DeckEditor = ({
           </section>
         );
       })}
+
+      {commanderRecs && copies(deck, 'main') > 0 ? (
+        <section className="border-t border-line px-4 py-4">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+              Suggested cuts
+            </h2>
+            {edhrecData?.deckCount != null ? (
+              <span className="text-[11px] text-ink-faint">vs {edhrecData.deckCount} EDHREC decks</span>
+            ) : null}
+            <span className="ml-auto flex items-center gap-1 text-[11px] text-ink-faint">
+              under
+              <NumberStepper
+                label="Cut cards played in under this share of decks"
+                max={100}
+                min={1}
+                onChange={setCutThreshold}
+                size="sm"
+                title="Suggest cutting cards that fewer than this share of EDHREC decks play"
+                value={cutThreshold}
+              />
+              %
+            </span>
+          </div>
+          {!edhrecData ? (
+            <p className="mt-2 text-sm text-ink-muted">Loading EDHREC play rates…</p>
+          ) : cuts.length === 0 ? (
+            <p className="mt-2 text-sm text-ink-muted">
+              Every main-deck card is played in at least {cutThreshold}% of decks. Raise the
+              threshold to be harsher.
+            </p>
+          ) : (
+            <>
+              <p className="mt-2 text-[11px] text-ink-faint">
+                {cuts.length} of {cutCandidates} cards fall under {cutThreshold}%
+                {played.floor < 1 ? (
+                  <span>
+                    {' '}
+                    · unlisted cards are under {Math.round(played.floor * 100)}%
+                  </span>
+                ) : null}
+              </p>
+              <ul className="mt-2 divide-y divide-line">
+                {cuts.map(cut => (
+                  <li key={cardKey(cut.card.name)} className="flex items-center gap-2 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm text-ink">
+                        {cut.card.quantity > 1 ? (
+                          <span className="text-ink-faint">{cut.card.quantity}× </span>
+                        ) : null}
+                        {cut.card.name}
+                      </div>
+                      <div className="text-[11px] text-ink-faint">
+                        {cut.inclusion == null
+                          ? `not listed — under ${Math.round(played.floor * 100)}%`
+                          : `in ${Math.round(cut.inclusion * 100)}% of decks`}
+                      </div>
+                    </div>
+                    <button
+                      className="shrink-0 rounded-lg bg-neg-soft px-3 py-2 text-xs font-semibold text-neg active:opacity-80"
+                      onClick={() => setQuantity(cut.card, 0)}
+                      type="button"
+                    >
+                      Cut
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      ) : null}
 
       {collection && deck.cards.length > 0 ? (
         <section className="border-t border-line px-4 py-4">

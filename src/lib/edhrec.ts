@@ -2,14 +2,15 @@
 //
 // EDHREC publishes the data behind each commander page as JSON at
 // json.edhrec.com/pages/commanders/<slug>[/<theme>].json — the same payload its
-// own site renders, so we don't scrape HTML. It sends no CORS headers, so the
-// request goes through the background worker (requestApi + host_permissions).
+// own site renders, so we don't scrape HTML. The extension routes the request
+// through its background worker; the phone build fetches JSON directly.
 //
 // Each card entry carries a Scryfall id, which we turn into a direct image-CDN
 // URL (browser-cached, no API call per hover).
 
 import { frontFaceName } from './cardName';
-import { requestApi } from './messaging';
+import { fetchRemote } from './fetchRemote';
+import { readPlatformStorage, writePlatformStorage } from './platformStorage';
 
 /** One recommended card within a category. */
 export interface EdhrecCard {
@@ -156,16 +157,11 @@ export const fetchEdhrec = async (
   const pageUrl = `${PAGE_BASE}/${path}`;
 
   if (!force) {
-    try {
-      const stored = await chrome.storage.local.get(cacheKey);
-      const hit = stored[cacheKey] as EdhrecData | undefined;
-      if (hit && Date.now() - hit.fetchedAt < CACHE_TTL_MS) return hit;
-    } catch {
-      // ignore cache read failures and fetch fresh
-    }
+    const hit = await readPlatformStorage<EdhrecData>(cacheKey);
+    if (hit && Date.now() - hit.fetchedAt < CACHE_TTL_MS) return hit;
   }
 
-  const res = await requestApi({ url: `${JSON_BASE}/${path}.json` });
+  const res = await fetchRemote(`${JSON_BASE}/${path}.json`, 'application/json');
   if (!res.ok) {
     // EDHREC answers 403 (not 404) for pages that don't exist.
     if (res.status === 403 || res.status === 404) {
@@ -177,10 +173,6 @@ export const fetchEdhrec = async (
   }
 
   const data = parsePayload(JSON.parse(res.body) as RawPayload, pageUrl);
-  try {
-    await chrome.storage.local.set({ [cacheKey]: data });
-  } catch {
-    // ignore cache write failures
-  }
+  await writePlatformStorage(cacheKey, data);
   return data;
 };
