@@ -9,11 +9,8 @@
 // roll up to one line per card name; changing the count keeps the best-known
 // printing and writes through to sync like a deck edit.
 //
-// Pictures are opt-in per row, which is the one place this deliberately differs
-// from the desktop panel. Card images are ~100KB each and this screen is used in
-// a shop, on mobile data — so the list stays text, and tapping a row's picture
-// icon fetches that one card. Box view is the other half of the same choice:
-// it's a grid of images, but you have to ask for it, and it shows fewer rows.
+// List rows show small thumbnails like the Tags search — tap to enlarge. Box view
+// is a grid of larger pictures for browsing; it shows fewer rows at once.
 
 import { useEffect, useMemo, useState } from 'react';
 
@@ -27,9 +24,8 @@ import type { Collection, CollectionCard } from '@/lib/collection';
 import { parseDeckList } from '@/lib/deck';
 import { collectionFile } from '@/lib/export';
 import { collectionValue, money, signedMoney, type CollectionValue } from '@/lib/prices';
-import { CardImage } from '@/ui/components/CardImage';
+import { CollectionThumb } from '@/ui/components/CollectionThumb';
 import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
-import { Image as ImageIcon } from '@/ui/components/icons';
 import { usePrices } from '@/ui/usePrices';
 
 const VISIBLE_LIMIT = 150;
@@ -75,12 +71,6 @@ interface Row {
   name: string;
   total: number;
 }
-
-const CollectionPicture = ({ alt, candidates }: { alt: string; candidates: readonly string[] }) => (
-  <div className="flex aspect-[488/680] w-full items-center justify-center overflow-hidden rounded-lg bg-raised">
-    <CardImage alt={alt} candidates={candidates} className="h-full w-full object-cover" />
-  </div>
-);
 
 /**
  * Roll the raw rows up per card, keeping one printing to show a picture of.
@@ -186,16 +176,6 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
     }
   }, [view]);
 
-  /** Rows whose picture has been asked for, in list view. */
-  const [opened, setOpened] = useState<Set<string>>(() => new Set());
-  const toggle = (key: string) =>
-    setOpened(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-
   const all = useMemo(() => (collection ? rollUp(collection) : []), [collection]);
   const rows = useMemo(() => {
     const needle = cardKey(query.trim());
@@ -281,7 +261,13 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
         <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3">
           {shown.map(row => (
             <div key={row.key} className="flex flex-col gap-1">
-              <CollectionPicture alt={row.name} candidates={row.candidates} />
+              <CollectionThumb
+                candidates={row.candidates}
+                className="aspect-[488/680] w-full overflow-hidden rounded-lg bg-raised"
+                imgStyle={{ objectPosition: '50% 17%' }}
+                name={row.name}
+                previewKey={`collection|box|${row.key}`}
+              />
               <span className="truncate text-xs text-ink" title={row.name}>
                 {row.name}
               </span>
@@ -294,38 +280,22 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
         </div>
       ) : !empty ? (
         <ul className="divide-y divide-line">
-          {shown.map(row => {
-            const open = opened.has(row.key);
-            return (
-              <li key={row.key} className="px-2 py-1">
-                <div className="flex items-center gap-2">
-                  <Stepper onChange={quantity => setQuantity(row, quantity)} quantity={row.total} />
-                  <span className="min-w-0 flex-1 truncate text-sm text-ink">{row.name}</span>
-                  {row.foil > 0 ? (
-                    <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                      {row.foil} foil
-                    </span>
-                  ) : null}
-                  <button
-                    aria-expanded={open}
-                    aria-label={open ? `Hide the picture of ${row.name}` : `Show ${row.name}`}
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg active:bg-raised ${
-                      open ? 'text-accent' : 'text-ink-faint'
-                    }`}
-                    onClick={() => toggle(row.key)}
-                    type="button"
-                  >
-                    <ImageIcon aria-hidden size={18} />
-                  </button>
-                </div>
-                {open ? (
-                  <div className="mb-2 ml-2 w-44">
-                    <CollectionPicture alt={row.name} candidates={row.candidates} />
-                  </div>
-                ) : null}
-              </li>
-            );
-          })}
+          {shown.map(row => (
+            <li key={row.key} className="flex items-center gap-2 px-2 py-1">
+              <Stepper onChange={quantity => setQuantity(row, quantity)} quantity={row.total} />
+              <CollectionThumb
+                candidates={row.candidates}
+                name={row.name}
+                previewKey={`collection|list|${row.key}`}
+              />
+              <span className="min-w-0 flex-1 truncate text-sm text-ink">{row.name}</span>
+              {row.foil > 0 ? (
+                <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                  {row.foil} foil
+                </span>
+              ) : null}
+            </li>
+          ))}
         </ul>
       ) : null}
 

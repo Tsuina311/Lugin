@@ -157,3 +157,30 @@ export const imagesByName = (cards: readonly ImageableCard[]): Map<string, strin
   }
   return new Map([...best].map(([key, { src }]) => [key, src]));
 };
+
+/** Best image URL list per card name — same printing preference as `imagesByName`. */
+export const candidatesByName = (
+  cards: readonly ImageableCard[],
+): Map<string, readonly string[]> => {
+  const best = new Map<string, { rank: number; candidates: readonly string[] }>();
+  for (const card of cards) {
+    const key = cardKey(card.name ?? '');
+    if (!key) continue;
+    const rank = printingRank(card);
+    if ((best.get(key)?.rank ?? -1) >= rank) continue;
+    const candidates = cardImageCandidates(card);
+    if (candidates.length) best.set(key, { rank, candidates });
+  }
+  return new Map([...best].map(([key, { candidates }]) => [key, candidates]));
+};
+
+/** Image candidates for a deck row: your copy first, then Scryfall's default. */
+export const deckCardCandidates = (
+  name: string,
+  fromCollection: Map<string, readonly string[]>,
+): readonly string[] => {
+  const owned = fromCollection.get(cardKey(name));
+  if (owned?.length) return owned;
+  const fallback = imageUrlFor(undefined, name);
+  return fallback ? [fallback] : [];
+};

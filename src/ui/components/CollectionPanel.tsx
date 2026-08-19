@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { Badge } from './Badge';
 import { Button } from './Button';
-import { CardResultThumb } from './CardResultThumb';
+import { CollectionThumb } from './CollectionThumb';
 import { EditionFilter } from './EditionFilter';
 import { SearchInput } from './Field';
 import { Hint } from './Hint';
@@ -14,7 +14,6 @@ import { SelectionBar } from './Selection';
 import { ViewToggle } from './ViewToggle';
 import { rememberFaces } from './cardPreview';
 import { Library, Loader2, Pencil, ReceiptEuro, RefreshCw } from './icons';
-import { useFirstLoadedImage } from './useFirstLoadedImage';
 
 import { cardImageOverrideStore } from '@/content/cardImageOverrideStore';
 import {
@@ -109,42 +108,6 @@ interface CollectionRow {
   setCode?: string;
   total: number;
 }
-
-/** Tag-search-style thumbnail with collection image fallbacks. */
-const CollectionThumb = ({
-  candidates,
-  className = 'h-8 w-8 flex-none overflow-hidden rounded bg-raised',
-  faceImages,
-  imgStyle,
-  name,
-  previewKey,
-}: {
-  candidates: readonly string[];
-  className?: string;
-  faceImages?: string[];
-  imgStyle?: CSSProperties;
-  name: string;
-  previewKey: string;
-}) => {
-  const { ready, src } = useFirstLoadedImage(candidates);
-  const urls =
-    src && faceImages && faceImages.length >= 2
-      ? [src, ...faceImages.slice(1)]
-      : src
-        ? [src]
-        : [];
-
-  return (
-    <CardResultThumb
-      className={className}
-      imgStyle={imgStyle}
-      loading={!ready && candidates.length > 0}
-      name={name}
-      previewKey={previewKey}
-      urls={urls}
-    />
-  );
-};
 
 export const CollectionPanel = () => {
   const { cleared, collection, heldPurchases, loading, error } = useSyncExternalStore(

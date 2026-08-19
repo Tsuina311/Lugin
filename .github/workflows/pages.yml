@@ -37,25 +37,22 @@ jobs:
       url: ${{ steps.proxy.outputs.url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Enable Corepack
-        run: corepack enable
-      - run: yarn install --immutable
       - name: Deploy Goldfish proxy
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           command: deploy
-        # No token yet — skip quietly; build falls back to vars.VITE_LUGIN_GOLDFISH_PROXY_URL.
+        # Fails until workers.dev is registered on the Cloudflare account, or if the
+        # token is missing — build falls back to vars.VITE_LUGIN_GOLDFISH_PROXY_URL.
         continue-on-error: true
       - name: Capture proxy URL
         id: proxy
         run: |
           if [ -n "${{ steps.deploy.outputs.deployment-url }}" ]; then
             echo "url=${{ steps.deploy.outputs.deployment-url }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.deploy.outcome }}" != "success" ]; then
+            echo "::warning::Goldfish proxy deploy failed. Register a workers.dev subdomain at https://dash.cloudflare.com → Workers & Pages → Overview, then re-run this workflow. Until then, set repository variable VITE_LUGIN_GOLDFISH_PROXY_URL to the worker URL manually."
           fi
 
   build:

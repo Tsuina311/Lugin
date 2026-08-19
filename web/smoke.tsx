@@ -153,13 +153,10 @@ if (!view.includes('>Save<')) {
   console.log('  ok  the collection can be saved as a file');
 }
 
-// Card images are ~100KB each and this screen is used in a shop, on mobile data.
-// "Only when asked" is the whole reason the picture icon exists, so it is worth
-// asserting rather than trusting: a stray <img> in the default list would be a
-// silent megabyte per scroll.
+// List rows show small thumbnails (Tags-style) with lazy-loaded art — the frame
+// and a loading spinner are present even before the image URL resolves.
 const listSays: [string, boolean][] = [
-  ['no picture is fetched before one is asked for', !/scryfall\.(io|com)/.test(view)],
-  ['every row offers its picture', view.includes('Show Sol Ring')],
+  ['each row shows a thumbnail', view.includes('h-8 w-8') && view.includes('Sol Ring')],
   ['the list can be swapped for a grid', view.includes('Show as card images')],
 ];
 for (const [what, held] of listSays) {
@@ -183,8 +180,8 @@ const editor = renderToString(
   <DeckEditor collection={collection} deck={newDeck({ at: 0 })} onBack={() => {}} />,
 ).replace(/<!--.*?-->/g, '');
 // A deck you can only read as a list of names is hard to judge; pictures are how
-// anyone actually recognises what is in a deck. Opt-in per row, and a box view
-// for all of them at once, exactly as the collection screen does it.
+// anyone actually recognises what is in a deck. Thumbnails sit beside each row,
+// with a box view for all of them at once, exactly as the collection screen does.
 const filled = renderToString(
   <DeckEditor collection={collection} deck={decks[0]} onBack={() => {}} />,
 ).replace(/<!--.*?-->/g, '');
@@ -195,7 +192,7 @@ const deckSays: [string, boolean][] = [
   ['a list can be pasted in instead', emptyDecks.includes('>Paste<')],
   ['a new deck can be filled', editor.includes('Add a card, or paste a list')],
   ['a deck can be thrown away', editor.includes('>Delete<')],
-  ['a deck card offers its picture', filled.includes('Show Sol Ring')],
+  ['a deck card shows a thumbnail', filled.includes('h-8 w-8') && filled.includes('Sol Ring')],
   ['the whole deck can be seen as images', filled.includes('Show as card images')],
   [
     'an empty deck offers no view switch to switch',

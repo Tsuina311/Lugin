@@ -101,7 +101,7 @@ export interface CardPreview {
  */
 export const useCardPreview = (): ((key: string, name: string, urls: string[]) => CardPreview) => {
   // Re-render when a lookup resolves, so the flip affordance can appear.
-  useSyncExternalStore(subscribe, getVersion);
+  useSyncExternalStore(subscribe, getVersion, getVersion);
 
   return useCallback((key: string, name: string, urls: string[]): CardPreview => {
     if (urls.length === 0) return { flippable: false, handlers: {} };
