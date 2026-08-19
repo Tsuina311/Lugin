@@ -9,23 +9,29 @@ import { requestApi } from './messaging';
 import type { ApiResult } from './types';
 
 const GOLDFISH = 'https://www.mtggoldfish.com/';
+const DEV_GOLDFISH_PROXY = 'http://127.0.0.1:8787';
 
 const isExtension = (): boolean =>
   typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id);
 
-const goldfishProxyUrl = (): string | undefined => {
+/** Phone-build proxy base URL (Cloudflare Worker), if configured. */
+export const goldfishProxyUrl = (): string | undefined => {
   const raw = import.meta.env.VITE_LUGIN_GOLDFISH_PROXY_URL;
-  return typeof raw === 'string' && raw.trim() ? raw.trim().replace(/\/$/, '') : undefined;
+  if (typeof raw === 'string' && raw.trim()) return raw.trim().replace(/\/$/, '');
+  // Local phone dev: `yarn goldfish:proxy` serves workers/goldfish-proxy.js here.
+  if (import.meta.env.DEV) return DEV_GOLDFISH_PROXY;
+  return undefined;
 };
 
 const isGoldfish = (url: string): boolean => url.startsWith(GOLDFISH);
 
+export const GOLDFISH_PHONE_SETUP =
+  'Deploy workers/goldfish-proxy.js once (`yarn goldfish:deploy`), then set VITE_LUGIN_GOLDFISH_PROXY_URL to the workers.dev URL (local .env.local and the GitHub Pages variable for deploys).';
+
 const fetchViaGoldfishProxy = async (url: string, accept?: string): Promise<ApiResult> => {
   const base = goldfishProxyUrl();
   if (!base) {
-    throw new Error(
-      'MTGGoldfish is not configured for the phone app yet. Use the extension, or open the page on Goldfish.',
-    );
+    throw new Error(`MTGGoldfish is not configured for the phone app yet. ${GOLDFISH_PHONE_SETUP}`);
   }
   const proxyUrl = `${base}?url=${encodeURIComponent(url)}`;
   const res = await fetch(proxyUrl, {

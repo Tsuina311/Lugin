@@ -10,6 +10,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "dev:web": "vite --config vite.web.config.ts",
+    "goldfish:deploy": "wrangler deploy",
+    "goldfish:proxy": "wrangler dev",
     "build:web": "tsc --noEmit && vite build --config vite.web.config.ts",
     "preview:web": "vite preview --config vite.web.config.ts",
     "typecheck": "tsc --noEmit",
@@ -73,6 +75,7 @@
     "stylelint-order": "^8.1.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "wrangler": "^4.124.0"
   }
 }

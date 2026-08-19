@@ -31,7 +31,32 @@ concurrency:
   group: pages
 
 jobs:
+  goldfish-proxy:
+    # Optional: auto-deploy the CORS proxy when a Cloudflare API token is set.
+    # Otherwise set the repository variable VITE_LUGIN_GOLDFISH_PROXY_URL manually
+    # after `yarn goldfish:deploy`.
+    if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.deployment-url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable Corepack
+        run: corepack enable
+      - run: yarn install --immutable
+      - name: Deploy Goldfish proxy
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: deploy
+
   build:
+    needs: [goldfish-proxy]
+    if: always() && !cancelled() && (needs.goldfish-proxy.result == 'success' || needs.goldfish-proxy.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -70,9 +95,8 @@ jobs:
           # quietly break the deploy.
           LUGIN_BASE_PATH: /${{ github.event.repository.name }}/
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-          # CORS proxy for MTGGoldfish (see workers/goldfish-proxy.js). Deploy the
-          # worker once with `npx wrangler deploy`, then set this to its URL.
-          VITE_LUGIN_GOLDFISH_PROXY_URL: ${{ vars.VITE_LUGIN_GOLDFISH_PROXY_URL }}
+          # CORS proxy for MTGGoldfish (see workers/goldfish-proxy.js).
+          VITE_LUGIN_GOLDFISH_PROXY_URL: ${{ needs.goldfish-proxy.outputs.url || vars.VITE_LUGIN_GOLDFISH_PROXY_URL }}
         run: yarn build:web
 
       # Every paper price in Magic, distilled to ~3.5 MB (about 1.2 MB over the
