@@ -1,111 +1,93 @@
-// Decks, and the one question worth asking about them away from the desk:
-// what's still missing?
+// Decks, and the two questions worth asking about them away from the desk:
+// what's still missing, and can I start a new one?
 //
 // `deckShortfall` is the extension's own comparison, reused unchanged — so the
-// shopping list on the phone can't drift from the one on the desktop.
+// shopping list on the phone can't drift from the one on the desktop. Creating
+// works the same way for the same reason: the desktop offers an empty deck of a
+// chosen format and a decklist to import, and both doors are here, over the same
+// `newDeck` and `deckFromImport` the extension builds with.
+//
+// Pasting is the phone's version of the desktop's file picker. A decklist on a
+// phone is far more often in the clipboard — copied out of Moxfield or a forum
+// post — than it is a file, and the file route is already covered by the Import
+// tab and the ManaBox share sheet.
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
-import { ExportBar } from './ExportBar';
+import { DeckEditor } from './DeckEditor';
+import { syncStore } from './syncStore';
 
 import type { Collection } from '@/lib/collection';
-import { deckShortfall, type Deck, type DeckSection } from '@/lib/deck';
-import { deckFile } from '@/lib/export';
+import { DECK_FORMATS, deckShortfall, type Deck, type DeckFormat } from '@/lib/deck';
 
-const SECTIONS: readonly { id: DeckSection; label: string }[] = [
-  { id: 'commander', label: 'Commander' },
-  { id: 'main', label: 'Main deck' },
-  { id: 'sideboard', label: 'Sideboard' },
-];
+const copies = (deck: Deck): number =>
+  deck.cards
+    .filter(card => card.section !== 'sideboard')
+    .reduce((sum, card) => sum + card.quantity, 0);
 
-const copies = (deck: Deck, section: DeckSection): number =>
-  deck.cards.filter(card => card.section === section).reduce((sum, card) => sum + card.quantity, 0);
-
-const DeckDetail = ({
-  collection,
-  deck,
-  onBack,
+const FormatPicker = ({
+  onChange,
+  value,
 }: {
-  collection: Collection | null;
-  deck: Deck;
-  onBack: () => void;
-}) => {
-  const missing = useMemo(
-    () => (collection ? deckShortfall(deck.cards, collection.byKey) : []),
-    [collection, deck],
-  );
+  onChange: (format: DeckFormat) => void;
+  value: DeckFormat;
+}) => (
+  <select
+    aria-label="Format for the new deck"
+    className="rounded-lg border border-line-strong bg-raised px-2 py-2.5 text-sm text-ink"
+    onChange={event => onChange(event.target.value as DeckFormat)}
+    value={value}
+  >
+    {DECK_FORMATS.map(format => (
+      <option key={format.id} value={format.id}>
+        {format.label}
+      </option>
+    ))}
+  </select>
+);
 
+/** The paste sheet: the phone's answer to the desktop's "upload a decklist". */
+const PasteList = ({
+  busy,
+  onCancel,
+  onPaste,
+}: {
+  busy: boolean;
+  onCancel: () => void;
+  onPaste: (text: string) => void;
+}) => {
+  const [text, setText] = useState('');
   return (
-    <div>
-      <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-canvas/95 px-2 py-2 backdrop-blur">
+    <div className="border-b border-line px-4 py-3">
+      <textarea
+        aria-label="Decklist"
+        autoCapitalize="none"
+        autoCorrect="off"
+        className="h-40 w-full rounded-lg border border-line-strong bg-raised px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint"
+        onChange={event => setText(event.target.value)}
+        placeholder={'1 Sol Ring\n1 Rhystic Study\n…'}
+        value={text}
+      />
+      <p className="mt-1 text-[11px] text-ink-faint">
+        Arena, MTGO, Moxfield and ManaBox lists all work, section headers included.
+      </p>
+      <div className="mt-2 flex gap-2">
         <button
-          className="rounded-md px-2 py-2 text-sm font-medium text-accent"
-          onClick={onBack}
+          className="flex-1 rounded-lg bg-accent py-2.5 text-sm font-semibold text-accent-ink disabled:opacity-40"
+          disabled={busy || !text.trim()}
+          onClick={() => onPaste(text)}
           type="button"
         >
-          ‹ Decks
+          {busy ? 'Reading…' : 'Make a deck from this'}
         </button>
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{deck.name}</span>
+        <button
+          className="rounded-lg px-4 text-sm font-medium text-ink-muted"
+          onClick={onCancel}
+          type="button"
+        >
+          Cancel
+        </button>
       </div>
-
-      <section className="flex items-center gap-3 border-b border-line px-4 py-3">
-        <p className="min-w-0 flex-1 text-[11px] leading-snug text-ink-faint">
-          Copy the list to paste into ManaBox, Moxfield or Archidekt — all three
-          import a deck as text.
-        </p>
-        <ExportBar actions={['copy', 'save', 'share']} file={() => deckFile(deck)} />
-      </section>
-
-      {collection ? (
-        <section className="border-b border-line px-4 py-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-            {missing.length === 0 ? 'Nothing missing' : `Missing ${missing.length}`}
-          </h2>
-          {missing.length === 0 ? (
-            <p className="mt-2 text-sm text-ink-muted">
-              You own every non-basic card in this deck.
-            </p>
-          ) : (
-            <ul className="mt-2 space-y-1.5">
-              {missing.map(card => (
-                <li key={card.name} className="flex items-baseline gap-3 text-sm">
-                  <span className="min-w-0 flex-1 truncate text-ink">{card.name}</span>
-                  {card.owned > 0 ? (
-                    <span className="shrink-0 text-[11px] text-ink-faint">have {card.owned}</span>
-                  ) : null}
-                  <span className="shrink-0 font-semibold tabular-nums text-neg">×{card.need}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ) : null}
-
-      {SECTIONS.map(section => {
-        const cards = deck.cards.filter(card => card.section === section.id);
-        if (cards.length === 0) return null;
-        return (
-          <section key={section.id}>
-            <h2 className="bg-panel px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              {section.label}
-              <span className="ml-2 tabular-nums opacity-70">{copies(deck, section.id)}</span>
-            </h2>
-            <ul className="divide-y divide-line">
-              {cards.map(card => (
-                <li
-                  key={`${section.id}:${card.name}`}
-                  className="flex items-baseline gap-3 px-4 py-2.5"
-                >
-                  <span className="shrink-0 text-sm tabular-nums text-ink-faint">
-                    {card.quantity}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-ink">{card.name}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
     </div>
   );
 };
@@ -118,45 +100,106 @@ export const DeckList = ({
   decks: readonly Deck[];
 }) => {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [format, setFormat] = useState<DeckFormat>('commander');
+  const [pasting, setPasting] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const open = decks.find(deck => deck.id === openId);
-  if (open) return <DeckDetail collection={collection} deck={open} onBack={() => setOpenId(null)} />;
+  if (open) return <DeckEditor collection={collection} deck={open} onBack={() => setOpenId(null)} />;
 
-  if (decks.length === 0) {
-    return (
-      <p className="px-6 py-10 text-center text-sm text-ink-muted">No decks have been synced yet.</p>
-    );
-  }
+  const create = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setOpenId(await syncStore.createDeck(format));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const paste = async (text: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const id = await syncStore.importDeckList(text, 'pasted list');
+      if (!id) {
+        setError('No cards found in that list.');
+        return;
+      }
+      setPasting(false);
+      setOpenId(id);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const sorted = [...decks].sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
-    <ul className="divide-y divide-line">
-      {sorted.map(deck => {
-        const missing = collection ? deckShortfall(deck.cards, collection.byKey).length : 0;
-        return (
-          <li key={deck.id}>
-            <button
-              className="flex w-full items-center gap-3 px-4 py-4 text-left active:bg-raised"
-              onClick={() => setOpenId(deck.id)}
-              type="button"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-ink">{deck.name}</span>
-                <span className="mt-0.5 block text-[11px] capitalize text-ink-faint">
-                  {deck.format} · {copies(deck, 'main') + copies(deck, 'commander')} cards
-                </span>
-              </span>
-              {missing > 0 ? (
-                <span className="shrink-0 rounded bg-neg-soft px-1.5 py-0.5 text-[10px] font-medium text-neg">
-                  {missing} missing
-                </span>
-              ) : null}
-              <span className="shrink-0 text-ink-faint">›</span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+    <div>
+      <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+        <FormatPicker onChange={setFormat} value={format} />
+        <button
+          className="flex-1 rounded-lg bg-accent py-2.5 text-sm font-semibold text-accent-ink disabled:opacity-40"
+          disabled={busy}
+          onClick={() => void create()}
+          type="button"
+        >
+          New deck
+        </button>
+        <button
+          aria-pressed={pasting}
+          className={`rounded-lg border border-line-strong px-3 py-2.5 text-sm font-medium ${
+            pasting ? 'bg-raised text-ink' : 'text-ink-muted'
+          }`}
+          onClick={() => setPasting(value => !value)}
+          type="button"
+        >
+          Paste
+        </button>
+      </div>
+
+      {pasting ? (
+        <PasteList busy={busy} onCancel={() => setPasting(false)} onPaste={text => void paste(text)} />
+      ) : null}
+
+      {error ? <p className="border-b border-line bg-neg-soft px-4 py-2 text-xs text-neg">{error}</p> : null}
+
+      {decks.length === 0 ? (
+        <p className="px-6 py-10 text-center text-sm text-ink-muted">
+          No decks yet. Start an empty one above and add cards to it, or paste a list you already
+          have.
+        </p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {sorted.map(deck => {
+            const missing = collection ? deckShortfall(deck.cards, collection.byKey).length : 0;
+            return (
+              <li key={deck.id}>
+                <button
+                  className="flex w-full items-center gap-3 px-4 py-4 text-left active:bg-raised"
+                  onClick={() => setOpenId(deck.id)}
+                  type="button"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-ink">{deck.name}</span>
+                    <span className="mt-0.5 block text-[11px] capitalize text-ink-faint">
+                      {deck.format} · {copies(deck)} cards
+                    </span>
+                  </span>
+                  {missing > 0 ? (
+                    <span className="shrink-0 rounded bg-neg-soft px-1.5 py-0.5 text-[10px] font-medium text-neg">
+                      {missing} missing
+                    </span>
+                  ) : null}
+                  <span className="shrink-0 text-ink-faint">›</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 };

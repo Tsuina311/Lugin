@@ -9,8 +9,10 @@ import { cardKey } from '@/lib/cardName';
 import {
   countCards,
   deckFromImport,
-  newDeckId,
+  mergeDeckCards,
+  newDeck,
   parseDeckList,
+  withFormat,
   type Deck,
   type DeckCard,
   type DeckFormat,
@@ -153,16 +155,7 @@ export const deckStore = {
 
   /** Create a new empty deck and return its id. */
   async create(name = 'New deck', format: DeckFormat = 'commander'): Promise<string> {
-    const now = Date.now();
-    const deck: Deck = {
-      cards: [],
-      createdAt: now,
-      format,
-      id: newDeckId(),
-      name: name.trim() || 'New deck',
-      source: 'manual',
-      updatedAt: now,
-    };
+    const deck = newDeck({ format, name });
     const decks = [deck, ...state.decks].sort(byRecent);
     set({ decks });
     await persist(decks);
@@ -197,17 +190,7 @@ export const deckStore = {
   async mergeText(id: string, text: string): Promise<void> {
     const { cards } = parseDeckList(text);
     if (cards.length === 0) return;
-    await mutateDeck(id, d => {
-      const next = [...d.cards];
-      for (const c of cards) {
-        const i = next.findIndex(
-          x => x.section === c.section && cardKey(x.name) === cardKey(c.name),
-        );
-        if (i >= 0) next[i] = { ...next[i], quantity: next[i].quantity + c.quantity };
-        else next.push(c);
-      }
-      return { ...d, cards: next };
-    });
+    await mutateDeck(id, d => ({ ...d, cards: mergeDeckCards(d.cards, cards) }));
   },
 
   /**
@@ -302,13 +285,7 @@ async replaceAll(decks: Deck[]): Promise<void> {
    * into the main deck so they aren't stranded in a now-hidden zone.
    */
   async setFormat(id: string, format: DeckFormat): Promise<void> {
-    await mutateDeck(id, d => {
-      const cards =
-        format === 'commander'
-          ? d.cards
-          : d.cards.map(c => (c.section === 'commander' ? { ...c, section: 'main' as const } : c));
-      return { ...d, cards, format };
-    });
+    await mutateDeck(id, d => withFormat(d, format));
   },
 
   /** Set how many lands this deck should run (null returns to the format's). */

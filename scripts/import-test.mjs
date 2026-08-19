@@ -56,7 +56,11 @@ const {
   collectionToCsv,
   collectionValue,
   deckFile,
+  deckFromImport,
   deckToText,
+  mergeDeckCards,
+  newDeck,
+  withFormat,
   findDuplicates,
   inspectImport,
   money,
@@ -1228,6 +1232,85 @@ check('a card known only by name still has a picture', () => {
 
 check('a row that identifies nothing at all yields no URL', () => {
   assert.equal(cardImageUrl({}), undefined);
+});
+
+// --- building a deck ----------------------------------------------------------
+//
+// "New deck" exists on the desktop and on the phone, and the two have to produce
+// the same object: a deck made on one device is opened on the other.
+
+check('a new deck is empty, Commander, and stamped once', () => {
+  const deck = newDeck({ at: 1000 });
+  assert.deepEqual(deck.cards, []);
+  assert.equal(deck.format, 'commander');
+  assert.equal(deck.source, 'manual');
+  assert.equal(deck.createdAt, 1000);
+  assert.equal(deck.updatedAt, 1000, 'a deck nobody has touched was not edited after it was made');
+});
+
+check('a deck with no name given still has one', () => {
+  assert.equal(newDeck({}).name, 'New deck');
+  assert.equal(newDeck({ name: '   ' }).name, 'New deck', 'and whitespace is not a name');
+  assert.equal(newDeck({ name: '  Tokens ' }).name, 'Tokens');
+});
+
+check('two decks made in the same millisecond are still two decks', () => {
+  assert.notEqual(newDeck({ at: 1 }).id, newDeck({ at: 1 }).id);
+});
+
+check('leaving Commander rescues the command zone instead of hiding it', () => {
+  // The cards are still in the deck and still counted, so a format switch that
+  // left them in a zone the UI no longer draws would look like theft.
+  const deck = {
+    cards: [
+      { name: 'Talrand', quantity: 1, section: 'commander' },
+      { name: 'Sol Ring', quantity: 1, section: 'main' },
+    ],
+    format: 'commander',
+  };
+  const moved = withFormat(deck, 'modern');
+  assert.equal(moved.format, 'modern');
+  assert.deepEqual(moved.cards.map(c => c.section), ['main', 'main']);
+});
+
+check('a format that keeps a command zone leaves the commander alone', () => {
+  const deck = { cards: [{ name: 'Talrand', quantity: 1, section: 'commander' }], format: 'commander' };
+  assert.equal(withFormat(deck, 'commander').cards[0].section, 'commander');
+});
+
+check('adding a card you already run bumps the row rather than repeating it', () => {
+  const merged = mergeDeckCards(
+    [{ name: 'Lightning Bolt', quantity: 3, section: 'main' }],
+    [{ name: 'lightning bolt', quantity: 1, section: 'main' }],
+  );
+  assert.equal(merged.length, 1, 'a decklist exported after this must not say Bolt twice');
+  assert.equal(merged[0].quantity, 4);
+});
+
+check('the same card in another zone is a different row', () => {
+  const merged = mergeDeckCards(
+    [{ name: 'Lightning Bolt', quantity: 3, section: 'main' }],
+    [{ name: 'Lightning Bolt', quantity: 2, section: 'sideboard' }],
+  );
+  assert.equal(merged.length, 2);
+});
+
+check('merging never mutates the deck it was given', () => {
+  const before = [{ name: 'Sol Ring', quantity: 1, section: 'main' }];
+  mergeDeckCards(before, [{ name: 'Sol Ring', quantity: 4, section: 'main' }]);
+  assert.equal(before[0].quantity, 1);
+});
+
+check('a pasted list becomes a deck through the same parser the desktop uses', () => {
+  const { cards } = parseDeckList('// Commander\n1 Talrand\n\n2 Sol Ring\n2 Sol Ring');
+  const deck = deckFromImport(cards, { at: 5, source: 'pasted list' });
+  assert.equal(deck.format, 'commander', 'because the list named a commander');
+  assert.equal(deck.cards.find(c => c.section === 'commander').name, 'Talrand');
+  assert.equal(
+    deck.cards.find(c => c.section === 'main').quantity,
+    4,
+    'and a card listed twice is one row',
+  );
 });
 
 await rm(out, { force: true, recursive: true });

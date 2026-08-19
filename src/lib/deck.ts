@@ -249,6 +249,29 @@ export const deckFromImport = (
   };
 };
 
+/**
+ * An empty deck, ready to be filled card by card.
+ *
+ * Shared for the same reason `deckFromImport` is: "New deck" exists on both the
+ * desktop and the phone, and if the two disagreed about the default format, the
+ * fallback name or the shape of the object, it would surface days later on
+ * whichever device didn't make the deck.
+ */
+export const newDeck = (
+  options: { at?: number; format?: DeckFormat; name?: string } = {},
+): Deck => {
+  const { at = Date.now(), format = 'commander', name } = options;
+  return {
+    cards: [],
+    createdAt: at,
+    format,
+    id: newDeckId(),
+    name: name?.trim() || 'New deck',
+    source: 'manual',
+    updatedAt: at,
+  };
+};
+
 /** A stable id for a new deck. */
 export const newDeckId = (): string =>
   globalThis.crypto?.randomUUID?.() ??
@@ -257,6 +280,42 @@ export const newDeckId = (): string =>
 /** Total copies across a set of deck cards (optionally one section). */
 export const countCards = (cards: DeckCard[], section?: DeckSection): number =>
   cards.reduce((n, c) => (section && c.section !== section ? n : n + c.quantity), 0);
+
+/**
+ * Fold cards into a deck's list, adding to a matching row rather than repeating
+ * it.
+ *
+ * Matched on section plus the loose name key, so typing "Lightning Bolt" into a
+ * deck that already runs three makes four — not a second row of one, which is
+ * what a decklist exported afterwards would otherwise say.
+ */
+export const mergeDeckCards = (
+  into: readonly DeckCard[],
+  add: readonly DeckCard[],
+): DeckCard[] => {
+  const out = into.map(card => ({ ...card }));
+  for (const card of add) {
+    const key = cardKey(card.name);
+    if (!key) continue;
+    const found = out.find(c => c.section === card.section && cardKey(c.name) === key);
+    if (found) found.quantity += card.quantity;
+    else out.push({ ...card });
+  }
+  return out;
+};
+
+/**
+ * Change a deck's format, rescuing anything in the command zone if that zone is
+ * about to stop existing — otherwise those cards are still in the deck, still
+ * counted, and nowhere on screen.
+ */
+export const withFormat = (deck: Deck, format: DeckFormat): Deck => ({
+  ...deck,
+  cards: formatInfo(format).commanderZone
+    ? deck.cards
+    : deck.cards.map(c => (c.section === 'commander' ? { ...c, section: 'main' as const } : c)),
+  format,
+});
 
 /** A card the deck is short of, and by how many copies. */
 export interface DeckShortfall {

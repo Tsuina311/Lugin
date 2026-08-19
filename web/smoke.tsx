@@ -16,13 +16,14 @@ import { renderToString } from 'react-dom/server';
 
 import { App } from '../src/web/App';
 import { CollectionView } from '../src/web/CollectionView';
+import { DeckEditor } from '../src/web/DeckEditor';
 import { DeckList } from '../src/web/DeckList';
 import { ImportScreen } from '../src/web/ImportScreen';
 import { PRICES_CACHE } from '../src/web/priceStore';
 import { SHARE_INBOX, SHARE_KEY_PATH } from '../src/web/sharedImport';
 
 import { buildCollection } from '@/lib/collection';
-import type { Deck } from '@/lib/deck';
+import { newDeck, type Deck } from '@/lib/deck';
 import { inspectImport } from '@/lib/import';
 import { ImportReview } from '@/ui/components/ImportReview';
 
@@ -103,6 +104,14 @@ const checks: [string, () => string][] = [
   ['CollectionView (empty)', () => renderToString(<CollectionView collection={null} />)],
   ['DeckList', () => renderToString(<DeckList collection={collection} decks={decks} />)],
   ['DeckList (empty)', () => renderToString(<DeckList collection={collection} decks={[]} />)],
+  ['DeckEditor', () => renderToString(<DeckEditor collection={collection} deck={decks[0]} onBack={() => {}} />)],
+  [
+    'DeckEditor (a deck with nothing in it yet)',
+    () =>
+      renderToString(
+        <DeckEditor collection={collection} deck={newDeck({ at: 0 })} onBack={() => {}} />,
+      ),
+  ],
 ];
 
 let failed = 0;
@@ -154,6 +163,33 @@ const listSays: [string, boolean][] = [
   ['the list can be swapped for a grid', view.includes('Show as card images')],
 ];
 for (const [what, held] of listSays) {
+  if (held) {
+    console.log(`  ok  ${what}`);
+  } else {
+    failed += 1;
+    console.log(`  FAIL  ${what}`);
+  }
+}
+
+// A phone that can only read decks made elsewhere is a viewer. Both of the
+// desktop's doors — an empty deck of a chosen format, and a list imported whole
+// — have to be reachable here, including from the empty state, which is exactly
+// where someone with no decks is standing.
+const emptyDecks = renderToString(<DeckList collection={collection} decks={[]} />).replace(
+  /<!--.*?-->/g,
+  '',
+);
+const editor = renderToString(
+  <DeckEditor collection={collection} deck={newDeck({ at: 0 })} onBack={() => {}} />,
+).replace(/<!--.*?-->/g, '');
+const deckSays: [string, boolean][] = [
+  ['a deck can be started with nothing to start from', emptyDecks.includes('New deck')],
+  ['the format is chosen before the deck is made', emptyDecks.includes('Commander')],
+  ['a list can be pasted in instead', emptyDecks.includes('>Paste<')],
+  ['a new deck can be filled', editor.includes('Add a card, or paste a list')],
+  ['a deck can be thrown away', editor.includes('>Delete<')],
+];
+for (const [what, held] of deckSays) {
   if (held) {
     console.log(`  ok  ${what}`);
   } else {

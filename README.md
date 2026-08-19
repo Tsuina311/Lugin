@@ -121,6 +121,37 @@ grid from the top instead of stalling on forty parallel requests. The smoke test
 asserts that a freshly rendered list contains no Scryfall URL at all, since a
 stray `<img>` here is a silent megabyte per scroll.
 
+**Decks can be built here, not just read.** The phone was a viewer for decks made
+somewhere else, which made the Decks tab a dead end on the device most likely to
+be in your hand in a shop. It now offers the desktop's two doors: an empty deck
+of a chosen format, and a decklist imported whole. Pasting stands in for the
+desktop's file picker, because a decklist on a phone is far more often in the
+clipboard — copied out of Moxfield or a forum post — than it is a file, and files
+already arrive through the Import tab and ManaBox's share sheet.
+
+Once open, a deck can be renamed, switched between formats, filled and emptied.
+Cards go in as text through the same `parseDeckList` the extension uses, so one
+box takes a typed name, a `2 Lightning Bolt` line, or a whole pasted list with
+section headers; names from your own collection are offered as you type, since a
+phone keyboard is the worst place to spell Lim-Dûl's Vault. What is deliberately
+*not* here is the rest of the desktop editor — Scryfall search, the mana curve,
+land balancing, EDHREC suggestions — which wants a big screen and a sitting-down
+kind of attention.
+
+Three operations moved into `src/lib/deck.ts` rather than being written twice:
+`newDeck` (both platforms have a "New deck" button, and a disagreement about the
+default format or fallback name would surface days later on whichever device
+didn't make the deck), `mergeDeckCards` (adding a card you already run has to
+bump the row, or an exported list names it twice) and `withFormat` (leaving
+Commander has to rescue the command zone, or those cards stay in the deck, stay
+counted, and vanish from the screen). All three are tested.
+
+Deck edits push on a 1.5-second debounce rather than per write. Building a deck
+is a burst of small changes — a quantity stepper is somebody tapping "+" four
+times — and a Drive round trip each would be slow, would flap the header between
+"syncing" and "synced", and would upload four versions of a state only the last
+of which matters. The local write is still immediate, so nothing is at risk.
+
 Which picture a row gets is a ladder, not a lookup, and it now lives in
 `src/lib/cardImage.ts` where both builds read it: a Scryfall id resolves to the
 image CDN directly (cacheable, and not the rate-limited API redirect), then a

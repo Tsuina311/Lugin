@@ -26,7 +26,7 @@ import { createSyncEngine } from '@/core/sync/engine';
 import type { ApplicationData, DomainKey } from '@/core/sync/model';
 import { UnsupportedSchemaError } from '@/core/sync/repository';
 import type { CollectionCard, StoredCollection } from '@/lib/collection';
-import { deckFromImport } from '@/lib/deck';
+import { deckFromImport, newDeck, parseDeckList, type Deck, type DeckFormat } from '@/lib/deck';
 import { applyImport, findDuplicates } from '@/lib/duplicates';
 import type { ImportDecision, ImportFormat } from '@/lib/import';
 import { webGoogleAuth } from '@/platform/web/googleAuth';
@@ -150,6 +150,43 @@ void loadLocal().then(() => {
   if (configured && webGoogleAuth.isConnected()) void reconcile(true);
 });
 
+let pushTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Push once the edits stop, rather than after each one.
+ *
+ * Building a deck is a burst of small writes — a quantity stepper is somebody
+ * tapping "+" four times — and a Drive round trip per tap would be slow, would
+ * flap the header between "syncing" and "synced", and would achieve nothing,
+ * since only the final state is ever uploaded. The local write already happened;
+ * this is only about when the copy leaves the phone.
+ */
+const schedulePush = (): void => {
+  if (pushTimer) clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => {
+    pushTimer = null;
+    void reconcile(true);
+  }, 1500);
+};
+
+/**
+ * Rewrite the deck list locally and mark it for pushing.
+ *
+ * No 'busy' status: this is an IndexedDB write behind a tap, and a spinner for
+ * it would flicker on every keystroke of a deck's name.
+ */
+const writeDecks = async (update: (decks: readonly Deck[]) => Deck[]): Promise<void> => {
+  try {
+    const before = await local.read();
+    const data = await local.edit('decks', update(before.decks.value));
+    set({ data, pending: true });
+  } catch (err) {
+    set({ error: describe(err), status: 'error' });
+    return;
+  }
+  schedulePush();
+};
+
 export const syncStore = {
   /**
    * Drop scanned cards into the local collection, merging exact printings.
@@ -200,6 +237,13 @@ connect(): void {
         set({ error: describe(err), status: 'error' });
       },
     );
+  },
+
+  /** Start an empty deck and return its id, so the caller can open it. */
+  async createDeck(format: DeckFormat, name?: string): Promise<string> {
+    const deck = newDeck({ format, name });
+    await writeDecks(decks => [deck, ...decks]);
+    return deck.id;
   },
 
   
@@ -268,6 +312,23 @@ disconnect(): void {
     await reconcile(true);
   },
 
+  /**
+   * File a pasted or uploaded decklist as a new deck, returning its id — or null
+   * when the text held no cards, which the caller says in place rather than as a
+   * sync error, because nothing about syncing went wrong.
+   */
+  async importDeckList(text: string, source: string): Promise<string | null> {
+    const { cards, name } = parseDeckList(text);
+    const deck = deckFromImport(cards, { name, source });
+    if (!deck) return null;
+    await writeDecks(decks => [deck, ...decks]);
+    return deck.id;
+  },
+
+  async removeDeck(id: string): Promise<void> {
+    await writeDecks(decks => decks.filter(deck => deck.id !== id));
+  },
+
   subscribe(listener: () => void): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);
@@ -276,5 +337,12 @@ disconnect(): void {
   /** The user asked, so a failure is worth showing. */
   syncNow(): void {
     void reconcile(false);
+  },
+
+  /** Change one deck. `updatedAt` is stamped here so no caller can forget it. */
+  async updateDeck(id: string, update: (deck: Deck) => Deck): Promise<void> {
+    await writeDecks(decks =>
+      decks.map(deck => (deck.id === id ? { ...update(deck), updatedAt: Date.now() } : deck)),
+    );
   },
 };
