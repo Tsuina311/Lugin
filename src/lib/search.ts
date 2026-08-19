@@ -161,6 +161,32 @@ export const hasSearchCriteria = (q: CardQuery): boolean =>
   q.cmcMax != null;
 
 /**
+ * Run a raw Scryfall query (one printing per card, alphabetical).
+ */
+export const searchScryfallQuery = async (
+  query: string,
+  limit = 50,
+): Promise<CardSearchResponse> => {
+  const trimmed = query.trim();
+  if (!trimmed) return { cards: [], query: '', total: 0 };
+
+  const url = `${SEARCH_URL}?order=name&unique=cards&dir=asc&q=${encodeURIComponent(trimmed)}`;
+  const res = await fetchRemote(url, 'application/json');
+  if (!res.ok) {
+    if (res.status === 404) return { cards: [], query: trimmed, total: 0 };
+    if (res.status === 400) throw new Error('That search isn’t valid Scryfall syntax.');
+    throw new Error(`Scryfall search failed (HTTP ${res.status})`);
+  }
+  const json = JSON.parse(res.body) as ScryfallList;
+  const data = json.data ?? [];
+  return {
+    cards: data.slice(0, limit).map(toResult),
+    query: trimmed,
+    total: json.total_cards ?? data.length,
+  };
+};
+
+/**
  * Run a search (one printing per card, alphabetical). Returns at most `limit`
  * cards plus the true total, so the caller can show images only once the set has
  * narrowed. Empty when there's nothing to search for, or when Scryfall finds
@@ -169,19 +195,5 @@ export const hasSearchCriteria = (q: CardQuery): boolean =>
 export const searchCards = async (q: CardQuery, limit = 12): Promise<CardSearchResponse> => {
   const query = buildScryfallQuery(q);
   if (!query || !hasSearchCriteria(q)) return { cards: [], query, total: 0 };
-
-  const url = `${SEARCH_URL}?order=name&unique=cards&dir=asc&q=${encodeURIComponent(query)}`;
-  const res = await fetchRemote(url, 'application/json');
-  if (!res.ok) {
-    if (res.status === 404) return { cards: [], query, total: 0 }; // no matches
-    if (res.status === 400) throw new Error('That search isn’t valid Scryfall syntax.');
-    throw new Error(`Scryfall search failed (HTTP ${res.status})`);
-  }
-  const json = JSON.parse(res.body) as ScryfallList;
-  const data = json.data ?? [];
-  return {
-    cards: data.slice(0, limit).map(toResult),
-    query,
-    total: json.total_cards ?? data.length,
-  };
+  return searchScryfallQuery(query, limit);
 };

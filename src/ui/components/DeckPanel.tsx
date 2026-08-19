@@ -12,6 +12,7 @@ import { GoldfishPanel } from './GoldfishPanel';
 import { IconButton } from './IconButton';
 import { ManaCurve } from './ManaCurve';
 import { SelectionBar } from './Selection';
+import { TagsPanel } from './TagsPanel';
 import { useCardPreview } from './cardPreview';
 import { COLOR_PIPS } from './colorPips';
 import {
@@ -388,6 +389,7 @@ const SECTION_LABEL: Record<DeckSection, string> = {
 // The editor's panes: the deck itself plus one per recommendation source.
 const DECK_VIEWS = [
   { id: 'deck', label: 'Deck', title: 'The cards in this deck' },
+  { id: 'tags', label: 'Tags', title: 'Find cards by mechanic or theme' },
   { id: 'edhrec', label: 'EDHREC', title: 'Recommended cards for this commander (EDHREC)' },
   {
     id: 'goldfish',
@@ -398,6 +400,8 @@ const DECK_VIEWS = [
 ] as const;
 
 type DeckView = (typeof DECK_VIEWS)[number]['id'];
+
+const COMMANDER_VIEWS = new Set<DeckView>(['edhrec', 'goldfish', 'cuts']);
 
 const DeckEditor = ({
   collectionByKey,
@@ -507,6 +511,13 @@ const DeckEditor = ({
   const [view, setView] = useState<DeckView>('deck');
   useEffect(() => setView('deck'), [deck.id]);
   const showSuggestions = fmt.commanderZone && commanders.length > 0;
+  const visibleViews = useMemo(
+    () => DECK_VIEWS.filter(v => v.id === 'deck' || v.id === 'tags' || showSuggestions),
+    [showSuggestions],
+  );
+  useEffect(() => {
+    if (!showSuggestions && COMMANDER_VIEWS.has(view)) setView('deck');
+  }, [showSuggestions, view]);
 
   // The commander's colour identity, which bounds what's legal in the deck —
   // used to preselect the card search's identity filter. Undefined until every
@@ -686,12 +697,12 @@ const DeckEditor = ({
         ) : (
           summary.total > 0 && <Badge tone="pos">complete</Badge>
         )}
-        {showSuggestions && (
+        {visibleViews.length > 1 && (
           <div
             className="ml-auto flex flex-none overflow-hidden rounded border border-line-strong"
             role="group"
           >
-            {DECK_VIEWS.map(v => (
+            {visibleViews.map(v => (
               <button
                 key={v.id}
                 aria-pressed={view === v.id}
@@ -766,9 +777,16 @@ const DeckEditor = ({
         </div>
       )}
 
-      {showSuggestions && view !== 'deck' ? (
+      {view !== 'deck' ? (
         <div className="min-h-0 flex-1">
-          {view === 'edhrec' ? (
+          {view === 'tags' ? (
+            <TagsPanel
+              collectionByKey={collectionByKey}
+              commanderIdentity={commanderIdentity}
+              inDeck={inDeck}
+              onAdd={names => void deckStore.addCards(deck.id, names, 'main')}
+            />
+          ) : view === 'edhrec' ? (
             <EdhrecPanel
               collectionByKey={collectionByKey}
               commanderNames={commanders.map(c => c.name)}
@@ -977,7 +995,7 @@ const DeckEditor = ({
               <EmptyState
                 hint={
                   fmt.commanderZone
-                    ? 'Pick a commander above and the recommendation tabs will fill in from there — or search for any card by name, type or mana value.'
+                    ? 'Pick a commander for EDHREC and Goldfish — or use Tags to find cards by mechanic, or search by name, type or mana value.'
                     : 'Search above by name, type or mana value to add cards, or import a list.'
                 }
                 icon={Search}

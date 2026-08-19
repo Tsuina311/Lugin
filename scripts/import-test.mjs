@@ -39,7 +39,8 @@ await writeFile(
    export { cardKey } from '${root}src/lib/cardName';
    export { sellerFrom, sellerSlugFromHref, timelineFrom } from '${root}src/sites/cardmarket/order';
    export { shouldWelcome } from '${root}src/ui/firstRun';
-   export * from '${root}src/lib/table';`,
+   export * from '${root}src/lib/table';
+   export * from '${root}src/lib/deckTags';`,
 );
 
 const bundle = join(out, 'import.mjs');
@@ -104,6 +105,9 @@ const {
   shippingPerCopy,
   shouldWelcome,
   timelineFrom,
+  filterDeckTags,
+  buildTagsQuery,
+  deckTagById,
 } = await import(pathToFileURL(bundle).href);
 
 let failed = 0;
@@ -1604,6 +1608,21 @@ check('an expansion read off a URL resolves to a dated set', () => {
   );
   assert.equal(setName, 'Time Spiral Remastered Extras');
   assert.equal(resolveSet(SETS, { setName })?.releasedAt, '2021-03-19');
+});
+
+check('deck tags filter by label, category, and synonyms', () => {
+  const draw = filterDeckTags('draw');
+  assert.ok(draw.some(t => t.id === 'draw'));
+  assert.ok(draw.some(t => t.id === 'draw-on-cast'));
+  assert.ok(filterDeckTags('evasion').some(t => t.id === 'flying'));
+  assert.ok(filterDeckTags('elf').some(t => t.id === 'tribe-elf'));
+});
+
+check('deck tags combine into a Scryfall query with optional identity', () => {
+  assert.equal(buildTagsQuery(['draw', 'flying']), '(o:"draw") (keyword:flying)');
+  assert.equal(buildTagsQuery(['draw'], ['U', 'R']), '(o:"draw") id<=ur');
+  assert.equal(buildTagsQuery(['draw'], []), '(o:"draw") id=c');
+  assert.equal(deckTagById('nope'), undefined);
 });
 
 await rm(out, { force: true, recursive: true });

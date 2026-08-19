@@ -45,6 +45,7 @@ import { deckFile } from '@/lib/export';
 import { fetchGoldfishArchetype } from '@/lib/mtggoldfish';
 import { searchCards } from '@/lib/search';
 import { CutsPanel } from '@/ui/components/CutsPanel';
+import { TagsPanel } from '@/ui/components/TagsPanel';
 import { EdhrecPanel } from '@/ui/components/EdhrecPanel';
 import { GoldfishPanel } from '@/ui/components/GoldfishPanel';
 import { Picture } from '@/ui/components/Picture';
@@ -74,12 +75,15 @@ const VIEW_KEY = 'lugin:webDeckView';
 
 const DECK_VIEWS = [
   { id: 'deck', label: 'Deck', title: 'The cards in this deck' },
+  { id: 'tags', label: 'Tags', title: 'Find cards by mechanic or theme' },
   { id: 'edhrec', label: 'EDHREC', title: 'Recommended cards for this commander' },
   { id: 'goldfish', label: 'Goldfish', title: 'Most-played cards for this commander' },
   { id: 'cuts', label: 'Cuts', title: 'Cards few other decks play' },
 ] as const;
 
 type DeckPanel = (typeof DECK_VIEWS)[number]['id'];
+
+const COMMANDER_PANELS = new Set<DeckPanel>(['edhrec', 'goldfish', 'cuts']);
 
 /** Identifies a row across sections, since the same card can sit in two. */
 const rowKey = (card: DeckCard): string => `${card.section}:${cardKey(card.name)}`;
@@ -175,7 +179,15 @@ export const DeckEditor = ({
   );
   const commandersKey = commanders.map(name => cardKey(name)).join('|');
   const commanderRecs = formatInfo(deck.format).commanderZone && commanders.length > 0;
+  const deckTabs = useMemo(
+    () => DECK_VIEWS.filter(tab => tab.id === 'deck' || tab.id === 'tags' || commanderRecs),
+    [commanderRecs],
+  );
   const collectionByKey = collection?.byKey ?? {};
+
+  useEffect(() => {
+    if (!commanderRecs && COMMANDER_PANELS.has(panel)) setPanel('deck');
+  }, [commanderRecs, panel]);
 
   const inDeck = useMemo(() => {
     const map: Record<string, number> = {};
@@ -386,12 +398,12 @@ export const DeckEditor = ({
             Add a commander to unlock EDHREC, Goldfish and cut suggestions.
           </p>
         ) : null}
-        {commanderRecs ? (
+        {deckTabs.length > 1 ? (
           <div
             className="mt-2 flex gap-1 overflow-x-auto px-2 pb-1"
             role="tablist"
           >
-            {DECK_VIEWS.map(tab => (
+            {deckTabs.map(tab => (
               <button
                 key={tab.id}
                 aria-selected={panel === tab.id}
@@ -410,7 +422,13 @@ export const DeckEditor = ({
         ) : null}
       </div>
 
-      {panel === 'edhrec' ? (
+      {panel === 'tags' ? (
+        <TagsPanel
+          collectionByKey={collectionByKey}
+          inDeck={inDeck}
+          onAdd={addToMain}
+        />
+      ) : panel === 'edhrec' ? (
         <EdhrecPanel
           collectionByKey={collectionByKey}
           commanderNames={commanders}
