@@ -32,13 +32,9 @@ concurrency:
 
 jobs:
   goldfish-proxy:
-    # Optional: auto-deploy the CORS proxy when a Cloudflare API token is set.
-    # Otherwise set the repository variable VITE_LUGIN_GOLDFISH_PROXY_URL manually
-    # after `yarn goldfish:deploy`.
-    if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     runs-on: ubuntu-latest
     outputs:
-      url: ${{ steps.deploy.outputs.deployment-url }}
+      url: ${{ steps.proxy.outputs.url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,10 +49,17 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           command: deploy
+        # No token yet — skip quietly; build falls back to vars.VITE_LUGIN_GOLDFISH_PROXY_URL.
+        continue-on-error: true
+      - name: Capture proxy URL
+        id: proxy
+        run: |
+          if [ -n "${{ steps.deploy.outputs.deployment-url }}" ]; then
+            echo "url=${{ steps.deploy.outputs.deployment-url }}" >> "$GITHUB_OUTPUT"
+          fi
 
   build:
     needs: [goldfish-proxy]
-    if: always() && !cancelled() && (needs.goldfish-proxy.result == 'success' || needs.goldfish-proxy.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
