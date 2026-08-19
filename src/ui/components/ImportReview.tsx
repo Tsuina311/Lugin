@@ -3,8 +3,9 @@ import { useMemo, useState } from 'react';
 import { Button } from './Button';
 
 import type { CollectionCard } from '@/lib/collection';
-import { findDuplicates, type DuplicateCandidate, type MatchStrength } from '@/lib/duplicates';
+import { findDuplicates, type DuplicateCandidate } from '@/lib/duplicates';
 import type { ImportDecision, ImportInspection, ImportKind } from '@/lib/import';
+import { STRENGTH_CLASS, STRENGTH_LABEL } from '@/ui/matchStrength';
 
 // The screen between "I picked a file" and "my collection changed".
 //
@@ -29,18 +30,6 @@ interface ImportReviewProps {
   /** Filename, so the header says which file this is about. */
   source: string;
 }
-
-const STRENGTH_LABEL: Record<MatchStrength, string> = {
-  exact: 'same printing',
-  likely: 'same set',
-  possible: 'maybe',
-};
-
-const STRENGTH_CLASS: Record<MatchStrength, string> = {
-  exact: 'bg-pos-soft text-pos',
-  likely: 'bg-accent-soft text-accent',
-  possible: 'bg-warn-soft text-warn',
-};
 
 const printing = (card: CollectionCard): string =>
   [card.setCode?.toUpperCase(), card.collectorNumber, card.foil ? 'foil' : null]

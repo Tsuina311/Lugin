@@ -52,18 +52,43 @@ const norm = (value: string | undefined): string => (value ?? '').trim().toLower
 const printingKey = (card: CollectionCard): string =>
   [cardKey(card.name), norm(card.setCode), norm(card.collectorNumber), card.foil].join('|');
 
+/** Whether the row identifies a printing at all, as opposed to just a card. */
+const statesPrinting = (card: CollectionCard): boolean =>
+  !!norm(card.setCode) || !!norm(card.collectorNumber);
+
 const editionKey = (card: CollectionCard): string =>
   [cardKey(card.name), norm(card.setCode), card.foil].join('|');
 
+/**
+ * Same card, same set, same finish — but keyed on the set's *name*.
+ *
+ * Cardmarket purchase rows know their edition as a name and never as a code, so
+ * a bought card and the same card in a ManaBox export have no set field in
+ * common; without this they could only ever pair on name alone, and every
+ * purchase would be graded a vague "maybe". Names agree far less reliably than
+ * codes do, which is why this ranks below `editionKey` rather than replacing it.
+ */
+const setNameKey = (card: CollectionCard): string =>
+  [cardKey(card.name), norm(card.setName), card.foil].join('|');
+
 const finishKey = (card: CollectionCard): string => [cardKey(card.name), card.foil].join('|');
 
-/** Index rows by a key, keeping the order they appeared in. */
+/**
+ * Index rows by a key, keeping the order they appeared in.
+ *
+ * `skip` drops rows whose key carries no actual evidence. Two rows that both
+ * omit a set are not "the same set": they would collide on the empty string and
+ * be paired with a confidence, and a reason, that neither row earned. They still
+ * meet lower down on name and finish, which is the honest description of them.
+ */
 const indexBy = (
   cards: CollectionCard[],
   key: (card: CollectionCard) => string,
+  skip?: (card: CollectionCard) => boolean,
 ): Map<string, number[]> => {
   const out = new Map<string, number[]>();
   cards.forEach((card, i) => {
+    if (skip?.(card)) return;
     const k = key(card);
     const bucket = out.get(k);
     if (bucket) bucket.push(i);
@@ -104,8 +129,9 @@ export const findDuplicates = (
     else byScryfall.set(key, [position]);
   });
 
-  const byPrinting = indexBy(existing, printingKey);
-  const byEdition = indexBy(existing, editionKey);
+  const byPrinting = indexBy(existing, printingKey, card => !statesPrinting(card));
+  const byEdition = indexBy(existing, editionKey, card => !norm(card.setCode));
+  const bySetName = indexBy(existing, setNameKey, card => !norm(card.setName));
   const byFinish = indexBy(existing, finishKey);
 
   const claim = (positions: number[] | undefined): number | null => {
@@ -120,8 +146,21 @@ export const findDuplicates = (
         card.scryfallId ? claim(byScryfall.get(`${norm(card.scryfallId)}|${card.foil}`)) : null,
         'Same printing — the file and your collection agree on the Scryfall id.',
       ],
-      ['exact', claim(byPrinting.get(printingKey(card))), `Same printing and finish (${describe(card)}).`],
-      ['likely', claim(byEdition.get(editionKey(card))), 'Same card and set, same finish.'],
+      [
+        'exact',
+        statesPrinting(card) ? claim(byPrinting.get(printingKey(card))) : null,
+        `Same printing and finish (${describe(card)}).`,
+      ],
+      [
+        'likely',
+        norm(card.setCode) ? claim(byEdition.get(editionKey(card))) : null,
+        'Same card and set, same finish.',
+      ],
+      [
+        'likely',
+        norm(card.setName) ? claim(bySetName.get(setNameKey(card))) : null,
+        `Same card and finish, both from ${card.setName}.`,
+      ],
       ['possible', claim(byFinish.get(finishKey(card))), 'Same card and finish, but a different or unstated printing.'],
     ];
 

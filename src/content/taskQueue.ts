@@ -18,6 +18,7 @@ import { askForVerification, needsVerification, VERIFY_HELP } from './verify';
 import { wantsStore } from './wantsStore';
 
 import { cardKey } from '@/lib/cardName';
+import { readWantDefaults } from '@/sites/cardmarket/wantDefaults';
 import {
   addWant,
   createWantList,
@@ -413,6 +414,11 @@ const handleDeckWants = async (
    */
   const askedFor = new Map<string, string>();
 
+  // Read once for the whole run, and shared with the single-add button in
+  // WantsPanel — the two used to hardcode different condition floors, so the same
+  // card landed on the list differently depending on which one put it there.
+  const wantDefaults = readWantDefaults();
+
   for (const card of cards) {
     if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
     if (!(await holdsLock())) throw new LostLock();
@@ -434,7 +440,11 @@ const handleDeckWants = async (
             amount: card.need,
             idMetacard: ids.idMetacard,
             idWantsList: listId,
-            minCondition: task.params?.minCondition ?? 2,
+            ...wantDefaults,
+            // An explicit per-task condition still wins over the stored default.
+            ...(task.params?.minCondition == null
+              ? {}
+              : { minCondition: task.params.minCondition }),
           },
           token,
         );

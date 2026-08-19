@@ -1,5 +1,7 @@
 import { cardKey, frontFaceName, stripVersion } from '@/lib/cardName';
 import { replayInPage, requestScryfall } from '@/lib/messaging';
+import { isLanguageName, languageOfRow } from '@/sites/cardmarket/language';
+import { parseOrderSeller, parseOrderTimeline } from '@/sites/cardmarket/order';
 
 // ---------------------------------------------------------------------------
 // Want lists: enumeration + local index building
@@ -943,7 +945,7 @@ const ADD_WANT_URL = '/Magic/AjaxAction/Wantslist_AddWant';
 /** Magic. The endpoint is shared with the site's other games. */
 const ID_GAME_MAGIC = '1';
 
-/** minCondition is Cardmarket's 1–7 scale; 5 = Good (what the site sends). */
+/** minCondition is Cardmarket's 1–7 scale; 5 is what the site's own form sends. */
 export interface AddWantParams {
   amount?: number;
   /** Identifies the card. Without it the site has nothing to add. */
@@ -952,7 +954,14 @@ export interface AddWantParams {
   isAltered?: boolean;
   isFoil?: boolean;
   isSigned?: boolean;
+  /**
+   * Cardmarket language ids to restrict the want to. Empty or omitted sends the
+   * literal `[]` the site uses for "any language".
+   */
+  languages?: readonly number[];
   minCondition?: number;
+  /** Most you'd pay per copy. Omitted means no cap, as before. */
+  wishPrice?: number;
 }
 
 /** Add one card to a want list via a replayed AjaxAction POST. */
@@ -960,6 +969,12 @@ export const addWant = async (params: AddWantParams, token: string): Promise<Del
   const flag = (on?: boolean): string => (on ? '1' : '0');
   // Field order is the site's. Empty arrays are sent as the literal "[]" the
   // site's own request carries, not omitted.
+  //
+  // `idLanguage` and `wishPrice` were pinned to "any" and "no cap" here for a long
+  // time, which meant the overlay could not express two of the three preferences
+  // the site's own form offers. They pass through now; the defaults are unchanged
+  // when a caller says nothing.
+  const languages = [...(params.languages ?? [])].filter(id => Number.isInteger(id) && id > 0);
   const body = new URLSearchParams([
     ['__cmtkn', token],
     ['idWantsList', params.idWantsList],
@@ -967,11 +982,14 @@ export const addWant = async (params: AddWantParams, token: string): Promise<Del
     ['idMetacard', params.idMetacard],
     ['amount', String(params.amount ?? 1)],
     ['idProduct', '[]'],
-    ['idLanguage', '[]'],
+    ['idLanguage', languages.length ? JSON.stringify(languages) : '[]'],
     ['minCondition', String(params.minCondition ?? 5)],
     ['isFoil', flag(params.isFoil)],
     ['isSigned', flag(params.isSigned)],
     ['isAltered', flag(params.isAltered)],
+    // Sent as a plain decimal point regardless of the display locale — the site's
+    // own request does the same, and a comma is read as a thousands separator.
+    ['wishPrice', params.wishPrice != null && params.wishPrice > 0 ? params.wishPrice.toFixed(2) : ''],
   ]).toString();
 
   const res = await replayInPage({
@@ -1435,53 +1453,7 @@ export const deleteWantList = (idWantsList: string, token: string): Promise<Dele
  * by the add-to-cart endpoint). Falls back to bare product links (names only)
  * if the row markup isn't recognized.
  */
-/** Languages Cardmarket shows as a flag icon (aria-label = language name). */
-const KNOWN_LANGUAGES = new Set([
-  'English',
-  'French',
-  'German',
-  'Italian',
-  'Spanish',
-  'Portuguese',
-  'Japanese',
-  'Simplified Chinese',
-  'Traditional Chinese',
-  'Chinese',
-  'Korean',
-  'Russian',
-  'Dutch',
-  'Polish',
-  'Czech',
-  'Hungarian',
-  'Other',
-]);
-
-/**
- * Language display names — English *and* native — that must never be treated as
- * a card name. Some rows expose a language flag/label whose text (e.g.
- * "Español") would otherwise be picked up as the name and sent to Scryfall.
- */
-const LANGUAGE_NAMES = new Set(
-  [
-    ...KNOWN_LANGUAGES,
-    'Français',
-    'Deutsch',
-    'Español',
-    'Italiano',
-    'Português',
-    'Nederlands',
-    'Polski',
-    'Русский',
-    '日本語',
-    '简体中文',
-    '繁體中文',
-    '中文',
-    '한국어',
-    'Čeština',
-    'Magyar',
-  ].map(s => s.toLowerCase()),
-);
-const isLanguageName = (name: string): boolean => LANGUAGE_NAMES.has(name.trim().toLowerCase());
+// Language names live in ./language.ts, shared with the page adapter.
 
 /**
  * Normalize a card name read from a link's text. Some listing pages (e.g. the
@@ -1539,12 +1511,7 @@ export const parseOffers = (root: ParentNode): ParsedOffer[] => {
       row.querySelector('.article-condition')?.getAttribute('data-bs-original-title') ||
       undefined;
 
-    // Language flag: a span whose aria-label is a known language name.
-    let language: string | undefined;
-    row.querySelectorAll<HTMLElement>('.product-attributes [aria-label]').forEach(el => {
-      const al = el.getAttribute('aria-label') ?? '';
-      if (!language && KNOWN_LANGUAGES.has(al)) language = al;
-    });
+    const language = languageOfRow(row);
 
     const { price, value } = findPrice(row);
     const imageUrl = findImageUrl(row);
@@ -1877,8 +1844,22 @@ export const scanSeller = async (
 // incremental: orders already folded in are skipped on a re-sync, and an
 // aborted scan still saves partial progress so re-syncing resumes cheaply.
 
-/** Completed-purchase states to scan (excludes Unpaid + Cancelled). */
-const PURCHASE_STATES = ['Paid', 'Sent', 'Arrived', 'NotArrived'];
+/**
+ * Cardmarket's own state for a completed purchase.
+ *
+ * These are route segments (`/Orders/Purchases/Arrived`), not display text, so
+ * they read the same whatever language the account is in.
+ */
+export type PurchaseState = 'Paid' | 'Sent' | 'Arrived' | 'NotArrived';
+
+/**
+ * Completed-purchase states to scan (excludes Unpaid + Cancelled).
+ *
+ * Ordered weakest-to-strongest on purpose: an order can only be in one state, but
+ * if the lists shift under us mid-sync and we see one twice, the later reading
+ * wins — and later here means further along, or disputed.
+ */
+const PURCHASE_STATES: PurchaseState[] = ['Paid', 'Sent', 'Arrived', 'NotArrived'];
 const MAX_LIST_PAGES = 40; // safety cap per state.
 
 /** One purchase of a card: which order, when it was paid, and the unit price. */
@@ -1912,12 +1893,45 @@ export interface PurchaseCard {
   purchases: PurchaseRecord[];
 }
 
+/**
+ * What an order is, as opposed to what was in it.
+ *
+ * The seller, the dispatch date and the shipping cost are properties of the order,
+ * and the card-keyed index has nowhere to put them — `shipping` was already a
+ * side-table keyed by order id, which was the shape asking to exist.
+ *
+ * Optional throughout: this arrived after people had already synced, so an index
+ * without it is normal and the backfill in `syncPurchases` fills it in.
+ */
+export interface PurchaseOrder {
+  /** Paid timestamp (ms), duplicated here so an order stands on its own. */
+  paidTs?: number;
+  /** Display name of the seller. */
+  seller?: string;
+  /** Stable seller identity, independent of the locale in the URL. */
+  sellerSlug?: string;
+  /** Seller profile path, for linking. */
+  sellerUrl?: string;
+  /** When the seller dispatched it (ms) — with `paidTs`, their handling time. */
+  sentTs?: number;
+  /**
+   * Where the order has got to, from the list it was enumerated under.
+   *
+   * Read from the state lists rather than the order page, because those are
+   * re-walked on every sync: an order that was in the post last week is on the
+   * Arrived list this week without us refetching anything.
+   */
+  state?: PurchaseState;
+}
+
 export interface PurchaseIndex {
   /** cardKey -> purchase history for that card. */
   cards: Record<string, PurchaseCard>;
   diagnostics: string[];
   /** Order ids already folded in (so a re-sync only fetches new orders). */
   orderIds: string[];
+  /** Per-order facts: seller, dispatch date. Absent on indexes synced before it. */
+  orders?: Record<string, PurchaseOrder>;
   /** Shipping paid per order (order id -> amount), for a separate shipping total. */
   shipping?: Record<string, number>;
   syncedAt: number;
@@ -2088,16 +2102,7 @@ const parseOrderShipping = (doc: ParentNode): number | undefined => {
   return undefined;
 };
 
-/** The "Paid" date from an order page's status timeline (fallback: first date). */
-const parseOrderPaidDate = (doc: ParentNode): { date?: string; ts?: number } => {
-  const boxes = [...doc.querySelectorAll<HTMLElement>('#Timeline .timeline-box, .timeline-box')];
-  const paid = boxes.find(b => /Paid\s*:/i.test(b.textContent ?? ''));
-  const text = paid?.textContent ?? doc.querySelector('#Timeline')?.textContent ?? '';
-  const m = text.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-  if (!m) return {};
-  const [, dd, mm, yyyy] = m;
-  return { date: `${dd}.${mm}.${yyyy}`, ts: Date.parse(`${yyyy}-${mm}-${dd}`) || undefined };
-};
+// The paid/sent timeline reader lives in ./order.ts, with the seller.
 
 export const syncPurchases = async (
   onProgress: (p: SyncProgress) => void,
@@ -2110,6 +2115,7 @@ export const syncPurchases = async (
     cards[k] = { count: v.count, name: v.name, purchases: [...(v.purchases ?? [])] };
   }
   const shipping: Record<string, number> = { ...(previous?.shipping ?? {}) };
+  const orders: Record<string, PurchaseOrder> = { ...(previous?.orders ?? {}) };
   const known = new Set(previous?.orderIds ?? []);
   const base = `/${currentLang()}/Magic/Orders/Purchases`;
 
@@ -2124,6 +2130,10 @@ export const syncPurchases = async (
     // are sorted newest-first, so on an incremental re-sync we stop paginating a
     // state as soon as a page has no unseen orders — no need to walk old history.
     const orderIds = new Set<string>();
+    // Which list each order turned up under. Cheap — we walk these pages anyway —
+    // and it is the only reading of "has it arrived yet" that refreshes without
+    // refetching the order itself.
+    const seenState = new Map<string, PurchaseState>();
     const hasUnseen = (ids: string[]) => ids.some(id => !known.has(id));
     for (let s = 0; s < PURCHASE_STATES.length; s++) {
       const state = PURCHASE_STATES[s];
@@ -2144,7 +2154,10 @@ export const syncPurchases = async (
         }
         const before = orderIds.size;
         let pageIds = parseOrderIds(doc);
-        pageIds.forEach(id => orderIds.add(id));
+        pageIds.forEach(id => {
+          orderIds.add(id);
+          seenState.set(id, state);
+        });
         const reportedPages = parsePageCount(doc);
         const totalPages = Math.min(reportedPages, MAX_LIST_PAGES);
         if (reportedPages > MAX_LIST_PAGES) {
@@ -2162,7 +2175,10 @@ export const syncPurchases = async (
           pagesFetched++;
           pageIds = parseOrderIds(pd);
           const pageHadUnseen = hasUnseen(pageIds);
-          pageIds.forEach(id => orderIds.add(id));
+          pageIds.forEach(id => {
+            orderIds.add(id);
+            seenState.set(id, state);
+          });
           if (orderIds.size === pre) {
             // Page p returned only ids we already have this run. If the pager
             // claims more pages, `?site=` likely isn't advancing the list.
@@ -2186,11 +2202,20 @@ export const syncPurchases = async (
       }
     }
 
+    // Record the states now, before any order is fetched: an order whose state
+    // moved on is worth knowing about even if the run is aborted halfway through
+    // phase 2, and it costs nothing since the lists have just been read.
+    for (const [id, state] of seenState) orders[id] = { ...orders[id], state };
+
     // Backfill: older orders indexed before we captured edition/image/product-id
     // won't show the right picture. Detect those (a record missing *both* a
     // product id and an image) and refetch them so history heals itself without
     // a full clear. We drop their stale records first so refetch replaces them.
     const needBackfill = new Set<string>();
+    // Orders indexed before we read the seller off the page. Counted separately
+    // because this is the one backfill that can flag *every* past order at once,
+    // and a re-sync that suddenly refetches two hundred pages should say why.
+    let needSeller = 0;
     if (incremental) {
       for (const c of Object.values(cards)) {
         for (const r of c.purchases) {
@@ -2198,6 +2223,11 @@ export const syncPurchases = async (
           // (indexed before we captured it) — refetch once so history heals.
           if ((!r.productId && !r.image) || r.foil === undefined) needBackfill.add(r.orderId);
         }
+      }
+      for (const id of known) {
+        if (orders[id]?.sellerSlug) continue;
+        if (!needBackfill.has(id)) needSeller += 1;
+        needBackfill.add(id);
       }
     }
     if (needBackfill.size > 0) {
@@ -2213,7 +2243,10 @@ export const syncPurchases = async (
         delete shipping[id];
         known.delete(id);
       }
-      diagnostics.push(`Backfilling ${needBackfill.size} older order(s) for edition/image data.`);
+      diagnostics.push(
+        `Backfilling ${needBackfill.size} older order(s) for edition/image data.` +
+          (needSeller > 0 ? ` ${needSeller} of them to learn who sold them.` : ''),
+      );
     }
 
     // Phase 2: fetch orders we haven't folded in before, plus any flagged for
@@ -2231,7 +2264,18 @@ export const syncPurchases = async (
       try {
         await pace(signal);
         const { doc } = await fetchDoc(`/${currentLang()}/Magic/Orders/${id}`, signal);
-        const { date, ts } = parseOrderPaidDate(doc);
+        const { date, sentTs, ts } = parseOrderTimeline(doc);
+        const seller = parseOrderSeller(doc);
+        // Merged, not replaced: the state was recorded from the list pages above
+        // and the order page has nothing better to say about it.
+        orders[id] = {
+          ...orders[id],
+          ...(ts == null ? {} : { paidTs: ts }),
+          ...(seller
+            ? { seller: seller.name, sellerSlug: seller.slug, sellerUrl: seller.url }
+            : {}),
+          ...(sentTs == null ? {} : { sentTs }),
+        };
         for (const art of parseOrderArticles(doc)) {
           const key = cardKey(art.name);
           if (!key) continue;
@@ -2273,7 +2317,12 @@ export const syncPurchases = async (
   diagnostics.push(
     aborted ? 'Stopped early — partial index saved; re-sync resumes.' : 'Scan complete.',
   );
-  return { cards, diagnostics, orderIds: [...known], shipping, syncedAt: Date.now() };
+  const named = Object.values(orders).filter(o => o.sellerSlug).length;
+  if (named > 0) {
+    const distinct = new Set(Object.values(orders).map(o => o.sellerSlug).filter(Boolean)).size;
+    diagnostics.push(`Seller known for ${named} order(s), across ${distinct} seller(s).`);
+  }
+  return { cards, diagnostics, orderIds: [...known], orders, shipping, syncedAt: Date.now() };
 };
 
 // ---------------------------------------------------------------------------

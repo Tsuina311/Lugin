@@ -44,6 +44,12 @@ import { wantsStore } from '@/content/wantsStore';
 import { cardKey } from '@/lib/cardName';
 import type { CardMetadata } from '@/lib/mtg';
 import {
+  CONDITIONS,
+  readWantDefaults,
+  writeWantDefaults,
+  type WantDefaults,
+} from '@/sites/cardmarket/wantDefaults';
+import {
   deleteWant,
   deleteWantList,
   listWantRows,
@@ -55,7 +61,7 @@ import {
   type WantRow,
   type WantsIndexList,
 } from '@/sites/cardmarket/wants';
-import { taskProgress } from '@/ui/format';
+import { taskProgress, timeAgo } from '@/ui/format';
 import { holdingPick, PICK_KEY } from '@/ui/modifier';
 
 /** The site's own page for a list, for anything we don't do ourselves yet. */
@@ -549,6 +555,22 @@ export const WantListsPanel = () => {
 
   const counts = useMemo(() => cardCounts(index), [index]);
 
+  // Mirrored in state so the controls re-render; localStorage is the store of
+  // record, because the task queue reads it synchronously mid-run.
+  const [wantDefaults, setWantDefaultsState] = useState(readWantDefaults);
+  const saveWantDefaults = (next: WantDefaults) => {
+    writeWantDefaults(next);
+    setWantDefaultsState(next);
+  };
+
+  // Distinct cards, not the sum of the lists: a card on three lists is one card
+  // you are looking for, and the larger number would only ever mislead.
+  const totalWanted = index ? Object.keys(index.cards).length : 0;
+  const mismatches = useMemo(
+    () => (index?.lists ?? []).filter(l => l.expected >= 0 && l.extracted < l.expected),
+    [index],
+  );
+
   const lists = useMemo(() => {
     const q = query.trim().toLowerCase();
     const all = index?.lists ?? [];
@@ -874,6 +896,85 @@ export const WantListsPanel = () => {
           </>
         )}
       </div>
+
+      {/* What the sync knows, and the two fields every new want is created with.
+          Both used to live under "Tools" in the Cards tab, which is where you
+          would look for neither of them. */}
+      {!open && (
+        <div className="flex flex-none flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-2 py-1 text-2xs text-ink-muted">
+          {index ? (
+            <span>
+              {index.lists.length} list{index.lists.length === 1 ? '' : 's'} · {totalWanted} card
+              {totalWanted === 1 ? '' : 's'} · read {timeAgo(index.syncedAt)}
+            </span>
+          ) : (
+            <span>Not read yet.</span>
+          )}
+
+          <label
+            className="flex items-center gap-1"
+            title="Condition floor for every want Lugin adds"
+          >
+            <span className="text-ink-faint">New wants at least</span>
+            <Select
+              onChange={e =>
+                saveWantDefaults({ ...wantDefaults, minCondition: Number(e.target.value) })
+              }
+              value={wantDefaults.minCondition}
+            >
+              {CONDITIONS.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.short}
+                </option>
+              ))}
+            </Select>
+          </label>
+
+          <label
+            className="flex items-center gap-1"
+            title="Maximum price for every want Lugin adds"
+          >
+            <span className="text-ink-faint">up to</span>
+            <input
+              className="h-6 w-14 rounded border border-line-strong bg-raised px-1.5 text-2xs text-ink outline-none focus:border-accent"
+              min="0"
+              onChange={e => {
+                const value = Number(e.target.value);
+                saveWantDefaults({
+                  ...wantDefaults,
+                  ...(e.target.value === '' || !(value > 0)
+                    ? { wishPrice: undefined }
+                    : { wishPrice: value }),
+                });
+              }}
+              placeholder="any"
+              step="0.25"
+              type="number"
+              value={wantDefaults.wishPrice ?? ''}
+            />
+          </label>
+
+          {index && (
+            <Button
+              className="ml-auto"
+              onClick={() => void wantsStore.clear()}
+              size="xs"
+              variant="subtle"
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* A list that came up short against its own card count means the parser
+          missed rows — worth saying, since the difference is silent otherwise. */}
+      {!open && mismatches.length > 0 && (
+        <p className="px-2 py-1 text-2xs text-warn">
+          {mismatches.length} list{mismatches.length === 1 ? '' : 's'} came up short against
+          Cardmarket’s own count — some may paginate differently.
+        </p>
+      )}
 
       {error && !open && <p className="px-2 py-1 text-2xs text-neg">{error}</p>}
 

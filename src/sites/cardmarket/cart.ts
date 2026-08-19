@@ -1,5 +1,6 @@
 import { callStore } from '@/content/callStore';
 import { replayInPage } from '@/lib/messaging';
+import { sellerSlugFromHref } from '@/sites/cardmarket/order';
 
 // Cardmarket adds an offer to the cart with a single AJAX POST:
 //   POST /en/Magic/AjaxAction/ShoppingCart_Add_AddArticlesFromUserOffers
@@ -112,11 +113,6 @@ export interface CartItem {
   /** Seller username slug (from the seller header this row sits under). */
   seller?: string;
 }
-
-const sellerSlugFromHref = (href: string | null): string | undefined => {
-  const m = href?.match(/\/Users\/([^/?#]+)/i);
-  return m ? decodeURIComponent(m[1]) : undefined;
-};
 
 export interface ServerCart {
   count: number;

@@ -3,20 +3,34 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { SearchInput } from './Field';
+import { Hint } from './Hint';
 import { IconButton } from './IconButton';
 import { ImportReview } from './ImportReview';
 import { PriceCheck } from './PriceCheck';
+import { PurchaseDuplicates } from './PurchaseDuplicates';
 import { SelectionBar } from './Selection';
 import { ViewToggle } from './ViewToggle';
-import { Pencil, RefreshCw } from './icons';
+import { Library, Loader2, Pencil, ReceiptEuro, RefreshCw } from './icons';
 import { useSequentialImages } from './useSequentialImages';
 
 import { cardImageOverrideStore } from '@/content/cardImageOverrideStore';
-import { collectionStore } from '@/content/collectionStore';
+import {
+  collectionStore,
+  setAddPurchasesToCollection,
+  shouldAddPurchasesToCollection,
+} from '@/content/collectionStore';
 import { deckStore } from '@/content/deckStore';
 import { expansionIconStore, normalizeSetName } from '@/content/expansionIconStore';
 import { previewStore } from '@/content/previewStore';
 import { purchaseStore } from '@/content/purchaseStore';
+import { taskQueue } from '@/content/taskQueue';
+import { arrivedOnly, inTransitCopies } from '@/lib/arrivedPurchases';
+import {
+  cdnImageFromId,
+  imageFromProductId,
+  imageUrlFor,
+  imageUrlForPrinting,
+} from '@/lib/cardImage';
 import { cardKey, stripVersion } from '@/lib/cardName';
 import { flags } from '@/lib/flags';
 import { inspectImport, type ImportDecision, type ImportInspection } from '@/lib/import';
@@ -24,14 +38,18 @@ import { requestPrices, requestScryfall, requestScryfallCached } from '@/lib/mes
 import { MANA_VALUE_BUCKETS, manaValueBucket, manaValueLabel, type CardMetadata } from '@/lib/mtg';
 import { collectionValue, money, signedMoney } from '@/lib/prices';
 import { fetchCardPrints, type CardPrint } from '@/lib/prints';
+import type { PurchaseVerdict } from '@/lib/purchaseDuplicates';
 import {
   currentLang,
   fetchDoc,
+  isCardPurchase,
   isNonCardName,
   type PurchaseRecord,
 } from '@/sites/cardmarket/wants';
+import { timeAgo } from '@/ui/format';
 import { usePrices } from '@/ui/usePrices';
 import { useRowSelection } from '@/ui/useRowSelection';
+import { useStickySet, useStickyValue } from '@/ui/useStickyState';
 
 // Quick primary-type toggles that filter the collection directly.
 const TYPE_TOGGLES = [
@@ -54,64 +72,8 @@ const FILTER_COLORS: { cls: string; code: string }[] = [
   { cls: 'bg-slate-400 text-slate-900', code: 'C' },
 ];
 
-const timeAgo = (ts: number): string => {
-  const mins = Math.round((Date.now() - ts) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} min ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs} h ago`;
-  return `${Math.round(hrs / 24)} d ago`;
-};
-
 const fmtEuro = (n?: number): string | undefined =>
   n == null ? undefined : `${n.toFixed(2).replace('.', ',')} €`;
-
-/**
- * Direct Scryfall image-CDN URL for a printing id. Scryfall lays images out at
- * `/normal/front/<a>/<b>/<id>.jpg` (a/b = first two id chars). Hitting the CDN
- * directly means the browser caches the file and repeat hovers make no request
- * — unlike `api.scryfall.com/cards/...?format=image`, which is an API call
- * (redirect) every time and is what Scryfall asks us not to hammer.
- */
-const cdnImageFromId = (scryfallId?: string): string | undefined => {
-  if (!scryfallId || !/^[0-9a-f-]{36}$/i.test(scryfallId)) return undefined;
-  return `https://cards.scryfall.io/normal/front/${scryfallId[0]}/${scryfallId[1]}/${scryfallId}.jpg`;
-};
-
-/** Last-resort image URL via the Scryfall API (only when no CDN url is known). */
-const imageUrlFor = (scryfallId?: string, name?: string): string | undefined => {
-  if (scryfallId) return `https://api.scryfall.com/cards/${scryfallId}?format=image&version=normal`;
-  if (name)
-    return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=normal`;
-  return undefined;
-};
-
-/**
- * Scryfall API image URL for an *exact* printing, keyed by set code + collector
- * number (`/cards/{set}/{number}`). This is what makes the picture match the
- * printing you actually own (e.g. Core Set 2021 #279) instead of Scryfall's
- * default printing (#1), which is all a name-only lookup can return. Used when
- * the row has a set + number but no Scryfall id (plain-list / purchase imports).
- */
-const imageUrlForPrinting = (setCode?: string, collectorNumber?: string): string | undefined => {
-  const set = setCode?.trim().toLowerCase();
-  const num = collectorNumber?.trim();
-  if (!set || !num) return undefined;
-  return `https://api.scryfall.com/cards/${encodeURIComponent(set)}/${encodeURIComponent(
-    num,
-  )}?format=image&version=normal`;
-};
-
-/**
- * Scryfall image URL for the *exact* printing identified by its Cardmarket
- * product id (`/cards/cardmarket/{id}`). Purchases carry this id, so it pins the
- * precise edition you bought — the most reliable source when we have no Scryfall
- * id or set + collector number.
- */
-const imageFromProductId = (productId?: string): string | undefined => {
-  if (!productId || !/^\d+$/.test(productId)) return undefined;
-  return `https://api.scryfall.com/cards/cardmarket/${productId}?format=image&version=normal`;
-};
 
 /** One distinct printing owned (set + collector number + finish + quantity). */
 interface OwnedPrinting {
@@ -144,11 +106,92 @@ interface CollectionRow {
 }
 
 export const CollectionPanel = () => {
-  const { collection, loading, error } = useSyncExternalStore(
+  const { cleared, collection, heldPurchases, loading, error } = useSyncExternalStore(
     collectionStore.subscribe,
     collectionStore.getSnapshot,
   );
+  const [confirmClear, setConfirmClear] = useState(false);
+  // Disarm when the collection changes underneath us. Otherwise arming the confirm,
+  // changing your mind and importing a file instead leaves a live "Delete" button
+  // one click from the cards you just added.
+  useEffect(() => setConfirmClear(false), [collection?.importedAt, collection?.totalCards]);
   const purchases = useSyncExternalStore(purchaseStore.subscribe, purchaseStore.getSnapshot);
+
+  // ---- Past purchases as a source of collection rows ------------------------
+  // The preference existed, but only in the Cards tab, and it only took effect on
+  // the *next* purchase sync — so someone with a year of history could tick "add
+  // purchases to my collection" and watch nothing happen. Here it is where the
+  // cards would land, and the button acts on the history already downloaded.
+  const [addPurchases, setAddPurchases] = useState(shouldAddPurchasesToCollection);
+  const [folding, setFolding] = useState(false);
+  const [foldError, setFoldError] = useState<string | null>(null);
+  const syncingPurchases = purchases.status === 'queued' || purchases.status === 'syncing';
+
+  /**
+   * What the button would actually add: cards, arrived, counted exactly as
+   * `syncFromPurchases` counts them. Advertising the whole order history here and
+   * then adding less would read as a bug.
+   */
+  const bought = useMemo(() => {
+    let copies = 0;
+    let unique = 0;
+    if (!purchases.index) return { copies, unique };
+    for (const card of Object.values(arrivedOnly(purchases.index).cards)) {
+      if (card.count <= 0 || !isCardPurchase(card)) continue;
+      unique += 1;
+      copies += card.count;
+    }
+    return { copies, unique };
+  }, [purchases.index]);
+
+  /** Bought but still travelling — withheld on purpose, so it has to be said. */
+  const inTransit = useMemo(
+    () => (purchases.index ? inTransitCopies(purchases.index) : 0),
+    [purchases.index],
+  );
+
+  /** Copies already folded in, so the button can say "refresh" instead of "add". */
+  const foldedCopies = useMemo(
+    () =>
+      (collection?.cards ?? []).reduce(
+        (n, c) => (c.source === 'purchases' ? n + c.quantity : n),
+        0,
+      ),
+    [collection],
+  );
+
+  const foldPurchasesIn = async () => {
+    if (!purchases.index) return;
+    setFolding(true);
+    setFoldError(null);
+    try {
+      await collectionStore.syncFromPurchases(purchases.index);
+    } catch (e) {
+      setFoldError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFolding(false);
+    }
+  };
+
+  /**
+   * Purchases withheld because they resemble cards already owned. Answering is
+   * optional — "Later" leaves them withheld rather than guessing, and the prompt
+   * comes back — so the review is opened rather than forced.
+   */
+  const [reviewingDupes, setReviewingDupes] = useState(false);
+  const answerDupes = async (answers: Record<string, PurchaseVerdict>) => {
+    if (!purchases.index) return;
+    setFolding(true);
+    setFoldError(null);
+    try {
+      await collectionStore.decidePurchaseDuplicates(answers, purchases.index);
+      setReviewingDupes(false);
+    } catch (e) {
+      setFoldError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFolding(false);
+    }
+  };
   const overrides = useSyncExternalStore(
     cardImageOverrideStore.subscribe,
     cardImageOverrideStore.getSnapshot,
@@ -470,13 +513,14 @@ export const CollectionPanel = () => {
   // ---- Scryfall metadata filters (type / creature type / color) -------------
   const [metaByName, setMetaByName] = useState<Record<string, CardMetadata>>({});
   const [metaState, setMetaState] = useState<'idle' | 'loading' | 'error'>('idle');
-  const [showFilters, setShowFilters] = useState(false);
-  const [fQuery, setFQuery] = useState('');
-  const [fColors, setFColors] = useState<Set<string>>(new Set());
-  const [fCmc, setFCmc] = useState<Set<number>>(new Set());
-  const [fSubtype, setFSubtype] = useState('');
+  // Remembered across navigations, like the other filter surfaces.
+  const [showFilters, setShowFilters] = useStickyValue('lugin:collection:showFilters', false);
+  const [fQuery, setFQuery] = useStickyValue('lugin:collection:query', '');
+  const [fColors, setFColors] = useStickySet<string>('lugin:collection:colors');
+  const [fCmc, setFCmc] = useStickySet<number>('lugin:collection:cmc');
+  const [fSubtype, setFSubtype] = useStickyValue('lugin:collection:subtype', '');
   // Quick primary-type toggle ('' = all). Single-select segmented control.
-  const [fType, setFType] = useState('');
+  const [fType, setFType] = useStickyValue('lugin:collection:type', '');
 
   const rowNames = useMemo(() => rows.map(r => r.name), [rows]);
 
@@ -859,16 +903,268 @@ export const CollectionPanel = () => {
               {timeAgo(collection.importedAt)}
             </span>
           )}
+          {/* Deleting the whole collection asks twice and says what it costs.
+              It used to be a one-click `subtle` button sitting where you reach for
+              the header controls — quieter than the confirmed, danger-styled button
+              that removes a *single* selected card, which is exactly backwards. */}
           {collection && (
-            <Button
-              className="ml-auto"
-              onClick={() => void collectionStore.clear()}
-              variant="subtle"
-            >
-              Clear
-            </Button>
+            <div className="ml-auto flex items-center gap-1">
+              {confirmClear ? (
+                <>
+                  <span className="text-[10px] text-red-300">
+                    Delete all {collection.totalCards} cards?
+                  </span>
+                  <Button
+                    onClick={() => {
+                      void collectionStore.clear();
+                      setConfirmClear(false);
+                    }}
+                    size="xs"
+                    title="Removes your whole collection from this device"
+                    variant="danger"
+                  >
+                    Delete
+                  </Button>
+                  <Button onClick={() => setConfirmClear(false)} size="xs" variant="subtle">
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={() => setConfirmClear(true)} size="xs" variant="subtle">
+                  Clear…
+                </Button>
+              )}
+            </div>
           )}
         </div>
+
+        {/* The local copy is the only copy until a sync runs, so a clear that was
+            a mistake needs a way back. Offered for this session only: an undo that
+            claimed to survive a reload would be lying. */}
+        {!collection && cleared && (
+          <div className="mt-2 flex items-center gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-100">
+            <span>
+              Cleared {cleared.cards.length} row{cleared.cards.length === 1 ? '' : 's'} from{' '}
+              {cleared.source}.
+            </span>
+            <Button
+              className="ml-auto"
+              onClick={() => void collectionStore.undoClear()}
+              size="xs"
+              variant="primary"
+            >
+              Undo
+            </Button>
+          </div>
+        )}
+        {/* Cards you have already bought are a collection you have already typed
+            in once, on Cardmarket. Uploading a file is the other way in; this is
+            the one that costs nothing. */}
+        <div className="mt-2 rounded border border-line p-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1.5 text-[11px] font-medium text-ink">
+              <ReceiptEuro aria-hidden size={13} />
+              Past purchases
+            </span>
+
+            {purchases.index ? (
+              bought.unique > 0 ? (
+                <>
+                  <span className="text-[10px] text-slate-500">
+                    {bought.unique} card{bought.unique === 1 ? '' : 's'} · {bought.copies} cop
+                    {bought.copies === 1 ? 'y' : 'ies'} in your order history
+                    {foldedCopies > 0 && ` · ${foldedCopies} already added`}
+                  </span>
+                  <Button
+                    className="ml-auto"
+                    disabled={folding}
+                    icon={folding ? Loader2 : foldedCopies > 0 ? RefreshCw : Library}
+                    onClick={() => void foldPurchasesIn()}
+                    size="xs"
+                    title={
+                      foldedCopies > 0
+                        ? 'Rebuild the purchased rows from your current order history'
+                        : 'Add every card you have bought to your collection'
+                    }
+                    variant={foldedCopies > 0 ? 'neutral' : 'primary'}
+                  >
+                    {folding
+                      ? 'Adding…'
+                      : foldedCopies > 0
+                        ? 'Refresh from history'
+                        : 'Add them to my collection'}
+                  </Button>
+                </>
+              ) : (
+                <span className="text-[10px] text-slate-500">
+                  No cards in your order history — only sealed or accessories.
+                </span>
+              )
+            ) : (
+              <>
+                <span className="text-[10px] text-slate-500">
+                  {syncingPurchases
+                    ? 'Reading your orders…'
+                    : 'Lugin hasn’t read your Cardmarket orders yet.'}
+                </span>
+                <Button
+                  className="ml-auto"
+                  disabled={syncingPurchases}
+                  icon={syncingPurchases ? Loader2 : undefined}
+                  onClick={() => {
+                    purchaseStore.markQueued();
+                    taskQueue.enqueue('syncPurchases', 'Sync purchases');
+                  }}
+                  size="xs"
+                  variant="primary"
+                >
+                  {syncingPurchases ? 'Syncing…' : 'Read my purchases'}
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Separate from the button on purpose: one adds what is there now, the
+              other decides what happens next time. Conflating them is why the old
+              checkbox looked broken. */}
+          {/* The hint sits outside the label: inside it, clicking the icon counts
+              as clicking the label and silently flips the preference. */}
+          <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-400">
+            <label className="flex items-center gap-1.5">
+              <input
+                checked={addPurchases}
+                onChange={e => {
+                  setAddPurchasesToCollection(e.target.checked);
+                  setAddPurchases(e.target.checked);
+                }}
+                type="checkbox"
+              />
+              Auto add new purchases
+            </label>
+            {/* A card you paid for on Tuesday is in a padded envelope, not in your
+                binder, so the fold-in waits for Cardmarket's own Arrived state. */}
+            <Hint label="What auto add does">
+              Adds cards to your collection once Cardmarket marks the order as arrived. Checked on
+              every purchase sync.
+            </Hint>
+          </div>
+
+          {/* Withheld copies have to be explained, or the count looks broken. */}
+          {inTransit > 0 && (
+            <div className="mt-1 text-[10px] text-slate-500">
+              {inTransit} cop{inTransit === 1 ? 'y is' : 'ies are'} still on the way — added once
+              the order arrives.
+            </div>
+          )}
+
+          {/* The other reason a purchase might not be in the collection, and the
+              one nobody would guess: it looks like a card that is already there. */}
+          {heldPurchases.length > 0 && (
+            <div className="mt-1 flex items-center gap-2 text-[10px] text-warn">
+              <span className="flex-1">
+                {heldPurchases.length} purchase{heldPurchases.length === 1 ? '' : 's'} may already
+                be in your collection — held back rather than counted twice.
+              </span>
+              <Button
+                disabled={folding}
+                onClick={() => setReviewingDupes(v => !v)}
+                size="xs"
+                variant={reviewingDupes ? 'neutral' : 'primary'}
+              >
+                {reviewingDupes ? 'Hide' : 'Review'}
+              </Button>
+            </div>
+          )}
+          {heldPurchases.length > 0 && reviewingDupes && (
+            <PurchaseDuplicates
+              busy={folding}
+              held={heldPurchases}
+              onCancel={() => setReviewingDupes(false)}
+              onConfirm={answers => void answerDupes(answers)}
+            />
+          )}
+          {/* Rebuilding replaces the purchased rows wholesale, so a hand-edited
+              quantity on one of them is not safe from it. Said once, here. */}
+          {foldedCopies > 0 && (
+            <div className="mt-1 text-[10px] text-slate-600">
+              Purchased rows are rebuilt from history, never doubled. Your uploaded rows are left
+              alone.
+            </div>
+          )}
+          {foldError && <div className="mt-1 text-[10px] text-red-400">{foldError}</div>}
+
+          {/* Progress lives here because this is where the sync is started from;
+              stopping it lives in the header, with every other running task. */}
+          {syncingPurchases && (
+            <div className="mt-1.5">
+              <div className="text-[10px] text-slate-400">
+                {purchases.status === 'queued'
+                  ? 'Waiting for the current task…'
+                  : purchases.progress?.phase === 'orders'
+                    ? `Reading order ${purchases.progress.current} of ${purchases.progress.total}…`
+                    : 'Looking up your orders…'}
+              </div>
+              <div className="mt-1 h-1 w-full overflow-hidden rounded bg-slate-800">
+                {purchases.progress?.phase === 'orders' ? (
+                  <div
+                    className="h-full bg-violet-500 transition-all"
+                    style={{
+                      width: `${(purchases.progress.current / Math.max(1, purchases.progress.total)) * 100}%`,
+                    }}
+                  />
+                ) : (
+                  // The listing phase has no total on the same scale — an
+                  // indeterminate sweep beats a bar that rewinds when orders start.
+                  <div className="h-full w-1/3 animate-pulse rounded bg-violet-500/70" />
+                )}
+              </div>
+            </div>
+          )}
+          {purchases.error && (
+            <div className="mt-1 text-[10px] text-red-400">{purchases.error}</div>
+          )}
+
+          {purchases.index && (
+            <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-600">
+              <span>
+                {purchases.index.orderIds.length} order
+                {purchases.index.orderIds.length === 1 ? '' : 's'} · read{' '}
+                {timeAgo(purchases.index.syncedAt)}
+              </span>
+              <Button
+                disabled={syncingPurchases}
+                onClick={() => {
+                  purchaseStore.markQueued();
+                  taskQueue.enqueue('syncPurchases', 'Sync purchases');
+                }}
+                size="xs"
+                variant="subtle"
+              >
+                Re-read
+              </Button>
+              <Button
+                className="ml-auto"
+                onClick={() => void purchaseStore.clear()}
+                size="xs"
+                title="Forget the downloaded order history (your collection rows stay)"
+                variant="subtle"
+              >
+                Forget history
+              </Button>
+            </div>
+          )}
+          {flags.devTools && purchases.index && (
+            <details className="mt-1 text-[10px] text-slate-500">
+              <summary className="cursor-pointer select-none">Purchase sync diagnostics</summary>
+              <div className="mt-1 space-y-0.5">
+                {purchases.index.diagnostics.map((d, i) => (
+                  <div key={i}>{d}</div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+
         {/* What the cards are worth now, which is a different question from what
             they cost — and answered without a single request per card, from the
             daily price table the worker keeps. */}
@@ -913,17 +1209,20 @@ export const CollectionPanel = () => {
         {flags.devTools && collection && (
           <PriceCheck cards={collection.cards} snapshot={prices.snapshot} />
         )}
-        <div className="mt-1 text-[10px] text-slate-500">
-          Export from ManaBox (Collection → Export → CSV) and upload it here — a whole collection,
-          one binder, or a deck; it works out which. A plain deck list (one card per line, optional
-          leading quantity) also works. You get to check what it found before anything is added.
+        {/* Was three sentences of file-format instructions, permanently on screen
+            above the cards they were about. The question they answer is only asked
+            once, so it waits behind the icon. */}
+        <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500">
+          You can also import your collection
+          <Hint label="Ways to import a collection">
+            Upload a ManaBox export (Collection → Export → CSV) or a plain list, one card per line.
+            You get to check what it found before anything is added.
+            <span className="mt-1 block">
+              Easier from a phone, where the export already is: import it in Lugin’s mobile version
+              and connect the same Google account — it arrives here on its own.
+            </span>
+          </Hint>
         </div>
-        {collection && (
-          <div className="mt-1 text-[10px] text-slate-600">
-            Imported from <span className="text-slate-400">{collection.source}</span> (
-            {collection.format})
-          </div>
-        )}
         {error && <div className="mt-1 text-red-400">{error}</div>}
       </div>
 
@@ -1274,9 +1573,7 @@ export const CollectionPanel = () => {
                         }${e.foil ? ' · foil' : ''} · ×${e.qty}`,
                     )
                     .join('\n');
-                  const show = url
-                    ? openPreview(r.key, url, r.name, flippable, faces)
-                    : undefined;
+                  const show = url ? openPreview(r.key, url, r.name, flippable, faces) : undefined;
                   return (
                     <li
                       key={r.key}
@@ -1300,9 +1597,7 @@ export const CollectionPanel = () => {
                         }
                         onMouseEnter={show}
                         onMouseLeave={url ? () => previewStore.hide() : undefined}
-                        onMouseMove={
-                          url ? e => previewStore.move(e.clientX, e.clientY) : undefined
-                        }
+                        onMouseMove={url ? e => previewStore.move(e.clientX, e.clientY) : undefined}
                         title={flippable ? 'Click to flip to the other side' : undefined}
                       >
                         {r.name}

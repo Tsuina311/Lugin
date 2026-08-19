@@ -9,6 +9,7 @@
 // (e.g. re-import a file, or fold in freshly-synced purchases) without touching
 // or double-counting the other.
 
+import { arrivedOnly } from '@/lib/arrivedPurchases';
 import { cardKey, stripVersion } from '@/lib/cardName';
 import {
   buildCollection,
@@ -17,9 +18,33 @@ import {
   type StoredCollection,
 } from '@/lib/collection';
 import { applyImport } from '@/lib/duplicates';
+import { addPaid, everyPaid, withCost, type Paid } from '@/lib/purchaseCost';
+import {
+  pruneVerdicts,
+  splitPurchases,
+  type HeldPurchase,
+  type PurchaseVerdict,
+  type PurchaseVerdicts,
+} from '@/lib/purchaseDuplicates';
 import { isCardPurchase, type PurchaseIndex } from '@/sites/cardmarket/wants';
 
 const STORAGE_KEY = 'lugin:collection';
+
+/**
+ * The purchase-vs-collection questions and their answers.
+ *
+ * Kept out of STORAGE_KEY because it isn't part of the collection: the rows are
+ * replaced wholesale by every fold-in, and this has to outlive that. `held` is
+ * derived, but persisting it is what lets the question survive a browser
+ * restart — a background auto-add that asked only until the tab closed would
+ * withhold cards and never say why.
+ */
+const DUPES_KEY = 'lugin:purchaseDupes';
+
+interface StoredDupes {
+  decided: Record<string, PurchaseVerdict>;
+  held: HeldPurchase[];
+}
 
 // User preference: automatically fold purchases into the collection after a
 // purchase sync. Off by default (some users don't keep what they buy). Stored
@@ -41,13 +66,36 @@ export const setAddPurchasesToCollection = (on: boolean): void => {
 };
 
 interface CollectionState {
+  /**
+   * What the last `clear()` threw away, so it can be put back.
+   *
+   * A collection is the one thing here nobody can reconstruct: it represents an
+   * afternoon of scanning cards, and the local copy is the only copy until a sync
+   * has run. Held in memory only — an undo that survived a page reload would be a
+   * promise this store cannot keep, and offering it would be worse than not.
+   */
+  cleared: StoredCollection | null;
   collection: Collection | null;
   error: string | null;
+  /**
+   * Purchases that look like cards already in the collection, withheld until the
+   * owner says which they are. Empty in the ordinary case.
+   */
+  heldPurchases: HeldPurchase[];
   /** True until the initial async load from storage resolves. */
   loading: boolean;
 }
 
-let state: CollectionState = { collection: null, error: null, loading: true };
+let state: CollectionState = {
+  cleared: null,
+  collection: null,
+  error: null,
+  heldPurchases: [],
+  loading: true,
+};
+
+/** Answers only; the held list lives in `state` so the UI re-renders with it. */
+let verdicts: PurchaseVerdicts = {};
 const listeners = new Set<() => void>();
 
 const set = (partial: Partial<CollectionState>) => {
@@ -69,27 +117,65 @@ const persistCards = async (
     source: collection.source,
   };
   await chrome.storage.local.set({ [STORAGE_KEY]: toStore });
-  set({ collection, error: null });
+  // Any deliberate write makes a pending undo stale: offering to restore what was
+  // cleared *before* an import would silently discard the import.
+  set({ cleared: null, collection, error: null });
   return collection;
 };
 
+const persistDupes = async (held: HeldPurchase[]): Promise<void> => {
+  const toStore: StoredDupes = { decided: { ...verdicts }, held };
+  await chrome.storage.local.set({ [DUPES_KEY]: toStore });
+  set({ heldPurchases: held });
+};
+
 // Load any previously-imported collection on startup.
-void chrome.storage.local.get(STORAGE_KEY).then(stored => {
+void chrome.storage.local.get([STORAGE_KEY, DUPES_KEY]).then(stored => {
+  const dupes = stored[DUPES_KEY] as StoredDupes | undefined;
+  verdicts = dupes?.decided ?? {};
   const raw = stored[STORAGE_KEY] as StoredCollection | undefined;
   if (raw?.cards) {
     set({
       collection: buildCollection(raw.cards, raw.source, raw.format, raw.importedAt),
+      heldPurchases: dupes?.held ?? [],
       loading: false,
     });
   } else {
-    set({ loading: false });
+    set({ heldPurchases: dupes?.held ?? [], loading: false });
   }
 });
 
 export const collectionStore = {
   async clear() {
+    const existing = state.collection;
     await chrome.storage.local.remove(STORAGE_KEY);
-    set({ collection: null, error: null });
+    set({
+      cleared: existing
+        ? {
+            cards: existing.cards,
+            format: existing.format,
+            importedAt: existing.importedAt,
+            source: existing.source,
+          }
+        : null,
+      collection: null,
+      error: null,
+    });
+    // Nothing is left for a purchase to be a duplicate of. The answers stay:
+    // `undoClear` can put the rows back, and they'd be about those rows again.
+    await persistDupes([]);
+  },
+
+  /**
+   * Record what the owner decided about withheld purchases and fold the history
+   * in again, which is what actually adds the ones they called separate.
+   */
+  async decidePurchaseDuplicates(
+    answers: Record<string, PurchaseVerdict>,
+    index: PurchaseIndex,
+  ): Promise<Collection> {
+    verdicts = { ...verdicts, ...answers };
+    return collectionStore.syncFromPurchases(index);
   },
 
   getSnapshot(): CollectionState {
@@ -173,8 +259,14 @@ export const collectionStore = {
    * Fold the user's purchase history into the collection as 'purchases'-sourced
    * rows. Idempotent: replaces any previous purchases rows with the current set,
    * so re-syncing never double-counts. Keeps uploaded ('import') rows intact.
+   *
+   * Only what has arrived: a card still in the post is not in the binder, and a
+   * collection that lists it is one you can't trust when you go looking. The
+   * filter runs first so everything below — counts, printings, cost basis — is
+   * computed from the copies actually in hand.
    */
-  async syncFromPurchases(index: PurchaseIndex): Promise<Collection> {
+  async syncFromPurchases(full: PurchaseIndex): Promise<Collection> {
+    const index = arrivedOnly(full);
     const purchaseRows: CollectionCard[] = [];
     for (const card of Object.values(index.cards)) {
       if (card.count <= 0) continue;
@@ -185,6 +277,15 @@ export const collectionStore = {
       // when we have it, else the edition name — so each distinct printing owned
       // becomes its own row carrying the data needed to show *its* image.
       const byPrinting = new Map<string, CollectionCard>();
+      // What each printing cost, accumulated alongside the rows. Kept separate
+      // because the unit basis is only knowable once every order line for that
+      // printing has been seen.
+      //
+      // Cardmarket has known these figures all along — `PurchaseRecord.price` is
+      // parsed off every order line — but the sync never carried them onto the
+      // collection row, so gain-since-purchase silently only worked for people who
+      // had also imported a ManaBox CSV.
+      const paidByPrinting = new Map<string, Paid>();
       let attributed = 0;
       for (const r of card.purchases ?? []) {
         const base = r.productId ?? r.edition ?? '';
@@ -193,6 +294,7 @@ export const collectionStore = {
         const pkey = `${base}|${r.foil ? 'f' : 'n'}`;
         const qty = r.qty ?? 1;
         attributed += qty;
+        addPaid(paidByPrinting, pkey, r, qty);
         const existingPrinting = byPrinting.get(pkey);
         if (existingPrinting) {
           existingPrinting.quantity += qty;
@@ -217,10 +319,14 @@ export const collectionStore = {
         purchaseRows.push({
           foil: false,
           name: card.name,
+          ...withCost(everyPaid(card.purchases)),
           quantity: card.count,
           source: 'purchases',
         });
         continue;
+      }
+      for (const [pkey, row] of byPrinting) {
+        Object.assign(row, withCost(paidByPrinting.get(pkey)));
       }
       purchaseRows.push(...byPrinting.values());
       // Any quantity we couldn't attribute to a specific printing.
@@ -229,6 +335,10 @@ export const collectionStore = {
         purchaseRows.push({
           foil: false,
           name: card.name,
+          // Priced from every order line for this card: the copies that landed here
+          // are the ones we know least about, so the card's own average is the best
+          // basis available for them.
+          ...withCost(everyPaid(card.purchases)),
           quantity: remainder,
           source: 'purchases',
         });
@@ -237,8 +347,23 @@ export const collectionStore = {
 
     const existing = state.collection;
     const keptOther = (existing?.cards ?? []).filter(c => c.source !== 'purchases');
+    // Only against rows this sync isn't replacing: purchase rows are re-derived
+    // wholesale, so matching against them would pair every card with its own
+    // previous self and withhold the entire history.
+    verdicts = pruneVerdicts(verdicts, purchaseRows);
+    const { add, held } = splitPurchases(purchaseRows, keptOther, verdicts);
     const source = existing?.source ?? 'Cardmarket purchases';
     const format = existing?.format ?? 'list';
-    return persistCards([...keptOther, ...purchaseRows], source, format);
+    const collection = await persistCards([...keptOther, ...add], source, format);
+    await persistDupes(held);
+    return collection;
+  },
+
+  /** Put back what the last `clear()` removed. No-op once anything else is written. */
+  async undoClear(): Promise<void> {
+    const held = state.cleared;
+    if (!held) return;
+    await collectionStore.replaceAll(held);
+    set({ cleared: null });
   },
 };

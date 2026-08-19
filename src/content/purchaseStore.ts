@@ -18,11 +18,25 @@ export type PurchaseStatus = 'idle' | 'queued' | 'syncing' | 'done' | 'error';
 interface PurchaseState {
   error: string | null;
   index: PurchaseIndex | null;
+  /**
+   * True until the initial read from storage resolves.
+   *
+   * Without it, "no purchases" and "we haven't looked yet" are the same state, so
+   * anything that greets a new user would greet everyone else too, for the moment
+   * between mount and storage answering.
+   */
+  loading: boolean;
   progress: SyncProgress | null;
   status: PurchaseStatus;
 }
 
-let state: PurchaseState = { error: null, index: null, progress: null, status: 'idle' };
+let state: PurchaseState = {
+  error: null,
+  index: null,
+  loading: true,
+  progress: null,
+  status: 'idle',
+};
 const listeners = new Set<() => void>();
 
 const set = (partial: Partial<PurchaseState>) => {
@@ -33,7 +47,8 @@ const set = (partial: Partial<PurchaseState>) => {
 // Load any previously-synced index on startup.
 void chrome.storage.local.get(PURCHASES_STORAGE_KEY).then(stored => {
   const index = stored[PURCHASES_STORAGE_KEY] as PurchaseIndex | undefined;
-  if (index && state.status === 'idle') set({ index, status: 'done' });
+  if (index && state.status === 'idle') set({ index, loading: false, status: 'done' });
+  else set({ loading: false });
 });
 
 export const purchaseStore = {

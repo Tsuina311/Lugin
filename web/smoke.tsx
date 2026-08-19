@@ -144,6 +144,24 @@ if (!view.includes('>Save<')) {
   console.log('  ok  the collection can be saved as a file');
 }
 
+// Card images are ~100KB each and this screen is used in a shop, on mobile data.
+// "Only when asked" is the whole reason the picture icon exists, so it is worth
+// asserting rather than trusting: a stray <img> in the default list would be a
+// silent megabyte per scroll.
+const listSays: [string, boolean][] = [
+  ['no picture is fetched before one is asked for', !/scryfall\.(io|com)/.test(view)],
+  ['every row offers its picture', view.includes('Show Sol Ring')],
+  ['the list can be swapped for a grid', view.includes('Show as card images')],
+];
+for (const [what, held] of listSays) {
+  if (held) {
+    console.log(`  ok  ${what}`);
+  } else {
+    failed += 1;
+    console.log(`  FAIL  ${what}`);
+  }
+}
+
 // The review is the one screen that must never quietly agree to something, so
 // assert it says what it found rather than merely rendering without throwing.
 const review = renderToString(

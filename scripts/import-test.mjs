@@ -28,6 +28,13 @@ await writeFile(
    export * from '${root}src/lib/duplicates';
    export * from '${root}src/lib/export';
    export * from '${root}src/lib/prices';
+   export * from '${root}src/lib/arrivedPurchases';
+   export * from '${root}src/lib/cardImage';
+   export * from '${root}src/lib/purchaseCost';
+   export * from '${root}src/lib/purchaseDuplicates';
+   export * from '${root}src/lib/sellerStats';
+   export { sellerFrom, sellerSlugFromHref, timelineFrom } from '${root}src/sites/cardmarket/order';
+   export { shouldWelcome } from '${root}src/ui/firstRun';
    export * from '${root}src/lib/table';`,
 );
 
@@ -42,7 +49,9 @@ await build({
 });
 
 const {
+  addPaid,
   applyImport,
+  cardImageUrl,
   collectionFile,
   collectionToCsv,
   collectionValue,
@@ -55,7 +64,23 @@ const {
   parseDeckList,
   parseTable,
   priceOf,
+  pruneVerdicts,
+  purchaseKey,
   sectionHeader,
+  splitPurchases,
+  everyPaid,
+  withCost,
+  arrivedOnly,
+  hasArrived,
+  inTransitCopies,
+  daysSince,
+  ordersWithoutSeller,
+  sellerFrom,
+  sellerSlugFromHref,
+  sellerStats,
+  shippingPerCopy,
+  shouldWelcome,
+  timelineFrom,
 } = await import(pathToFileURL(bundle).href);
 
 let failed = 0;
@@ -673,6 +698,536 @@ check('merging into a lot with no recorded cost adopts the one there is', () => 
 check('money reads as money', () => {
   assert.equal(money(1234), '12,34 €');
   assert.equal(money(1234, 'usd'), '$12.34');
+});
+
+// ---------------------------------------------------------------------------
+// Cost basis derived from Cardmarket orders
+//
+// These back the purchase sync's `purchasePrice`. Worth testing rather than
+// eyeballing: every failure mode here produces a plausible-looking number, and a
+// portfolio gain nobody can sanity-check is a portfolio gain nobody will question.
+// ---------------------------------------------------------------------------
+
+check('one order line is its own unit cost', () => {
+  assert.deepEqual(withCost(everyPaid([{ price: 2.5, qty: 1 }])), { purchasePrice: 2.5 });
+});
+
+check('two order lines at different prices average by quantity', () => {
+  // Two at 1,00 plus three at 2,00 is five at 1,60 — the same blend as an import.
+  const paid = everyPaid([
+    { price: 1, qty: 2 },
+    { price: 2, qty: 3 },
+  ]);
+  assert.deepEqual(withCost(paid), { purchasePrice: 1.6 });
+});
+
+check('a line with no price is not a free copy', () => {
+  // 5,00 for the one copy we know about. Averaging over both copies would report
+  // 2,50 and invent a 100% gain out of a missing field.
+  const paid = everyPaid([{ price: 5, qty: 1 }, { qty: 1 }]);
+  assert.equal(paid.qty, 1);
+  assert.deepEqual(withCost(paid), { purchasePrice: 5 });
+});
+
+check('no price anywhere leaves no basis, rather than a basis of zero', () => {
+  assert.deepEqual(withCost(everyPaid([{ qty: 3 }])), {});
+  assert.deepEqual(withCost(everyPaid([])), {});
+  assert.deepEqual(withCost(undefined), {});
+});
+
+check('a free order line is treated as unrecorded, not as a cost of zero', () => {
+  // Cardmarket shows 0,00 on gifts and corrections; a real card with a real basis
+  // must not be dragged toward zero by one.
+  assert.deepEqual(withCost(everyPaid([{ price: 0, qty: 1 }])), {});
+});
+
+check('a basis is rounded to the cent', () => {
+  // Three copies for a euro is 0,3333… and would otherwise surface as a gain of a
+  // fraction of a cent on a card nobody touched.
+  assert.deepEqual(withCost(everyPaid([{ price: 1, qty: 3 }, { price: 0, qty: 0 }])), {
+    purchasePrice: 1,
+  });
+  const thirds = withCost({ qty: 3, spent: 1 });
+  assert.equal(thirds.purchasePrice, 0.33);
+});
+
+check('order lines are kept apart per printing', () => {
+  // The same card bought in two editions must not blend into one basis: each row
+  // in the collection is one printing and is valued as one.
+  const paid = new Map();
+  addPaid(paid, 'ltr|n', { price: 1 }, 1);
+  addPaid(paid, 'cmr|n', { price: 9 }, 1);
+  addPaid(paid, 'ltr|n', { price: 3 }, 1);
+  assert.deepEqual(withCost(paid.get('ltr|n')), { purchasePrice: 2 });
+  assert.deepEqual(withCost(paid.get('cmr|n')), { purchasePrice: 9 });
+});
+
+check('a nonsense price is ignored rather than propagated', () => {
+  const paid = new Map();
+  addPaid(paid, 'k', { price: Number.NaN }, 1);
+  addPaid(paid, 'k', { price: Number.POSITIVE_INFINITY }, 1);
+  assert.equal(paid.get('k'), undefined);
+});
+
+// ---------------------------------------------------------------------------
+// What counts as arrived
+// ---------------------------------------------------------------------------
+
+/** Two copies delivered, one still in the post, one from before states existed. */
+const DELIVERY = {
+  cards: {
+    'sol ring': {
+      count: 4,
+      name: 'Sol Ring',
+      purchases: [
+        { orderId: 'here', price: 1.5, qty: 2 },
+        { orderId: 'posted', price: 2, qty: 1 },
+        { orderId: 'ancient', price: 1, qty: 1 },
+      ],
+    },
+    'black lotus': {
+      count: 1,
+      name: 'Black Lotus',
+      purchases: [{ orderId: 'posted', price: 25000, qty: 1 }],
+    },
+  },
+  orders: {
+    ancient: {},
+    here: { state: 'Arrived' },
+    posted: { state: 'Sent' },
+  },
+};
+
+check('a card in the post is not in your collection', () => {
+  const arrived = arrivedOnly(DELIVERY);
+  assert.equal(arrived.cards['black lotus'], undefined, 'its only copy is still in transit');
+  assert.equal(arrived.cards['sol ring'].count, 3, '2 delivered + 1 from before states existed');
+});
+
+check('counts are recomputed, not carried over', () => {
+  // `count` is the total ever bought. Trusting it would credit the collection
+  // with copies that are still in a padded envelope.
+  assert.equal(DELIVERY.cards['sol ring'].count, 4);
+  assert.equal(arrivedOnly(DELIVERY).cards['sol ring'].count, 3);
+});
+
+check('an order with no known state counts as arrived', () => {
+  // Unknown is overwhelmingly "old order, indexed before states were captured".
+  // Reading it as undelivered would quietly empty a collection.
+  assert.equal(hasArrived(undefined), true);
+  assert.equal(hasArrived(''), true);
+  assert.equal(hasArrived('Arrived'), true);
+  assert.equal(hasArrived('Paid'), false, 'paid for is not the same as received');
+  assert.equal(hasArrived('Sent'), false);
+  assert.equal(hasArrived('NotArrived'), false, 'a disputed order least of all');
+});
+
+check('an index synced before states existed keeps every card', () => {
+  const old = { cards: DELIVERY.cards };
+  assert.equal(Object.keys(arrivedOnly(old).cards).length, 2);
+  assert.equal(arrivedOnly(old).cards['sol ring'].count, 4);
+});
+
+check('a card with no order lines at all is kept on its total', () => {
+  const odd = { cards: { x: { count: 3, name: 'X' } }, orders: {} };
+  assert.equal(arrivedOnly(odd).cards.x.count, 3);
+});
+
+check('what is still travelling can be counted, so the UI can say so', () => {
+  assert.equal(inTransitCopies(DELIVERY), 2, 'one Sol Ring and the Lotus');
+  assert.equal(inTransitCopies({ cards: {} }), 0);
+});
+
+check('filtering leaves the rest of the index alone', () => {
+  const arrived = arrivedOnly(DELIVERY);
+  assert.deepEqual(arrived.orders, DELIVERY.orders);
+  assert.deepEqual(DELIVERY.cards['sol ring'].purchases.length, 3, 'input is not mutated');
+});
+
+// ---------------------------------------------------------------------------
+// Who you buy from, rolled up from order history
+// ---------------------------------------------------------------------------
+
+const DAY = 24 * 60 * 60 * 1000;
+const AUG = Date.parse('2026-08-01');
+
+/** Two orders from Alice, one from Bob, and one whose seller was never captured. */
+const HISTORY = {
+  cards: {
+    'sol ring': {
+      count: 3,
+      name: 'Sol Ring',
+      purchases: [
+        { orderId: 'a1', price: 1.5, qty: 2 },
+        { orderId: 'b1', price: 2, qty: 1 },
+      ],
+    },
+    'llanowar elves': {
+      count: 4,
+      name: 'Llanowar Elves',
+      purchases: [
+        { orderId: 'a2', price: 0.25, qty: 3 },
+        { orderId: 'ghost', price: 9, qty: 1 },
+      ],
+    },
+  },
+  orders: {
+    a1: { paidTs: AUG, seller: 'Alice', sellerSlug: 'alice', sellerUrl: '/en/Magic/Users/alice', sentTs: AUG + DAY },
+    a2: { paidTs: AUG + 10 * DAY, seller: 'Alice', sellerSlug: 'alice', sentTs: AUG + 15 * DAY },
+    b1: { paidTs: AUG + 2 * DAY, seller: 'Bob', sellerSlug: 'bob' },
+    ghost: { paidTs: AUG },
+  },
+  shipping: { a1: 1.2, a2: 1.3, b1: 5 },
+};
+
+check('sellers are ranked by how often you bought from them', () => {
+  const stats = sellerStats(HISTORY);
+  assert.equal(stats.length, 2, 'the order with no seller forms no seller');
+  assert.equal(stats[0].slug, 'alice');
+  assert.equal(stats[0].orders, 2);
+  assert.equal(stats[1].slug, 'bob');
+});
+
+check('spend excludes postage, and postage is its own figure', () => {
+  const [alice] = sellerStats(HISTORY);
+  // 2 × 1,50 + 3 × 0,25 = 3,75 on cards; 1,20 + 1,30 = 2,50 of postage.
+  assert.equal(alice.spent, 3.75);
+  assert.equal(alice.shipping, 2.5);
+  assert.equal(alice.copies, 5);
+  assert.equal(alice.cards, 2, 'distinct cards, not copies');
+});
+
+check('postage per copy is what a cheap-shipping seller is actually worth', () => {
+  const [alice, bob] = sellerStats(HISTORY);
+  assert.equal(shippingPerCopy(alice), 0.5);
+  // Bob charges 5,00 to send a single card, which is the whole point of the metric.
+  assert.equal(shippingPerCopy(bob), 5);
+});
+
+check('handling time is the median of paid-to-sent, in days', () => {
+  const [alice] = sellerStats(HISTORY);
+  // One order shipped next day, one after five: the median of two is their mean.
+  assert.equal(alice.handlingDays, 3);
+  assert.equal(alice.handlingSamples, 2);
+});
+
+check('a seller who never showed a dispatch date reports no handling time', () => {
+  const [, bob] = sellerStats(HISTORY);
+  assert.equal(bob.handlingDays, null, 'not zero, which would read as same-day');
+  assert.equal(bob.handlingSamples, 0);
+});
+
+check('one observation is reported as one observation', () => {
+  const stats = sellerStats({
+    cards: {},
+    orders: { x: { paidTs: AUG, sellerSlug: 's', sentTs: AUG + 2 * DAY } },
+  });
+  assert.equal(stats[0].handlingDays, 2);
+  assert.equal(stats[0].handlingSamples, 1, 'so the UI can refuse to call it a rate');
+});
+
+check('a dispatch before payment is discarded rather than counted as negative', () => {
+  const stats = sellerStats({
+    cards: {},
+    orders: { x: { paidTs: AUG, sellerSlug: 's', sentTs: AUG - 5 * DAY } },
+  });
+  assert.equal(stats[0].handlingDays, null);
+});
+
+check('first and last purchase bracket the history', () => {
+  const [alice] = sellerStats(HISTORY);
+  assert.equal(alice.sinceTs, AUG);
+  assert.equal(alice.lastTs, AUG + 10 * DAY);
+  assert.equal(daysSince(alice.lastTs, AUG + 12 * DAY), 2);
+});
+
+check('a seller with an order but no readable card rows still appears', () => {
+  const stats = sellerStats({ cards: {}, orders: { x: { sellerSlug: 'ghost-shop' } } });
+  assert.equal(stats.length, 1);
+  assert.equal(stats[0].orders, 1);
+  assert.equal(stats[0].spent, 0);
+});
+
+check('orders whose seller is unknown are counted, so a re-sync can be offered', () => {
+  assert.equal(ordersWithoutSeller(HISTORY), 1);
+  assert.equal(ordersWithoutSeller({ cards: {} }), 0);
+});
+
+check('a history synced before sellers existed yields no sellers and no crash', () => {
+  const old = { cards: HISTORY.cards, shipping: HISTORY.shipping };
+  assert.deepEqual(sellerStats(old), []);
+  assert.equal(ordersWithoutSeller(old), 4);
+});
+
+check('the display name falls back to the slug rather than showing blank', () => {
+  const stats = sellerStats({ cards: {}, orders: { x: { sellerSlug: 'quietshop' } } });
+  assert.equal(stats[0].name, 'quietshop');
+});
+
+// ---------------------------------------------------------------------------
+// Reading the seller and the timeline off an order page
+// ---------------------------------------------------------------------------
+
+check('a seller is identified by slug, not by the locale in the URL', () => {
+  assert.equal(sellerSlugFromHref('/en/Magic/Users/FKTRD'), 'FKTRD');
+  assert.equal(sellerSlugFromHref('/fr/Magic/Users/FKTRD/Offers'), 'FKTRD');
+  assert.equal(sellerSlugFromHref('/de/Magic/Users/FKTRD?foo=1#x'), 'FKTRD');
+  assert.equal(sellerSlugFromHref('/en/Magic/Products/Singles'), undefined);
+  assert.equal(sellerSlugFromHref(null), undefined);
+});
+
+check('an escaped slug is decoded, so the name matches what is displayed', () => {
+  assert.equal(sellerSlugFromHref('/en/Magic/Users/Mr%20Cards'), 'Mr Cards');
+});
+
+check('an icon-only seller link still yields a usable name', () => {
+  assert.equal(sellerFrom('/en/Magic/Users/shop', '  ').name, 'shop');
+  assert.equal(sellerFrom('/en/Magic/Users/shop', '>').name, 'shop', 'one glyph is not a name');
+  assert.equal(sellerFrom('/en/Magic/Users/shop', ' Card Shop ').name, 'Card Shop');
+});
+
+const paidSent = (paid, sent) => timelineFrom([`Paid: ${paid}`, `Sent: ${sent}`]);
+
+check('paid and sent dates come off the timeline', () => {
+  const t = paidSent('01.08.2026', '03.08.2026');
+  assert.equal(t.date, '01.08.2026');
+  assert.equal(t.ts, Date.parse('2026-08-01'));
+  assert.equal(t.sentTs, Date.parse('2026-08-03'));
+});
+
+check('the timeline is read in every locale Cardmarket serves', () => {
+  for (const [paidLabel, sentLabel] of [
+    ['Paid', 'Sent'],
+    ['Bezahlt', 'Versandt'],
+    ['Payé', 'Envoyé'],
+    ['Payée', 'Expédiée'],
+    ['Pagato', 'Spedito'],
+    ['Pagado', 'Enviado'],
+    ['Betaald', 'Verzonden'],
+  ]) {
+    const t = timelineFrom([`${paidLabel}: 01.08.2026`, `${sentLabel}: 04.08.2026`]);
+    assert.equal(t.ts, Date.parse('2026-08-01'), `paid in ${paidLabel}`);
+    assert.equal(t.sentTs, Date.parse('2026-08-04'), `sent in ${sentLabel}`);
+  }
+});
+
+check('a date is only taken from the box that labels it', () => {
+  // Arrival is later than dispatch; reading it as the dispatch would flatter the
+  // seller's handling time with the postal service's transit.
+  const t = timelineFrom(['Paid: 01.08.2026', 'Sent: 02.08.2026', 'Arrived: 09.08.2026']);
+  assert.equal(t.sentTs, Date.parse('2026-08-02'));
+});
+
+check('an unrecognized layout still dates the order from the first date it finds', () => {
+  const t = timelineFrom(['Something unfamiliar'], 'Ordered 01.08.2026');
+  assert.equal(t.date, '01.08.2026');
+  assert.equal(t.sentTs, undefined);
+});
+
+check('a dispatch earlier than payment is refused rather than stored', () => {
+  assert.equal(paidSent('05.08.2026', '01.08.2026').sentTs, undefined);
+});
+
+check('a same-day dispatch is kept, and is genuinely zero days', () => {
+  const t = paidSent('05.08.2026', '05.08.2026');
+  assert.equal(t.sentTs, t.ts);
+});
+
+check('an order with no dates yields no dates', () => {
+  assert.deepEqual(timelineFrom([]), {});
+});
+
+// ---------------------------------------------------------------------------
+// Whether to greet someone
+// ---------------------------------------------------------------------------
+
+const FRESH = {
+  collection: false,
+  hydrated: true,
+  purchases: false,
+  wants: false,
+  welcomed: false,
+};
+
+check('a brand new user is welcomed', () => {
+  assert.equal(shouldWelcome(FRESH), true);
+});
+
+check('nothing is decided until storage has answered', () => {
+  // The whole point: before hydration a returning user looks identical to a new
+  // one, so the honest answer is "not yet" rather than "welcome".
+  assert.equal(shouldWelcome({ ...FRESH, hydrated: false }), null);
+  assert.equal(shouldWelcome({ ...FRESH, hydrated: false, wants: true }), null);
+});
+
+check('any one source of data means the app, not a greeting', () => {
+  assert.equal(shouldWelcome({ ...FRESH, wants: true }), false);
+  assert.equal(shouldWelcome({ ...FRESH, purchases: true }), false);
+  assert.equal(shouldWelcome({ ...FRESH, collection: true }), false, 'an upload is data too');
+});
+
+check('a skip sticks, even though the user still has nothing', () => {
+  assert.equal(shouldWelcome({ ...FRESH, welcomed: true }), false);
+});
+
+// --- purchases meeting a collection ------------------------------------------
+//
+// The fold-in used to append its rows to whatever was already there, so a card
+// scanned into ManaBox *and* bought on Cardmarket was counted twice — and the
+// count looked perfectly normal, which is what made it worth testing.
+
+/** As the fold-in derives them: an edition name and a product id, never a set code. */
+const bought = (name, extra = {}) => ({
+  foil: false,
+  name,
+  quantity: 1,
+  setName: 'The Lord of the Rings',
+  source: 'purchases',
+  ...extra,
+});
+
+/** As ManaBox exports them: a set code, a collector number, sometimes a set name. */
+const scanned = (name, extra = {}) => ({
+  collectorNumber: '1',
+  foil: false,
+  name,
+  quantity: 1,
+  setCode: 'ltr',
+  setName: 'The Lord of the Rings',
+  source: 'import',
+  ...extra,
+});
+
+check('a bought card and the same scanned card are paired on the set name', () => {
+  // Neither side shares a set *code*, so without the name tier this could only
+  // ever be graded "maybe" — true but useless for deciding.
+  const { candidates } = findDuplicates([bought('Sol Ring')], [scanned('Sol Ring')]);
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].strength, 'likely');
+  assert.match(candidates[0].reason, /The Lord of the Rings/);
+});
+
+check('two rows that both omit a set are not "the same set"', () => {
+  const { candidates } = findDuplicates(
+    [card('Sol Ring')],
+    [card('Sol Ring', { source: 'purchases' })],
+  );
+  assert.equal(candidates.length, 1, 'they still meet on name and finish');
+  assert.equal(candidates[0].strength, 'possible', 'but neither row earned a set match');
+});
+
+check('an unanswered collision is withheld, not added', () => {
+  const { add, held } = splitPurchases([bought('Sol Ring')], [scanned('Sol Ring')], {});
+  assert.equal(add.length, 0, 'nothing grows the collection before you answer');
+  assert.equal(held.length, 1);
+  assert.equal(held[0].incoming.name, 'Sol Ring');
+});
+
+check('a purchase matching nothing you own is added without asking', () => {
+  const { add, held } = splitPurchases([bought('Rhystic Study')], [scanned('Sol Ring')], {});
+  assert.equal(held.length, 0);
+  assert.deepEqual(add.map(c => c.name), ['Rhystic Study']);
+});
+
+check('"I already own it" drops the purchase for good', () => {
+  const row = bought('Sol Ring');
+  const decided = { [purchaseKey(row)]: 'own' };
+  const { add, held } = splitPurchases([row], [scanned('Sol Ring')], decided);
+  assert.equal(add.length, 0);
+  assert.equal(held.length, 0, 'and the question is not asked again');
+});
+
+check('"that is a different copy" adds it and stops asking', () => {
+  const row = bought('Sol Ring');
+  const decided = { [purchaseKey(row)]: 'separate' };
+  const { add, held } = splitPurchases([row], [scanned('Sol Ring')], decided);
+  assert.deepEqual(add.map(c => c.name), ['Sol Ring']);
+  assert.equal(held.length, 0);
+});
+
+check('buying a third copy does not reopen a settled question', () => {
+  // The key has to survive re-derivation, which is the only reason answers can
+  // be remembered at all — the fold-in rebuilds every purchase row each sync.
+  assert.equal(purchaseKey(bought('Sol Ring', { quantity: 1 })), purchaseKey(bought('Sol Ring', { quantity: 3 })));
+});
+
+check('a foil purchase is a separate question from the regular one', () => {
+  assert.notEqual(purchaseKey(bought('Sol Ring')), purchaseKey(bought('Sol Ring', { foil: true })));
+});
+
+check('purchase rows are never matched against each other', () => {
+  // `owned` is the rows the fold-in is *not* replacing. Handing it the previous
+  // purchase rows would pair every card with its own past self and withhold the
+  // whole history, so the store filters them out first; this pins the shape.
+  const rows = [bought('Sol Ring'), bought('Rhystic Study')];
+  const { add, held } = splitPurchases(rows, [], {});
+  assert.equal(held.length, 0);
+  assert.equal(add.length, 2);
+});
+
+check('answers about purchases no longer in the history are forgotten', () => {
+  const stale = purchaseKey(bought('Black Lotus'));
+  const live = purchaseKey(bought('Sol Ring'));
+  const pruned = pruneVerdicts({ [stale]: 'own', [live]: 'separate' }, [bought('Sol Ring')]);
+  assert.deepEqual(pruned, { [live]: 'separate' });
+});
+
+check('two copies bought of a card you own ask once, about both copies', () => {
+  const { add, held } = splitPurchases([bought('Sol Ring', { quantity: 2 })], [scanned('Sol Ring')], {});
+  assert.equal(add.length, 0);
+  assert.equal(held.length, 1);
+  assert.equal(held[0].incoming.quantity, 2, 'the row is one question, whatever it holds');
+});
+
+// --- which picture is this card ----------------------------------------------
+//
+// Every source a row can come from knows a different amount about the printing,
+// and the wrong rung of the ladder means a picture of somebody else's copy.
+
+const ID = '0123abcd-4567-89ef-0123-456789abcdef';
+
+check('a Scryfall id goes straight to the image CDN, not the API', () => {
+  // The API route is a redirect and a rate-limited call every single time; the
+  // CDN file is cached by the browser. Same picture, very different cost.
+  const url = cardImageUrl({ name: 'Sol Ring', scryfallId: ID });
+  assert.match(url, /^https:\/\/cards\.scryfall\.io\/normal\/front\/0\/1\//);
+  assert.ok(url.endsWith(`${ID}.jpg`));
+});
+
+check('a malformed Scryfall id is ignored rather than built into a broken URL', () => {
+  const url = cardImageUrl({ name: 'Sol Ring', scryfallId: 'not-an-id' });
+  assert.doesNotMatch(url, /cards\.scryfall\.io/);
+  assert.match(url, /named\?exact=Sol%20Ring/);
+});
+
+check('a Cardmarket product id outranks a set code', () => {
+  // Both name a printing, but the product id is what the purchase actually was.
+  const url = cardImageUrl({
+    collectorNumber: '1',
+    name: 'Sol Ring',
+    productId: '12345',
+    setCode: 'ltr',
+  });
+  assert.match(url, /\/cards\/cardmarket\/12345\?/);
+});
+
+check('set and collector number pin the printing when there is no id', () => {
+  const url = cardImageUrl({ collectorNumber: '279', name: 'Sol Ring', setCode: 'M21' });
+  assert.match(url, /\/cards\/m21\/279\?/, 'and the set code is lowercased for the path');
+});
+
+check('a set code with no collector number is not enough to name a printing', () => {
+  // Scryfall would need both; falling through to the name is the honest answer.
+  const url = cardImageUrl({ name: 'Sol Ring', setCode: 'ltr' });
+  assert.match(url, /named\?exact=/);
+});
+
+check('a card known only by name still has a picture', () => {
+  assert.match(cardImageUrl({ name: 'Lim-Dûl’s Vault' }), /named\?exact=Lim-D/);
+});
+
+check('a row that identifies nothing at all yields no URL', () => {
+  assert.equal(cardImageUrl({}), undefined);
 });
 
 await rm(out, { force: true, recursive: true });

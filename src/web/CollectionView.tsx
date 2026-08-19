@@ -4,19 +4,83 @@
 // of rows and a phone will not enjoy them all in the DOM, but the way anyone
 // actually uses this screen is "do I own X" — so search narrows it, and the cap
 // keeps scrolling smooth without a windowing dependency.
+//
+// Pictures are opt-in per row, which is the one place this deliberately differs
+// from the desktop panel. Card images are ~100KB each and this screen is used in
+// a shop, on mobile data — so the list stays text, and tapping a row's picture
+// icon fetches that one card. Box view is the other half of the same choice:
+// it's a grid of images, but you have to ask for it, and it shows fewer rows.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { ExportBar } from './ExportBar';
 import { loadPrices } from './priceStore';
 
-import { cardKey } from '@/lib/cardName';
+import { cardImageUrl } from '@/lib/cardImage';
+import { cardKey, stripVersion } from '@/lib/cardName';
 import type { Collection } from '@/lib/collection';
 import { collectionFile } from '@/lib/export';
 import { collectionValue, money, signedMoney, type CollectionValue } from '@/lib/prices';
+import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
+import { Image as ImageIcon } from '@/ui/components/icons';
+import { useSequentialImages } from '@/ui/components/useSequentialImages';
 import { usePrices } from '@/ui/usePrices';
 
 const VISIBLE_LIMIT = 150;
+
+/** Fewer, because each one is a picture rather than a line of text. */
+const BOX_LIMIT = 48;
+
+const VIEW_KEY = 'lugin:webCollectionView';
+
+/** A card name, and the best picture of the printing you own of it. */
+interface Row {
+  foil: number;
+  key: string;
+  name: string;
+  src?: string;
+  total: number;
+}
+
+/**
+ * Roll the raw rows up per card, keeping one printing to show a picture of.
+ *
+ * Keyed exactly as `buildCollection` keys `byKey`, so the list length and the
+ * "unique" count in the header can't drift apart and quietly disagree.
+ *
+ * The representative printing prefers whichever source pins the printing down
+ * hardest — a Scryfall id, then a Cardmarket product id, then a set code — since
+ * that decides whether the picture is your card or merely a card of that name.
+ */
+const rollUp = (collection: Collection): Row[] => {
+  const map = new Map<string, Row & { rank: number }>();
+
+  for (const card of collection.cards) {
+    const key = cardKey(card.name);
+    if (!key) continue;
+    let row = map.get(key);
+    if (!row) {
+      row = { foil: 0, key, name: stripVersion(card.name), rank: 0, total: 0 };
+      map.set(key, row);
+    }
+    const qty = card.quantity || 0;
+    row.total += qty;
+    if (card.foil) row.foil += qty;
+
+    const rank = card.scryfallId ? 3 : card.productId ? 2 : card.setCode ? 1 : 0;
+    if (rank > row.rank || !row.src) {
+      const src = cardImageUrl(card);
+      if (src) {
+        row.src = src;
+        row.rank = rank;
+      }
+    }
+  }
+
+  return [...map.values()]
+    .map(({ rank: _rank, ...row }) => row)
+    .sort((a, b) => a.name.localeCompare(b.name));
+};
 
 /**
  * What it's worth, and what it has done since you bought it.
@@ -58,6 +122,17 @@ const Worth = ({ value, stale }: { stale: boolean; value: CollectionValue }) => 
   );
 };
 
+/** A card's picture, or the space it will occupy, so the layout doesn't jump. */
+const Picture = ({ alt, ready, src }: { alt: string; ready: boolean; src?: string }) => (
+  <div className="flex aspect-[488/680] w-full items-center justify-center overflow-hidden rounded-lg bg-raised">
+    {ready && src ? (
+      <img alt={alt} className="h-full w-full object-cover" src={src} />
+    ) : (
+      <span className="h-5 w-5 animate-spin rounded-full border-2 border-line-strong border-t-accent" />
+    )}
+  </div>
+);
+
 export const CollectionView = ({ collection }: { collection: Collection | null }) => {
   const [query, setQuery] = useState('');
   const { snapshot, stale } = usePrices(loadPrices);
@@ -66,12 +141,50 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
     [collection, snapshot],
   );
 
+  const [view, setView] = useState<ViewShape>(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'box' ? 'box' : 'list';
+    } catch {
+      return 'list';
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_KEY, view);
+    } catch {
+      // a browser refusing storage still gets a working screen, just a forgetful one
+    }
+  }, [view]);
+
+  /** Rows whose picture has been asked for, in list view. */
+  const [opened, setOpened] = useState<Set<string>>(() => new Set());
+  const toggle = (key: string) =>
+    setOpened(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const all = useMemo(() => (collection ? rollUp(collection) : []), [collection]);
   const rows = useMemo(() => {
-    if (!collection) return [];
-    const all = Object.values(collection.byKey).sort((a, b) => a.name.localeCompare(b.name));
     const needle = cardKey(query.trim());
     return needle ? all.filter(row => cardKey(row.name).includes(needle)) : all;
-  }, [collection, query]);
+  }, [all, query]);
+
+  const shown = rows.slice(0, view === 'box' ? BOX_LIMIT : VISIBLE_LIMIT);
+
+  // One at a time, so a grid on a slow connection fills in from the top instead
+  // of stalling on forty simultaneous requests.
+  const wanted = useMemo(
+    () =>
+      shown
+        .filter(row => view === 'box' || opened.has(row.key))
+        .map(row => row.src)
+        .filter((src): src is string => !!src),
+    [opened, shown, view],
+  );
+  const loaded = useSequentialImages(wanted);
 
   if (!collection || collection.cards.length === 0) {
     return (
@@ -80,8 +193,6 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
       </p>
     );
   }
-
-  const shown = rows.slice(0, VISIBLE_LIMIT);
 
   return (
     <div>
@@ -101,6 +212,7 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
             unique
             {query ? ` · ${rows.length.toLocaleString()} matching` : ''}
           </p>
+          <ViewToggle onChange={setView} size="md" value={view} />
           {/* The whole collection, not the search results: a filtered export would
               quietly hand another app a fraction of what you own.
 
@@ -113,21 +225,65 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
         <Worth stale={stale} value={value} />
       </div>
 
-      <ul className="divide-y divide-line">
-        {shown.map(row => (
-          <li key={row.name} className="flex items-baseline gap-3 px-4 py-3">
-            <span className="min-w-0 flex-1 truncate text-sm text-ink">{row.name}</span>
-            {row.foil > 0 ? (
-              <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                {row.foil} foil
+      {view === 'box' ? (
+        <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3">
+          {shown.map(row => (
+            <div key={row.key} className="flex flex-col gap-1">
+              <Picture alt={row.name} ready={!!row.src && loaded.has(row.src)} src={row.src} />
+              <span className="truncate text-xs text-ink" title={row.name}>
+                {row.name}
               </span>
-            ) : null}
-            <span className="shrink-0 text-sm font-semibold tabular-nums text-ink-muted">
-              ×{row.total}
-            </span>
-          </li>
-        ))}
-      </ul>
+              <span className="flex items-center gap-1.5 text-[11px] text-ink-faint">
+                <span className="font-semibold tabular-nums text-ink-muted">×{row.total}</span>
+                {row.foil > 0 ? <span className="text-accent">{row.foil} foil</span> : null}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <ul className="divide-y divide-line">
+          {shown.map(row => {
+            const open = opened.has(row.key);
+            return (
+              <li key={row.key} className="px-4 py-3">
+                <div className="flex items-baseline gap-3">
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink">{row.name}</span>
+                  {row.foil > 0 ? (
+                    <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                      {row.foil} foil
+                    </span>
+                  ) : null}
+                  <span className="shrink-0 text-sm font-semibold tabular-nums text-ink-muted">
+                    ×{row.total}
+                  </span>
+                  {/* Self-anchored rather than in a toolbar: it's about this card,
+                      and on a phone the thumb is already at the row. */}
+                  <button
+                    aria-expanded={open}
+                    aria-label={open ? `Hide the picture of ${row.name}` : `Show ${row.name}`}
+                    className={`-my-2 -mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                      open ? 'text-accent' : 'text-ink-faint'
+                    }`}
+                    onClick={() => toggle(row.key)}
+                    type="button"
+                  >
+                    <ImageIcon aria-hidden size={18} />
+                  </button>
+                </div>
+                {open ? (
+                  <div className="mt-2 w-44">
+                    <Picture
+                      alt={row.name}
+                      ready={!!row.src && loaded.has(row.src)}
+                      src={row.src}
+                    />
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       {rows.length > shown.length ? (
         <p className="px-4 py-4 text-center text-xs text-ink-faint">

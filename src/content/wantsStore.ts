@@ -15,11 +15,13 @@ export type SyncStatus = 'idle' | 'queued' | 'syncing' | 'done' | 'error';
 interface WantsState {
   error: string | null;
   index: WantsIndex | null;
+  /** True until the initial read from storage resolves. See `purchaseStore`. */
+  loading: boolean;
   progress: SyncProgress | null;
   status: SyncStatus;
 }
 
-let state: WantsState = { error: null, index: null, progress: null, status: 'idle' };
+let state: WantsState = { error: null, index: null, loading: true, progress: null, status: 'idle' };
 const listeners = new Set<() => void>();
 
 const set = (partial: Partial<WantsState>) => {
@@ -30,7 +32,8 @@ const set = (partial: Partial<WantsState>) => {
 // Load any previously-synced index on startup.
 void chrome.storage.local.get(WANTS_STORAGE_KEY).then(stored => {
   const index = stored[WANTS_STORAGE_KEY] as WantsIndex | undefined;
-  if (index && state.status === 'idle') set({ index, status: 'done' });
+  if (index && state.status === 'idle') set({ index, loading: false, status: 'done' });
+  else set({ loading: false });
 });
 
 export const wantsStore = {

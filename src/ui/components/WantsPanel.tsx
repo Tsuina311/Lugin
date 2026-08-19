@@ -21,11 +21,8 @@ import {
 import { useSequentialImages } from './useSequentialImages';
 
 import { cartStore } from '@/content/cartStore';
-import {
-  collectionStore,
-  shouldAddPurchasesToCollection,
-  setAddPurchasesToCollection,
-} from '@/content/collectionStore';
+import { collectionStore } from '@/content/collectionStore';
+import { setPageFilter } from '@/content/pageFilter';
 import { previewStore } from '@/content/previewStore';
 import { purchaseStore } from '@/content/purchaseStore';
 import { shippingStore } from '@/content/shippingStore';
@@ -45,6 +42,7 @@ import {
   shippingTiers,
   type ShippingEstimate,
 } from '@/sites/cardmarket/shipping';
+import { readWantDefaults } from '@/sites/cardmarket/wantDefaults';
 import {
   addWant,
   deleteWant,
@@ -70,9 +68,17 @@ import {
   type WantPlacement,
   type WantsIndex,
 } from '@/sites/cardmarket/wants';
-import { taskProgress } from '@/ui/format';
+import { timeAgo } from '@/ui/format';
 import { usePrices } from '@/ui/usePrices';
 import { useRowSelection } from '@/ui/useRowSelection';
+import { useStickySet, useStickyValue } from '@/ui/useStickyState';
+
+/**
+ * Identifies this panel's page-row filter. The Filter tab registers its own under
+ * a different name, and `pageFilter` intersects them rather than letting whichever
+ * rendered last take the page.
+ */
+const PAGE_FILTER_OWNER = 'wants';
 
 /** MTG color pips, for the metadata filter chips (C = colorless). */
 const FILTER_COLORS: { cls: string; code: string }[] = [
@@ -264,17 +270,8 @@ const initialScan: ScanState = {
   totalScanned: 0,
 };
 
-const timeAgo = (ts: number): string => {
-  const mins = Math.round((Date.now() - ts) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} min ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs} h ago`;
-  return `${Math.round(hrs / 24)} d ago`;
-};
-
 export const WantsPanel = () => {
-  const { status, index: rawIndex, progress, error } = useWants();
+  const { index: rawIndex } = useWants();
   const pageData = usePageData();
   const cart = useSyncExternalStore(cartStore.subscribe, cartStore.getSnapshot);
   const cartItems = cart.items;
@@ -321,15 +318,9 @@ export const WantsPanel = () => {
     void shippingStore.detectHomeCountry().finally(() => setDetectingCountry(false));
   }, [shipping.loading, shipping.toCountry]);
 
-  // Persistent task queue (sequential, survives navigation).
+  // Persistent task queue (sequential, survives navigation). What is running is
+  // reported by the header indicator; this panel only enqueues.
   const tasks = useSyncExternalStore(taskQueue.subscribe, taskQueue.getSnapshot);
-  const wantsTask = tasks.find(
-    t => t.type === 'syncWants' && (t.status === 'queued' || t.status === 'running'),
-  );
-  const purchaseTask = tasks.find(
-    t => t.type === 'syncPurchases' && (t.status === 'queued' || t.status === 'running'),
-  );
-  const activeTasks = tasks.filter(t => t.status === 'queued' || t.status === 'running');
 
   // Two independent measurements: the panel decides whether it can afford a
   // sidebar, the results column decides whether a card fits on one line. Keeping
@@ -337,22 +328,6 @@ export const WantsPanel = () => {
   const { ref: panelRef, wide } = useWideLayout(880);
   const { ref: listRef, wide: oneLine } = useWideLayout(700);
 
-  // Collapse the management chrome (tasks + syncs + seller scan) so the scrolled
-  // results list gets the most space. Remembered across navigations.
-  const [toolsOpen, setToolsOpen] = useState(() => {
-    try {
-      return localStorage.getItem('lugin:toolsOpen') === '1';
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem('lugin:toolsOpen', toolsOpen ? '1' : '0');
-    } catch {
-      // ignore storage failures
-    }
-  }, [toolsOpen]);
   // Cardmarket names alternate printings like "Edgar Markov (V.2)". For
   // "purchased?" we treat any printing as the same card, so collapse the
   // version suffix. Built on the read side so it works against an existing
@@ -375,16 +350,12 @@ export const WantsPanel = () => {
     }
     return map;
   }, [purchases]);
-  const purchasedKeys = purchaseLookup;
-
   // Per-card face images for the hover preview. Looked up lazily from Scryfall
   // (cached in the background worker) the first time a card is hovered. A value
   // of length >= 2 means the card is double-faced and the preview can flip;
   // an empty array marks a resolved single-faced card so we don't re-request.
   const [facesByKey, setFacesByKey] = useState<Record<string, string[]>>({});
-  const [addPurchasesToCollection, setAddPurchasesToCollectionState] = useState(
-    shouldAddPurchasesToCollection(),
-  );
+
   const faceRequested = useRef<Set<string>>(new Set());
 
   const loadFaces = (key: string, name: string, editionBack?: string) => {
@@ -457,9 +428,6 @@ export const WantsPanel = () => {
       lists: index?.cards[cardKey(o.name)]?.lists ?? [],
     }));
   }, [index, pageData]);
-
-  const totalWanted = index ? Object.keys(index.cards).length : 0;
-  const mismatches = index?.lists.filter(l => l.extracted < l.expected) ?? [];
 
   // ---- Seller scan (find everything a seller has on my want lists) ---------
   const seller = useMemo(() => detectSeller(), []);
@@ -718,7 +686,12 @@ export const WantsPanel = () => {
       if (!ids?.idMetacard)
         throw new Error('Couldn\u2019t find this card\u2019s id on Cardmarket.');
       const r = await addWant(
-        { idMetacard: ids.idMetacard, idWantsList: list.id, isFoil: o.isFoil },
+        {
+          idMetacard: ids.idMetacard,
+          idWantsList: list.id,
+          isFoil: o.isFoil,
+          ...readWantDefaults(),
+        },
         token,
       );
       setWantAdd(s => ({
@@ -740,6 +713,36 @@ export const WantsPanel = () => {
   const showingScan = scan.status === 'done';
   const displayMatches = showingScan ? scan.matches : pageMatches;
   const wantedCount = displayMatches.filter(m => m.lists.length > 0).length;
+
+  // ---- Hide non-wanted rows on the Cardmarket page itself -------------------
+  //
+  // The panel has always been able to show *which* of a page's cards you want.
+  // What it could not do is get the other 900 out of the way, so browsing a big
+  // seller still meant scrolling their whole stock with Lugin open beside it.
+  // `pageFilter` already knew how to hide rows; it was only ever wired to the
+  // Filter tab.
+  const [hidePageRows, setHidePageRows] = useStickyValue('lugin:cards:hidePageRows', false);
+
+  // Only meaningful against the live page: scan results describe other pages of
+  // the seller's stock, so there are no rows here to match them to.
+  const canHidePageRows = !showingScan && !!index;
+
+  useEffect(() => {
+    // Withheld until the want index has loaded. Before then every card looks
+    // un-wanted, and hiding on that basis would empty the page and blame the user's
+    // want lists for it.
+    if (!hidePageRows || !canHidePageRows) {
+      setPageFilter(PAGE_FILTER_OWNER, null);
+      return;
+    }
+    setPageFilter(
+      PAGE_FILTER_OWNER,
+      pageMatches.filter(m => m.lists.length > 0).map(m => m.name),
+    );
+  }, [hidePageRows, canHidePageRows, pageMatches]);
+
+  // Withdraw only our own filter; the Filter tab may have one too.
+  useEffect(() => () => setPageFilter(PAGE_FILTER_OWNER, null), []);
 
   // Group offers by card name: a card with several editions collapses into one
   // row, cheapest offer first. Single-offer cards render flat.
@@ -783,7 +786,9 @@ export const WantsPanel = () => {
   // results and cached in the background worker, so it's cheap to reopen.
   const [metaByName, setMetaByName] = useState<Record<string, CardMetadata>>({});
   const [metaState, setMetaState] = useState<'idle' | 'loading' | 'error'>('idle');
-  const [showFilters, setShowFilters] = useState(false);
+  // Kept open across navigations too: reopening the drawer to see why the list is
+  // short is the same friction as re-picking the filter.
+  const [showFilters, setShowFilters] = useStickyValue('lugin:cards:showFilters', false);
 
   // List vs. box (grid) view for the results, persisted across navigations.
   const [resultsView, setResultsView] = useState<'list' | 'box'>(() => {
@@ -800,10 +805,14 @@ export const WantsPanel = () => {
       // ignore storage failures
     }
   }, [resultsView]);
-  const [fQuery, setFQuery] = useState('');
-  const [fColors, setFColors] = useState<Set<string>>(new Set());
-  const [fCmc, setFCmc] = useState<Set<number>>(new Set());
-  const [fSubtype, setFSubtype] = useState('');
+  // Remembered across navigations. Safe to restore unconditionally, unlike the
+  // Filter tab's page-row hiding: these only narrow the list Lugin draws itself,
+  // so a filter that outlives its metadata shows an empty panel with its own
+  // controls visible right above it, not a Cardmarket page that looks empty.
+  const [fQuery, setFQuery] = useStickyValue('lugin:cards:query', '');
+  const [fColors, setFColors] = useStickySet<string>('lugin:cards:colors');
+  const [fCmc, setFCmc] = useStickySet<number>('lugin:cards:cmc');
+  const [fSubtype, setFSubtype] = useStickyValue('lugin:cards:subtype', '');
 
   const groupNames = useMemo(() => grouped.map(g => g.name), [grouped]);
 
@@ -1055,9 +1064,7 @@ export const WantsPanel = () => {
     return ratio >= CLOSE_LO && ratio <= CLOSE_HI;
   };
 
-  const liveTargets = (
-    mode: 'close' | 'all',
-  ): { key: string; name: string; url: string }[] => {
+  const liveTargets = (mode: 'close' | 'all'): { key: string; name: string; url: string }[] => {
     const targets: { key: string; name: string; url: string }[] = [];
     const seen = new Set<string>();
     for (const g of visibleGrouped) {
@@ -1761,7 +1768,9 @@ export const WantsPanel = () => {
             <div className="absolute right-0 top-full z-50 mt-1 max-h-48 w-44 overflow-auto rounded border border-slate-700 bg-slate-900 py-1 shadow-lg">
               {wantListOptions === null ? (
                 <div className="px-2 py-1 text-[10px] text-slate-500">
-                  {listsLoading ? 'Loading lists…' : 'No want lists found — sync them first.'}
+                  {listsLoading
+                    ? 'Loading lists…'
+                    : 'No want lists found — read them in the Wants tab first.'}
                 </div>
               ) : wantListOptions.length === 0 ? (
                 <div className="px-2 py-1 text-[10px] text-slate-500">You have no want lists.</div>
@@ -2051,43 +2060,6 @@ export const WantsPanel = () => {
 
   return (
     <div ref={panelRef} className="flex h-full flex-col">
-      {/* Slim bar to collapse the management chrome so the list gets the space */}
-      <div className="flex items-center gap-2 border-b border-slate-800 px-2 py-1 text-[10px] text-slate-400">
-        <Button
-          className="font-semibold"
-          onClick={() => setToolsOpen(v => !v)}
-          size="xs"
-          title={toolsOpen ? 'Hide sync / scan tools' : 'Show sync / scan tools'}
-          variant="subtle"
-        >
-          <span className="inline-block w-2">{toolsOpen ? '▾' : '▸'}</span>
-          Tools
-        </Button>
-        {/* Keep essential progress visible even when collapsed. */}
-        {!toolsOpen && activeTasks.length > 0 && (
-          <span className="truncate text-sky-400">
-            {activeTasks[0].label}
-            {activeTasks[0].status === 'running' && activeTasks[0].progress
-              ? ` ${activeTasks[0].progress.current}/${activeTasks[0].progress.total}`
-              : activeTasks[0].status === 'queued'
-                ? ' queued'
-                : '…'}
-            {activeTasks.length > 1 && ` (+${activeTasks.length - 1})`}
-          </span>
-        )}
-        {!toolsOpen && scan.status === 'scanning' && (
-          <span className="truncate text-emerald-400">
-            Scanning {seller?.name}
-            {scan.progress ? ` — ${scan.progress.current}` : '…'}
-          </span>
-        )}
-        {!toolsOpen && scan.status === 'done' && seller && (
-          <span className="truncate text-slate-500">
-            scan saved · {scan.matches.length} matches
-          </span>
-        )}
-      </div>
-
       {/* Shipping cost tiers for the seller you're browsing (always visible) */}
       {seller &&
         (() => {
@@ -2095,15 +2067,9 @@ export const WantsPanel = () => {
           if (shipping.toCountry == null) {
             return (
               <div className="border-b border-slate-800 bg-slate-900/40 px-2 py-1 text-[10px] text-slate-500">
-                {detectingCountry ? (
-                  'Detecting your country from your account…'
-                ) : (
-                  <>
-                    Set your country under{' '}
-                    <span className="font-semibold text-slate-400">Tools</span> to see {seller.name}
-                    's shipping.
-                  </>
-                )}
+                {detectingCountry
+                  ? 'Detecting your country from your account…'
+                  : `Pick your country below to see ${seller.name}'s shipping.`}
               </div>
             );
           }
@@ -2249,265 +2215,11 @@ export const WantsPanel = () => {
               way. Narrow, they stay under their button in the results header. */}
           {wide && filterControls}
 
-          {/* Task queue — long actions run one at a time and survive navigation */}
-          {toolsOpen && tasks.length > 0 && (
-            <div className="border-b border-slate-800 bg-slate-900/60 p-2 text-[11px]">
-              <div className="mb-1 flex items-center gap-2">
-                <span className="font-semibold text-slate-300">Tasks</span>
-                {tasks.some(t => t.status === 'queued' || t.status === 'running') && (
-                  <span className="text-slate-500">
-                    {tasks.filter(t => t.status === 'queued' || t.status === 'running').length}{' '}
-                    active
-                  </span>
-                )}
-                {tasks.some(t => t.status === 'done' || t.status === 'error') && (
-                  <Button
-                    className="ml-auto"
-                    onClick={() => taskQueue.clearFinished()}
-                    size="xs"
-                    variant="subtle"
-                  >
-                    Clear finished
-                  </Button>
-                )}
-              </div>
-              <div className="max-h-32 space-y-1 overflow-auto">
-                {tasks.map(t => (
-                  <div key={t.id} className="flex items-center gap-2">
-                    <span
-                      className={`h-2 w-2 shrink-0 rounded-full ${
-                        t.status === 'running'
-                          ? 'animate-pulse bg-sky-400'
-                          : t.status === 'queued'
-                            ? 'bg-slate-500'
-                            : t.status === 'done'
-                              ? 'bg-emerald-500'
-                              : 'bg-red-500'
-                      }`}
-                    />
-                    <span className="shrink-0 text-slate-300">{t.label}</span>
-                    <span className="min-w-0 flex-1 truncate text-slate-500">
-                      {t.status === 'running'
-                        ? t.progress
-                          ? taskProgress(t.progress)
-                          : 'running…'
-                        : t.status === 'queued'
-                          ? 'queued'
-                          : t.status === 'done'
-                            ? (t.summary ?? 'done')
-                            : (t.error ?? 'failed')}
-                    </span>
-                    {(t.status === 'queued' || t.status === 'running') && (
-                      <Button
-                        className="shrink-0"
-                        onClick={() => taskQueue.cancel(t.id)}
-                        size="xs"
-                        title={t.status === 'queued' ? 'Cancel' : 'Stop'}
-                        variant="neutral"
-                      >
-                        {t.status === 'queued' ? 'Cancel' : 'Stop'}
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Sync controls */}
-          {toolsOpen && (
-            <div className="border-b border-slate-800 p-2 text-[11px]">
-              {status === 'syncing' || status === 'queued' ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-300">
-                    {status === 'queued'
-                      ? 'Queued — waiting for the current task…'
-                      : `Syncing ${progress ? `${progress.current}/${progress.total}` : ''}…`}
-                    {status === 'syncing' && progress && (
-                      <span className="ml-1 text-slate-500">{progress.listName}</span>
-                    )}
-                  </span>
-                  <Button
-                    className="ml-auto"
-                    onClick={() => wantsTask && taskQueue.cancel(wantsTask.id)}
-                    variant="neutral"
-                  >
-                    {status === 'queued' ? 'Cancel' : 'Stop'}
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => {
-                      wantsStore.markQueued();
-                      taskQueue.enqueue('syncWants', 'Sync want lists');
-                    }}
-                    size="md"
-                    variant="primary"
-                  >
-                    {index ? 'Re-sync want lists' : 'Sync my want lists'}
-                  </Button>
-                  {index && (
-                    <span className="text-slate-500">
-                      {index.lists.length} lists · {totalWanted} cards · {timeAgo(index.syncedAt)}
-                    </span>
-                  )}
-                  {index && (
-                    <Button className="ml-auto" onClick={() => wantsStore.clear()} variant="subtle">
-                      Clear
-                    </Button>
-                  )}
-                </div>
-              )}
-              {status === 'syncing' && progress && (
-                <div className="mt-2 h-1 w-full overflow-hidden rounded bg-slate-800">
-                  <div
-                    className="h-full bg-sky-500 transition-all"
-                    style={{ width: `${(progress.current / progress.total) * 100}%` }}
-                  />
-                </div>
-              )}
-              {error && <div className="mt-1 text-red-400">{error}</div>}
-              {mismatches.length > 0 && (
-                <div className="mt-1 text-[10px] text-amber-400">
-                  {mismatches.length} list(s) came up short vs their card count — some may paginate
-                  differently. Send me one want-list page's HTML to fix.
-                </div>
-              )}
-              {index && (
-                <details className="mt-1 text-[10px] text-slate-400">
-                  <summary className="cursor-pointer select-none">Diagnostics</summary>
-                  <div className="mt-1 space-y-0.5">
-                    {index.diagnostics.map((d, i) => (
-                      <div key={i} className="text-slate-400">
-                        {d}
-                      </div>
-                    ))}
-                    {index.lists.length > 0 && (
-                      <div className="mt-1 border-t border-slate-800 pt-1">
-                        {index.lists.map(l => (
-                          <div
-                            key={l.id}
-                            className={
-                              l.extracted < l.expected ? 'text-amber-400' : 'text-slate-500'
-                            }
-                          >
-                            {l.name}: {l.extracted}
-                            {l.expected >= 0 ? ` / ${l.expected}` : ''}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
-
-          {/* Purchase-history sync — powers the "Purchased" tag while browsing */}
-          {toolsOpen && (
-            <div className="border-b border-slate-800 p-2 text-[11px]">
-              {purchases.status === 'syncing' || purchases.status === 'queued' ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-300">
-                    {purchases.status === 'queued'
-                      ? 'Queued — waiting for the current task…'
-                      : purchases.progress?.phase === 'orders'
-                        ? `Scanning purchases ${purchases.progress.current}/${purchases.progress.total}…`
-                        : 'Preparing purchase scan…'}
-                    {purchases.status === 'syncing' && purchases.progress && (
-                      <span className="ml-1 text-slate-500">{purchases.progress.listName}</span>
-                    )}
-                  </span>
-                  <Button
-                    className="ml-auto"
-                    onClick={() => purchaseTask && taskQueue.cancel(purchaseTask.id)}
-                    variant="neutral"
-                  >
-                    {purchases.status === 'queued' ? 'Cancel' : 'Stop'}
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => {
-                      purchaseStore.markQueued();
-                      taskQueue.enqueue('syncPurchases', 'Sync purchases');
-                    }}
-                    size="md"
-                    variant="primary"
-                  >
-                    {purchases.index ? 'Re-sync purchases' : 'Sync my purchases'}
-                  </Button>
-                  {purchases.index && (
-                    <span className="text-slate-500">
-                      {purchasedKeys.size} cards · {purchases.index.orderIds.length} orders ·{' '}
-                      {timeAgo(purchases.index.syncedAt)}
-                    </span>
-                  )}
-                  {purchases.index && (
-                    <Button
-                      className="ml-auto"
-                      onClick={() => purchaseStore.clear()}
-                      variant="subtle"
-                    >
-                      Clear
-                    </Button>
-                  )}
-                </div>
-              )}
-              <label className="mt-2 flex items-start gap-2 text-slate-400">
-                <input
-                  checked={addPurchasesToCollection}
-                  className="mt-0.5"
-                  onChange={e => {
-                    setAddPurchasesToCollection(e.target.checked);
-                    setAddPurchasesToCollectionState(e.target.checked);
-                  }}
-                  type="checkbox"
-                />
-                <span>
-                  Add purchases to my collection
-                  <span className="block text-[10px] text-slate-500">
-                    Folds bought cards into the Collection tab after each sync.
-                  </span>
-                </span>
-              </label>
-              {purchases.status === 'syncing' && purchases.progress && (
-                <div className="mt-2 h-1 w-full overflow-hidden rounded bg-slate-800">
-                  {purchases.progress.phase === 'orders' ? (
-                    <div
-                      className="h-full bg-violet-500 transition-all"
-                      style={{
-                        width: `${(purchases.progress.current / Math.max(1, purchases.progress.total)) * 100}%`,
-                      }}
-                    />
-                  ) : (
-                    // Listing phase has no meaningful total on the same scale — show an
-                    // indeterminate sweep instead of a determinate width that would
-                    // rewind when the order-fetch phase starts.
-                    <div className="h-full w-1/3 animate-pulse rounded bg-violet-500/70" />
-                  )}
-                </div>
-              )}
-              {purchases.error && <div className="mt-1 text-red-400">{purchases.error}</div>}
-              {purchases.index && (
-                <details className="mt-1 text-[10px] text-slate-400">
-                  <summary className="cursor-pointer select-none">
-                    Purchase scan diagnostics
-                  </summary>
-                  <div className="mt-1 space-y-0.5">
-                    {purchases.index.diagnostics.map((d, i) => (
-                      <div key={i}>{d}</div>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
-
-          {/* Shipping — just your home country; per-seller rates load on demand */}
-          {toolsOpen && (
+          {/* Shipping — just your home country; per-seller rates load on demand.
+              Shown when it is not yet answered, or when you are looking at a
+              seller and it is therefore about to be used. The rest of the time it
+              is a setting nobody needs to see. */}
+          {(shipping.toCountry == null || !!seller) && (
             <div className="border-b border-slate-800 p-2 text-[11px]">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-slate-400">Ship to</span>
@@ -2562,8 +2274,9 @@ export const WantsPanel = () => {
             </div>
           )}
 
-          {/* Seller scan controls */}
-          {toolsOpen && index && seller && (
+          {/* Seller scan controls — the Cards tab's own headline action, so it is
+              always in view when there is a seller to scan. */}
+          {index && seller && (
             <div className="border-b border-slate-800 p-2 text-[11px]">
               {scan.status === 'scanning' ? (
                 <div className="flex items-center gap-2">
@@ -2663,7 +2376,7 @@ export const WantsPanel = () => {
                 )}
                 {index && listCards.size === 0 && (
                   <span className="text-amber-400">
-                    Sync your want lists to price sellers &amp; find missing cards.
+                    Read your want lists in the Wants tab to price sellers &amp; find missing cards.
                   </span>
                 )}
               </div>
@@ -2877,6 +2590,21 @@ export const WantsPanel = () => {
                           variant="neutral"
                         >
                           Filters{filtersActive ? ' •' : ''}
+                        </Button>
+                      )}
+                      {canHidePageRows && (
+                        <Button
+                          active={hidePageRows}
+                          onClick={() => setHidePageRows(v => !v)}
+                          size="xs"
+                          title={
+                            hidePageRows
+                              ? 'Show every row on the Cardmarket page again'
+                              : 'Hide rows on the Cardmarket page for cards not on a want list'
+                          }
+                          variant="neutral"
+                        >
+                          {hidePageRows ? 'Showing wants only' : 'Wants only on page'}
                         </Button>
                       )}
                       {showingScan && visibleGrouped.some(g => g.offers.some(o => o.articleId)) && (

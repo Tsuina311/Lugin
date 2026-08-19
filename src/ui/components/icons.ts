@@ -28,6 +28,7 @@ export {
   Filter,
   FlaskConical,
   Hash,
+  Image,
   Import,
   Info,
   Layers,

@@ -1,5 +1,6 @@
 import type { Diagnostic, ExtractionResult, PageContext, SiteAdapter } from '../types';
 
+import { languageOfRow } from './language';
 import { SELECTORS } from './selectors';
 
 import { attrOf, collectJsonLd, jsonLdType, parseMoney, textOf } from '@/lib/extract';
@@ -75,6 +76,12 @@ const extractOffers = (doc: Document, diagnostics: Diagnostic[]): CardOffer[] =>
       priceText,
       seller: textOf(row, SELECTORS.product.offerSeller),
     };
+    // `CardOffer` has carried a `language` field all along and nothing filled it
+    // in, so every consumer saw an offer with no language — including the price
+    // breakdown, which is the one place people most want it.
+    const language = languageOfRow(row);
+    if (language) offer.language = language;
+
     const amount = textOf(row, SELECTORS.product.offerAmount);
     if (amount) {
       const n = Number.parseInt(amount.replace(/\D/g, ''), 10);

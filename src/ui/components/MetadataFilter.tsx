@@ -1,16 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { usePageData } from '../usePageData';
 
 import { Button } from './Button';
 import { COLOR_PIPS } from './colorPips';
 
-import { applyPageFilter, clearPageFilter } from '@/content/pageFilter';
+import { setPageFilter } from '@/content/pageFilter';
 import { cardKey } from '@/lib/cardName';
 import { requestScryfall } from '@/lib/messaging';
 import type { CardMetadata } from '@/lib/mtg';
+import { useStickySet, useStickyValue } from '@/ui/useStickyState';
 
 const norm = (s: string) => s.trim().toLowerCase();
+
+/** Identifies this panel's page filter, so the Cards tab's is independent. */
+const FILTER_OWNER = 'metadata';
 
 interface Row {
   meta?: CardMetadata;
@@ -37,14 +41,32 @@ export const MetadataFilter = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
-  const [search, setSearch] = useState('');
-  const [colors, setColors] = useState<Set<string>>(new Set());
-  const [types, setTypes] = useState<Set<string>>(new Set());
-  const [subtype, setSubtype] = useState('');
-  const [cmcMin, setCmcMin] = useState('');
-  const [cmcMax, setCmcMax] = useState('');
-  const [applyToPage, setApplyToPage] = useState(false);
+  // Filters, remembered across page loads — Cardmarket navigations remount this
+  // panel, and re-picking five colours on every card page is the whole complaint.
+  const [search, setSearch] = useStickyValue('lugin:filter:search', '');
+  const [colors, setColors] = useStickySet<string>('lugin:filter:colors');
+  const [types, setTypes] = useStickySet<string>('lugin:filter:types');
+  const [subtype, setSubtype] = useStickyValue('lugin:filter:subtype', '');
+  const [cmcMin, setCmcMin] = useStickyValue('lugin:filter:cmcMin', '');
+  const [cmcMax, setCmcMax] = useStickyValue('lugin:filter:cmcMax', '');
+  const [applyToPage, setApplyToPage] = useStickyValue('lugin:filter:applyToPage', false);
+
+  const active =
+    search.trim() !== '' ||
+    colors.size > 0 ||
+    types.size > 0 ||
+    subtype !== '' ||
+    cmcMin !== '' ||
+    cmcMax !== '';
+
+  const clearFilters = () => {
+    setSearch('');
+    setColors(new Set());
+    setTypes(new Set());
+    setSubtype('');
+    setCmcMin('');
+    setCmcMax('');
+  };
 
   const names = useMemo(
     () =>
@@ -137,16 +159,41 @@ export const MetadataFilter = () => {
   );
 
   // Hide/show the real rows on the Cardmarket page to mirror the filter.
+  //
+  // Gated on `loaded`, and that guard is load-bearing now that the filter is
+  // remembered: on a fresh page no metadata has arrived yet, so every row looks
+  // colourless and typeless. A restored "red only" filter would match nothing and
+  // blank the entire page — a spectacular way to look broken.
   useEffect(() => {
-    if (!applyToPage) {
-      clearPageFilter();
+    if (!applyToPage || !loaded) {
+      setPageFilter(FILTER_OWNER, null);
       return;
     }
-    applyPageFilter(new Set(matchKey ? matchKey.split('|') : []));
-  }, [applyToPage, matchKey]);
+    setPageFilter(FILTER_OWNER, matchKey ? matchKey.split('|') : []);
+  }, [applyToPage, loaded, matchKey]);
 
-  // Always restore the page when this panel unmounts.
-  useEffect(() => () => clearPageFilter(), []);
+  // Withdraw only this panel's filter when it unmounts; the Cards tab may have
+  // one of its own.
+  useEffect(() => () => setPageFilter(FILTER_OWNER, null), []);
+
+  // Fetch metadata unprompted when a remembered filter is waiting for it.
+  //
+  // Without this, a surviving filter is only surviving checkboxes: every new page
+  // would need a manual "Load metadata" before it did anything. Lookups are
+  // batched and cached in the worker for 30 days, so on a browse through one
+  // expansion this is nearly always a cache hit.
+  const attempted = useRef('');
+  const fingerprint = useMemo(() => names.join('|'), [names]);
+  useEffect(() => {
+    if (!active || loaded || loading || !fingerprint) return;
+    // One attempt per set of names, so a page of cards Scryfall has never heard of
+    // is asked about once rather than on every render.
+    if (attempted.current === fingerprint) return;
+    attempted.current = fingerprint;
+    void load();
+    // `load` is rebuilt every render; the ref above is what stops repeats.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, loaded, loading, fingerprint]);
 
   const toggle = (set: Set<string>, value: string, setter: (s: Set<string>) => void) => {
     const next = new Set(set);
@@ -194,6 +241,18 @@ export const MetadataFilter = () => {
         )}
         {error && <div className="mt-1 text-[11px] text-red-400">{error}</div>}
       </div>
+
+      {/* A remembered filter is still a filter. Say so before the metadata lands,
+          because until it does the controls below are hidden and the only visible
+          symptom would be a short list. */}
+      {active && (
+        <div className="flex items-center gap-2 border-b border-slate-800 bg-sky-500/10 px-2 py-1 text-[10px] text-sky-200">
+          <span>Filter active{!loaded && (loading ? ' · loading metadata…' : ' · waiting')}</span>
+          <Button className="ml-auto" onClick={clearFilters} size="xs" variant="subtle">
+            Clear
+          </Button>
+        </div>
+      )}
 
       {/* Filters */}
       {loaded && (

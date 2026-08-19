@@ -1,8 +1,21 @@
 # Lugin — Custom UI Layer
 
-A Manifest V3 Chrome extension that **captures a website's HTTP traffic** (request + response bodies), shows it in a **React overlay injected onto the page**, and gives you a place to **build your own UI on top of the site's API**.
+A Manifest V3 Chrome extension that layers **its own interface over Cardmarket**,
+plus a small phone app sharing the same source. Built for the case where a site is
+useful but its UI is painful.
 
-Built for the case where a site is useful but its UI is painful: capture what it does, then layer your own interface on top.
+In practice it is a **Magic: The Gathering buying companion**: it scans a seller's
+whole stock against your want lists, prices and values your collection offline,
+filters on the gameplay attributes Cardmarket won't filter on, builds decks, and
+reads cards through a phone camera. What it does *not* do is anything seller-side
+— see [what people complain about](#measured-against-what-people-complain-about)
+for where the line falls and why.
+
+It reads the site by parsing the **already-rendered DOM** rather than the wire,
+because Cardmarket is server-rendered; the traffic capture underneath it
+(request + response bodies, shown in a React overlay injected onto the page) is
+what makes that tractable, and remains available as a development tool for
+working out how a page does what it does.
 
 ## How it works
 
@@ -96,6 +109,27 @@ resolution, the conflict copies and the retry are shared and tested once.
 It renders that local copy rather than a fetch, so the collection is there before
 any network call and an import made in a shop with no signal is kept and pushed
 later.
+
+**Card pictures are opt-in per row**, which is the one place the phone
+deliberately behaves differently from the desktop panel. An image is around 100KB
+and this screen gets used standing in a shop on mobile data, so the list stays
+text and a picture icon on each row fetches that one card. Box view is the other
+half of the same bargain — a grid of images, but you have to ask for it, and it
+shows fewer rows than the list does. Both load one image at a time
+(`useSequentialImages`, shared with the extension) so a slow connection fills the
+grid from the top instead of stalling on forty parallel requests. The smoke test
+asserts that a freshly rendered list contains no Scryfall URL at all, since a
+stray `<img>` here is a silent megabyte per scroll.
+
+Which picture a row gets is a ladder, not a lookup, and it now lives in
+`src/lib/cardImage.ts` where both builds read it: a Scryfall id resolves to the
+image CDN directly (cacheable, and not the rate-limited API redirect), then a
+Cardmarket product id, then the row's own captured image, then set code plus
+collector number, and only then the card's name. The ordering is by how exactly
+each source pins down the *printing* — a name-only lookup returns Scryfall's
+default printing, which for a card like Sol Ring is a picture of somebody else's
+copy. The extension keeps its own extra rungs above these (a printing the user
+picked by hand, an image scraped from a Cardmarket page).
 
 ### Measuring the card scanner
 
@@ -211,9 +245,18 @@ into a 3.5 MB table of every paper price (`scripts/build-prices.mjs`), deploys i
 beside the app, and both surfaces hold it locally: value and gain-since-purchase
 are then arithmetic that works offline. The same table colours offers on the
 Cards tab (it tracks Cardmarket's Price Trend closely); live page fetches are
-kept only for close calls and on demand, for the live *From* price. The gain
-leans on `purchasePrice`, which ManaBox writes into every scanned row and we no
-longer throw away. See [docs/PRICES.md](docs/PRICES.md).
+kept only for close calls and on demand, for the live *From* price.
+
+The gain needs a cost basis, and there are two sources. ManaBox writes
+`purchasePrice` into every scanned row, which we no longer throw away. Cardmarket
+knows it too — every order line carries a unit price — and the purchase sync now
+records it, as a quantity-weighted average per printing
+(`src/lib/purchaseCost.ts`, tested, because every way of getting this wrong
+yields a plausible number nobody would question). Until it did, gain worked only
+for people who had also imported a CSV: anyone who synced their orders saw a
+portfolio value with no basis and therefore no gain at all. An order line with no
+parsed price counts as unrecorded rather than as a free copy. See
+[docs/PRICES.md](docs/PRICES.md).
 
 What makes all this nearly free is that `src/core/sync` never knew about Chrome —
 `createDriveRepository` takes an injected `fetch` and a `TokenProvider`, so the
@@ -232,8 +275,163 @@ src/core/sync  ──┬──►  src/platform/chrome  ──►  extension  (d
 
 ## Using it
 
-- **Traffic tab** — live list of the page's fetch/XHR calls. Click one to inspect method, status, timing, headers, and pretty-printed request/response bodies.
-- **API tab** — send your own requests through the background worker (no CORS headaches) and view the response. This is where you'll start building custom actions.
+The overlay docks to either side of any Cardmarket page, or takes the full screen.
+Its tabs are the feature list:
+
+- **Cards** — the offers on the page in front of you, or a seller's entire stock
+  after a scan, cross-referenced against your want lists. Per-offer price,
+  condition, language and foil status; edition and foil price breakdown;
+  add-to-cart and add-to-want-list; shipping tiers per seller. **Wants only on
+  page** hides rows for cards you don't want, on Cardmarket's own table.
+- **Collection** — what you own, valued from the local price table, with
+  gain-since-purchase. Imports and exports ManaBox's own formats, and can build
+  itself from what you have already bought (see **Past purchases**, below).
+- **Wants** — your want lists side by side, with bulk move, copy and delete.
+- **Decks** — deck building against Scryfall search, EDHREC and Goldfish views,
+  and a suggested cut list.
+- **Filter** — the gameplay metadata Cardmarket won't filter on: colour, type,
+  creature type, mana value. Optionally hides non-matching rows on the page.
+
+**Traffic** and **API** are development tools and stay behind `flags.devTools`.
+
+Each tab owns the sync that fills it: want lists are read from the Wants tab,
+order history from the Collection tab. Both used to live together under a
+**Tools** disclosure in the Cards tab, which meant the two most important buttons
+in the app were collapsed by default, in a tab about neither of them. What is
+*running* is not a tab's business at all — the queue is global and survives page
+changes — so it moved to a header icon that appears only when something is
+happening and lists it on hover (`TaskIndicator`).
+
+### The first run
+
+Every one of those tabs is a view over two things Lugin reads from your account:
+your want lists and your order history. Until they are read, each tab is an empty
+box — and the buttons that fill them were behind a **Tools** disclosure in the
+Cards tab, so the first impression was a set of empty rooms with the light switch
+in a cupboard. A new install now opens on a welcome screen instead, which asks for
+the two syncs, says what each one buys you and roughly how long it takes, and
+offers **Skip** just as plainly.
+
+Deciding whether someone is new is the part worth care. Every store loads
+asynchronously from `chrome.storage`, so "this user has nothing" and "we have not
+looked yet" are the same shape, and reading them as the same thing would greet
+*everyone* on *every* page load for as long as storage took to answer. So the
+stores now expose a `loading` flag, the question lives in one tested pure function
+(`src/ui/firstRun.ts`), and `useFirstRun` subscribes only until the answer is
+known — a purchase sync reports progress once per order, and the shell has no
+business re-rendering hundreds of times for a question settled in milliseconds. A
+skip is remembered, because someone who declined still has no data and asking
+again would be nagging dressed as onboarding.
+
+### Past purchases as a collection
+
+The Collection tab can fill itself from your order history: Cardmarket already
+knows every card you bought, which is a collection you have typed in once
+already. The control sits with the cards it creates, and it does two separate
+things on purpose — a button that folds in the history **already downloaded**, and
+**Auto add new purchases** for whether to keep doing it. The preference existed
+before, in the Cards tab, and it only took effect on the *next* sync: you could
+tick it with a year of history indexed and watch nothing happen. Rebuilding
+replaces the purchased rows wholesale and leaves uploaded rows alone, so it can be
+run again without doubling anything.
+
+Only what has **arrived** is folded in. A card you paid for on Tuesday is not in
+your collection on Tuesday; it is in a padded envelope, and a collection that
+lists it is one you cannot trust when you go looking for the card. The purchase
+sync already enumerates orders by Cardmarket's own state (`Paid`, `Sent`,
+`Arrived`, `NotArrived`) to find them, so it now records which list each order came
+from — the one reading of "has it turned up" that refreshes on every sync without
+refetching the order itself. An order with no recorded state counts as arrived:
+unknown states are almost entirely old orders too deep in the history for an
+incremental sync to walk past again, and reading them as undelivered would quietly
+empty someone's collection (`src/lib/arrivedPurchases.ts`, tested). Copies still in
+transit are counted and shown rather than silently omitted, since a number that
+does not add up reads as a bug.
+
+**A purchase that looks like a card you already have is withheld, not added.**
+Rebuilding the purchased rows makes the fold-in idempotent against itself, but it
+said nothing about the *other* rows: a card scanned into ManaBox and also bought
+on Cardmarket became two rows, and `buildCollection` sums quantities across rows,
+so the count silently doubled. Uploading a file has always asked this question —
+that is what `src/lib/duplicates.ts` is for — and the purchase path now asks it
+too, holding the collisions back and offering a review in the Collection tab.
+Ticked means "already in my collection", the same default as the import review:
+an inflated count is indistinguishable from a correct one without recounting a
+binder, so it errs towards not growing the collection behind your back.
+
+Answers have to outlive the rows they are about, since every sync re-derives
+them. They are recorded against a key built the way the fold-in groups order
+lines — product id, else edition name, split by finish — so buying a third copy
+of something already answered about doesn't reopen a settled question, and
+answers about purchases no longer in the history are pruned
+(`src/lib/purchaseDuplicates.ts`, tested).
+
+Pairing a purchase against an uploaded row needed a new rung on the matching
+ladder. Purchase rows know their edition as a *name* and never as a set code,
+while ManaBox exports lead with the code, so the two sides had no set field in
+common and every purchase could only be graded a vague "maybe". Matching on the
+set name ranks below the set code, which is the honest ordering: names agree far
+less reliably than codes. The same pass removed two false claims of confidence —
+rows that state no set were being paired as "same set", and rows that state no
+printing at all as "same printing", both on a collision of empty strings.
+
+Filter selections in all three filtering surfaces survive navigation for six
+hours (`src/ui/useStickyState.ts`). Cardmarket is server-rendered, so following a
+link tears the content script down and builds a new one — anything held in plain
+component state was gone the moment you clicked a card, which reproduced the
+complaint people make about Cardmarket's own filter panel. Six hours rather than
+forever because a filter is a statement about what you are shopping for now;
+restoring last week's would hide most of a fresh page with no visible cause.
+
+Preferences for new wants — the condition floor and a maximum price — sit in the
+Wants tab, beside the lists they apply to. They are Cardmarket's own fields, and
+the single-add button and the bulk "add missing cards" task read one stored
+answer, having previously hardcoded two different condition floors.
+
+## Measured against what people complain about
+
+Lugin is aimed at a published list of the most common Cardmarket complaints. It
+is worth being explicit about which ones it answers, because the pattern is
+sharper than the individual rows: **the buyer-side complaints are largely solved
+and the seller-side ones are not addressed at all.**
+
+| Complaint | State |
+| --- | --- |
+| Filter a seller's stock by my want lists | **Solved.** Scan a seller's whole stock and see only your wants; on the page in front of you, non-wanted rows can be hidden outright. |
+| Wants management / a "shopping wizard" | **Partly.** Deep list management, any-printing wants, best-single-seller ranking with shipping. No multi-seller basket optimisation. |
+| Filters that persist and don't collapse | **Solved** for Lugin's own filters. Cardmarket's panel is untouched. |
+| Favourite or followed sellers | **No.** |
+| Prices broken down by language and condition | **Partly.** Captured per offer; not aggregated, and no history. |
+| Bulk listing cards for sale | **No.** |
+| Inventory export and bulk editing | **Partly.** ManaBox round trip and multi-select actions; no bulk field edit, no seller inventory. |
+| Search better than Cardmarket's | **Partly.** Scryfall search for deck building; no replacement for the catalogue search. |
+| Sales tracking and accounting | **Partly, and only for buying.** Purchase history, spend, cost basis and gain. Nothing for sellers. |
+| Fewer clicks for common toggles | **Partly.** Foil is read and respected; there is no one-click foil filter. |
+
+### What it deliberately doesn't do
+
+Everything a **seller** needs is absent, and that is a scope decision rather than
+a backlog: bulk listing, stock management, price suggestion and sales accounting
+would be a different product, and the extension writes nothing to Cardmarket
+except buyer-side actions it replays from the site's own requests (cart adds,
+want edits). The only DOM writes are hiding rows and sampling the site's theme.
+
+Two gaps are worth separating from the rest because they are cheap now and get
+expensive later:
+
+- **Price history does not exist, and cannot be backfilled.** The daily table is
+  a snapshot that overwrites; a day not retained is gone. Everything people ask
+  for under "price trends" and most of what they ask for under accounting rests
+  on a time series that has to start accumulating before it is useful.
+- **Language restriction on wants is plumbed but not exposed.** `addWant` carries
+  the field; the UI does not offer it, because Cardmarket's language ids would
+  have to be guessed and a want silently filtered to the wrong language looks
+  exactly like a correct one. `languageOptionsFromPage` reads the ids off the
+  site's own picker, which needs confirming against a real want form once.
+
+Genuinely large, for contrast: multi-seller basket optimisation (the real
+Shopping Wizard equivalent), and replacing Cardmarket's catalogue search, whose
+result cap is a server-side limit no amount of DOM reading gets around.
 
 ## Reading data from a server-side-rendered site (e.g. Cardmarket)
 
@@ -282,6 +480,20 @@ enough — no set matching needed.
   instant and Scryfall isn't hammered.
 - Filter by color, type, subtype (creature type), and mana-value range.
 
+**Apply to page** hides the non-matching rows on Cardmarket itself. Two details
+that are load-bearing rather than incidental:
+
+- It waits for the metadata. On a page whose cards haven't been looked up yet
+  every card is colourless and typeless, so a restored "red only" filter would
+  match nothing and blank the whole page — which looks like a broken extension,
+  not an active filter. A restored filter also fetches its metadata unprompted,
+  or persistence would preserve the checkboxes without preserving the filter.
+- Row hiding is **registered per owner** and the registrations intersect
+  (`src/content/pageFilter.ts`). The Cards tab hides rows too, and every panel
+  stays mounted at once, so a single apply/clear pair meant the last effect to
+  run took the page and a re-render of an idle panel cleared the active one's
+  work.
+
 Register a new `SiteAdapter` in `src/sites/registry.ts` for any additional
 scraped sites.
 
@@ -301,37 +513,60 @@ overlay and the permissions Chrome grants. Rebuild afterward.
 
 ```
 src/
-  manifest.config.ts     # MV3 manifest (crxjs) — edit TARGET_MATCHES here
+  manifest.config.ts      # MV3 manifest (crxjs) — edit TARGET_MATCHES here
   interceptor/main.ts     # MAIN-world fetch/XHR capture
-  content/
-    index.tsx             # shadow-DOM mount + message bridge
-    callStore.ts          # observable store of captured calls
-    extractionRunner.ts   # runs DOM extraction + MutationObserver
-    pageDataStore.ts      # observable store of extracted page data
+  content/                # everything that touches the live page
+    index.tsx             #   shadow-DOM mount + message bridge
+    extractionRunner.ts   #   DOM extraction + MutationObserver
+    pageFilter.ts         #   hides rows on Cardmarket, registered per owner
+    taskQueue.ts          #   long multi-page jobs, resumable
+    *Store.ts             #   observable stores (wants, cart, collection, …)
   sites/
-    types.ts              # SiteAdapter interface + page/extraction types
     registry.ts           # host -> adapter lookup
+    types.ts              # SiteAdapter interface + page/extraction types
     cardmarket/
-      adapter.ts          # page detection + layered extraction
-      selectors.ts        # ALL Cardmarket selectors (tune here)
-  background/
-    service-worker.ts     # toolbar toggle + CORS-free API fetches
-  ui/
-    App.tsx               # overlay shell (tabs, filter, layout)
-    components/           # CardsPanel, CallList, CallDetail, ApiTester
-    useCalls.ts           # React <-> capture store binding
-    usePageData.ts        # React <-> extraction store binding
-    format.ts             # presentation helpers
-    index.css             # Tailwind (scoped to the shadow root)
-  lib/
-    types.ts              # shared message + data types
-    mtg.ts                # Magic card/offer data model
-    extract.ts            # generic extraction helpers (JSON-LD, money parsing)
-    messaging.ts          # postMessage + runtime messaging helpers
+      adapter.ts          #   page detection + layered extraction
+      selectors.ts        #   ALL Cardmarket selectors (tune here)
+      wants.ts            #   want lists, seller scans, purchase history
+      wantDefaults.ts     #   condition/price/language for new wants
+      language.ts         #   reading an offer's language off a row
+      cart.ts, shipping.ts
+  lib/                    # portable: no DOM, no Chrome, no React
+    mtg.ts                #   card/offer data model
+    prices.ts             #   valuation and gain
+    purchaseCost.ts       #   cost basis from order lines
+    import.ts, export.ts  #   ManaBox formats, both directions
+    scan/                 #   the card scanner (see below)
+  core/sync/              # platform-free sync engine (Drive + conflict copies)
+  platform/               # the only Chrome-vs-web difference
+    chrome/, web/         #   local + remote repositories, auth
+  background/             # service worker: toolbar, CORS-free fetches, prices
+  ui/                     # the extension overlay
+    App.tsx               #   shell: tabs, docking, theme
+    components/           #   WantsPanel, CollectionPanel, DeckPanel, …
+    useStickyState.ts     #   filters that survive a navigation
+  web/                    # the phone app, same lib/ and core/
+    ScanScreen.tsx        #   camera + OCR
+    cardIndexStore.ts     #   the cached card-name index
 ```
+
+`src/lib/scan/` is deliberately free of the DOM: the evaluation harness in
+`scripts/` runs the same modules the phone runs, which is the only reason its
+numbers mean anything.
 
 ## Known constraints
 
+- Cardmarket's markup is the ground truth and it is not a contract. Selector
+  changes are a one-file fix (`src/sites/cardmarket/selectors.ts`) by design, but
+  they are a fix somebody has to make.
+- Anything that walks many pages (a seller scan, a purchase sync) is paced and
+  capped, because the alternative is a Cloudflare challenge. A very large seller
+  stops at `MAX_SELLER_PAGES`.
+- Prices are a **daily snapshot**, not live, except for the on-demand *From*
+  price. There is no history at all.
+- The phone app cannot show Cardmarket: the site sends
+  `x-frame-options: SAMEORIGIN`. Scanning, collection and decks work there;
+  Cardmarket integration is extension-only.
 - Response bodies are captured as **text** and capped at **512 KB** (see `MAX_BODY_BYTES`). Binary responses show a placeholder.
 - Capture only sees traffic made via `fetch`/`XMLHttpRequest` from the page. Requests made by the browser itself (documents, images, `sendBeacon`, WebSockets) aren't wrapped yet.
 - The overlay is injected in the top frame only (`all_frames: false`).

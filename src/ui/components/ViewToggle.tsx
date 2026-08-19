@@ -13,11 +13,23 @@ const SEGMENT: { icon: LucideIcon; id: ViewShape; label: string }[] = [
   { icon: LayoutGrid, id: 'box', label: 'Show as card images' },
 ];
 
+/**
+ * `md` is for the phone build. The desktop size is a 24px target, which is fine
+ * for a mouse and misses under a thumb — but the control has to stay the same
+ * control, so it's a size rather than a second component.
+ */
+const SIZE = {
+  md: { button: 'h-9 w-11', icon: 16 },
+  sm: { button: 'h-6 w-7', icon: 13 },
+} as const;
+
 export const ViewToggle = ({
   onChange,
+  size = 'sm',
   value,
 }: {
   onChange: (next: ViewShape) => void;
+  size?: keyof typeof SIZE;
   value: ViewShape;
 }) => (
   <div
@@ -32,7 +44,7 @@ export const ViewToggle = ({
           key={id}
           aria-label={label}
           aria-pressed={on}
-          className={`flex h-6 w-7 items-center justify-center transition-colors ${
+          className={`flex items-center justify-center transition-colors ${SIZE[size].button} ${
             on
               ? 'bg-accent text-accent-ink'
               : 'bg-raised text-ink-faint hover:bg-tint hover:text-ink'
@@ -41,7 +53,7 @@ export const ViewToggle = ({
           title={label}
           type="button"
         >
-          <Icon aria-hidden size={13} strokeWidth={2.25} />
+          <Icon aria-hidden size={SIZE[size].icon} strokeWidth={2.25} />
         </button>
       );
     })}
