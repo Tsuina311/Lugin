@@ -42,7 +42,9 @@ import {
 } from '@/lib/deck';
 import { fetchEdhrec } from '@/lib/edhrec';
 import { deckFile } from '@/lib/export';
+import { fetchRemote } from '@/lib/fetchRemote';
 import { fetchGoldfishArchetype } from '@/lib/mtggoldfish';
+import { sortWubrg } from '@/lib/mtg';
 import { searchCards } from '@/lib/search';
 import { CutsPanel } from '@/ui/components/CutsPanel';
 import { TagsPanel } from '@/ui/components/TagsPanel';
@@ -179,6 +181,35 @@ export const DeckEditor = ({
   );
   const commandersKey = commanders.map(name => cardKey(name)).join('|');
   const commanderRecs = formatInfo(deck.format).commanderZone && commanders.length > 0;
+  const [commanderIdentity, setCommanderIdentity] = useState<string[] | undefined>();
+
+  useEffect(() => {
+    if (commanders.length === 0) {
+      setCommanderIdentity(undefined);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const colors = new Set<string>();
+      for (const name of commanders) {
+        try {
+          const res = await fetchRemote(
+            `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`,
+          );
+          if (!res.ok) continue;
+          const card = JSON.parse(res.body) as { color_identity?: string[] };
+          for (const color of card.color_identity ?? []) colors.add(color);
+        } catch {
+          // One unknown commander shouldn't block the rest.
+        }
+      }
+      if (!cancelled) setCommanderIdentity(colors.size ? sortWubrg([...colors]) : []);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [commandersKey, commanders]);
+
   const deckTabs = useMemo(
     () => DECK_VIEWS.filter(tab => tab.id === 'deck' || tab.id === 'tags' || commanderRecs),
     [commanderRecs],
@@ -425,6 +456,7 @@ export const DeckEditor = ({
       {panel === 'tags' ? (
         <TagsPanel
           collectionByKey={collectionByKey}
+          commanderIdentity={commanderIdentity}
           inDeck={inDeck}
           onAdd={addToMain}
         />

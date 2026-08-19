@@ -8,11 +8,22 @@ import { useCardPreview } from './cardPreview';
 
 import { cardKey } from '@/lib/cardName';
 import { buildTagsQuery, deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
+import { sortWubrg } from '@/lib/mtg';
 import { searchScryfallQuery, type CardSearchResult } from '@/lib/search';
 import { useRowSelection, type RowSelection } from '@/ui/useRowSelection';
+import { COLOR_PIPS } from '@/ui/components/colorPips';
 
 const PAGE_SIZE = 40;
 const RESULT_LIMIT = 80;
+
+const IDENTITY_PIPS = COLOR_PIPS.filter(p => p.code !== 'C');
+
+const toggleIn = (set: Set<string>, value: string, apply: (s: Set<string>) => void): void => {
+  const next = new Set(set);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  apply(next);
+};
 
 export const TagsPanel = ({
   collectionByKey,
@@ -30,7 +41,8 @@ export const TagsPanel = ({
 }) => {
   const [tagSearch, setTagSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [useIdentity, setUseIdentity] = useState(!!commanderIdentity?.length);
+  const [useIdentity, setUseIdentity] = useState(false);
+  const [identity, setIdentity] = useState<Set<string>>(() => new Set());
   const [hideInDeck, setHideInDeck] = useState(true);
   const [ownedOnly, setOwnedOnly] = useState(false);
 
@@ -41,10 +53,23 @@ export const TagsPanel = ({
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
-  const identityKey = commanderIdentity?.join('') ?? '';
+  const identityKey =
+    commanderIdentity === undefined
+      ? 'pending'
+      : commanderIdentity.length === 0
+        ? 'colorless'
+        : sortWubrg([...commanderIdentity]).join('');
   useEffect(() => {
-    if (commanderIdentity?.length) setUseIdentity(true);
-  }, [identityKey, commanderIdentity?.length]);
+    if (commanderIdentity === undefined) return;
+    setIdentity(new Set(commanderIdentity));
+    setUseIdentity(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identityKey]);
+
+  const identityFilter = useMemo(
+    () => (useIdentity ? sortWubrg([...identity]) : undefined),
+    [identity, useIdentity],
+  );
 
   const filteredTags = useMemo(() => filterDeckTags(tagSearch), [tagSearch]);
   const grouped = useMemo(() => deckTagsByCategory(filteredTags), [filteredTags]);
@@ -71,10 +96,7 @@ export const TagsPanel = ({
     let cancelled = false;
     setStatus('loading');
     setError(null);
-    const query = buildTagsQuery(
-      selectedIds,
-      useIdentity && commanderIdentity ? commanderIdentity : undefined,
-    );
+    const query = buildTagsQuery(selectedIds, identityFilter);
     setQueryText(query);
     void searchScryfallQuery(query, RESULT_LIMIT)
       .then(resp => {
@@ -93,7 +115,7 @@ export const TagsPanel = ({
     return () => {
       cancelled = true;
     };
-  }, [commanderIdentity, selectedIds, useIdentity]);
+  }, [identityFilter, selectedIds]);
 
   const ownedOf = (name: string): number => collectionByKey[cardKey(name)]?.total ?? 0;
   const deckQtyOf = (name: string): number => inDeck[cardKey(name)] ?? 0;
@@ -153,17 +175,6 @@ export const TagsPanel = ({
           <p className="text-ink-faint">Pick one or more tags, then add matching cards below.</p>
         )}
         <div className="flex flex-wrap items-center gap-2 text-ink-muted">
-          {commanderIdentity ? (
-            <label className="flex items-center gap-1">
-              <input
-                checked={useIdentity}
-                className="h-3 w-3 accent-[color:var(--lugin-accent)]"
-                onChange={e => setUseIdentity(e.target.checked)}
-                type="checkbox"
-              />
-              commander identity
-            </label>
-          ) : null}
           <label className="flex items-center gap-1">
             <input
               checked={hideInDeck}
@@ -218,6 +229,48 @@ export const TagsPanel = ({
         {filteredTags.length === 0 ? (
           <p className="py-2 text-center text-2xs text-ink-faint">No tags match that search.</p>
         ) : null}
+      </div>
+
+      <div className="flex-none border-b border-line px-2 py-1.5 text-2xs">
+        <div className="flex flex-wrap items-center gap-1">
+          <label
+            className="flex items-center gap-1 text-ink-muted"
+            title="Only cards legal in these colors (Commander colour-identity rule)"
+          >
+            <input
+              checked={useIdentity}
+              className="h-3 w-3 accent-[color:var(--lugin-accent)]"
+              onChange={e => setUseIdentity(e.target.checked)}
+              type="checkbox"
+            />
+            colors
+          </label>
+          {IDENTITY_PIPS.map(p => (
+            <button
+              key={p.code}
+              aria-pressed={useIdentity && identity.has(p.code)}
+              className={`h-5 w-5 rounded-full text-[10px] font-bold ${p.cls} ${
+                useIdentity && identity.has(p.code) ? 'ring-2 ring-accent' : 'opacity-50'
+              }`}
+              onClick={() => {
+                setUseIdentity(true);
+                toggleIn(identity, p.code, setIdentity);
+              }}
+              title={`Include ${p.code} in the identity filter`}
+              type="button"
+            >
+              {p.label}
+            </button>
+          ))}
+          {useIdentity && identity.size === 0 ? (
+            <span className="text-ink-faint">colorless only</span>
+          ) : null}
+          {commanderIdentity?.length ? (
+            <span className="text-ink-faint" title="Preselected from your commander">
+              from commander
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {selectedIds.length > 0 && visible.length > 0 ? (
