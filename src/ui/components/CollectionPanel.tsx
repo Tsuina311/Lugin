@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 
 import { Badge } from './Badge';
 import { Button } from './Button';
-import { CardImage } from './CardImage';
 import { EditionFilter } from './EditionFilter';
 import { SearchInput } from './Field';
 import { Hint } from './Hint';
@@ -12,7 +11,9 @@ import { PriceCheck } from './PriceCheck';
 import { PurchaseDuplicates } from './PurchaseDuplicates';
 import { SelectionBar } from './Selection';
 import { ViewToggle } from './ViewToggle';
+import { rememberFaces, useCardPreview } from './cardPreview';
 import { Library, Loader2, Pencil, ReceiptEuro, RefreshCw } from './icons';
+import { useFirstLoadedImage } from './useFirstLoadedImage';
 
 import { cardImageOverrideStore } from '@/content/cardImageOverrideStore';
 import {
@@ -107,6 +108,56 @@ interface CollectionRow {
   setCode?: string;
   total: number;
 }
+
+/** Miniature card art with the same hover + click-to-enlarge preview as deck rows. */
+const CollectionThumb = ({
+  candidates,
+  className = 'h-7 w-7 flex-none overflow-hidden rounded-sm bg-raised',
+  faceImages,
+  imgClassName,
+  imgStyle,
+  name,
+  previewKey,
+}: {
+  candidates: readonly string[];
+  className?: string;
+  faceImages?: string[];
+  imgClassName?: string;
+  imgStyle?: CSSProperties;
+  name: string;
+  previewKey: string;
+}) => {
+  const { ready, src } = useFirstLoadedImage(candidates);
+  const preview = useCardPreview();
+  const urls =
+    src && faceImages && faceImages.length >= 2
+      ? [src, ...faceImages.slice(1)]
+      : src
+        ? [src]
+        : [];
+  const { flippable, handlers } = preview(previewKey, name, urls);
+
+  return (
+    <div className={className} {...handlers}>
+      {ready && src ? (
+        <img
+          alt={name}
+          className={
+            imgClassName ??
+            `h-full w-full object-cover ${flippable ? 'cursor-pointer' : 'cursor-zoom-in'}`
+          }
+          src={src}
+          style={imgStyle ?? { objectPosition: '50% 18%' }}
+          title={flippable ? 'Click to flip to the other side' : undefined}
+        />
+      ) : candidates.length > 0 ? (
+        <div className="flex h-full w-full items-center justify-center">
+          <Loader2 aria-hidden className="h-3 w-3 animate-spin text-ink-faint" />
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 export const CollectionPanel = () => {
   const { cleared, collection, heldPurchases, loading, error } = useSyncExternalStore(
@@ -573,6 +624,10 @@ export const CollectionPanel = () => {
       });
   }, [rowNames]);
 
+  useEffect(() => {
+    rememberFaces(Object.values(metaByName));
+  }, [metaByName]);
+
   // Load metadata whenever the filter panel is open OR a type toggle is active
   // (type filtering needs Scryfall data even without the panel open).
   useEffect(() => {
@@ -893,8 +948,6 @@ export const CollectionPanel = () => {
     if (meta?.imageUrl && !out.includes(meta.imageUrl)) out.push(meta.imageUrl);
     return out;
   };
-
-  const rowImageUrl = (row: CollectionRow): string | undefined => rowImageCandidates(row)[0];
 
   // In box view, prefer real Scryfall metadata images (direct CDN, browser
   // cached) over the name-only API redirect, so load metadata for the rows.
@@ -1466,11 +1519,7 @@ export const CollectionPanel = () => {
                   const boughtEds = boughtEditions(r.name);
                   const override = overrides[r.key];
                   const meta = metaByName[cardKey(r.name)];
-                  const faces = meta?.faceImages;
-                  const flippable = !!faces && faces.length >= 2;
                   const candidates = rowImageCandidates(r);
-                  const src = candidates[0];
-                  const show = src ? openPreview(r.key, src, r.name, flippable, faces) : undefined;
                   return (
                     <div
                       key={r.key}
@@ -1482,25 +1531,14 @@ export const CollectionPanel = () => {
                       {/* Left column: always-visible cropped art (hover for the
                           full card / flip), quantity and the printing actions. */}
                       <div className="flex w-28 flex-none flex-col gap-1">
-                        <div
-                          className="group relative h-14 w-full cursor-zoom-in overflow-hidden rounded bg-slate-900"
-                          onClick={e => {
-                            if (!flippable) return;
-                            e.preventDefault();
-                            e.stopPropagation();
-                            previewStore.flip();
-                          }}
-                          onMouseEnter={show}
-                          onMouseLeave={() => previewStore.hide()}
-                          onMouseMove={e => previewStore.move(e.clientX, e.clientY)}
-                        >
-                          <CardImage
-                            alt={r.name}
-                            candidates={candidates}
-                            className="h-full w-full object-cover"
-                            style={{ objectPosition: '50% 17%' }}
-                          />
-                        </div>
+                        <CollectionThumb
+                          candidates={candidates}
+                          className="group relative h-14 w-full overflow-hidden rounded bg-slate-900"
+                          faceImages={meta?.faceImages}
+                          imgStyle={{ objectPosition: '50% 17%' }}
+                          name={r.name}
+                          previewKey={`collection|box|${r.key}`}
+                        />
                         <span className="text-center text-[11px] font-semibold tabular-nums text-slate-300">
                           ×{r.total}
                         </span>
@@ -1602,10 +1640,8 @@ export const CollectionPanel = () => {
               <ul className="outline-none" {...selection.listProps}>
                 {visibleRows.map(r => {
                   const override = overrides[r.key];
-                  const url = rowImageUrl(r);
                   const meta = metaByName[cardKey(r.name)];
-                  const faces = meta?.faceImages;
-                  const flippable = !!faces && faces.length >= 2;
+                  const candidates = rowImageCandidates(r);
                   const primary = r.editions[0];
                   const setTip = r.editions
                     .map(
@@ -1615,7 +1651,6 @@ export const CollectionPanel = () => {
                         }${e.foil ? ' · foil' : ''} · ×${e.qty}`,
                     )
                     .join('\n');
-                  const show = url ? openPreview(r.key, url, r.name, flippable, faces) : undefined;
                   return (
                     <li
                       key={r.key}
@@ -1624,24 +1659,13 @@ export const CollectionPanel = () => {
                         'flex items-center gap-1.5 border-b border-line/60 px-2 py-1 hover:bg-tint',
                       )}
                     >
-                      <span
-                        className={`min-w-0 flex-1 truncate text-xs text-ink ${
-                          url ? 'cursor-zoom-in' : ''
-                        }`}
-                        onClick={
-                          flippable
-                            ? e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                previewStore.flip();
-                              }
-                            : undefined
-                        }
-                        onMouseEnter={show}
-                        onMouseLeave={url ? () => previewStore.hide() : undefined}
-                        onMouseMove={url ? e => previewStore.move(e.clientX, e.clientY) : undefined}
-                        title={flippable ? 'Click to flip to the other side' : undefined}
-                      >
+                      <CollectionThumb
+                        candidates={candidates}
+                        faceImages={meta?.faceImages}
+                        name={r.name}
+                        previewKey={`collection|list|${r.key}`}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-xs text-ink" title={r.name}>
                         {r.name}
                       </span>
                       {r.foil > 0 && (
