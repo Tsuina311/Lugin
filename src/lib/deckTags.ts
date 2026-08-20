@@ -126,6 +126,13 @@ export const DECK_TAGS: DeckTag[] = [
   { category: 'Life', id: 'lifegain', label: 'Lifegain', query: 'o:"gain" o:"life"', terms: ['life gain'] },
   { category: 'Life', id: 'drain', label: 'Life drain', query: 'o:"loses" o:"life" o:"gain"', terms: ['extort'] },
   { category: 'Life', id: 'pay-life', label: 'Pay life', query: 'o:"pay" o:"life"', terms: ['necropotence'] },
+  {
+    category: 'Life',
+    id: 'alt-win',
+    label: 'Alternate win condition',
+    query: '(o:"win the game" or o:"wins the game" or o:"lose the game" or o:"loses the game")',
+    terms: ['alt win', 'wincon', 'lose the game', 'laboratory maniac', "thassa's oracle"],
+  },
 
   // Spells
   { category: 'Spells', id: 'instant-sorcery', label: 'Instants & sorceries', query: '(t:instant or t:sorcery)' },
