@@ -210,6 +210,14 @@ input[type="number"]::-webkit-outer-spin-button {
   background-color: var(--lugin-accent-soft);
 }
 
+/* Circular-arrow mouse cursor for double-faced flip targets (same glyph as the
+   list-row image icon). Hotspot is the centre of the 32×32 bitmap. */
+.cursor-flip {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg transform='translate(6 6)'%3E%3Cpath fill='%23ffffff' stroke='%230f172a' stroke-width='1.25' stroke-linejoin='round' d='M10 3.5a6.5 6.5 0 015.9 3.8l1.2-1.2v3.9h-3.9l1.5-1.5A5 5 0 0010 5V3.5zm0 13a6.5 6.5 0 01-5.9-3.8L2.9 13.9V10h3.9l-1.5 1.5A5 5 0 0010 15v1.5z'/%3E%3C/g%3E%3C/svg%3E")
+      16 16,
+    pointer;
+}
+
 /* ---------------------------------------------------------------------------
    "Match the site" theme.
    Our components are styled with a fixed dark (slate) palette. Rather than

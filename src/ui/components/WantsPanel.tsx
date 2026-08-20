@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
 
 import { useWideLayout } from '../useWideLayout';
 
@@ -92,11 +92,6 @@ const FILTER_COLORS: { cls: string; code: string }[] = [
 ];
 
 /**
- * The one-line row layout: card, printing, want lists, price, add, remove. The
- * flexible columns shrink together while price and the two actions keep their
- * width, so every row's numbers and buttons sit in the same place.
- */
-/**
  * Where the illustration sits inside a full card image, as fractions of that
  * image. Cardmarket and Scryfall both hand us the whole card, frame and all, so
  * the tiles crop to this window instead of nudging `object-position` around,
@@ -121,8 +116,16 @@ const ART_ASPECT = (ART_WINDOW.width * CARD_ASPECT) / ART_WINDOW.height;
 const ART_CHIP =
   'flex items-center gap-0.5 rounded bg-black/70 px-1 py-0.5 text-[10px] font-medium leading-none text-white backdrop-blur-[2px]';
 
+/**
+ * One-line seller-scan / wants rows: card, printing, want lists, price, add,
+ * remove. Flexible columns shrink together; price and actions keep width.
+ */
 const ROW_COLUMNS =
   'grid grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,1.1fr)_8.75rem_5rem_1.25rem] items-center gap-x-2';
+
+/** Product-search seller rows: no card name / want-list columns — one printing, many sellers. */
+const PRODUCT_OFFER_COLUMNS =
+  'grid grid-cols-[minmax(0,1.15fr)_2.75rem_4rem_minmax(0,1.05fr)_1.75rem_minmax(0,0.7fr)_6.5rem_3.25rem] items-center gap-x-1.5';
 
 const useWants = () => useSyncExternalStore(wantsStore.subscribe, wantsStore.getSnapshot);
 
@@ -826,6 +829,38 @@ export const WantsPanel = () => {
   const showingScan = !showingSearch && scan.status === 'done';
   const displayMatches = showingProduct ? search.matches : showingScan ? scan.matches : [];
 
+  /** Catalogue hits folded by card name — one parent, printings as sub-rows. */
+  const catalogueGroups = useMemo(() => {
+    const order: string[] = [];
+    const byKey = new Map<string, { key: string; name: string; printings: ProductSuggestion[] }>();
+    for (const item of search.catalogue) {
+      const key = cardKey(item.name);
+      let g = byKey.get(key);
+      if (!g) {
+        g = { key, name: stripVersion(frontFaceName(item.name)) || item.name, printings: [] };
+        byKey.set(key, g);
+        order.push(key);
+      }
+      g.printings.push(item);
+    }
+    return order.map(k => byKey.get(k)!);
+  }, [search.catalogue]);
+
+  const catalogueFromPrice = (printings: ProductSuggestion[]) => {
+    let best: string | undefined;
+    let bestVal = Infinity;
+    for (const p of printings) {
+      if (!p.fromPrice) continue;
+      const n = Number(
+        p.fromPrice.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.'),
+      );
+      if (!Number.isFinite(n) || n >= bestVal) continue;
+      bestVal = n;
+      best = p.fromPrice;
+    }
+    return best;
+  };
+
   // ---- Filter by edition ----------------------------------------------------
   // Offers off a Cardmarket page name their expansion but never date it, so the
   // set catalogue turns those names into years. Applied to the offers *before*
@@ -1114,7 +1149,9 @@ export const WantsPanel = () => {
     | { status: 'done'; summary: SellerStockSummary }
     | { status: 'error' };
   const [sellerStock, setSellerStock] = useState<Record<string, SellerStockState>>({});
+  // v2: count from profile "Singles (N)", not offers page size.
   const sellerStockDone = useRef<Record<string, SellerStockSummary>>({});
+  const sellerStockCacheKey = (url: string) => `v2:${url}`;
 
   useEffect(() => {
     if (!showingProduct) return;
@@ -1130,11 +1167,12 @@ export const WantsPanel = () => {
       let first = true;
       for (const url of urls) {
         if (controller.signal.aborted) return;
-        if (sellerStockDone.current[url]) {
+        const cacheKey = sellerStockCacheKey(url);
+        if (sellerStockDone.current[cacheKey]) {
           setSellerStock(prev =>
             prev[url]?.status === 'done'
               ? prev
-              : { ...prev, [url]: { status: 'done', summary: sellerStockDone.current[url] } },
+              : { ...prev, [url]: { status: 'done', summary: sellerStockDone.current[cacheKey] } },
           );
           continue;
         }
@@ -1148,7 +1186,7 @@ export const WantsPanel = () => {
           first = false;
           const summary = await fetchSellerStockSummary(url, controller.signal);
           if (controller.signal.aborted) return;
-          sellerStockDone.current[url] = summary;
+          sellerStockDone.current[cacheKey] = summary;
           setSellerStock(prev => ({ ...prev, [url]: { status: 'done', summary } }));
         } catch (err) {
           if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -1457,75 +1495,50 @@ export const WantsPanel = () => {
   const metaLine = (o: ScanMatch) =>
     [o.edition, o.condition, o.language].filter(Boolean).join(' · ');
 
-  /** Seller-facing line for product-search offers (no repeated edition). */
-  const sellerMeta = (o: ScanMatch) => {
-    const bits: ReactNode[] = [];
-    if (o.seller) {
-      bits.push(
-        o.sellerUrl ? (
-          <a
-            key="seller"
-            className="font-medium text-sky-300 hover:underline"
-            href={o.sellerUrl}
-            onClick={e => e.stopPropagation()}
-            rel="noreferrer"
-            target="_blank"
-          >
-            {o.seller}
-          </a>
-        ) : (
-          <span key="seller" className="font-medium text-slate-200">
-            {o.seller}
-          </span>
-        ),
-      );
+  /** Seller-facing cells for product-search offers (columnar, not a · soup). */
+  const productSellerLink = (o: ScanMatch) =>
+    o.seller ? (
+      o.sellerUrl ? (
+        <a
+          className="truncate font-medium text-sky-300 hover:underline"
+          href={o.sellerUrl}
+          onClick={e => e.stopPropagation()}
+          rel="noreferrer"
+          target="_blank"
+          title={o.seller}
+        >
+          {o.seller}
+        </a>
+      ) : (
+        <span className="truncate font-medium text-slate-200">{o.seller}</span>
+      )
+    ) : (
+      <span className="text-slate-600">—</span>
+    );
+
+  const productStockCell = (o: ScanMatch) => {
+    if (!o.sellerUrl) return <span className="text-slate-600">—</span>;
+    const st = sellerStock[o.sellerUrl];
+    if (!st || st.status === 'loading') {
+      return <span className="text-slate-600">…</span>;
     }
-    if (o.sellerSales) bits.push(<span key="sales">{o.sellerSales} sales</span>);
-    if (o.sellerRating) bits.push(<span key="rate">{o.sellerRating}</span>);
-    if (o.sellerCountry) bits.push(<span key="loc">{o.sellerCountry}</span>);
-    if (o.sellerUrl) {
-      const st = sellerStock[o.sellerUrl];
-      if (st?.status === 'loading') {
-        bits.push(
-          <span key="stock" className="text-slate-600">
-            stock…
-          </span>,
-        );
-      } else if (st?.status === 'done') {
-        const { singles, minPrice, maxPrice } = st.summary;
-        if (singles != null) {
-          bits.push(
-            <span key="singles" title="Singles this seller currently lists">
-              {singles.toLocaleString('de-DE')} singles
-            </span>,
-          );
-        }
-        if (minPrice && maxPrice && minPrice !== maxPrice) {
-          bits.push(
-            <span key="range" title="Cheapest and most expensive Singles they list">
-              {minPrice.replace(/\s*€$/, '')}–{maxPrice}
-            </span>,
-          );
-        } else if (minPrice) {
-          bits.push(
-            <span key="range" title="Cheapest Singles they list">
-              from {minPrice}
-            </span>,
-          );
-        }
-      }
-    }
-    if (o.condition) bits.push(<span key="cond">{o.condition}</span>);
-    if (o.language) bits.push(<span key="lang">{o.language}</span>);
-    if (bits.length === 0) return null;
+    if (st.status === 'error') return <span className="text-slate-600">—</span>;
+    const { singles, minPrice, maxPrice } = st.summary;
     return (
-      <span className="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-        {bits.map((b, i) => (
-          <span key={i} className="inline-flex items-center gap-1.5">
-            {i > 0 && <span className="text-slate-600">·</span>}
-            {b}
+      <span className="min-w-0 truncate" title="Singles listed · stock price range">
+        {singles != null ? (
+          <span className="tabular-nums text-slate-300">{singles.toLocaleString('de-DE')}</span>
+        ) : (
+          <span className="text-slate-600">—</span>
+        )}
+        {minPrice && maxPrice && minPrice !== maxPrice ? (
+          <span className="text-slate-500">
+            {' '}
+            · {minPrice.replace(/\s*€$/, '')}–{maxPrice.replace(/\s*€$/, '')}
           </span>
-        ))}
+        ) : minPrice ? (
+          <span className="text-slate-500"> · from {minPrice.replace(/\s*€$/, '')}</span>
+        ) : null}
       </span>
     );
   };
@@ -1543,6 +1556,35 @@ export const WantsPanel = () => {
       </span>
     );
   };
+
+  const renderProductOfferRow = (o: ScanMatch, key: string | number) => (
+    <li key={key} className={`${PRODUCT_OFFER_COLUMNS} px-2 py-1 text-[11px]`}>
+      <span className="min-w-0 flex items-center gap-1 truncate">
+        {productSellerLink(o)}
+        {foilTag(o.isFoil)}
+        {offerInCart(o)}
+      </span>
+      <span className="truncate tabular-nums text-slate-400" title="Completed sales">
+        {o.sellerSales ?? '—'}
+      </span>
+      <span className="truncate text-slate-400" title={o.sellerCountry}>
+        {o.sellerCountry ?? '—'}
+      </span>
+      {productStockCell(o)}
+      <span className="truncate text-slate-400" title="Condition">
+        {o.condition ?? '—'}
+      </span>
+      <span className="truncate text-slate-400" title="Language">
+        {o.language ?? '—'}
+      </span>
+      <span className="flex flex-col items-end gap-0.5 text-right">
+        {renderPrice(o, true)}
+        {entryShipLabel(o)}
+      </span>
+      <span className="flex justify-end">{addAction(o)}</span>
+      <span className="col-span-8 empty:hidden">{renderAddError(o)}</span>
+    </li>
+  );
 
   /**
    * "In cart" tag. Solid/blue when this exact offer is in the extension cart,
@@ -1825,27 +1867,46 @@ export const WantsPanel = () => {
    * Shows the full card near the cursor and, for double-faced cards, lets a
    * click flip to the back (the edition-specific back is derived from the
    * Cardmarket product id embedded in the image URL when present).
+   *
+   * Cardmarket names DFCs as "Front // Back", so that marker is enough to show
+   * the flip cursor before Scryfall answers — and with a product id we can build
+   * the back-face URL immediately.
    */
   const previewHandlers = (src: string, name?: string) => {
     const key = name ? cardKey(name) : '';
     const faces = key ? facesByKey[key] : undefined;
-    const flippable = !!faces && faces.length >= 2;
     const productId = src.match(/\/(\d+)\.(?:jpg|jpeg|png|webp)(?:[?#]|$)/)?.[1];
     const editionBack = productId
       ? `https://api.scryfall.com/cards/cardmarket/${productId}?format=image&version=normal&face=back`
       : undefined;
+    const looksDoubleFaced = !!name?.includes('//');
+    const knownBack = faces && faces.length >= 2 ? faces[1] : undefined;
+    const back =
+      editionBack && (looksDoubleFaced || knownBack) ? editionBack : knownBack;
+    const flippable = !!back;
+    const flipCursor = flippable || looksDoubleFaced;
     return {
-      flippable,
+      flippable: flipCursor,
       handlers: {
         onClick: (e: { preventDefault: () => void; stopPropagation: () => void }) => {
-          if (!flippable) return;
+          if (!flipCursor) return;
           e.preventDefault();
           e.stopPropagation();
-          previewStore.flip();
+          const shown = previewStore.getSnapshot();
+          const at = previewStore.getPosition();
+          if (back) {
+            if (shown?.key === key && shown.urls.length >= 2) {
+              previewStore.flip();
+            } else {
+              previewStore.show({ index: 1, key, urls: [src, back] }, at.x, at.y);
+            }
+            return;
+          }
+          if (key && name) loadFaces(key, name, editionBack);
         },
         onMouseEnter: (e: { clientX: number; clientY: number }) => {
           previewStore.show(
-            { index: 0, key, urls: flippable ? [src, editionBack ?? faces![1]] : [src] },
+            { index: 0, key, urls: flippable && back ? [src, back] : [src] },
             e.clientX,
             e.clientY,
           );
@@ -1870,7 +1931,7 @@ export const WantsPanel = () => {
       <span
         aria-label={flippable ? 'Preview card image — click to flip' : 'Preview card image'}
         className={`inline-flex h-4 w-4 flex-none items-center justify-center rounded hover:text-sky-300 ${
-          flippable ? 'cursor-pointer text-sky-400' : 'cursor-zoom-in text-slate-400'
+          flippable ? 'cursor-flip text-sky-400' : 'cursor-zoom-in text-slate-400'
         }`}
         onClick={handlers.onClick}
         onMouseEnter={handlers.onMouseEnter}
@@ -2266,7 +2327,12 @@ export const WantsPanel = () => {
               <>
                 Results for “{search.query}”
                 {search.status === 'catalogue' && (
-                  <span className="text-ink-faint"> · {search.catalogue.length} printings</span>
+                  <span className="text-ink-faint">
+                    {' '}
+                    · {catalogueGroups.length} card
+                    {catalogueGroups.length === 1 ? '' : 's'} · {search.catalogue.length} printing
+                    {search.catalogue.length === 1 ? '' : 's'}
+                  </span>
                 )}
               </>
             )}
@@ -2802,7 +2868,7 @@ export const WantsPanel = () => {
                             ? 'Searching…'
                             : search.status === 'error'
                               ? 'Search failed'
-                              : `${search.catalogue.length} printing${search.catalogue.length === 1 ? '' : 's'}`}
+                              : `${catalogueGroups.length} card${catalogueGroups.length === 1 ? '' : 's'} · ${search.catalogue.length} printing${search.catalogue.length === 1 ? '' : 's'}`}
                           {search.query && search.status === 'catalogue' && ` for “${search.query}”`}
                         </>
                       ) : showingProduct ? (
@@ -2999,7 +3065,21 @@ export const WantsPanel = () => {
                     </SelectionBar>
                   )}
                   {/* Column headings, so a row of numbers and codes reads as a table. */}
-                  {oneLine && resultsView === 'list' && visibleGrouped.length > 0 && (
+                  {resultsView === 'list' && visibleGrouped.length > 0 && showingProduct && (
+                    <div
+                      className={`${PRODUCT_OFFER_COLUMNS} border-t border-slate-800/60 px-2 py-1 text-[9px] uppercase tracking-wide text-slate-600`}
+                    >
+                      <span>Seller</span>
+                      <span>Sales</span>
+                      <span>Country</span>
+                      <span>Stock</span>
+                      <span>Cond</span>
+                      <span>Lang</span>
+                      <span className="text-right">Price</span>
+                      <span />
+                    </div>
+                  )}
+                  {oneLine && resultsView === 'list' && visibleGrouped.length > 0 && !showingProduct && (
                     <div
                       className={`${ROW_COLUMNS} border-t border-slate-800/60 px-2 py-1 text-[9px] uppercase tracking-wide text-slate-600`}
                     >
@@ -3020,56 +3100,144 @@ export const WantsPanel = () => {
                     <div className="p-4 text-center text-[11px] text-red-400">
                       {search.error ?? 'Search failed'}
                     </div>
-                  ) : search.catalogue.length === 0 ? (
+                  ) : catalogueGroups.length === 0 ? (
                     <div className="p-4 text-center text-[11px] text-slate-500">
                       No printings matched “{search.query}”.
                     </div>
                   ) : (
                     <div className="divide-y divide-line">
-                      {search.catalogue.map(item => {
-                        const thumb = item.imageUrl;
-                        const preview = thumb ? previewHandlers(thumb, item.name) : null;
-                        return (
-                          <button
-                            key={item.href}
-                            className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-tint"
-                            onClick={() => void openProduct(item)}
-                            type="button"
-                          >
-                            {thumb ? (
-                              <img
-                                alt=""
-                                className="h-10 w-7 flex-none cursor-zoom-in rounded-sm object-cover"
-                                loading="lazy"
-                                src={thumb}
-                                {...(preview?.handlers ?? {})}
-                                // Keep the row click for opening offers; preview
-                                // hover still works. Stop zoom-click from also
-                                // selecting the printing.
-                                onClick={e => {
-                                  if (preview) {
-                                    e.stopPropagation();
-                                    preview.handlers.onClick(e);
+                      {catalogueGroups.map(g => {
+                        const renderPrinting = (
+                          item: ProductSuggestion,
+                          opts: { showName: boolean },
+                        ) => {
+                          const thumb = item.imageUrl;
+                          const preview = thumb ? previewHandlers(thumb, item.name) : null;
+                          const thumbCursor = preview?.flippable
+                            ? 'cursor-flip'
+                            : 'cursor-zoom-in';
+                          return (
+                            <button
+                              key={item.href}
+                              className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-tint"
+                              onClick={() => void openProduct(item)}
+                              type="button"
+                            >
+                              {thumb ? (
+                                <img
+                                  alt=""
+                                  className={`h-10 w-7 flex-none rounded-sm object-cover ${thumbCursor}`}
+                                  loading="lazy"
+                                  src={thumb}
+                                  title={
+                                    preview?.flippable
+                                      ? 'Click to flip to the other side'
+                                      : undefined
                                   }
-                                }}
-                              />
-                            ) : (
-                              <span className="h-10 w-7 flex-none rounded-sm bg-panel" />
-                            )}
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-xs text-ink">{item.name}</span>
-                              {item.expansion && (
-                                <span className="block truncate text-2xs text-ink-faint">
-                                  {item.expansion}
+                                  {...(preview?.handlers ?? {})}
+                                  onClick={e => {
+                                    if (preview) {
+                                      e.stopPropagation();
+                                      preview.handlers.onClick(e);
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <span className="h-10 w-7 flex-none rounded-sm bg-panel" />
+                              )}
+                              <span className="min-w-0 flex-1">
+                                {opts.showName ? (
+                                  <>
+                                    <span className="block truncate text-xs text-ink">
+                                      {item.name}
+                                    </span>
+                                    {item.expansion && (
+                                      <span className="block truncate text-2xs text-ink-faint">
+                                        {item.expansion}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="block truncate text-xs text-ink">
+                                    {item.expansion || item.name}
+                                  </span>
+                                )}
+                              </span>
+                              {item.fromPrice && (
+                                <span className="flex-none text-2xs tabular-nums text-ink-muted">
+                                  from {item.fromPrice}
                                 </span>
                               )}
-                            </span>
-                            {item.fromPrice && (
-                              <span className="flex-none text-2xs tabular-nums text-ink-muted">
-                                from {item.fromPrice}
+                            </button>
+                          );
+                        };
+
+                        if (g.printings.length === 1) {
+                          return (
+                            <div key={g.key}>{renderPrinting(g.printings[0], { showName: true })}</div>
+                          );
+                        }
+
+                        const lead = g.printings.find(p => p.imageUrl) ?? g.printings[0];
+                        const thumb = lead?.imageUrl;
+                        // Keep the Cardmarket "Front // Back" name so DFCs get
+                        // the flip cursor before Scryfall resolves faces.
+                        const preview = thumb
+                          ? previewHandlers(thumb, lead.name)
+                          : null;
+                        const fromPrice = catalogueFromPrice(g.printings);
+                        return (
+                          <details key={g.key} className="group/editions">
+                            <summary className="flex cursor-pointer list-none items-center gap-2 px-2 py-1.5 transition-colors hover:bg-tint">
+                              {thumb ? (
+                                <img
+                                  alt=""
+                                  className={`h-10 w-7 flex-none rounded-sm object-cover ${
+                                    preview?.flippable ? 'cursor-flip' : 'cursor-zoom-in'
+                                  }`}
+                                  loading="lazy"
+                                  src={thumb}
+                                  title={
+                                    preview?.flippable
+                                      ? 'Click to flip to the other side'
+                                      : undefined
+                                  }
+                                  {...(preview?.handlers ?? {})}
+                                  onClick={e => {
+                                    // Preview / flip without toggling the editions list.
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    preview?.handlers.onClick(e);
+                                  }}
+                                />
+                              ) : (
+                                <span className="h-10 w-7 flex-none rounded-sm bg-panel" />
+                              )}
+                              <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">
+                                {g.name}
                               </span>
-                            )}
-                          </button>
+                              <span className="flex-none rounded bg-slate-700 px-1 text-[9px] text-slate-300">
+                                {g.printings.length} editions
+                              </span>
+                              {fromPrice && (
+                                <span className="flex-none text-2xs tabular-nums text-ink-muted">
+                                  from {fromPrice}
+                                </span>
+                              )}
+                              <ChevronDown
+                                aria-hidden
+                                className="flex-none text-ink-faint transition-transform group-open/editions:rotate-180"
+                                size={13}
+                              />
+                            </summary>
+                            <ul className="list-none divide-y divide-line/40 border-l border-line ml-4">
+                              {g.printings.map(item => (
+                                <li key={item.href}>
+                                  {renderPrinting(item, { showName: false })}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
                         );
                       })}
                     </div>
@@ -3125,12 +3293,17 @@ export const WantsPanel = () => {
                           cart, what you paid, which lists — rides on its edges.
                           Hovering still opens the full card. */}
                           <div
-                            className="relative flex-none cursor-zoom-in overflow-hidden bg-canvas"
+                            className={`relative flex-none overflow-hidden bg-canvas ${
+                              preview?.flippable ? 'cursor-flip' : 'cursor-zoom-in'
+                            }`}
                             onClick={preview?.handlers.onClick}
                             onMouseEnter={preview?.handlers.onMouseEnter}
                             onMouseLeave={preview?.handlers.onMouseLeave}
                             onMouseMove={preview?.handlers.onMouseMove}
                             style={{ aspectRatio: `${ART_ASPECT}` }}
+                            title={
+                              preview?.flippable ? 'Click to flip to the other side' : undefined
+                            }
                           >
                             {ready ? (
                               // Blown up and pulled up-left until the art window
@@ -3271,6 +3444,27 @@ export const WantsPanel = () => {
                       // Single offer → flat row.
                       if (g.offers.length === 1) {
                         const o = g.offers[0];
+                        if (showingProduct) {
+                          return (
+                            <li key={key} {...selection.rowProps(key, 'group')}>
+                              <div className="flex items-center gap-2 border-b border-slate-800/40 px-2 py-1.5 text-[12px] text-slate-100">
+                                {imageIcon(o.imageUrl, o.name)}
+                                <span className="min-w-0 flex-1 truncate font-medium">{o.name}</span>
+                                {o.edition && (
+                                  <span className="truncate text-[10px] text-slate-400">
+                                    {o.edition}
+                                  </span>
+                                )}
+                                {foilTag(o.isFoil)}
+                                {purchasedTag(o.name)}
+                                {ownedTag(o.name)}
+                              </div>
+                              <ul className="list-none divide-y divide-slate-800/40">
+                                {renderProductOfferRow(o, o.articleId ?? 0)}
+                              </ul>
+                            </li>
+                          );
+                        }
                         const nameCell = (
                           <>
                             {imageIcon(o.imageUrl, o.name)}
@@ -3281,8 +3475,6 @@ export const WantsPanel = () => {
                             {ownedTag(o.name)}
                           </>
                         );
-                        const rowMeta = showingProduct ? sellerMeta(o) || metaLine(o) : metaLine(o);
-                        const ship = showingProduct ? entryShipLabel(o) : null;
                         // Wide: one line per card, columns aligned across rows.
                         if (oneLine) {
                           return (
@@ -3291,14 +3483,14 @@ export const WantsPanel = () => {
                                 <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-100">
                                   {nameCell}
                                 </div>
-                                <div className="min-w-0 truncate text-[10px] text-slate-400">
-                                  {rowMeta}
+                                <div
+                                  className="min-w-0 truncate text-[10px] text-slate-400"
+                                  title={metaLine(o)}
+                                >
+                                  {metaLine(o)}
                                 </div>
                                 {listBadges(g.lists, true)}
-                                <div className="flex flex-col items-end gap-0.5">
-                                  {renderPrice(o, true)}
-                                  {ship}
-                                </div>
+                                {renderPrice(o, true)}
                                 <div className="flex justify-end">{addAction(o)}</div>
                                 {removeIcon(g.name)}
                               </div>
@@ -3314,10 +3506,9 @@ export const WantsPanel = () => {
                                 <div className="flex items-center gap-1.5 text-[12px] text-slate-100">
                                   {nameCell}
                                 </div>
-                                {rowMeta && (
-                                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
-                                    {rowMeta}
-                                    {ship}
+                                {metaLine(o) && (
+                                  <div className="mt-0.5 text-[10px] text-slate-400">
+                                    {metaLine(o)}
                                   </div>
                                 )}
                                 {listBadges(g.lists)}
@@ -3360,11 +3551,25 @@ export const WantsPanel = () => {
                           </span>
                         </span>
                       );
-                      const headerMeta = showingProduct
-                        ? [cheapest.edition, anyFoil ? 'foil available' : null]
-                            .filter(Boolean)
-                            .join(' · ')
-                        : metaLine(cheapest);
+
+                      if (showingProduct) {
+                        return (
+                          <li key={key} {...selection.rowProps(key, 'group')}>
+                            <div className="flex items-center gap-2 border-b border-slate-800/40 px-2 py-1.5 text-[12px] text-slate-100">
+                              {groupName}
+                              {cheapest.edition && (
+                                <span className="min-w-0 flex-1 truncate text-[10px] text-slate-400">
+                                  {cheapest.edition}
+                                </span>
+                              )}
+                              <span className="ml-auto flex-none">{fromPrice}</span>
+                            </div>
+                            <ul className="list-none divide-y divide-slate-800/40">
+                              {g.offers.map((o, i) => renderProductOfferRow(o, o.articleId ?? i))}
+                            </ul>
+                          </li>
+                        );
+                      }
 
                       const offerRows = (
                         <ul
@@ -3375,21 +3580,14 @@ export const WantsPanel = () => {
                           {g.offers.map((o, i) => {
                             const offerTags = (
                               <>
-                                {!showingProduct && imageIcon(o.imageUrl, g.name)}
+                                {imageIcon(o.imageUrl, g.name)}
                                 {foilTag(o.isFoil)}
                                 {offerInCart(o)}
                               </>
                             );
-                            const offerMeta = showingProduct ? (
-                              sellerMeta(o) || (
-                                <span className="text-slate-600">seller unknown</span>
-                              )
-                            ) : (
-                              metaLine(o) || (
-                                <span className="text-slate-600">details unavailable</span>
-                              )
+                            const offerMeta = metaLine(o) || (
+                              <span className="text-slate-600">details unavailable</span>
                             );
-                            const ship = showingProduct ? entryShipLabel(o) : null;
                             if (oneLine) {
                               return (
                                 <li key={o.articleId ?? i} className={`${ROW_COLUMNS} py-0.5`}>
@@ -3400,7 +3598,6 @@ export const WantsPanel = () => {
                                   <span />
                                   <span className="flex flex-col items-end gap-0.5">
                                     {renderPrice(o, true)}
-                                    {ship}
                                   </span>
                                   <span className="flex justify-end">{addAction(o)}</span>
                                   <span />
@@ -3416,8 +3613,7 @@ export const WantsPanel = () => {
                                   <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-300">
                                       {offerTags}
-                                      {offerMeta}
-                                      {ship}
+                                      <span>{offerMeta}</span>
                                     </div>
                                   </div>
                                   {renderAddControl(o)}
@@ -3428,47 +3624,6 @@ export const WantsPanel = () => {
                           })}
                         </ul>
                       );
-
-                      if (showingProduct) {
-                        return (
-                          <li key={key} {...selection.rowProps(key, 'group px-2 py-1.5')}>
-                            {oneLine ? (
-                              <div className={`${ROW_COLUMNS} px-0 py-0.5`}>
-                                <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-100">
-                                  {groupName}
-                                </span>
-                                <span
-                                  className="truncate text-[10px] text-slate-400"
-                                  title={headerMeta}
-                                >
-                                  {headerMeta}
-                                </span>
-                                {listBadges(g.lists, true)}
-                                <span className="text-right">{fromPrice}</span>
-                                <span />
-                                {removeIcon(g.name)}
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <span className="min-w-0 flex-1">
-                                  <span className="flex items-center gap-1.5 text-[12px] text-slate-100">
-                                    {groupName}
-                                  </span>
-                                  {headerMeta && (
-                                    <div className="mt-0.5 text-[10px] text-slate-400">
-                                      {headerMeta}
-                                    </div>
-                                  )}
-                                  {listBadges(g.lists)}
-                                </span>
-                                {fromPrice}
-                              </div>
-                            )}
-                            {oneLine ? removeStatus(g.name) : removeControl(g.name)}
-                            {offerRows}
-                          </li>
-                        );
-                      }
 
                       return (
                         <li key={key} {...selection.rowProps(key, 'group px-2 py-1.5')}>

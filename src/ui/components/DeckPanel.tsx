@@ -323,7 +323,7 @@ const DeckList = ({
                             {urls[0] && (
                               <img
                                 alt={c.name}
-                                className={`h-full w-full object-cover ${flippable ? 'cursor-pointer' : ''}`}
+                                className={`h-full w-full object-cover ${flippable ? 'cursor-flip' : ''}`}
                                 decoding="async"
                                 loading="lazy"
                                 src={urls[0]}
@@ -1047,7 +1047,7 @@ const DeckRow = ({
         {urls[0] ? (
           <img
             alt={card.name}
-            className={`h-full w-full object-cover ${flippable ? 'cursor-pointer' : 'cursor-zoom-in'}`}
+            className={`h-full w-full object-cover ${flippable ? 'cursor-flip' : 'cursor-zoom-in'}`}
             src={urls[0]}
             style={{ objectPosition: '50% 18%' }}
             title={flippable ? 'Click to flip to the other side' : undefined}
@@ -1501,7 +1501,7 @@ const AddCardBox = ({
                       <span className="block" {...handlers}>
                         <img
                           alt={c.name}
-                          className={`h-28 w-full object-cover ${flippable ? 'cursor-pointer' : ''}`}
+                          className={`h-28 w-full object-cover ${flippable ? 'cursor-flip' : ''}`}
                           src={c.imageUrl}
                           title={flippable ? 'Click to flip to the other side' : undefined}
                         />
@@ -1567,7 +1567,7 @@ const AddCardBox = ({
                             >
                               <img
                                 alt=""
-                                className={`h-full w-full object-cover ${flippable ? 'cursor-pointer' : ''}`}
+                                className={`h-full w-full object-cover ${flippable ? 'cursor-flip' : ''}`}
                                 loading="lazy"
                                 src={c.imageUrl}
                                 style={{ objectPosition: '50% 18%' }}

@@ -37,7 +37,9 @@ const PinnedPreview = ({ active, shown }: { active: string; shown: PreviewState 
     >
       <img
         alt=""
-        className="max-h-[85vh] max-w-[min(400px,90vw)] cursor-zoom-in rounded-md border border-line-strong shadow-pop"
+        className={`max-h-[85vh] max-w-[min(400px,90vw)] rounded-md border border-line-strong shadow-pop ${
+          flippable ? 'cursor-flip' : 'cursor-zoom-in'
+        }`}
         decoding="async"
         onClick={event => {
           event.stopPropagation();

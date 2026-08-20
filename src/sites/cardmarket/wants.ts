@@ -594,7 +594,7 @@ const sellerFromRow = (
   return { seller, sellerCountry, sellerRating, sellerSales, sellerUrl };
 };
 
-/** Stock overview scraped from a seller's Singles offers pages. */
+/** Stock overview scraped from a seller's profile + Singles offers pages. */
 export interface SellerStockSummary {
   /** Most expensive Singles offer (text). */
   maxPrice?: string;
@@ -611,66 +611,137 @@ const parseIntLocale = (raw: string): number | undefined => {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 };
 
-/** "2.345 Results" / "1.234 Treffer" / pagination "of 2.345". */
-const TOTAL_HITS_RE =
-  /([\d]{1,3}(?:[.\s]\d{3})+|\d+)\s*(?:Results?|Treffer|R[eé]sultats?|Risultati|Resultados)/i;
-const OF_TOTAL_RE = /\b(?:of|von|de|di)\s+([\d]{1,3}(?:[.\s]\d{3})+|\d+)\b/i;
+/** Profile category tile: "Singles (3596)" — the real stock count. */
+const SINGLES_COUNT_RE = /Singles\s*\(\s*([\d.\s]+)\s*\)/i;
+/** Pagination: "1 – 15 of 3.596" / "von 3.596" (never the bare page size). */
+const OF_TOTAL_RE =
+  /(?:\d[\d.\s]*\s*[-–]\s*\d[\d.\s]*\s+)?(?:of|von|de|di)\s+([\d]{1,3}(?:[.\s]\d{3})+|\d{3,})/i;
 
-/**
- * Read Singles count + the first offer price from a seller offers document.
- * Callers fetch once sorted ascending (min) and once descending (max).
- */
-export const parseSellerStockSummary = (doc: Document): SellerStockSummary => {
-  const text = doc.body?.innerText ?? '';
-  const singles =
-    parseIntLocale(text.match(TOTAL_HITS_RE)?.[1] ?? '') ??
-    parseIntLocale(doc.querySelector('.pagination')?.textContent?.match(OF_TOTAL_RE)?.[1] ?? '') ??
-    parseIntLocale(
-      doc
-        .querySelector('[class*="hit"], [class*="result"], .total-count')
-        ?.textContent?.match(/([\d]{1,3}(?:[.\s]\d{3})+|\d+)/)?.[1] ?? '',
-    );
+/** Singles count from the seller profile page (`/Users/<name>`). */
+export const parseSellerProfileSingles = (doc: Document): number | undefined => {
+  // Link text "Singles (3596)" (most common).
+  for (const a of doc.querySelectorAll<HTMLAnchorElement>('a[href*="Offers/Singles"]')) {
+    const n = parseIntLocale((a.textContent ?? '').match(SINGLES_COUNT_RE)?.[1] ?? '');
+    if (n != null && n > 0) return n;
+    // Count in a sibling when the link is only "Singles".
+    const sib = `${a.nextElementSibling?.textContent ?? ''} ${a.parentElement?.textContent ?? ''}`;
+    const fromSib = parseIntLocale(sib.match(/\(\s*([\d.\s]+)\s*\)/)?.[1] ?? '');
+    if (/singles/i.test(a.textContent ?? '') && fromSib != null && fromSib > 0) return fromSib;
+  }
+  // Whole-page fallback: first "Singles (N)" in visible text.
+  return parseIntLocale((doc.body?.innerText ?? '').match(SINGLES_COUNT_RE)?.[1] ?? '');
+};
 
+/** First offer price on a Singles list page (caller controls sort order). */
+export const parseSellerOffersFirstPrice = (
+  doc: Document,
+): Pick<SellerStockSummary, 'minPrice' | 'minPriceValue'> => {
   const row = doc.querySelector<HTMLElement>(
     '[id^="articleRow"], [id^="stockRow"], .article-row, .row.article-row',
   );
-  const { price, value } = row ? findPrice(row) : {};
-  return {
-    ...(singles != null ? { singles } : {}),
-    ...(price ? { minPrice: price, minPriceValue: value } : {}),
-  };
+  if (!row) return {};
+  const { price, value } = findPrice(row);
+  return price ? { minPrice: price, minPriceValue: value } : {};
 };
 
-const sellerSinglesUrl = (sellerUrl: string, sortBy: 'price_asc' | 'price_desc'): string => {
-  const base = sellerUrl.replace(/\/$/, '');
-  const path = /\/Offers\/Singles/i.test(base) ? base : `${base}/Offers/Singles`;
-  const url = new URL(path, location.origin);
-  url.searchParams.set('sortBy', sortBy);
+/** Total hits from an offers list — only "of N" style, never "15 Results". */
+export const parseSellerOffersTotal = (doc: Document): number | undefined => {
+  const pag = doc.querySelector('.pagination, nav[aria-label*="page" i]')?.textContent ?? '';
+  const fromPag = parseIntLocale(pag.match(OF_TOTAL_RE)?.[1] ?? '');
+  if (fromPag != null) return fromPag;
+  return parseIntLocale((doc.body?.innerText ?? '').match(OF_TOTAL_RE)?.[1] ?? '');
+};
+
+const sellerProfileUrl = (sellerUrl: string): string => {
+  const url = new URL(sellerUrl, location.origin);
+  url.pathname = url.pathname.replace(/\/Offers\/.*$/i, '');
+  url.search = '';
+  url.hash = '';
+  return url.href.replace(/\/$/, '');
+};
+
+/**
+ * Build a sorted Singles URL from the page's own sort `<select>`, when present.
+ */
+const sortedSinglesUrl = (
+  listUrl: string,
+  doc: Document,
+  dir: 'asc' | 'desc',
+): string => {
+  const select = doc.querySelector<HTMLSelectElement>(
+    'select[name="sortBy"], select#sortBy, select[name*="sort" i]',
+  );
+  if (select) {
+    const match = [...select.options].find(o => {
+      const t = `${o.value} ${o.textContent}`.toLowerCase();
+      if (!/price|preis|prix|prezzo|precio/.test(t)) return false;
+      if (dir === 'asc') return /asc|low|cheap|lowest|aufsteig|croissant|crescente/.test(t);
+      return /desc|high|highest|teuer|absteig|d[eé]croissant|decrescente/.test(t);
+    });
+    if (match) {
+      const url = new URL(listUrl, location.origin);
+      url.searchParams.set(select.name || 'sortBy', match.value);
+      return url.href;
+    }
+  }
+  const url = new URL(listUrl, location.origin);
+  url.searchParams.set('sortBy', dir === 'asc' ? 'price_asc' : 'price_desc');
   return url.href;
 };
 
 /**
  * How many Singles a seller lists, plus their cheapest and dearest offer.
  *
- * Cardmarket does not put that on the product-page row, so we hit their Singles
- * list twice (price ascending / descending). Callers should cache and pace —
- * one product page can name dozens of sellers.
+ * Count comes from the profile tile ("Singles (3596)") — never from the offers
+ * list page size ("15 Results"), which is what we used to show by mistake.
+ * Min/max use the Singles list sorted both ways.
  */
 export const fetchSellerStockSummary = async (
   sellerUrl: string,
   signal?: AbortSignal,
 ): Promise<SellerStockSummary> => {
-  const { doc: asc } = await fetchDoc(sellerSinglesUrl(sellerUrl, 'price_asc'), signal);
-  const low = parseSellerStockSummary(asc);
+  const profile = sellerProfileUrl(sellerUrl);
+  const { doc: profileDoc } = await fetchDoc(profile, signal);
+  const singlesFromProfile = parseSellerProfileSingles(profileDoc);
+
   await pace(signal);
-  const { doc: desc } = await fetchDoc(sellerSinglesUrl(sellerUrl, 'price_desc'), signal);
-  const high = parseSellerStockSummary(desc);
+  const listUrl = `${profile}/Offers/Singles`;
+  const { doc: listDoc } = await fetchDoc(listUrl, signal);
+  // Pagination "of 3.596" is a backup only — never a bare page-size hit count.
+  const singles = singlesFromProfile ?? parseSellerOffersTotal(listDoc);
+
+  const ascUrl = sortedSinglesUrl(listUrl, listDoc, 'asc');
+  const descUrl = sortedSinglesUrl(listUrl, listDoc, 'desc');
+
+  await pace(signal);
+  const { doc: ascDoc } = await fetchDoc(ascUrl, signal);
+  let low = parseSellerOffersFirstPrice(ascDoc);
+
+  await pace(signal);
+  const { doc: descDoc } = await fetchDoc(descUrl, signal);
+  let high = parseSellerOffersFirstPrice(descDoc);
+
+  if (
+    low.minPriceValue != null &&
+    high.minPriceValue != null &&
+    high.minPriceValue < low.minPriceValue
+  ) {
+    const tmp = low;
+    low = high;
+    high = tmp;
+  }
+
+  const same =
+    low.minPriceValue != null &&
+    high.minPriceValue != null &&
+    low.minPriceValue === high.minPriceValue;
+
   return {
-    singles: low.singles ?? high.singles,
-    minPrice: low.minPrice,
-    minPriceValue: low.minPriceValue,
-    maxPrice: high.minPrice,
-    maxPriceValue: high.minPriceValue,
+    ...(singles != null ? { singles } : {}),
+    ...(low.minPrice ? { minPrice: low.minPrice, minPriceValue: low.minPriceValue } : {}),
+    ...(!same && high.minPrice
+      ? { maxPrice: high.minPrice, maxPriceValue: high.minPriceValue }
+      : {}),
   };
 };
 

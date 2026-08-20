@@ -211,7 +211,7 @@ const CutRow = ({
         {imageUrls[0] && (
           <img
             alt={card.name}
-            className={`h-full w-full object-cover ${flippable ? 'cursor-pointer' : 'cursor-zoom-in'}`}
+            className={`h-full w-full object-cover ${flippable ? 'cursor-flip' : 'cursor-zoom-in'}`}
             decoding="async"
             loading="lazy"
             src={imageUrls[0]}
