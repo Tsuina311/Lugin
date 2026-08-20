@@ -594,6 +594,86 @@ const sellerFromRow = (
   return { seller, sellerCountry, sellerRating, sellerSales, sellerUrl };
 };
 
+/** Stock overview scraped from a seller's Singles offers pages. */
+export interface SellerStockSummary {
+  /** Most expensive Singles offer (text). */
+  maxPrice?: string;
+  maxPriceValue?: number;
+  /** Cheapest Singles offer (text). */
+  minPrice?: string;
+  minPriceValue?: number;
+  /** How many Singles they currently list. */
+  singles?: number;
+}
+
+const parseIntLocale = (raw: string): number | undefined => {
+  const n = Number.parseInt(raw.replace(/[.\s]/g, ''), 10);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+};
+
+/** "2.345 Results" / "1.234 Treffer" / pagination "of 2.345". */
+const TOTAL_HITS_RE =
+  /([\d]{1,3}(?:[.\s]\d{3})+|\d+)\s*(?:Results?|Treffer|R[eé]sultats?|Risultati|Resultados)/i;
+const OF_TOTAL_RE = /\b(?:of|von|de|di)\s+([\d]{1,3}(?:[.\s]\d{3})+|\d+)\b/i;
+
+/**
+ * Read Singles count + the first offer price from a seller offers document.
+ * Callers fetch once sorted ascending (min) and once descending (max).
+ */
+export const parseSellerStockSummary = (doc: Document): SellerStockSummary => {
+  const text = doc.body?.innerText ?? '';
+  const singles =
+    parseIntLocale(text.match(TOTAL_HITS_RE)?.[1] ?? '') ??
+    parseIntLocale(doc.querySelector('.pagination')?.textContent?.match(OF_TOTAL_RE)?.[1] ?? '') ??
+    parseIntLocale(
+      doc
+        .querySelector('[class*="hit"], [class*="result"], .total-count')
+        ?.textContent?.match(/([\d]{1,3}(?:[.\s]\d{3})+|\d+)/)?.[1] ?? '',
+    );
+
+  const row = doc.querySelector<HTMLElement>(
+    '[id^="articleRow"], [id^="stockRow"], .article-row, .row.article-row',
+  );
+  const { price, value } = row ? findPrice(row) : {};
+  return {
+    ...(singles != null ? { singles } : {}),
+    ...(price ? { minPrice: price, minPriceValue: value } : {}),
+  };
+};
+
+const sellerSinglesUrl = (sellerUrl: string, sortBy: 'price_asc' | 'price_desc'): string => {
+  const base = sellerUrl.replace(/\/$/, '');
+  const path = /\/Offers\/Singles/i.test(base) ? base : `${base}/Offers/Singles`;
+  const url = new URL(path, location.origin);
+  url.searchParams.set('sortBy', sortBy);
+  return url.href;
+};
+
+/**
+ * How many Singles a seller lists, plus their cheapest and dearest offer.
+ *
+ * Cardmarket does not put that on the product-page row, so we hit their Singles
+ * list twice (price ascending / descending). Callers should cache and pace —
+ * one product page can name dozens of sellers.
+ */
+export const fetchSellerStockSummary = async (
+  sellerUrl: string,
+  signal?: AbortSignal,
+): Promise<SellerStockSummary> => {
+  const { doc: asc } = await fetchDoc(sellerSinglesUrl(sellerUrl, 'price_asc'), signal);
+  const low = parseSellerStockSummary(asc);
+  await pace(signal);
+  const { doc: desc } = await fetchDoc(sellerSinglesUrl(sellerUrl, 'price_desc'), signal);
+  const high = parseSellerStockSummary(desc);
+  return {
+    singles: low.singles ?? high.singles,
+    minPrice: low.minPrice,
+    minPriceValue: low.minPriceValue,
+    maxPrice: high.minPrice,
+    maxPriceValue: high.minPriceValue,
+  };
+};
+
 const IMAGE_RE =
   /https?:(?:\/\/|\\\/\\\/)[\w.\-\\/]*product-images\.s3\.cardmarket\.com[\w.\-\\/]+\.(?:jpg|png|webp)/i;
 /** Path portion (used when the row carries only a relative image path). */

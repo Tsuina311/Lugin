@@ -10,6 +10,7 @@ import { IconButton } from './IconButton';
 import { SelectionBar } from './Selection';
 import { ViewToggle } from './ViewToggle';
 import {
+  ArrowLeft,
   ChevronDown,
   ExternalLink,
   Info,
@@ -57,8 +58,10 @@ import {
   fetchPriceGuide,
   fetchProductIds,
   fetchSellerListOffers,
+  fetchSellerStockSummary,
   fetchSellersWithMostWants,
   getLastGuideHtml,
+  pace,
   parseOffers,
   scanSeller,
   type PriceGuide,
@@ -66,6 +69,7 @@ import {
   type PurchaseRecord,
   type ScanProgress,
   type ScanStrategy,
+  type SellerStockSummary,
   type SellerWants,
   type WantListMeta,
   type WantPlacement,
@@ -507,13 +511,29 @@ export const WantsPanel = () => {
   const backToCatalogue = () => {
     searchAbort.current?.abort();
     searchAbort.current = null;
-    setSearch(s => ({
-      ...s,
-      error: null,
-      matches: [],
-      product: null,
-      status: s.catalogue.length > 0 ? 'catalogue' : 'idle',
-    }));
+    setSearch(s => {
+      if (s.catalogue.length > 0) {
+        return {
+          ...s,
+          error: null,
+          matches: [],
+          product: null,
+          status: 'catalogue',
+        };
+      }
+      const term = s.query?.trim();
+      if (term) {
+        queueMicrotask(() => void runCatalogueSearch(term));
+        return {
+          ...s,
+          error: null,
+          matches: [],
+          product: null,
+          status: 'searching',
+        };
+      }
+      return initialSearch;
+    });
   };
 
   // ---- Seller scan (find everything a seller has on my want lists) ---------
@@ -1087,6 +1107,60 @@ export const WantsPanel = () => {
     }
   }, [showingProduct, search.matches, shipping.toCountry]);
 
+  // Seller Singles count + price range aren't on the product row — load each
+  // unique seller's offers list (cached, paced, capped) while shopping.
+  type SellerStockState =
+    | { status: 'loading' }
+    | { status: 'done'; summary: SellerStockSummary }
+    | { status: 'error' };
+  const [sellerStock, setSellerStock] = useState<Record<string, SellerStockState>>({});
+  const sellerStockDone = useRef<Record<string, SellerStockSummary>>({});
+
+  useEffect(() => {
+    if (!showingProduct) return;
+    const urls = [
+      ...new Set(
+        search.matches.map(m => m.sellerUrl).filter((u): u is string => typeof u === 'string' && !!u),
+      ),
+    ].slice(0, 30);
+    if (urls.length === 0) return;
+
+    const controller = new AbortController();
+    void (async () => {
+      let first = true;
+      for (const url of urls) {
+        if (controller.signal.aborted) return;
+        if (sellerStockDone.current[url]) {
+          setSellerStock(prev =>
+            prev[url]?.status === 'done'
+              ? prev
+              : { ...prev, [url]: { status: 'done', summary: sellerStockDone.current[url] } },
+          );
+          continue;
+        }
+        setSellerStock(prev =>
+          prev[url]?.status === 'loading' || prev[url]?.status === 'done'
+            ? prev
+            : { ...prev, [url]: { status: 'loading' } },
+        );
+        try {
+          if (!first) await pace(controller.signal);
+          first = false;
+          const summary = await fetchSellerStockSummary(url, controller.signal);
+          if (controller.signal.aborted) return;
+          sellerStockDone.current[url] = summary;
+          setSellerStock(prev => ({ ...prev, [url]: { status: 'done', summary } }));
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          if (controller.signal.aborted) return;
+          setSellerStock(prev => ({ ...prev, [url]: { status: 'error' } }));
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [showingProduct, search.matches]);
+
   /** Cheapest shipping method a source country would charge for an order. */
   const shipEstimate = (
     fromCountryId: number | null | undefined,
@@ -1409,6 +1483,38 @@ export const WantsPanel = () => {
     if (o.sellerSales) bits.push(<span key="sales">{o.sellerSales} sales</span>);
     if (o.sellerRating) bits.push(<span key="rate">{o.sellerRating}</span>);
     if (o.sellerCountry) bits.push(<span key="loc">{o.sellerCountry}</span>);
+    if (o.sellerUrl) {
+      const st = sellerStock[o.sellerUrl];
+      if (st?.status === 'loading') {
+        bits.push(
+          <span key="stock" className="text-slate-600">
+            stock…
+          </span>,
+        );
+      } else if (st?.status === 'done') {
+        const { singles, minPrice, maxPrice } = st.summary;
+        if (singles != null) {
+          bits.push(
+            <span key="singles" title="Singles this seller currently lists">
+              {singles.toLocaleString('de-DE')} singles
+            </span>,
+          );
+        }
+        if (minPrice && maxPrice && minPrice !== maxPrice) {
+          bits.push(
+            <span key="range" title="Cheapest and most expensive Singles they list">
+              {minPrice.replace(/\s*€$/, '')}–{maxPrice}
+            </span>,
+          );
+        } else if (minPrice) {
+          bits.push(
+            <span key="range" title="Cheapest Singles they list">
+              from {minPrice}
+            </span>,
+          );
+        }
+      }
+    }
     if (o.condition) bits.push(<span key="cond">{o.condition}</span>);
     if (o.language) bits.push(<span key="lang">{o.language}</span>);
     if (bits.length === 0) return null;
@@ -2136,6 +2242,18 @@ export const WantsPanel = () => {
       {/* Breadcrumb for catalogue → printing offers. */}
       {showingSearch && (
         <div className="flex items-center gap-2 border-b border-line bg-raised px-2 py-1 text-2xs">
+          {showingProduct && (
+            <Button
+              className="flex-none"
+              icon={ArrowLeft}
+              onClick={backToCatalogue}
+              size="xs"
+              title="Back to the list of printings"
+              variant="neutral"
+            >
+              Printings
+            </Button>
+          )}
           <span className="min-w-0 flex-1 truncate text-ink">
             {showingProduct ? (
               <>
@@ -2168,11 +2286,6 @@ export const WantsPanel = () => {
               Open
               <ExternalLink aria-hidden size={10} />
             </a>
-          )}
-          {showingProduct && search.catalogue.length > 0 && (
-            <Button onClick={backToCatalogue} size="xs" variant="subtle">
-              Back to results
-            </Button>
           )}
           <Button onClick={clearSearch} size="xs" variant="subtle">
             Clear
@@ -2913,38 +3026,52 @@ export const WantsPanel = () => {
                     </div>
                   ) : (
                     <div className="divide-y divide-line">
-                      {search.catalogue.map(item => (
-                        <button
-                          key={item.href}
-                          className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-tint"
-                          onClick={() => void openProduct(item)}
-                          type="button"
-                        >
-                          {item.imageUrl ? (
-                            <img
-                              alt=""
-                              className="h-10 w-7 flex-none rounded-sm object-cover"
-                              loading="lazy"
-                              src={item.imageUrl}
-                            />
-                          ) : (
-                            <span className="h-10 w-7 flex-none rounded-sm bg-panel" />
-                          )}
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs text-ink">{item.name}</span>
-                            {item.expansion && (
-                              <span className="block truncate text-2xs text-ink-faint">
-                                {item.expansion}
+                      {search.catalogue.map(item => {
+                        const thumb = item.imageUrl;
+                        const preview = thumb ? previewHandlers(thumb, item.name) : null;
+                        return (
+                          <button
+                            key={item.href}
+                            className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-tint"
+                            onClick={() => void openProduct(item)}
+                            type="button"
+                          >
+                            {thumb ? (
+                              <img
+                                alt=""
+                                className="h-10 w-7 flex-none cursor-zoom-in rounded-sm object-cover"
+                                loading="lazy"
+                                src={thumb}
+                                {...(preview?.handlers ?? {})}
+                                // Keep the row click for opening offers; preview
+                                // hover still works. Stop zoom-click from also
+                                // selecting the printing.
+                                onClick={e => {
+                                  if (preview) {
+                                    e.stopPropagation();
+                                    preview.handlers.onClick(e);
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <span className="h-10 w-7 flex-none rounded-sm bg-panel" />
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-xs text-ink">{item.name}</span>
+                              {item.expansion && (
+                                <span className="block truncate text-2xs text-ink-faint">
+                                  {item.expansion}
+                                </span>
+                              )}
+                            </span>
+                            {item.fromPrice && (
+                              <span className="flex-none text-2xs tabular-nums text-ink-muted">
+                                from {item.fromPrice}
                               </span>
                             )}
-                          </span>
-                          {item.fromPrice && (
-                            <span className="flex-none text-2xs tabular-nums text-ink-muted">
-                              from {item.fromPrice}
-                            </span>
-                          )}
-                        </button>
-                      ))}
+                          </button>
+                        );
+                      })}
                     </div>
                   )
                 ) : visibleGrouped.length === 0 ? (
