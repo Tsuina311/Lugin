@@ -51,7 +51,23 @@ export interface ProductSuggestion {
 /** The thumbnail hides its real URL in a tooltip's `<img>` markup. */
 const imageFromRow = (row: Element): string | undefined => {
   const tooltip = row.querySelector('[data-bs-title]')?.getAttribute('data-bs-title') ?? '';
-  return tooltip.match(/src=["']?([^"'\s>]+)/)?.[1];
+  // Live DOM attributes are entity-decoded; ajax HTML sometimes still has &quot;.
+  const raw = tooltip.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  const src = raw.match(/src=["']([^"']+)["']/)?.[1] ?? raw.match(/src=([^\s>]+)/)?.[1];
+  return src?.replace(/^["']|["']$/g, '') || undefined;
+};
+
+const nameFromRow = (row: Element): string | undefined => {
+  const nameCell = row.querySelector('.autocomplete-cell.name');
+  const fromTruncate = nameCell?.querySelector('.text-truncate')?.textContent?.trim();
+  if (fromTruncate) return fromTruncate;
+  // Fallback: alt on the thumbnail tooltip (same printing the image shows).
+  const tip = row.querySelector('[data-bs-title]')?.getAttribute('data-bs-title') ?? '';
+  const fromAlt = tip
+    .replace(/&quot;/g, '"')
+    .match(/alt=["']([^"']+)["']/)?.[1]
+    ?.trim();
+  return fromAlt || undefined;
 };
 
 const countFrom = (text: string | null | undefined): number | undefined => {
@@ -70,11 +86,11 @@ const countFrom = (text: string | null | undefined): number | undefined => {
 export const parseSuggestions = (root: ParentNode): ProductSuggestion[] => {
   const out: ProductSuggestion[] = [];
   root.querySelectorAll<HTMLAnchorElement>('a.autocomplete-link').forEach(row => {
-    const nameCell = row.querySelector('.autocomplete-cell.name');
-    const name = nameCell?.querySelector('.text-truncate')?.textContent?.trim();
+    const name = nameFromRow(row);
     const href = row.getAttribute('href');
-    if (!name || !href) return;
+    if (!name || !href || !href.includes('/Products/')) return;
 
+    const nameCell = row.querySelector('.autocomplete-cell.name');
     const imageUrl = imageFromRow(row);
     out.push({
       available: countFrom(nameCell?.querySelector('.text-muted')?.textContent),
@@ -111,7 +127,7 @@ export interface SearchReply {
  */
 export const searchProducts = async (
   query: string,
-  options: { categoryId?: number | null; token?: string | null } = {},
+  options: { categoryId?: number | string | null; token?: string | null } = {},
 ): Promise<SearchReply> => {
   const term = query.trim();
   if (term.length < MIN_SEARCH_LENGTH) return { suggestions: [] };

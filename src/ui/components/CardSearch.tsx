@@ -5,7 +5,11 @@ import { CircleAlert, ExternalLink, Loader2 } from './icons';
 
 import { askForLogin, ajaxToken } from '@/content/session';
 import { searchProducts, type ProductSuggestion } from '@/sites/cardmarket/search';
-import { MIN_SEARCH_LENGTH } from '@/sites/cardmarket/searchArgs';
+import {
+  MIN_SEARCH_LENGTH,
+  SINGLES_CATEGORY_ID,
+  cardmarketSearchUrl,
+} from '@/sites/cardmarket/searchArgs';
 import { currentLang } from '@/sites/cardmarket/wants';
 
 /**
@@ -25,7 +29,7 @@ export const CardSearch = ({
 }) => {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
-  const [status, setStatus] = useState<'idle' | 'searching' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'searching' | 'empty' | 'error'>('idle');
   /** Null while the failure is the one we can name precisely: no session. */
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -64,12 +68,15 @@ export const CardSearch = ({
           fail(null);
           return;
         }
-        const reply = await searchProducts(term, { token });
+        const reply = await searchProducts(term, {
+          categoryId: SINGLES_CATEGORY_ID,
+          token,
+        });
         if (seq !== latest.current) return;
         setSuggestions(reply.suggestions);
         setHighlighted(0);
-        setStatus('idle');
         setError(null);
+        setStatus(reply.suggestions.length === 0 ? 'empty' : 'idle');
         setOpen(true);
       })().catch((err: unknown) => {
         if (seq !== latest.current) return;
@@ -84,9 +91,22 @@ export const CardSearch = ({
     onPick(suggestion);
   };
 
+  const showAll = cardmarketSearchUrl(query.trim(), currentLang());
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
       setOpen(false);
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (open && suggestions.length > 0) {
+        const chosen = suggestions[highlighted];
+        if (chosen) pick(chosen);
+        return;
+      }
+      // No suggestion to pick — open Cardmarket's own Search 2.0 results page.
+      if (query.trim().length >= MIN_SEARCH_LENGTH) location.assign(showAll);
       return;
     }
     if (!open || suggestions.length === 0) return;
@@ -94,14 +114,10 @@ export const CardSearch = ({
       e.preventDefault();
       const step = e.key === 'ArrowDown' ? 1 : -1;
       setHighlighted(i => (i + step + suggestions.length) % suggestions.length);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const chosen = suggestions[highlighted];
-      if (chosen) pick(chosen);
     }
   };
 
-  const showAll = `/${currentLang()}/Magic/Products/Search?searchString=${encodeURIComponent(query.trim())}`;
+  const showDropdown = open && (status === 'error' || status === 'empty' || suggestions.length > 0);
 
   return (
     <div className="relative border-b border-line bg-panel px-2 py-1.5">
@@ -121,7 +137,7 @@ export const CardSearch = ({
         value={query}
       />
 
-      {open && (status === 'error' || suggestions.length > 0) && (
+      {showDropdown && (
         // Floats over the results rather than pushing them down, so the list you
         // are searching from stays where it was when the dropdown closes.
         <div className="absolute inset-x-2 top-full z-20 max-h-80 overflow-auto rounded border border-line-strong bg-raised shadow-pop">
@@ -146,6 +162,19 @@ export const CardSearch = ({
                   {error}
                 </span>
               )}
+              <a
+                className="flex items-center gap-1 text-accent hover:underline"
+                href={showAll}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Search on Cardmarket instead
+                <ExternalLink aria-hidden size={10} />
+              </a>
+            </div>
+          ) : status === 'empty' ? (
+            <div className="flex flex-col gap-1 px-2 py-1.5 text-2xs text-ink-muted">
+              <span className="text-ink">No singles matched “{query.trim()}”.</span>
               <a
                 className="flex items-center gap-1 text-accent hover:underline"
                 href={showAll}

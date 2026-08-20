@@ -92,6 +92,7 @@ const {
   daysSince,
   ordersWithoutSeller,
   buildArgs,
+  cardmarketSearchUrl,
   encodeArgs,
   obfuscate,
   tokenFromArgs,
@@ -1452,6 +1453,31 @@ check('a search term with an accent still produces a token the server accepts', 
   // guards the seam between the two.
   const args = buildArgs(CAPTURED_TOKEN, { searchString: 'Æther' });
   assert.equal(obfuscate(scrambledHalf(args)), `Product_Search***${CAPTURED_TOKEN}`);
+});
+
+check('catalogue search URLs request Search 2.0', () => {
+  // Without searchMode=v2 Cardmarket serves the old results page, which is what
+  // the header box no longer writes — and what Lugin used to open by mistake.
+  assert.equal(
+    cardmarketSearchUrl('cul', 'en'),
+    '/en/Magic/Products/Search?category=-1&searchMode=v2&searchString=cul',
+  );
+});
+
+check('Singles category ids go out as strings, like the site select does', () => {
+  // The header box pushes `<select>.value` into the array, which is always a
+  // string. Sending `[1]` instead of `["1"]` is a different request.
+  const args = buildArgs(CAPTURED_TOKEN, {
+    productCategoryIds: [1],
+    searchString: 'cul',
+  });
+  const b64 = decodeURIComponent(args.slice(args.indexOf('%2A%2A%2A') + '%2A%2A%2A'.length));
+  assert.deepEqual(JSON.parse(Buffer.from(b64, 'base64').toString()), {
+    productCategoryIds: ['1'],
+    responsive: '1',
+    searchMode: 'v2',
+    searchString: 'cul',
+  });
 });
 
 check('a suggestion is pinned to its printing through the image URL', () => {

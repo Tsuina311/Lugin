@@ -38,19 +38,19 @@ const tokenFromCall = (call: { requestBody?: string; url?: string }): string | n
 };
 
 /**
- * Find the session's `__cmtkn`. Prefers a token seen in a captured request body
- * (exactly the one the site uses), then falls back to the live DOM / inline
- * scripts. Returns null if none can be found.
+ * Find the session's `__cmtkn`. Prefers the live DOM (what the page would send
+ * right now), then a token seen in a captured request body, then a scrape of
+ * the HTML. Returns null if none can be found.
  */
 export const findCmToken = (): string | null => {
-  for (const call of callStore.getSnapshot()) {
-    const token = tokenFromCall(call);
-    if (token) return token;
-  }
   const input = document.querySelector<HTMLInputElement>('input[name="__cmtkn"]');
   if (input?.value && TOKEN_HEX.test(input.value)) return input.value;
   const attr = document.querySelector('[data-token], [data-cmtkn]')?.getAttribute('data-token');
   if (attr && TOKEN_HEX.test(attr)) return attr;
+  for (const call of callStore.getSnapshot()) {
+    const token = tokenFromCall(call);
+    if (token) return token;
+  }
   return extractCmToken(document.documentElement.innerHTML);
 };
 

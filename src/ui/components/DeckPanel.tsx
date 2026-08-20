@@ -66,13 +66,14 @@ import {
   type CardSearchResponse,
   type CardSearchResult,
 } from '@/lib/search';
+import { cardmarketSearchUrl } from '@/sites/cardmarket/searchArgs';
 import { currentLang } from '@/sites/cardmarket/wants';
 import { useCardMetadata } from '@/ui/useCardMetadata';
 import { useRowSelection, type RowSelection } from '@/ui/useRowSelection';
 
 // Cardmarket product search for a card the user still needs to buy.
 const buyUrl = (name: string): string =>
-  `${location.origin}/${currentLang()}/Magic/Products/Search?searchString=${encodeURIComponent(name)}`;
+  `${location.origin}${cardmarketSearchUrl(name, currentLang())}`;
 
 // How the deck list is broken up — remembered across sessions. localStorage can
 // throw in locked-down contexts, so every access is guarded.
@@ -699,7 +700,7 @@ const DeckEditor = ({
         )}
         {visibleViews.length > 1 && (
           <div
-            className="ml-auto flex flex-none overflow-hidden rounded border border-line-strong"
+            className="ml-auto flex max-w-[55%] flex-none overflow-x-auto rounded border border-line-strong"
             role="group"
           >
             {visibleViews.map(v => (

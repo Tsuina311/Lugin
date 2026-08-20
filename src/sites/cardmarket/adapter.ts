@@ -95,7 +95,8 @@ const extractOffers = (doc: Document, diagnostics: Diagnostic[]): CardOffer[] =>
 // Every card on a list/search/user-offers page links to its product page via
 // `/Products/Singles/...`, with the card name as the link text. Harvesting those
 // anchors is far more robust than guessing table-row markup, and works across
-// all Cardmarket list layouts.
+// all Cardmarket list layouts — including Search 2.0's gallery grid, where the
+// link text is polluted with expansion chrome and "From X €".
 const extractList = (doc: Document, diagnostics: Diagnostic[]): CardListing[] => {
   const anchors = Array.from(
     doc.querySelectorAll<HTMLAnchorElement>('a[href*="/Products/Singles/"]'),
@@ -104,18 +105,22 @@ const extractList = (doc: Document, diagnostics: Diagnostic[]): CardListing[] =>
   const seen = new Set<string>();
   const listings: CardListing[] = [];
   for (const a of anchors) {
-    const name = a.textContent?.trim();
-    if (!name || name.length < 2) continue; // skip image-only / icon links
+    // Prefer the gallery image's alt (a clean name) over the link text.
+    const altName = a.querySelector<HTMLImageElement>('img[alt]')?.getAttribute('alt')?.trim();
+    const name = (altName || a.textContent || '').replace(/\s+/g, ' ').trim();
+    // Cut a trailing "From 0,15 €" that gallery cards fold into the link text.
+    const cleaned = name.replace(/\s*(?:from\b\s*)?\d[\d.,\s]*\s*€.*$/i, '').trim();
+    if (!cleaned || cleaned.length < 2) continue;
+    // Skip bare category nav links like `/Products/Singles`.
     const href = a.getAttribute('href') ?? undefined;
-    // The URL names the expansion, which is what lets the overlay offer an
-    // edition filter on a search page spanning a dozen sets.
-    const setName = expansionFromProductUrl(href);
-    // Keyed on the set too: a search for "Abrupt Decay" lists one row per
-    // expansion, and those are different printings, not a repeat of one.
-    const key = `${name.toLowerCase()}|${setName?.toLowerCase() ?? ''}`;
+    if (href && /\/Products\/Singles\/?(\?|$)/i.test(href)) continue;
+    const setName =
+      a.querySelector<HTMLElement>('.expansion-symbol[title]')?.getAttribute('title')?.trim() ||
+      expansionFromProductUrl(href);
+    const key = `${cleaned.toLowerCase()}|${setName?.toLowerCase() ?? ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    listings.push({ href, name, ...(setName ? { setName } : {}) });
+    listings.push({ href, name: cleaned, ...(setName ? { setName } : {}) });
   }
 
   diagnostics.push({

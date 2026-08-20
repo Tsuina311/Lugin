@@ -52,9 +52,27 @@ export const encodeArgs = (raw: string): string => {
 
 export interface SearchParams {
   /** Restrict to Singles (1), Boosters (2), … or null for everything. */
-  productCategoryIds?: number[] | null;
+  productCategoryIds?: Array<number | string> | null;
   searchString: string;
 }
+
+/** Cardmarket's Singles category — what "search for a card" almost always wants. */
+export const SINGLES_CATEGORY_ID = '1';
+
+/**
+ * Catalogue search URL in Search 2.0 shape.
+ *
+ * Without `searchMode=v2` the site falls back to the old results page, which is
+ * what the header box no longer writes and what Lugin used to open by mistake.
+ */
+export const cardmarketSearchUrl = (term: string, lang: string): string => {
+  const params = new URLSearchParams({
+    category: '-1',
+    searchMode: 'v2',
+    searchString: term.trim(),
+  });
+  return `/${lang}/Magic/Products/Search?${params}`;
+};
 
 /**
  * Build the `args` body value for one search.
@@ -62,13 +80,20 @@ export interface SearchParams {
  * The JSON's field order is Cardmarket's own rather than alphabetical. This is a
  * wire format being reproduced, and a request that is byte-identical to the
  * search box's cannot be rejected for a reason we failed to imagine.
+ *
+ * Category ids are strings, matching `<select>.value` in the site's own box —
+ * `JSON.stringify([1])` is not the same payload as `["1"]`.
  */
 export const buildArgs = (token: string, params: SearchParams): string => {
+  const categories =
+    params.productCategoryIds == null
+      ? null
+      : params.productCategoryIds.map(id => String(id));
   /* eslint-disable sort-keys-fix/sort-keys-fix -- the order is load-bearing, see above */
   const json = JSON.stringify({
     searchString: params.searchString,
     searchMode: 'v2',
-    productCategoryIds: params.productCategoryIds ?? null,
+    productCategoryIds: categories,
     responsive: '1',
   });
   /* eslint-enable sort-keys-fix/sort-keys-fix */

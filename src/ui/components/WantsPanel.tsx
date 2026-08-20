@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
 
-import { usePageData } from '../usePageData';
 import { useWideLayout } from '../useWideLayout';
 
 import { Badge } from './Badge';
@@ -25,7 +24,6 @@ import { useSequentialImages } from './useSequentialImages';
 
 import { cartStore } from '@/content/cartStore';
 import { collectionStore } from '@/content/collectionStore';
-import { setPageFilter } from '@/content/pageFilter';
 import { previewStore } from '@/content/previewStore';
 import { purchaseStore } from '@/content/purchaseStore';
 import { shippingStore } from '@/content/shippingStore';
@@ -58,10 +56,8 @@ import {
   fetchProductIds,
   fetchSellerListOffers,
   fetchSellersWithMostWants,
-  findImageUrl,
   getLastGuideHtml,
   parseOffers,
-  parseWantRows,
   scanSeller,
   type EditionPrice,
   type PriceGuide,
@@ -79,13 +75,6 @@ import { usePrices } from '@/ui/usePrices';
 import { useRowSelection } from '@/ui/useRowSelection';
 import { useSetIndex } from '@/ui/useSetIndex';
 import { useStickySet, useStickyValue } from '@/ui/useStickyState';
-
-/**
- * Identifies this panel's page-row filter. The Filter tab registers its own under
- * a different name, and `pageFilter` intersects them rather than letting whichever
- * rendered last take the page.
- */
-const PAGE_FILTER_OWNER = 'wants';
 
 /** MTG color pips, for the metadata filter chips (C = colorless). */
 const FILTER_COLORS: { cls: string; code: string }[] = [
@@ -295,7 +284,6 @@ const initialSearch: SearchState = { error: null, matches: [], product: null, st
 
 export const WantsPanel = () => {
   const { index: rawIndex } = useWants();
-  const pageData = usePageData();
   const cart = useSyncExternalStore(cartStore.subscribe, cartStore.getSnapshot);
   const cartItems = cart.items;
 
@@ -416,47 +404,9 @@ export const WantsPanel = () => {
       }
     : null;
 
-  // Parse the current page's offer rows directly (rich: price/foil/edition/id),
-  // re-running whenever the extracted page data changes. This is the resting
-  // state of the panel: what you get before you search or scan for anything.
-  const pageMatches = useMemo<ScanMatch[]>(() => {
-    void pageData; // re-parse when the page's extracted data updates
-    const offers = parseOffers(document.body);
-    // On a want-list page, `parseOffers` only sees cards that carry a product
-    // link. Want rows for cards without a live product page yet (e.g. new
-    // spoilers) render as `.want-name` text with no link, so merge in the
-    // dedicated want-row parser to capture them too (deduped by card key).
-    if (/\/Wants\/\d+/.test(location.pathname)) {
-      // Prefer any card image already on the page (instant — the browser has it
-      // — and matches the exact printing) over a Scryfall lookup. Keyed by card.
-      const pageImages = new Map<string, string>();
-      document.querySelectorAll<HTMLElement>('.want-name').forEach(nameEl => {
-        const name = nameEl.textContent?.trim();
-        if (!name) return;
-        const scope =
-          nameEl.closest<HTMLElement>('.accordion-item, tr, li') ?? nameEl.parentElement;
-        const img = scope ? findImageUrl(scope) : undefined;
-        if (img) pageImages.set(cardKey(name), img);
-      });
-      const seen = new Set(offers.map(o => cardKey(o.name)));
-      for (const row of parseWantRows(document.body)) {
-        const key = cardKey(row.name);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        offers.push({ imageUrl: pageImages.get(key), isFoil: false, name: row.name });
-      }
-    }
-    return offers.map(o => ({
-      ...o,
-      lists: index?.cards[cardKey(o.name)]?.lists ?? [],
-    }));
-  }, [index, pageData]);
-
   // ---- Search Cardmarket for a card ----------------------------------------
-  // The other two sources describe wherever the user already is. This one lets
-  // them look somewhere else without leaving the panel: pick a printing out of
-  // Cardmarket's own autocomplete, and we fetch that product page and read it
-  // with the same parser the live page goes through.
+  // Pick a printing from Cardmarket's autocomplete; we fetch that product page
+  // and read its offers with the same parser the live page uses.
   const [search, setSearch] = useState<SearchState>(initialSearch);
   const searchAbort = useRef<AbortController | null>(null);
 
@@ -770,48 +720,12 @@ export const WantsPanel = () => {
     }
   };
 
-  // What the results area shows, most deliberate choice first: a card the user
-  // went looking for, then a finished seller scan, then — the resting state —
-  // whatever is on the page behind the panel.
+  // What the results area shows: a card the user searched for, else a finished
+  // seller scan. Idle shows neither — the page behind the panel is no longer
+  // mirrored here (own search replaces that).
   const showingSearch = search.product != null;
   const showingScan = !showingSearch && scan.status === 'done';
-  const displayMatches = showingSearch
-    ? search.matches
-    : showingScan
-      ? scan.matches
-      : pageMatches;
-  const wantedCount = displayMatches.filter(m => m.lists.length > 0).length;
-
-  // ---- Hide non-wanted rows on the Cardmarket page itself -------------------
-  //
-  // The panel has always been able to show *which* of a page's cards you want.
-  // What it could not do is get the other 900 out of the way, so browsing a big
-  // seller still meant scrolling their whole stock with Lugin open beside it.
-  // `pageFilter` already knew how to hide rows; it was only ever wired to the
-  // Filter tab.
-  const [hidePageRows, setHidePageRows] = useStickyValue('lugin:cards:hidePageRows', false);
-
-  // Only meaningful against the live page. Scan results describe other pages of
-  // the seller's stock and a search describes another product entirely, so in
-  // both cases there are no rows here to match them to.
-  const canHidePageRows = !showingScan && !showingSearch && !!index;
-
-  useEffect(() => {
-    // Withheld until the want index has loaded. Before then every card looks
-    // un-wanted, and hiding on that basis would empty the page and blame the user's
-    // want lists for it.
-    if (!hidePageRows || !canHidePageRows) {
-      setPageFilter(PAGE_FILTER_OWNER, null);
-      return;
-    }
-    setPageFilter(
-      PAGE_FILTER_OWNER,
-      pageMatches.filter(m => m.lists.length > 0).map(m => m.name),
-    );
-  }, [hidePageRows, canHidePageRows, pageMatches]);
-
-  // Withdraw only our own filter; the Filter tab may have one too.
-  useEffect(() => () => setPageFilter(PAGE_FILTER_OWNER, null), []);
+  const displayMatches = showingSearch ? search.matches : showingScan ? scan.matches : [];
 
   // ---- Filter by edition ----------------------------------------------------
   // Offers off a Cardmarket page name their expansion but never date it, so the
@@ -2181,7 +2095,7 @@ export const WantsPanel = () => {
     <div ref={panelRef} className="flex h-full flex-col">
       <CardSearch busy={search.status === 'loading'} onPick={openProduct} />
 
-      {/* Which card the rows below belong to, and the way back to the page. */}
+      {/* Which card the rows below belong to. */}
       {showingSearch && (
         <div className="flex items-center gap-2 border-b border-line bg-raised px-2 py-1 text-2xs">
           <span className="min-w-0 flex-1 truncate text-ink">
@@ -2207,7 +2121,7 @@ export const WantsPanel = () => {
             </a>
           )}
           <Button onClick={clearSearch} size="xs" variant="subtle">
-            Back to this page
+            Clear
           </Button>
         </div>
       )}
@@ -2708,7 +2622,7 @@ export const WantsPanel = () => {
             </div>
           )}
 
-          {/* Results: whole-seller scan when done, else the current page's cards */}
+          {/* Results: search product offers, or a finished seller scan */}
           <div ref={listRef} className="min-h-0 flex-1 overflow-auto">
             {
               <>
@@ -2729,11 +2643,7 @@ export const WantsPanel = () => {
                           {scan.strategy === 'pages' && ` (scanned ${scan.totalScanned} offers)`}
                         </>
                       ) : (
-                        <>
-                          {visibleGrouped.length} card{visibleGrouped.length === 1 ? '' : 's'}
-                          {effectiveList ? ` in "${effectiveList}"` : ' on this page'}
-                          {!effectiveList && index && ` · ${wantedCount} on your want lists`}
-                        </>
+                        <>Search a card or scan a seller</>
                       )}
                     </span>
                     <div className="ml-auto flex items-center gap-1.5">
@@ -2749,21 +2659,6 @@ export const WantsPanel = () => {
                           variant="neutral"
                         >
                           Filters{filtersActive ? ' •' : ''}
-                        </Button>
-                      )}
-                      {canHidePageRows && (
-                        <Button
-                          active={hidePageRows}
-                          onClick={() => setHidePageRows(v => !v)}
-                          size="xs"
-                          title={
-                            hidePageRows
-                              ? 'Show every row on the Cardmarket page again'
-                              : 'Hide rows on the Cardmarket page for cards not on a want list'
-                          }
-                          variant="neutral"
-                        >
-                          {hidePageRows ? 'Showing wants only' : 'Wants only on page'}
                         </Button>
                       )}
                       {showingScan && visibleGrouped.some(g => g.offers.some(o => o.articleId)) && (
@@ -2939,9 +2834,13 @@ export const WantsPanel = () => {
                 </div>
                 {visibleGrouped.length === 0 ? (
                   <div className="p-4 text-center text-[11px] text-slate-500">
-                    {showingScan
-                      ? `None of ${seller?.name ?? 'this seller'}'s offers match your want lists.`
-                      : 'No card offers detected on this page.'}
+                    {showingSearch
+                      ? search.status === 'loading'
+                        ? 'Loading offers…'
+                        : 'No offers found for this printing.'
+                      : showingScan
+                        ? `None of ${seller?.name ?? 'this seller'}'s offers match your want lists.`
+                        : 'Search for a card above, or scan the seller you’re browsing.'}
                   </div>
                 ) : resultsView === 'box' ? (
                   <div

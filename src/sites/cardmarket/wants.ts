@@ -2,6 +2,7 @@ import { cardKey, frontFaceName, stripVersion } from '@/lib/cardName';
 import { replayInPage, requestScryfall } from '@/lib/messaging';
 import { isLanguageName, languageOfRow } from '@/sites/cardmarket/language';
 import { parseOrderSeller, parseOrderTimeline } from '@/sites/cardmarket/order';
+import { cardmarketSearchUrl } from '@/sites/cardmarket/searchArgs';
 
 // ---------------------------------------------------------------------------
 // Want lists: enumeration + local index building
@@ -1284,9 +1285,7 @@ export const findProductForCard = async (
 
   // Last resort: the search page, which either is the product (an exact match
   // redirects to it) or links to it.
-  const search = `/${currentLang()}/Magic/Products/Search?searchString=${encodeURIComponent(
-    frontFaceName(name),
-  )}`;
+  const search = cardmarketSearchUrl(frontFaceName(name), currentLang());
   return keep(await idsFrom(await read(search)));
 };
 
