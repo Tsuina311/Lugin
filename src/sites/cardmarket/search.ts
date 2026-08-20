@@ -1,33 +1,26 @@
 /**
- * Cardmarket's own search box, called the way the site calls it.
+ * Cardmarket catalogue search — autocomplete AJAX and the Search 2.0 results page.
  *
- * Typing in the header search fires a single POST:
+ * The header box POSTs to AjaxAction for keystroke suggestions. That endpoint is
+ * fragile (obfuscated args + CSRF), so the reliable path for "show me printings"
+ * is the same HTML page the site navigates to on Enter:
  *
- *   POST /<lang>/Magic/AjaxAction
- *   args=<obfuscated>***<base64 of the search parameters>
+ *   GET /<lang>/Magic/Products/Search?category=-1&searchMode=v2&searchString=…
  *
- * The half before the `***` is the action name and the session's CSRF token,
- * lightly scrambled — the plaintext is `Product_Search***<64 hex characters>`.
- * That is obfuscation, not encryption: there is no secret, and the token is the
- * same `__cmtkn` every other Cardmarket AJAX call sends in the clear. It exists
- * to make the endpoint tedious to call by hand, so treat it as a wire format to
- * reproduce faithfully rather than a lock to pick. `searchArgs.ts` holds the
- * format and is tested against a real captured request.
- *
- * Why bother, when `/Products/Search?searchString=` is a plain page we could
- * fetch and scrape? Because this returns every *printing* of a match with its
- * expansion, product id and live offer count in one small reply — exactly the
- * shape a picker needs, and what the site itself pays for a keystroke. Scraping
- * the search page would cost a full page render per search.
- *
- * If Cardmarket ever changes the scramble this throws, and the panel falls back
- * to offering the plain search page: the feature degrades, it doesn't break.
+ * Lugin fetches that page in-session and scrapes the gallery/list links, so the
+ * panel can stay fullscreen without sending the user to Cardmarket's UI.
  */
 
 import { ajaxBox } from './ajax';
 import { findCmToken } from './cart';
-import { MIN_SEARCH_LENGTH, buildArgs, productFactsFromImage } from './searchArgs';
-import { currentLang } from './wants';
+import { expansionFromProductUrl } from './productUrl';
+import {
+  MIN_SEARCH_LENGTH,
+  buildArgs,
+  cardmarketSearchUrl,
+  productFactsFromImage,
+} from './searchArgs';
+import { currentLang, fetchDoc } from './wants';
 
 import { replayInPage } from '@/lib/messaging';
 
@@ -38,6 +31,8 @@ export interface ProductSuggestion {
   category?: string;
   /** Expansion name, e.g. "Return to Ravnica". */
   expansion?: string;
+  /** Lowest price text from a gallery card, e.g. "0,15 €". */
+  fromPrice?: string;
   /** Product page path, e.g. "/en/Magic/Products/Singles/…?language=1,2,5". */
   href: string;
   imageUrl?: string;
@@ -120,10 +115,78 @@ export interface SearchReply {
 }
 
 /**
- * Search Cardmarket's catalogue for a term.
+ * Printings listed on a Search 2.0 results page (gallery or list).
  *
- * Replayed in the page context, like every other call we make on the user's
- * behalf, so it carries the session exactly as the site's search box does.
+ * Gallery cards bury the name in `img[alt]` and the set in the expansion icon
+ * title; list view puts both in the link text. Either way the product href is
+ * the stable identity.
+ */
+export const parseCatalogueResults = (root: ParentNode): ProductSuggestion[] => {
+  const out: ProductSuggestion[] = [];
+  const seen = new Set<string>();
+
+  root.querySelectorAll<HTMLAnchorElement>('a[href*="/Products/Singles/"]').forEach(a => {
+    const href = a.getAttribute('href');
+    if (!href || /\/Products\/Singles\/?(\?|$)/i.test(href)) return;
+
+    const img = a.querySelector<HTMLImageElement>('img[alt], img[data-echo], img[src]');
+    const altName = img?.getAttribute('alt')?.trim();
+    const titleText = a.querySelector('.card-title, h2, .col-10')?.textContent ?? '';
+    const rawName = (altName || titleText || a.textContent || '').replace(/\s+/g, ' ').trim();
+    const name = rawName.replace(/\s*(?:from\b\s*)?\d[\d.,\s]*\s*€.*$/i, '').trim();
+    if (!name || name.length < 2) return;
+
+    const expansion =
+      a.querySelector<HTMLElement>('.expansion-symbol[title]')?.getAttribute('title')?.trim() ||
+      expansionFromProductUrl(href);
+
+    const echo = img?.getAttribute('data-echo')?.trim();
+    const src = img?.getAttribute('src')?.trim();
+    const imageUrl =
+      (echo && !/transparent/i.test(echo) ? echo : undefined) ||
+      (src && !/transparent/i.test(src) ? src : undefined);
+
+    const priceText = a.querySelector('.card-text.text-muted, .price-container')?.textContent ?? '';
+    const fromPrice = priceText.match(/[\d.,]+\s*€/)?.[0];
+
+    if (seen.has(href)) return;
+    seen.add(href);
+
+    out.push({
+      expansion,
+      fromPrice,
+      href,
+      imageUrl,
+      name,
+      ...productFactsFromImage(imageUrl),
+    });
+  });
+
+  return out;
+};
+
+/**
+ * Fetch Cardmarket's Search 2.0 page for a term and return its printings.
+ *
+ * This is the path that matches pressing Enter in the site's own search box —
+ * same URL, same session cookies — so it works when the autocomplete Ajax call
+ * returns an empty envelope.
+ */
+export const searchCatalogue = async (
+  query: string,
+  signal?: AbortSignal,
+): Promise<ProductSuggestion[]> => {
+  const term = query.trim();
+  if (term.length < MIN_SEARCH_LENGTH) return [];
+  const { doc } = await fetchDoc(cardmarketSearchUrl(term, currentLang()), signal);
+  return parseCatalogueResults(doc);
+};
+
+/**
+ * Search Cardmarket's catalogue for a term via the header autocomplete Ajax.
+ *
+ * Prefer {@link searchCatalogue} when you need a reliable full result set; this
+ * stays for callers that want the lighter keystroke response when it works.
  */
 export const searchProducts = async (
   query: string,

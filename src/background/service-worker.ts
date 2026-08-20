@@ -4,6 +4,7 @@ import { getSets } from './sets';
 import { handleSyncMessage } from './sync';
 
 import { adoptRenamedKeys } from '@/lib/renamedKeys';
+import { isScryfallUrl, scryfallFetch } from '@/lib/scryfallFetch';
 import type { ApiRequest, ApiResult, RuntimeMessage, RuntimeResponse } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -30,6 +31,10 @@ chrome.action.onClicked.addListener(async tab => {
 });
 
 const performFetch = async (request: ApiRequest): Promise<ApiResult> => {
+  // Tag search, prints, shipping helpers, … all share this path. Scryfall gets
+  // its own queue so concurrent UI work can't stampede into 429s.
+  if (isScryfallUrl(request.url)) return scryfallFetch(request);
+
   const response = await fetch(request.url, {
     body: request.body,
     headers: request.headers,

@@ -1,5 +1,6 @@
 import { cardKey, frontFaceName, looseKey } from '@/lib/cardName';
 import type { CardMetadata, CommanderInfo, CommanderPairing } from '@/lib/mtg';
+import { scryfallFetch } from '@/lib/scryfallFetch';
 
 // Scryfall client (background worker). Looks up Magic card metadata by name via
 // the batch "collection" endpoint, caching results in chrome.storage.local so
@@ -264,15 +265,16 @@ export const getCardMetadata = async (rawNames: string[]): Promise<CardMetadata[
     const chunk = misses.slice(i, i + BATCH_SIZE);
     const identifiers = chunk.map(([, frontFace]) => ({ name: frontFace }));
 
-    const response = await fetch(COLLECTION_URL, {
+    const result = await scryfallFetch({
       body: JSON.stringify({ identifiers }),
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       method: 'POST',
+      url: COLLECTION_URL,
     });
-    if (!response.ok) {
-      throw new Error(`Scryfall responded ${response.status} ${response.statusText}`);
+    if (!result.ok) {
+      throw new Error(`Scryfall responded ${result.status} ${result.statusText}`);
     }
-    const json = (await response.json()) as { data?: Array<Record<string, unknown>> };
+    const json = JSON.parse(result.body) as { data?: Array<Record<string, unknown>> };
     for (const card of json.data ?? []) {
       const meta = toMetadata(card);
       toCache.push([cardKey(meta.name), meta]);

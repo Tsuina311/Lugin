@@ -6,6 +6,7 @@
 // fetch nor a service-worker relay can read its HTML in modern browsers.
 
 import { requestApi } from './messaging';
+import { isScryfallUrl, scryfallFetch } from './scryfallFetch';
 import type { ApiResult } from './types';
 
 const GOLDFISH = 'https://www.mtggoldfish.com/';
@@ -54,6 +55,15 @@ export const fetchRemote = async (url: string, accept?: string): Promise<ApiResu
 
   if (isGoldfish(url)) {
     return fetchViaGoldfishProxy(url, accept);
+  }
+
+  // Phone build talks to Scryfall directly — same queue as the extension's
+  // background path so tag search and metadata don't race each other here.
+  if (isScryfallUrl(url)) {
+    return scryfallFetch({
+      headers: accept ? { Accept: accept } : undefined,
+      url,
+    });
   }
 
   const res = await fetch(url, {

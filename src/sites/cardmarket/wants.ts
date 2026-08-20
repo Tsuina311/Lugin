@@ -536,7 +536,63 @@ export interface ParsedOffer {
   priceValue?: number;
   /** Absolute URL of the product page (for market price lookups). */
   productUrl?: string;
+  /** Seller username on the offer row (product pages). */
+  seller?: string;
+  /** Seller's country / item location, for shipping estimates. */
+  sellerCountry?: string;
+  /** Seller rating as shown on the row, e.g. "99.8%". */
+  sellerRating?: string;
+  /** Sales count badge next to the seller name. */
+  sellerSales?: string;
+  /** Absolute URL of the seller's profile. */
+  sellerUrl?: string;
 }
+
+/** Seller identity + trust signals from a product/seller offer row. */
+const sellerFromRow = (
+  row: Element,
+): Pick<
+  ParsedOffer,
+  'seller' | 'sellerCountry' | 'sellerRating' | 'sellerSales' | 'sellerUrl'
+> => {
+  const link = row.querySelector<HTMLAnchorElement>(
+    '.seller-info .seller-name a[href*="/Users/"], .seller-name a[href*="/Users/"]',
+  );
+  const seller = link?.textContent?.replace(/\s+/g, ' ').trim() || undefined;
+  let sellerUrl: string | undefined;
+  const href = link?.getAttribute('href');
+  if (href) {
+    try {
+      sellerUrl = new URL(href, location.origin).href;
+    } catch {
+      sellerUrl = href;
+    }
+  }
+
+  const sellerSales =
+    row.querySelector('.sell-count')?.textContent?.replace(/\s+/g, '').trim() || undefined;
+
+  // Rating is usually a title/aria on a badge or star icon ("99.8% Positive").
+  const ratingEl = row.querySelector(
+    '.seller-rating, .seller-info [title*="%"], .seller-info [aria-label*="%"]',
+  );
+  const ratingRaw =
+    ratingEl?.getAttribute('aria-label') ||
+    ratingEl?.getAttribute('title') ||
+    ratingEl?.textContent ||
+    '';
+  const sellerRating = ratingRaw.match(/(\d{1,3}(?:[.,]\d+)?\s*%)/)?.[1]?.replace(/\s+/g, '') || undefined;
+
+  const locEl = row.querySelector(
+    '[title^="Item location" i], [aria-label^="Item location" i], [title*="Item location" i]',
+  );
+  const locRaw =
+    locEl?.getAttribute('title') || locEl?.getAttribute('aria-label') || locEl?.textContent || '';
+  const sellerCountry =
+    locRaw.replace(/^Item location:\s*/i, '').replace(/\s+/g, ' ').trim() || undefined;
+
+  return { seller, sellerCountry, sellerRating, sellerSales, sellerUrl };
+};
 
 const IMAGE_RE =
   /https?:(?:\/\/|\\\/\\\/)[\w.\-\\/]*product-images\.s3\.cardmarket\.com[\w.\-\\/]+\.(?:jpg|png|webp)/i;
@@ -669,14 +725,19 @@ export interface EditionPrice {
  * the same trailing slug for the product (`/Products/Singles/<set>/<slug>`) and
  * its aggregate card page (`/Magic/Cards/<slug>`), so we can derive it directly
  * — no extra fetch to discover the "Show Offers" link.
+ *
+ * Requires both set and card segments; an expansion-only path would otherwise
+ * 404 as `/Magic/Cards/<set-name>`.
  */
 export const metacardUrlFromProduct = (productUrl: string): string | undefined => {
   try {
     const u = new URL(productUrl, location.origin);
-    const segments = u.pathname.split('/').filter(Boolean);
-    const slug = segments.pop();
+    const match = u.pathname.match(/\/Products\/Singles\/[^/]+\/([^/?#]+)\/?$/i);
+    const slug = match?.[1];
     if (!slug) return undefined;
-    const lang = /^[a-z]{2}$/.test(segments[0] ?? '') ? segments[0] : 'en';
+    const lang = /^[a-z]{2}$/i.test(u.pathname.split('/').filter(Boolean)[0] ?? '')
+      ? u.pathname.split('/').filter(Boolean)[0]
+      : 'en';
     return `${u.origin}/${lang}/Magic/Cards/${slug}`;
   } catch {
     return undefined;
@@ -1471,25 +1532,60 @@ export const cleanOfferName = (raw: string): string => {
   return s;
 };
 
-export const parseOffers = (root: ParentNode): ParsedOffer[] => {
+export const parseOffers = (
+  root: ParentNode,
+  opts: {
+    /** Name-only product links when no article rows exist (search/list pages). */
+    allowNameFallback?: boolean;
+    /**
+     * Card name to use when a row has no product link / tooltip name — typical
+     * on product detail pages, where every seller row is for the same printing.
+     */
+    defaultName?: string;
+  } = {},
+): ParsedOffer[] => {
   const offers: ParsedOffer[] = [];
-  const rows = root.querySelectorAll<HTMLElement>('[id^="articleRow"], [id^="stockRow"]');
+  // Prefer id-based rows (carry the article id); also accept class-based rows
+  // Cardmarket uses on newer product pages without `articleRow…` ids.
+  const rows = root.querySelectorAll<HTMLElement>(
+    '[id^="articleRow"], [id^="stockRow"], .article-row, .row.article-row',
+  );
   rows.forEach(row => {
-    // Name: prefer a product link, but offer rows on the metacard page carry the
-    // name only in the camera icon's tooltip (`data-bs-title="<img ... alt="X">"`).
+    // Name: prefer a product link, but offer rows on the product page usually
+    // omit it (you're already on that card). Fall back to the camera tooltip,
+    // an img alt, then the caller's defaultName.
     const linkName = row
       .querySelector<HTMLElement>('a[href*="/Products/Singles/"], a[href*="/Magic/Cards/"]')
       ?.textContent?.trim();
     let name = linkName ? cleanOfferName(linkName) : undefined;
     if (!name) {
-      const tip = row
-        .querySelector<HTMLElement>('.thumbnail-icon[data-bs-title], [data-bs-title*="alt="]')
-        ?.getAttribute('data-bs-title');
-      name = tip?.match(/alt="([^"]+)"/)?.[1]?.trim();
+      const tipEl = row.querySelector<HTMLElement>(
+        '.thumbnail-icon[data-bs-title], [data-bs-title*="alt="], [data-bs-original-title*="alt="], [title*="alt="]',
+      );
+      const tip =
+        tipEl?.getAttribute('data-bs-title') ||
+        tipEl?.getAttribute('data-bs-original-title') ||
+        tipEl?.getAttribute('title') ||
+        '';
+      name = tip
+        .replace(/&quot;/g, '"')
+        .match(/alt=["']([^"']+)["']/)?.[1]
+        ?.trim();
     }
+    if (!name) {
+      const alt = row.querySelector<HTMLImageElement>('img[alt]')?.getAttribute('alt')?.trim();
+      if (alt && alt.length >= 2 && !isLanguageName(alt)) name = cleanOfferName(alt);
+    }
+    if (!name && opts.defaultName) name = opts.defaultName;
     if (!name || name.length < 2 || isLanguageName(name)) return;
 
-    const articleId = row.id.match(/(\d+)/)?.[1];
+    const articleId =
+      row.id.match(/(\d+)/)?.[1] ||
+      row.getAttribute('data-id-article') ||
+      row.getAttribute('data-article-id') ||
+      row.querySelector<HTMLInputElement>('input[name="idArticle"]')?.value ||
+      row.innerHTML.match(/idArticle["'\s:=]+(\d{5,})/)?.[1] ||
+      undefined;
 
     // Edition: the expansion anchor carries it as aria-label / tooltip.
     const expA = row.querySelector<HTMLElement>('a[href*="/Expansions/"]');
@@ -1537,12 +1633,54 @@ export const parseOffers = (root: ParentNode): ParsedOffer[] => {
       price,
       priceValue: value,
       productUrl,
+      ...sellerFromRow(row),
     });
   });
 
-  if (offers.length === 0) {
+  // Product pages sometimes omit the article-row class. With a known card name,
+  // widen to table-body rows that still look like seller offers.
+  if (offers.length === 0 && opts.defaultName) {
+    root.querySelectorAll<HTMLElement>('.table-body .row').forEach(row => {
+      const looksLikeOffer =
+        !!row.querySelector(
+          '.seller-name, .seller-info, .article-condition, input[name="idArticle"], a[href*="/Users/"]',
+        ) || /idArticle/i.test(row.innerHTML);
+      if (!looksLikeOffer) return;
+      const { price, value } = findPrice(row);
+      const articleId =
+        row.id.match(/(\d+)/)?.[1] ||
+        row.getAttribute('data-id-article') ||
+        row.getAttribute('data-article-id') ||
+        row.querySelector<HTMLInputElement>('input[name="idArticle"]')?.value ||
+        row.innerHTML.match(/idArticle["'\s:=]+(\d{5,})/)?.[1] ||
+        undefined;
+      if (!articleId && value == null) return;
+      const isFoil = !!row.querySelector(
+        '.st_SpecialIcon, [data-original-title="Foil" i], [aria-label="Foil" i]',
+      );
+      const condEl = row.querySelector<HTMLElement>('.article-condition .badge, .article-condition');
+      offers.push({
+        articleId,
+        condition:
+          condEl?.textContent?.trim() ||
+          row.querySelector('.article-condition')?.getAttribute('data-bs-original-title') ||
+          undefined,
+        imageUrl: findImageUrl(row),
+        isFoil,
+        language: languageOfRow(row),
+        name: opts.defaultName!,
+        price,
+        priceValue: value,
+        ...sellerFromRow(row),
+      });
+    });
+  }
+
+  if (offers.length === 0 && opts.allowNameFallback !== false) {
     // Name-only fallback (e.g. spoiler pages, which have no article/stock rows).
     // Keep the product link so we can look up editions and add to a want list.
+    // Skip this on product detail fetches (`allowNameFallback: false`) — otherwise
+    // related-product links become a fake single "offer" with no sellers.
     const seen = new Set<string>();
     root.querySelectorAll<HTMLAnchorElement>('a[href*="/Products/Singles/"]').forEach(a => {
       // Prefer the gallery image's `alt` (a clean name) over the link text, which

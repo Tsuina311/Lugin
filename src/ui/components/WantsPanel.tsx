@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from 'react';
 
 import { useWideLayout } from '../useWideLayout';
 
@@ -36,7 +36,10 @@ import { MANA_VALUE_BUCKETS, manaValueBucket, manaValueLabel, type CardMetadata 
 import { money, priceOf } from '@/lib/prices';
 import { editionIdOf, groupEditionsByYear, tallyEditions } from '@/lib/sets';
 import { addArticleToCart, findCmToken } from '@/sites/cardmarket/cart';
-import type { ProductSuggestion } from '@/sites/cardmarket/search';
+import {
+  searchCatalogue,
+  type ProductSuggestion,
+} from '@/sites/cardmarket/search';
 import {
   COUNTRIES,
   countryId,
@@ -50,7 +53,6 @@ import {
   addWant,
   deleteWant,
   fetchAllWantLists,
-  fetchCardEditions,
   fetchDoc,
   fetchPriceGuide,
   fetchProductIds,
@@ -59,7 +61,6 @@ import {
   getLastGuideHtml,
   parseOffers,
   scanSeller,
-  type EditionPrice,
   type PriceGuide,
   type ScanMatch as ScanMatchT,
   type PurchaseRecord,
@@ -217,13 +218,11 @@ const scanStorageKey = (baseUrl: string) => `lugin:sellerScan:${baseUrl}`;
 // the whole list. Stamped with a fetch time and treated as stale after a few
 // days (prices drift), so old data never silently misleads.
 const PRICE_STORAGE_KEY = 'lugin:priceGuides';
-const EDITIONS_STORAGE_KEY = 'lugin:editions';
 const PRICE_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 /** Offer / snapshot ratios inside this band are the ones a live page can change. */
 const CLOSE_LO = 0.85;
 const CLOSE_HI = 1.2;
 type StampedPrice = { guide: PriceGuide; ts: number };
-type StampedEditions = { editions: EditionPrice[]; ts: number };
 
 /** Merge one price guide into the persisted map, pruning stale entries. */
 const persistPrice = async (url: string, guide: PriceGuide): Promise<void> => {
@@ -235,21 +234,6 @@ const persistPrice = async (url: string, guide: PriceGuide): Promise<void> => {
       if (!v || now - v.ts >= PRICE_MAX_AGE_MS) delete map[k];
     map[url] = { guide, ts: now };
     await chrome.storage.local.set({ [PRICE_STORAGE_KEY]: map });
-  } catch {
-    // best-effort cache; ignore storage failures
-  }
-};
-
-/** Merge one card's editions breakdown into the persisted map, pruning stale entries. */
-const persistEditions = async (key: string, editions: EditionPrice[]): Promise<void> => {
-  try {
-    const stored = await chrome.storage.local.get(EDITIONS_STORAGE_KEY);
-    const map = (stored[EDITIONS_STORAGE_KEY] ?? {}) as Record<string, StampedEditions>;
-    const now = Date.now();
-    for (const [k, v] of Object.entries(map))
-      if (!v || now - v.ts >= PRICE_MAX_AGE_MS) delete map[k];
-    map[key] = { editions, ts: now };
-    await chrome.storage.local.set({ [EDITIONS_STORAGE_KEY]: map });
   } catch {
     // best-effort cache; ignore storage failures
   }
@@ -267,20 +251,29 @@ const initialScan: ScanState = {
 };
 
 /**
- * A printing the user searched for, and the offers on its product page.
+ * Catalogue search + a printing's offers.
  *
- * The third source of rows for this panel, beside the page you're on and a
- * seller scan. All three end up as `ScanMatch[]`, which is why searching gets
- * the price comparison, cart buttons and owned/purchased tags for free.
+ * First the Search 2.0 results page is fetched into `catalogue` (same printings
+ * Cardmarket would show). Picking one loads that product's offers into
+ * `matches`, which shares the price / cart / owned UI with seller scans.
  */
 interface SearchState {
+  catalogue: ProductSuggestion[];
   error: string | null;
   matches: ScanMatch[];
   product: ProductSuggestion | null;
-  status: 'idle' | 'loading' | 'done' | 'error';
+  query: string | null;
+  status: 'idle' | 'searching' | 'catalogue' | 'loading' | 'done' | 'error';
 }
 
-const initialSearch: SearchState = { error: null, matches: [], product: null, status: 'idle' };
+const initialSearch: SearchState = {
+  catalogue: [],
+  error: null,
+  matches: [],
+  product: null,
+  query: null,
+  status: 'idle',
+};
 
 export const WantsPanel = () => {
   const { index: rawIndex } = useWants();
@@ -405,33 +398,103 @@ export const WantsPanel = () => {
     : null;
 
   // ---- Search Cardmarket for a card ----------------------------------------
-  // Pick a printing from Cardmarket's autocomplete; we fetch that product page
-  // and read its offers with the same parser the live page uses.
+  // Fetch Search 2.0 into the panel, then open one printing's offers.
   const [search, setSearch] = useState<SearchState>(initialSearch);
   const searchAbort = useRef<AbortController | null>(null);
+
+  const runCatalogueSearch = async (term: string) => {
+    searchAbort.current?.abort();
+    const controller = new AbortController();
+    searchAbort.current = controller;
+    setSearch({
+      catalogue: [],
+      error: null,
+      matches: [],
+      product: null,
+      query: term,
+      status: 'searching',
+    });
+    try {
+      const catalogue = await searchCatalogue(term, controller.signal);
+      if (controller.signal.aborted) return;
+      setSearch({
+        catalogue,
+        error: null,
+        matches: [],
+        product: null,
+        query: term,
+        status: 'catalogue',
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setSearch({
+        catalogue: [],
+        error: err instanceof Error ? err.message : String(err),
+        matches: [],
+        product: null,
+        query: term,
+        status: 'error',
+      });
+    }
+  };
 
   const openProduct = async (product: ProductSuggestion) => {
     searchAbort.current?.abort();
     const controller = new AbortController();
     searchAbort.current = controller;
-    setSearch({ error: null, matches: [], product, status: 'loading' });
+    setSearch(s => ({
+      ...s,
+      error: null,
+      matches: [],
+      product,
+      status: 'loading',
+    }));
     try {
-      const { doc } = await fetchDoc(product.href, controller.signal);
-      const offers = parseOffers(doc.body);
-      setSearch({
+      const href = new URL(product.href, location.origin).href;
+      const { doc, html } = await fetchDoc(href, controller.signal);
+      // Challenge / login shells have no seller table — say so instead of
+      // "no offers" for a card that clearly has stock on the live site.
+      const title = doc.querySelector('title')?.textContent?.trim() ?? '';
+      if (/just a moment|attention required|access denied|cloudflare/i.test(title)) {
+        throw new Error('Cardmarket blocked the product page (Cloudflare). Refresh and try again.');
+      }
+      if (html.length < 2000) {
+        throw new Error('Product page response was empty — refresh Cardmarket and try again.');
+      }
+      // Product pages must not use the name-only link fallback — that turns
+      // related printings into a fake single row with no sellers (and can feed
+      // expansion URLs into the editions lookup). Seller rows on those pages
+      // usually omit the card name; pass it in so rows aren't dropped.
+      const offers = parseOffers(doc.body, {
+        allowNameFallback: false,
+        defaultName: product.name,
+      });
+      const matches = offers.map(o => ({
+        ...o,
+        edition: o.edition ?? product.expansion,
+        imageUrl: o.imageUrl ?? product.imageUrl,
+        lists: index?.cards[cardKey(o.name || product.name)]?.lists ?? [],
+        name: o.name || product.name,
+        productUrl: o.productUrl ?? href,
+      }));
+      // Seller rows read better as a list than a single gallery tile.
+      if (matches.length > 0) setResultsView('list');
+      setSearch(s => ({
+        ...s,
         error: null,
-        matches: offers.map(o => ({ ...o, lists: index?.cards[cardKey(o.name)]?.lists ?? [] })),
+        matches,
         product,
         status: 'done',
-      });
+      }));
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
-      setSearch({
+      setSearch(s => ({
+        ...s,
         error: err instanceof Error ? err.message : String(err),
         matches: [],
         product,
         status: 'error',
-      });
+      }));
     }
   };
 
@@ -439,6 +502,18 @@ export const WantsPanel = () => {
     searchAbort.current?.abort();
     searchAbort.current = null;
     setSearch(initialSearch);
+  };
+
+  const backToCatalogue = () => {
+    searchAbort.current?.abort();
+    searchAbort.current = null;
+    setSearch(s => ({
+      ...s,
+      error: null,
+      matches: [],
+      product: null,
+      status: s.catalogue.length > 0 ? 'catalogue' : 'idle',
+    }));
   };
 
   // ---- Seller scan (find everything a seller has on my want lists) ---------
@@ -720,12 +795,16 @@ export const WantsPanel = () => {
     }
   };
 
-  // What the results area shows: a card the user searched for, else a finished
-  // seller scan. Idle shows neither — the page behind the panel is no longer
-  // mirrored here (own search replaces that).
-  const showingSearch = search.product != null;
+  // What the results area shows: a product's offers, else a finished seller scan.
+  // Catalogue hits render separately (pick a printing first).
+  const showingProduct = search.product != null;
+  const showingCatalogue =
+    !showingProduct &&
+    (search.status === 'catalogue' || search.status === 'searching' || search.status === 'error') &&
+    search.query != null;
+  const showingSearch = showingProduct || showingCatalogue;
   const showingScan = !showingSearch && scan.status === 'done';
-  const displayMatches = showingSearch ? search.matches : showingScan ? scan.matches : [];
+  const displayMatches = showingProduct ? search.matches : showingScan ? scan.matches : [];
 
   // ---- Filter by edition ----------------------------------------------------
   // Offers off a Cardmarket page name their expansion but never date it, so the
@@ -750,12 +829,14 @@ export const WantsPanel = () => {
   );
 
   const editionMatches = useMemo(() => {
-    if (fEditions.size === 0) return displayMatches;
+    // A single printing from search shouldn't inherit sticky edition picks from
+    // a prior seller scan — those often wipe every offer for an unrelated set.
+    if (showingProduct || fEditions.size === 0) return displayMatches;
     return displayMatches.filter(m => {
       const key = editionIdOf(setIndex, { setName: m.edition });
       return key != null && fEditions.has(key);
     });
-  }, [displayMatches, fEditions, setIndex]);
+  }, [displayMatches, fEditions, setIndex, showingProduct]);
 
   // Group offers by card name: a card with several editions collapses into one
   // row, cheapest offer first. Single-offer cards render flat.
@@ -913,10 +994,16 @@ export const WantsPanel = () => {
 
   const visibleGrouped = useMemo(
     () =>
-      grouped.filter(g => (!effectiveList || g.lists.includes(effectiveList)) && metaMatch(g.name)),
+      // Product-search results are one card: sticky metadata filters from a
+      // seller scan would hide it for irrelevant reasons (wrong color query, …).
+      showingProduct
+        ? grouped
+        : grouped.filter(
+            g => (!effectiveList || g.lists.includes(effectiveList)) && metaMatch(g.name),
+          ),
     // metaMatch reads these; listing them keeps the memo correct.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [grouped, effectiveList, metaByName, fQuery, fColors, fCmc, fSubtype],
+    [grouped, effectiveList, metaByName, fQuery, fColors, fCmc, fSubtype, showingProduct],
   );
 
   /** Resolve the best front-image URL for a card (page image → cached CDN →
@@ -986,6 +1073,19 @@ export const WantsPanel = () => {
       if (id != null) void shippingStore.ensureMatrix(id);
     }
   }, [sellers.rows, shipping.toCountry]);
+
+  // Prefetch each product-offer seller's shipping route so entry ship shows
+  // without waiting for a click.
+  useEffect(() => {
+    if (!showingProduct || shipping.toCountry == null) return;
+    const seen = new Set<number>();
+    for (const o of search.matches) {
+      const id = countryId(o.sellerCountry);
+      if (id == null || seen.has(id)) continue;
+      seen.add(id);
+      void shippingStore.ensureMatrix(id);
+    }
+  }, [showingProduct, search.matches, shipping.toCountry]);
 
   /** Cheapest shipping method a source country would charge for an order. */
   const shipEstimate = (
@@ -1162,19 +1262,10 @@ export const WantsPanel = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot, visibleGrouped]);
 
-  // ---- Other editions / foil (one "Show Offers" request per card) ----------
-  // Keyed by cardKey. Each metacard page aggregates every printing + foil, so a
-  // single request powers the "other editions / foil" breakdown for a card.
-  const [editions, setEditions] = useState<Record<string, EditionPrice[]>>({});
-  const [editionsState, setEditionsState] = useState<
-    Record<string, 'loading' | 'error' | 'challenge'>
-  >({});
-  const [openEditions, setOpenEditions] = useState<Set<string>>(new Set());
-
-  // Rehydrate cached prices + editions from chrome.storage on mount, dropping
-  // anything older than PRICE_MAX_AGE_MS so stale figures don't reappear.
+  // Rehydrate cached prices from chrome.storage on mount, dropping anything
+  // older than PRICE_MAX_AGE_MS so stale figures don't reappear.
   useEffect(() => {
-    void chrome.storage.local.get([PRICE_STORAGE_KEY, EDITIONS_STORAGE_KEY]).then(stored => {
+    void chrome.storage.local.get([PRICE_STORAGE_KEY]).then(stored => {
       const now = Date.now();
       const pMap = (stored[PRICE_STORAGE_KEY] ?? {}) as Record<string, StampedPrice>;
       const fresh: Record<string, PriceGuide> = {};
@@ -1185,42 +1276,8 @@ export const WantsPanel = () => {
         }
       }
       if (Object.keys(fresh).length) setPrices(p => ({ ...fresh, ...p }));
-
-      const eMap = (stored[EDITIONS_STORAGE_KEY] ?? {}) as Record<string, StampedEditions>;
-      const freshEds: Record<string, EditionPrice[]> = {};
-      for (const [k, v] of Object.entries(eMap)) {
-        if (v && now - v.ts < PRICE_MAX_AGE_MS) freshEds[k] = v.editions;
-      }
-      if (Object.keys(freshEds).length) setEditions(e => ({ ...freshEds, ...e }));
     });
   }, []);
-
-  const toggleEditions = async (key: string, name: string, productUrl?: string) => {
-    const willOpen = !openEditions.has(key);
-    setOpenEditions(s => {
-      const n = new Set(s);
-      if (n.has(key)) n.delete(key);
-      else n.add(key);
-      return n;
-    });
-    // Fetch lazily the first time it's opened. We can resolve the card from a
-    // product URL when present, otherwise from its name (metacard-page rows).
-    if (!willOpen || editions[key] || editionsState[key] === 'loading') return;
-    setEditionsState(s => ({ ...s, [key]: 'loading' }));
-    try {
-      const eds = await fetchCardEditions({ name, productUrl });
-      setEditions(e => ({ ...e, [key]: eds }));
-      void persistEditions(key, eds);
-      setEditionsState(s => {
-        const n = { ...s };
-        delete n[key];
-        return n;
-      });
-    } catch (err) {
-      const challenge = err instanceof Error && err.message.startsWith('CHALLENGE:');
-      setEditionsState(s => ({ ...s, [key]: challenge ? 'challenge' : 'error' }));
-    }
-  };
 
   // ---- Remove from all want lists (Feature 1) ------------------------------
   // Per cardKey status: 'removing' | 'done' | '<error message>'. `confirmKey`
@@ -1325,6 +1382,61 @@ export const WantsPanel = () => {
 
   const metaLine = (o: ScanMatch) =>
     [o.edition, o.condition, o.language].filter(Boolean).join(' · ');
+
+  /** Seller-facing line for product-search offers (no repeated edition). */
+  const sellerMeta = (o: ScanMatch) => {
+    const bits: ReactNode[] = [];
+    if (o.seller) {
+      bits.push(
+        o.sellerUrl ? (
+          <a
+            key="seller"
+            className="font-medium text-sky-300 hover:underline"
+            href={o.sellerUrl}
+            onClick={e => e.stopPropagation()}
+            rel="noreferrer"
+            target="_blank"
+          >
+            {o.seller}
+          </a>
+        ) : (
+          <span key="seller" className="font-medium text-slate-200">
+            {o.seller}
+          </span>
+        ),
+      );
+    }
+    if (o.sellerSales) bits.push(<span key="sales">{o.sellerSales} sales</span>);
+    if (o.sellerRating) bits.push(<span key="rate">{o.sellerRating}</span>);
+    if (o.sellerCountry) bits.push(<span key="loc">{o.sellerCountry}</span>);
+    if (o.condition) bits.push(<span key="cond">{o.condition}</span>);
+    if (o.language) bits.push(<span key="lang">{o.language}</span>);
+    if (bits.length === 0) return null;
+    return (
+      <span className="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+        {bits.map((b, i) => (
+          <span key={i} className="inline-flex items-center gap-1.5">
+            {i > 0 && <span className="text-slate-600">·</span>}
+            {b}
+          </span>
+        ))}
+      </span>
+    );
+  };
+
+  /** Entry (1-card) shipping for a product-search offer, when we know the route. */
+  const entryShipLabel = (o: ScanMatch) => {
+    const est = shipEstimate(countryId(o.sellerCountry), 1, o.priceValue ?? 0);
+    if (!est) return null;
+    return (
+      <span
+        className="whitespace-nowrap text-[10px] text-amber-300/90"
+        title={`${est.method.name} from ${o.sellerCountry} · ≈${est.weight} g`}
+      >
+        + ship ≈{fmtEuro(est.method.price)}
+      </span>
+    );
+  };
 
   /**
    * "In cart" tag. Solid/blue when this exact offer is in the extension cart,
@@ -1673,83 +1785,6 @@ export const WantsPanel = () => {
     );
   };
 
-  /** Info icon that toggles the "other editions / foil" breakdown for a card. */
-  const editionsInfo = (key: string, name: string, productUrl?: string) => {
-    const open = openEditions.has(key);
-    return (
-      <button
-        aria-label="Other editions and foil prices"
-        className={`inline-flex h-4 w-4 flex-none items-center justify-center rounded-full border text-[9px] font-bold ${
-          open
-            ? 'border-sky-400 bg-sky-500/20 text-sky-300'
-            : 'border-slate-600 text-slate-400 hover:border-sky-400 hover:text-sky-300'
-        }`}
-        onClick={e => {
-          e.preventDefault();
-          e.stopPropagation();
-          void toggleEditions(key, name, productUrl);
-        }}
-        title="Show From / Price Trend for other editions & foil"
-        type="button"
-      >
-        i
-      </button>
-    );
-  };
-
-  /** Expanded per-edition/foil price breakdown (cheapest offer per printing). */
-  const editionsPanel = (key: string) => {
-    if (!openEditions.has(key)) return null;
-    const state = editionsState[key];
-    const eds = editions[key];
-    return (
-      <div className="mt-1 rounded border border-slate-800 bg-slate-900/60 p-1.5 text-[10px]">
-        {state === 'loading' && <div className="text-slate-500">Loading editions…</div>}
-        {state === 'error' && (
-          <div className="text-red-400">Couldn't load the card's other editions.</div>
-        )}
-        {state === 'challenge' && (
-          <div className="flex flex-wrap items-center gap-2 text-amber-400">
-            <span>
-              Cardmarket is asking you to verify you're human. Your seller scan is saved and will
-              still be here.
-            </span>
-            <Button onClick={() => location.reload()} size="xs" variant="neutral">
-              Reload and verify
-            </Button>
-          </div>
-        )}
-        {!state && eds && eds.length === 0 && (
-          <div className="text-slate-500">No edition data found.</div>
-        )}
-        {!state && eds && eds.length > 0 && (
-          <table className="w-full border-collapse">
-            <tbody>
-              {eds.map((ed, i) => (
-                <tr key={`${ed.edition}|${ed.isFoil}|${i}`} className="text-slate-300">
-                  <td className="py-0.5 pr-2">
-                    <span className="truncate">{ed.edition}</span>
-                    {ed.isFoil && (
-                      <span className="ml-1 rounded bg-amber-500/20 px-1 text-[8px] font-semibold text-amber-300">
-                        FOIL
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-0.5 pr-2 text-right text-slate-500">
-                    {ed.count} offer{ed.count === 1 ? '' : 's'}
-                  </td>
-                  <td className="py-0.5 text-right font-semibold text-slate-100">
-                    {ed.from ? `from ${ed.from}` : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    );
-  };
-
   /**
    * For id-less rows (e.g. spoiler pages) that carry a product link: an "Add to
    * want list" button whose dropdown lists the user's want lists. Rows without a
@@ -2093,23 +2128,37 @@ export const WantsPanel = () => {
 
   return (
     <div ref={panelRef} className="flex h-full flex-col">
-      <CardSearch busy={search.status === 'loading'} onPick={openProduct} />
+      <CardSearch
+        busy={search.status === 'searching' || search.status === 'loading'}
+        onSearch={term => void runCatalogueSearch(term)}
+      />
 
-      {/* Which card the rows below belong to. */}
+      {/* Breadcrumb for catalogue → printing offers. */}
       {showingSearch && (
         <div className="flex items-center gap-2 border-b border-line bg-raised px-2 py-1 text-2xs">
           <span className="min-w-0 flex-1 truncate text-ink">
-            {search.product?.name}
-            {search.product?.expansion && (
-              <span className="text-ink-faint"> · {search.product.expansion}</span>
+            {showingProduct ? (
+              <>
+                {search.product?.name}
+                {search.product?.expansion && (
+                  <span className="text-ink-faint"> · {search.product.expansion}</span>
+                )}
+              </>
+            ) : (
+              <>
+                Results for “{search.query}”
+                {search.status === 'catalogue' && (
+                  <span className="text-ink-faint"> · {search.catalogue.length} printings</span>
+                )}
+              </>
             )}
           </span>
           {search.status === 'error' && (
             <span className="flex-none text-neg" title={search.error ?? undefined}>
-              Couldn’t load the offers
+              {showingProduct ? 'Couldn’t load the offers' : 'Search failed'}
             </span>
           )}
-          {search.product?.href && (
+          {showingProduct && search.product?.href && (
             <a
               className="flex flex-none items-center gap-1 text-accent hover:underline"
               href={search.product.href}
@@ -2119,6 +2168,11 @@ export const WantsPanel = () => {
               Open
               <ExternalLink aria-hidden size={10} />
             </a>
+          )}
+          {showingProduct && search.catalogue.length > 0 && (
+            <Button onClick={backToCatalogue} size="xs" variant="subtle">
+              Back to results
+            </Button>
           )}
           <Button onClick={clearSearch} size="xs" variant="subtle">
             Clear
@@ -2623,13 +2677,22 @@ export const WantsPanel = () => {
           )}
 
           {/* Results: search product offers, or a finished seller scan */}
-          <div ref={listRef} className="min-h-0 flex-1 overflow-auto">
+          <div ref={listRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {
               <>
-                <div className="sticky top-0 z-10 bg-slate-900">
+                <div className="z-10 flex-none bg-slate-900">
                   <div className="flex items-center gap-2 px-2 py-1 text-[10px] text-slate-500">
                     <span>
-                      {showingSearch ? (
+                      {showingCatalogue ? (
+                        <>
+                          {search.status === 'searching'
+                            ? 'Searching…'
+                            : search.status === 'error'
+                              ? 'Search failed'
+                              : `${search.catalogue.length} printing${search.catalogue.length === 1 ? '' : 's'}`}
+                          {search.query && search.status === 'catalogue' && ` for “${search.query}”`}
+                        </>
+                      ) : showingProduct ? (
                         <>
                           {search.status === 'loading'
                             ? 'Loading offers…'
@@ -2647,6 +2710,8 @@ export const WantsPanel = () => {
                       )}
                     </span>
                     <div className="ml-auto flex items-center gap-1.5">
+                      {!showingCatalogue && (
+                        <>
                       <ViewToggle onChange={setResultsView} value={resultsView} />
                       {/* Wide, the filters are permanently in the sidebar. */}
                       {!wide && (
@@ -2660,6 +2725,8 @@ export const WantsPanel = () => {
                         >
                           Filters{filtersActive ? ' •' : ''}
                         </Button>
+                      )}
+                        </>
                       )}
                       {showingScan && visibleGrouped.some(g => g.offers.some(o => o.articleId)) && (
                         <Button
@@ -2832,12 +2899,62 @@ export const WantsPanel = () => {
                     </div>
                   )}
                 </div>
-                {visibleGrouped.length === 0 ? (
+                <div className="min-h-0 flex-1 overflow-auto">
+                {showingCatalogue ? (
+                  search.status === 'searching' ? (
+                    <div className="p-4 text-center text-[11px] text-slate-500">Searching…</div>
+                  ) : search.status === 'error' ? (
+                    <div className="p-4 text-center text-[11px] text-red-400">
+                      {search.error ?? 'Search failed'}
+                    </div>
+                  ) : search.catalogue.length === 0 ? (
+                    <div className="p-4 text-center text-[11px] text-slate-500">
+                      No printings matched “{search.query}”.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-line">
+                      {search.catalogue.map(item => (
+                        <button
+                          key={item.href}
+                          className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-tint"
+                          onClick={() => void openProduct(item)}
+                          type="button"
+                        >
+                          {item.imageUrl ? (
+                            <img
+                              alt=""
+                              className="h-10 w-7 flex-none rounded-sm object-cover"
+                              loading="lazy"
+                              src={item.imageUrl}
+                            />
+                          ) : (
+                            <span className="h-10 w-7 flex-none rounded-sm bg-panel" />
+                          )}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs text-ink">{item.name}</span>
+                            {item.expansion && (
+                              <span className="block truncate text-2xs text-ink-faint">
+                                {item.expansion}
+                              </span>
+                            )}
+                          </span>
+                          {item.fromPrice && (
+                            <span className="flex-none text-2xs tabular-nums text-ink-muted">
+                              from {item.fromPrice}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )
+                ) : visibleGrouped.length === 0 ? (
                   <div className="p-4 text-center text-[11px] text-slate-500">
-                    {showingSearch
+                    {showingProduct
                       ? search.status === 'loading'
                         ? 'Loading offers…'
-                        : 'No offers found for this printing.'
+                        : search.status === 'error'
+                          ? search.error || 'Could not load offers for this printing.'
+                          : 'No offers found for this printing.'
                       : showingScan
                         ? `None of ${seller?.name ?? 'this seller'}'s offers match your want lists.`
                         : 'Search for a card above, or scan the seller you’re browsing.'}
@@ -2927,7 +3044,6 @@ export const WantsPanel = () => {
                               >
                                 {g.name}
                               </span>
-                              {editionsInfo(key, g.name, guideUrl)}
                               {canRemove &&
                                 !removing &&
                                 removeState[key] !== 'done' &&
@@ -2987,7 +3103,6 @@ export const WantsPanel = () => {
                                   ))}
                               </span>
                             </div>
-                            {editionsPanel(key)}
                           </div>
 
                           {/* Inline confirm for the destructive remove (covers the box). */}
@@ -3037,9 +3152,10 @@ export const WantsPanel = () => {
                             {offerInCart(o)}
                             {purchasedTag(o.name)}
                             {ownedTag(o.name)}
-                            {editionsInfo(key, o.name, o.productUrl)}
                           </>
                         );
+                        const rowMeta = showingProduct ? sellerMeta(o) || metaLine(o) : metaLine(o);
+                        const ship = showingProduct ? entryShipLabel(o) : null;
                         // Wide: one line per card, columns aligned across rows.
                         if (oneLine) {
                           return (
@@ -3048,19 +3164,18 @@ export const WantsPanel = () => {
                                 <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-100">
                                   {nameCell}
                                 </div>
-                                <div
-                                  className="truncate text-[10px] text-slate-400"
-                                  title={metaLine(o)}
-                                >
-                                  {metaLine(o)}
+                                <div className="min-w-0 truncate text-[10px] text-slate-400">
+                                  {rowMeta}
                                 </div>
                                 {listBadges(g.lists, true)}
-                                {renderPrice(o, true)}
+                                <div className="flex flex-col items-end gap-0.5">
+                                  {renderPrice(o, true)}
+                                  {ship}
+                                </div>
                                 <div className="flex justify-end">{addAction(o)}</div>
                                 {removeIcon(g.name)}
                               </div>
-                              {editionsPanel(key)}
-                              {removeStatus(g.name)}
+                                {removeStatus(g.name)}
                               {renderAddError(o)}
                             </li>
                           );
@@ -3072,9 +3187,10 @@ export const WantsPanel = () => {
                                 <div className="flex items-center gap-1.5 text-[12px] text-slate-100">
                                   {nameCell}
                                 </div>
-                                {metaLine(o) && (
-                                  <div className="mt-0.5 text-[10px] text-slate-400">
-                                    {metaLine(o)}
+                                {rowMeta && (
+                                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
+                                    {rowMeta}
+                                    {ship}
                                   </div>
                                 )}
                                 {listBadges(g.lists)}
@@ -3082,20 +3198,23 @@ export const WantsPanel = () => {
                               </div>
                               {renderAddControl(o)}
                             </div>
-                            {editionsPanel(key)}
                             {renderAddError(o)}
                           </li>
                         );
                       }
-                      // Multiple offers → collapsed dropdown.
+                      // Multiple offers → product search stays expanded (you're
+                      // shopping sellers); seller scans stay a collapsed dropdown.
                       const cheapest = g.offers[0];
                       const anyFoil = g.offers.some(o => o.isFoil);
+                      const countLabel = showingProduct
+                        ? `${g.offers.length} offer${g.offers.length === 1 ? '' : 's'}`
+                        : `${g.offers.length} editions`;
                       const groupName = (
                         <>
                           {imageIcon(g.offers[0].imageUrl, g.name)}
                           <span className="truncate">{g.name}</span>
                           <span className="rounded bg-slate-700 px-1 text-[9px] text-slate-300">
-                            {g.offers.length} editions
+                            {countLabel}
                           </span>
                           {foilTag(anyFoil)}
                           {inCartTag(
@@ -3104,7 +3223,6 @@ export const WantsPanel = () => {
                           )}
                           {purchasedTag(g.name)}
                           {ownedTag(g.name)}
-                          {editionsInfo(key, g.name, cheapest.productUrl)}
                         </>
                       );
                       const fromPrice = cheapest.price && (
@@ -3115,6 +3233,116 @@ export const WantsPanel = () => {
                           </span>
                         </span>
                       );
+                      const headerMeta = showingProduct
+                        ? [cheapest.edition, anyFoil ? 'foil available' : null]
+                            .filter(Boolean)
+                            .join(' · ')
+                        : metaLine(cheapest);
+
+                      const offerRows = (
+                        <ul
+                          className={`mt-1.5 list-none border-l border-slate-800 pl-2 ${
+                            oneLine ? '' : 'space-y-1.5'
+                          }`}
+                        >
+                          {g.offers.map((o, i) => {
+                            const offerTags = (
+                              <>
+                                {!showingProduct && imageIcon(o.imageUrl, g.name)}
+                                {foilTag(o.isFoil)}
+                                {offerInCart(o)}
+                              </>
+                            );
+                            const offerMeta = showingProduct ? (
+                              sellerMeta(o) || (
+                                <span className="text-slate-600">seller unknown</span>
+                              )
+                            ) : (
+                              metaLine(o) || (
+                                <span className="text-slate-600">details unavailable</span>
+                              )
+                            );
+                            const ship = showingProduct ? entryShipLabel(o) : null;
+                            if (oneLine) {
+                              return (
+                                <li key={o.articleId ?? i} className={`${ROW_COLUMNS} py-0.5`}>
+                                  <span className="col-span-2 flex min-w-0 items-center gap-1.5 truncate text-[11px] text-slate-300">
+                                    {offerTags}
+                                    {offerMeta}
+                                  </span>
+                                  <span />
+                                  <span className="flex flex-col items-end gap-0.5">
+                                    {renderPrice(o, true)}
+                                    {ship}
+                                  </span>
+                                  <span className="flex justify-end">{addAction(o)}</span>
+                                  <span />
+                                  <span className="col-span-6 empty:hidden">
+                                    {renderAddError(o)}
+                                  </span>
+                                </li>
+                              );
+                            }
+                            return (
+                              <li key={o.articleId ?? i}>
+                                <div className="flex items-start gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-300">
+                                      {offerTags}
+                                      {offerMeta}
+                                      {ship}
+                                    </div>
+                                  </div>
+                                  {renderAddControl(o)}
+                                </div>
+                                {renderAddError(o)}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      );
+
+                      if (showingProduct) {
+                        return (
+                          <li key={key} {...selection.rowProps(key, 'group px-2 py-1.5')}>
+                            {oneLine ? (
+                              <div className={`${ROW_COLUMNS} px-0 py-0.5`}>
+                                <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-100">
+                                  {groupName}
+                                </span>
+                                <span
+                                  className="truncate text-[10px] text-slate-400"
+                                  title={headerMeta}
+                                >
+                                  {headerMeta}
+                                </span>
+                                {listBadges(g.lists, true)}
+                                <span className="text-right">{fromPrice}</span>
+                                <span />
+                                {removeIcon(g.name)}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="min-w-0 flex-1">
+                                  <span className="flex items-center gap-1.5 text-[12px] text-slate-100">
+                                    {groupName}
+                                  </span>
+                                  {headerMeta && (
+                                    <div className="mt-0.5 text-[10px] text-slate-400">
+                                      {headerMeta}
+                                    </div>
+                                  )}
+                                  {listBadges(g.lists)}
+                                </span>
+                                {fromPrice}
+                              </div>
+                            )}
+                            {oneLine ? removeStatus(g.name) : removeControl(g.name)}
+                            {offerRows}
+                          </li>
+                        );
+                      }
+
                       return (
                         <li key={key} {...selection.rowProps(key, 'group px-2 py-1.5')}>
                           <details className="group/rows">
@@ -3153,65 +3381,15 @@ export const WantsPanel = () => {
                                 {fromPrice}
                               </summary>
                             )}
-                            {editionsPanel(key)}
                             {oneLine ? removeStatus(g.name) : removeControl(g.name)}
-                            <ul
-                              className={`mt-1.5 list-none border-l border-slate-800 pl-2 ${
-                                oneLine ? '' : 'space-y-1.5'
-                              }`}
-                            >
-                              {g.offers.map((o, i) => {
-                                const offerTags = (
-                                  <>
-                                    {imageIcon(o.imageUrl, g.name)}
-                                    {foilTag(o.isFoil)}
-                                    {offerInCart(o)}
-                                  </>
-                                );
-                                const offerMeta = metaLine(o) || (
-                                  <span className="text-slate-600">details unavailable</span>
-                                );
-                                // The printings line up under the card's own columns,
-                                // so comparing them is a straight vertical read.
-                                if (oneLine) {
-                                  return (
-                                    <li key={o.articleId ?? i} className={`${ROW_COLUMNS} py-0.5`}>
-                                      <span className="col-span-2 flex min-w-0 items-center gap-1.5 truncate text-[11px] text-slate-300">
-                                        {offerTags}
-                                        {offerMeta}
-                                      </span>
-                                      <span />
-                                      {renderPrice(o, true)}
-                                      <span className="flex justify-end">{addAction(o)}</span>
-                                      <span />
-                                      <span className="col-span-6 empty:hidden">
-                                        {renderAddError(o)}
-                                      </span>
-                                    </li>
-                                  );
-                                }
-                                return (
-                                  <li key={o.articleId ?? i}>
-                                    <div className="flex items-start gap-2">
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-1.5 text-[11px] text-slate-300">
-                                          {offerTags}
-                                          <span>{offerMeta}</span>
-                                        </div>
-                                      </div>
-                                      {renderAddControl(o)}
-                                    </div>
-                                    {renderAddError(o)}
-                                  </li>
-                                );
-                              })}
-                            </ul>
+                            {offerRows}
                           </details>
                         </li>
                       );
                     })}
                   </ul>
                 )}
+                </div>
               </>
             }
           </div>

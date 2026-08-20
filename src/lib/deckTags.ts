@@ -20,13 +20,16 @@ export const DECK_TAG_CATEGORIES = [
   'Card advantage',
   'Combat',
   'Tokens & wide',
+  'Artifact tokens',
   'Counters',
   'Graveyard',
   'Removal',
   'Mana',
   'Life',
+  'Win conditions',
   'Spells',
   'Artifacts & enchantments',
+  'Types & themes',
   'Permanent effects',
   'Tribal',
   'Triggers',
@@ -34,6 +37,41 @@ export const DECK_TAG_CATEGORIES = [
 
 /** Creatures of a tribe plus payoffs that reference it in oracle text. */
 const tribeQuery = (type: string): string => `(t:${type} or o:${type})`;
+
+/**
+ * A card type (Room, Battle, Gate, …) plus oracle payoffs that name it.
+ * Prefer phrases that mean the type (`"a Room"`, `"Rooms you"`) over bare
+ * English words (`door`, `case`) — those match half the catalogue and make
+ * Scryfall slow enough to 429 under normal use.
+ */
+const typeThemeQuery = (type: string, extraOracle: string[] = []): string => {
+  const parts = [
+    `t:${type}`,
+    `o:"a ${type}"`,
+    `o:"${type}s you"`,
+    ...extraOracle.map(o => (/\s/.test(o) || /^[A-Z]/.test(o) ? `o:"${o}"` : `o:${o}`)),
+  ];
+  return `(${parts.join(' or ')})`;
+};
+
+/**
+ * Named artifact tokens (Treasure, Clue, Blood, …) and the cards that make or
+ * care about them. Stick to `"X token"` / `"a X"` / `Xs` — bare words like
+ * `o:gold` or `o:map` are common English and explode the result set.
+ */
+const artifactTokenQuery = (
+  singular: string,
+  opts: { article?: 'a' | 'an'; extras?: string[] } = {},
+): string => {
+  const article = opts.article ?? 'a';
+  const parts = [
+    `o:"${singular} token"`,
+    `o:"${article} ${singular}"`,
+    `o:${singular}s`,
+    ...(opts.extras ?? []),
+  ];
+  return `(${parts.join(' or ')})`;
+};
 
 export const DECK_TAGS: DeckTag[] = [
   // Card advantage
@@ -84,6 +122,71 @@ export const DECK_TAGS: DeckTag[] = [
   { category: 'Tokens & wide', id: 'affinity', label: 'Affinity', query: 'keyword:affinity', terms: ['artifacts'] },
   { category: 'Tokens & wide', id: 'ninjutsu', label: 'Ninjutsu', query: 'keyword:ninjutsu' },
 
+  // Named artifact tokens — makers and payoffs for each token type.
+  {
+    category: 'Artifact tokens',
+    id: 'treasure',
+    label: 'Treasure',
+    query: artifactTokenQuery('Treasure'),
+    terms: ['mana', 'pirate', 'smash'],
+  },
+  {
+    category: 'Artifact tokens',
+    id: 'clue',
+    label: 'Clue',
+    query: artifactTokenQuery('Clue', { extras: ['keyword:investigate'] }),
+    terms: ['investigate', 'detective', 'murders'],
+  },
+  {
+    category: 'Artifact tokens',
+    id: 'food',
+    label: 'Food',
+    query: artifactTokenQuery('Food'),
+    terms: ['lifegain', 'feast', 'trail'],
+  },
+  {
+    category: 'Artifact tokens',
+    id: 'blood',
+    label: 'Blood',
+    query: artifactTokenQuery('Blood'),
+    terms: ['vampire', 'vow', 'discard'],
+  },
+  {
+    category: 'Artifact tokens',
+    id: 'map',
+    label: 'Map',
+    query: artifactTokenQuery('Map'),
+    terms: ['explore', 'ixalan', 'lost caverns'],
+  },
+  {
+    category: 'Artifact tokens',
+    id: 'powerstone',
+    label: 'Powerstone',
+    query: artifactTokenQuery('Powerstone'),
+    terms: ['brotherhood', 'dominaria united', 'artifact'],
+  },
+  {
+    category: 'Artifact tokens',
+    id: 'junk',
+    label: 'Junk',
+    query: artifactTokenQuery('Junk'),
+    terms: ['fallout', 'wasteland'],
+  },
+  {
+    category: 'Artifact tokens',
+    id: 'gold',
+    label: 'Gold',
+    query: artifactTokenQuery('Gold'),
+    terms: ['theros', 'treasure precursor'],
+  },
+  {
+    category: 'Artifact tokens',
+    id: 'incubator',
+    label: 'Incubator',
+    query: artifactTokenQuery('Incubator', { article: 'an' }),
+    terms: ['phyrexia', 'transform', 'phyrexian'],
+  },
+
   // Counters
   { category: 'Counters', id: 'plus-one', label: '+1/+1 counters', query: 'o:"+1/+1 counter"', terms: ['go tall'] },
   { category: 'Counters', id: 'proliferate', label: 'Proliferate', query: 'keyword:proliferate' },
@@ -117,7 +220,6 @@ export const DECK_TAGS: DeckTag[] = [
   { category: 'Mana', id: 'land-ramp', label: 'Land search', query: 'o:"search" o:"land" o:"library"', terms: ['cultivate'] },
   { category: 'Mana', id: 'extra-land', label: 'Extra land drop', query: 'o:"additional land"', terms: ['exploration'] },
   { category: 'Mana', id: 'landfall', label: 'Landfall', query: 'keyword:landfall' },
-  { category: 'Mana', id: 'treasure', label: 'Treasure tokens', query: 'o:"Treasure token"' },
   { category: 'Mana', id: 'ritual', label: 'Mana ritual', query: 'o:"add" o:"until end of turn"', terms: ['dark ritual'] },
   { category: 'Mana', id: 'cost-reduction', label: 'Cost reduction', query: 'o:"cost" o:"less"', terms: ['emperor'] },
   { category: 'Mana', id: 'cascade', label: 'Cascade', query: 'keyword:cascade' },
@@ -126,8 +228,10 @@ export const DECK_TAGS: DeckTag[] = [
   { category: 'Life', id: 'lifegain', label: 'Lifegain', query: 'o:"gain" o:"life"', terms: ['life gain'] },
   { category: 'Life', id: 'drain', label: 'Life drain', query: 'o:"loses" o:"life" o:"gain"', terms: ['extort'] },
   { category: 'Life', id: 'pay-life', label: 'Pay life', query: 'o:"pay" o:"life"', terms: ['necropotence'] },
+
+  // Win conditions — not life totals; Laboratory Maniac, Approach, etc.
   {
-    category: 'Life',
+    category: 'Win conditions',
     id: 'alt-win',
     label: 'Alternate win condition',
     query: '(o:"win the game" or o:"wins the game" or o:"lose the game" or o:"loses the game")',
@@ -148,6 +252,87 @@ export const DECK_TAGS: DeckTag[] = [
   { category: 'Artifacts & enchantments', id: 'equipment', label: 'Equipment', query: 't:equipment', terms: ['voltron'] },
   { category: 'Artifacts & enchantments', id: 'aura', label: 'Auras', query: 't:aura', terms: ['voltron'] },
   { category: 'Artifacts & enchantments', id: 'sacrifice-outlet', label: 'Sacrifice outlets', query: 'o:"sacrifice" o:":"', terms: ['aristocrats'] },
+
+  // Types & themes — subtype/set pieces and the oracle that cares about them.
+  {
+    category: 'Types & themes',
+    id: 'rooms',
+    label: 'Rooms',
+    // Avoid bare o:door / o:locked — those are common English and balloon the
+    // query into a ~1000-card scrape that Scryfall rate-limits.
+    query: typeThemeQuery('room', ['unlock a door', 'unlock', 'that door']),
+    terms: ['duskmourn', 'unlock', 'door', 'haunted house'],
+  },
+  {
+    category: 'Types & themes',
+    id: 'battles',
+    label: 'Battles',
+    // Bare o:battle matches "battlefield". Use type-aware phrases instead:
+    // attack payoffs ("a battle"), modal removal (", battle" / "or battle"), …
+    query:
+      '(t:battle or o:"a battle" or o:"target battle" or o:battles or o:"or battle" or o:", battle")',
+    terms: ['siege', 'mom', 'phyrexia', 'attack a battle', 'invasion'],
+  },
+  {
+    category: 'Types & themes',
+    id: 'gates',
+    label: 'Gates',
+    query: typeThemeQuery('gate'),
+    terms: ['guildgate', 'ravnica', 'maze', 'circuitous'],
+  },
+  {
+    category: 'Types & themes',
+    id: 'caves',
+    label: 'Caves',
+    query: typeThemeQuery('cave'),
+    terms: ['lost caverns', 'ixalan', 'descend'],
+  },
+  {
+    category: 'Types & themes',
+    id: 'sagas',
+    label: 'Sagas',
+    query: typeThemeQuery('saga', ['lore counter', 'read ahead']),
+    terms: ['enchantment', 'chapter', 'read ahead'],
+  },
+  {
+    category: 'Types & themes',
+    id: 'classes',
+    label: 'Classes',
+    query: '(t:class or o:"a Class" or o:"Class you control")',
+    terms: ['afr', 'level up', 'background'],
+  },
+  {
+    category: 'Types & themes',
+    id: 'vehicles',
+    label: 'Vehicles',
+    query: '(t:vehicle or keyword:crew or o:crew)',
+    terms: ['crew', 'pilot', 'mount'],
+  },
+  {
+    category: 'Types & themes',
+    id: 'shrines',
+    label: 'Shrines',
+    query: typeThemeQuery('shrine'),
+    terms: ['sanctum', 'go-shintai', 'enchantment'],
+  },
+  {
+    category: 'Types & themes',
+    id: 'cases',
+    label: 'Cases',
+    // Bare o:case matches "in case" everywhere — stick to Case vocabulary.
+    query: '(t:case or o:"a Case" or o:"Cases you" or o:"to solve" or o:solved)',
+    terms: ['murders', 'karlov', 'investigate', 'clue'],
+  },
+  {
+    category: 'Types & themes',
+    id: 'spacecraft',
+    label: 'Spacecraft',
+    // Never bare o:station — it is a substring of "manifestation" and pulls in
+    // Theros Inspired cards (Arbiter of the Ideal, etc.).
+    query:
+      '(t:spacecraft or o:"a Spacecraft" or o:"Spacecraft you" or keyword:station or o:"station counter")',
+    terms: ['edge of eternities', 'station', 'spaceship'],
+  },
 
   // Permanent player designations & threshold markers (City's Blessing, storied, …)
   { category: 'Permanent effects', id: 'ascend', label: 'Ascend', query: 'keyword:ascend', terms: ["city's blessing", 'tenth land'] },

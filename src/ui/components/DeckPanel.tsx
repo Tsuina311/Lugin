@@ -672,7 +672,7 @@ const DeckEditor = ({
       </div>
 
       {/* Where the deck stands: size against the format, and what it costs you. */}
-      <div className="flex flex-none items-center gap-1.5 border-b border-line px-2 py-1 text-xs">
+      <div className="flex flex-none flex-wrap items-center gap-1.5 border-b border-line px-2 py-1 text-xs">
         <span className="tabular-nums text-ink-muted">
           <span className="font-semibold text-ink">{summary.total}</span>
           {fmt.targetSize ? `/${fmt.targetSize}` : ''} cards
@@ -698,30 +698,30 @@ const DeckEditor = ({
         ) : (
           summary.total > 0 && <Badge tone="pos">complete</Badge>
         )}
-        {visibleViews.length > 1 && (
-          <div
-            className="ml-auto flex max-w-[55%] flex-none overflow-x-auto rounded border border-line-strong"
-            role="group"
-          >
-            {visibleViews.map(v => (
-              <button
-                key={v.id}
-                aria-pressed={view === v.id}
-                className={`px-1.5 py-0.5 text-2xs font-medium transition-colors ${
-                  view === v.id
-                    ? 'bg-accent-soft text-accent'
-                    : 'text-ink-faint hover:bg-tint hover:text-ink'
-                }`}
-                onClick={() => setView(v.id)}
-                title={v.title}
-                type="button"
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
+      {visibleViews.length > 1 && (
+        <div
+          className="flex flex-none overflow-x-auto border-b border-line"
+          role="group"
+        >
+          {visibleViews.map(v => (
+            <button
+              key={v.id}
+              aria-pressed={view === v.id}
+              className={`flex-none px-2.5 py-1 text-2xs font-medium transition-colors ${
+                view === v.id
+                  ? 'border-b-2 border-accent bg-accent-soft text-accent'
+                  : 'text-ink-faint hover:bg-tint hover:text-ink'
+              }`}
+              onClick={() => setView(v.id)}
+              title={v.title}
+              type="button"
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {wantListOpen && (
         <DeckWantList deck={deck} missing={missing} onClose={() => setWantListOpen(false)} />
@@ -780,7 +780,7 @@ const DeckEditor = ({
       )}
 
       {view !== 'deck' ? (
-        <div className="min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col">
           {view === 'tags' ? (
             <TagsPanel
               collectionByKey={collectionByKey}

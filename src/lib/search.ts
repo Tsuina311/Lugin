@@ -202,6 +202,9 @@ export const searchScryfallQuery = async (
   if (!res.ok) {
     if (res.status === 404) return { cards: [], query: trimmed, total: 0 };
     if (res.status === 400) throw new Error('That search isn’t valid Scryfall syntax.');
+    if (res.status === 429) {
+      throw new Error('Scryfall is rate-limiting right now — wait a second and try again.');
+    }
     throw new Error(`Scryfall search failed (HTTP ${res.status})`);
   }
   const json = JSON.parse(res.body) as ScryfallList;

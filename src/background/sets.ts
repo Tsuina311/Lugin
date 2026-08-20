@@ -10,6 +10,7 @@
 // this is a slow-moving list where being a few days behind costs nothing worse
 // than a brand-new expansion sorting under "unknown year" until the next fetch.
 
+import { scryfallFetch } from '@/lib/scryfallFetch';
 import type { SetInfo } from '@/lib/sets';
 
 const KEY = 'lugin:sets';
@@ -31,9 +32,9 @@ const held = async (): Promise<Held | null> => {
 };
 
 const download = async (): Promise<SetInfo[] | null> => {
-  const res = await fetch(SOURCE, { headers: { Accept: 'application/json' } });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { data?: Record<string, unknown>[] };
+  const result = await scryfallFetch({ url: SOURCE });
+  if (!result.ok) return null;
+  const json = JSON.parse(result.body) as { data?: Record<string, unknown>[] };
   // Only the three fields we sort and match on. The full payload carries icons,
   // card counts and a dozen booleans per set, none of which we would use and all
   // of which we would then be storing on every user's disk.

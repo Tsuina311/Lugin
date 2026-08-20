@@ -87,6 +87,10 @@ export const TagsPanel = ({
     });
 
   const selectedIds = useMemo(() => [...selected], [selected]);
+  // Stable key so identity array identity changes don't retrigger the effect.
+  const selectedKey = selectedIds.slice().sort().join('|');
+  const identityFilterKey =
+    identityFilter === undefined ? 'off' : identityFilter.length === 0 ? 'c' : identityFilter.join('');
 
   useEffect(() => {
     if (selectedIds.length === 0) {
@@ -102,25 +106,32 @@ export const TagsPanel = ({
     setError(null);
     const query = buildTagsQuery(selectedIds, identityFilter);
     setQueryText(query);
-    void searchScryfallQuery(query, RESULT_LIMIT, deckFormat)
-      .then(resp => {
-        if (cancelled) return;
-        setResults(resp.cards);
-        setTotal(resp.total);
-        setQueryText(resp.query);
-        setStatus('idle');
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        setResults([]);
-        setTotal(0);
-        setStatus('error');
-        setError(e instanceof Error ? e.message : 'Search failed');
-      });
+    // Short debounce: picking a tag and the commander-identity effect settling
+    // often land in the same tick burst; one search is enough.
+    const timer = window.setTimeout(() => {
+      void searchScryfallQuery(query, RESULT_LIMIT, deckFormat)
+        .then(resp => {
+          if (cancelled) return;
+          setResults(resp.cards);
+          setTotal(resp.total);
+          setQueryText(resp.query);
+          setStatus('idle');
+        })
+        .catch((e: unknown) => {
+          if (cancelled) return;
+          setResults([]);
+          setTotal(0);
+          setStatus('error');
+          setError(e instanceof Error ? e.message : 'Search failed');
+        });
+    }, 250);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [deckFormat, identityFilter, selectedIds]);
+    // selectedKey / identityFilterKey stand in for the arrays.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deckFormat, identityFilterKey, selectedKey]);
 
   const ownedOf = (name: string): number => collectionByKey[cardKey(name)]?.total ?? 0;
   const deckQtyOf = (name: string): number => inDeck[cardKey(name)] ?? 0;
@@ -143,7 +154,7 @@ export const TagsPanel = ({
   };
 
   return (
-    <div className="flex min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-1 flex-col">
       <div className="flex-none space-y-2 border-b border-line px-2 py-2 text-2xs">
         <input
           aria-label="Search tags"
