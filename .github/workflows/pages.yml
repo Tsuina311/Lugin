@@ -37,22 +37,32 @@ jobs:
       url: ${{ steps.proxy.outputs.url }}
     steps:
       - uses: actions/checkout@v4
+      # Avoid cloudflare/wrangler-action here: it shells out to Yarn 1, which this
+      # repo rejects (packageManager: yarn@3). npx wrangler is enough for one file.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Deploy Goldfish proxy
         id: deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: deploy
-        # Fails until workers.dev is registered on the Cloudflare account, or if the
-        # token is missing — build falls back to vars.VITE_LUGIN_GOLDFISH_PROXY_URL.
         continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN secret is missing"
+            exit 1
+          fi
+          npx --yes wrangler@4 deploy 2>&1 | tee /tmp/wrangler-out.txt
+          URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' /tmp/wrangler-out.txt | head -1 || true)
+          echo "deployment-url=${URL}" >> "$GITHUB_OUTPUT"
+          test -n "$URL"
       - name: Capture proxy URL
         id: proxy
         run: |
           if [ -n "${{ steps.deploy.outputs.deployment-url }}" ]; then
             echo "url=${{ steps.deploy.outputs.deployment-url }}" >> "$GITHUB_OUTPUT"
           elif [ "${{ steps.deploy.outcome }}" != "success" ]; then
-            echo "::warning::Goldfish proxy deploy failed. Register a workers.dev subdomain at https://dash.cloudflare.com → Workers & Pages → Overview, then re-run this workflow. Until then, set repository variable VITE_LUGIN_GOLDFISH_PROXY_URL to the worker URL manually."
+            echo "::warning::Goldfish proxy deploy failed. Check CLOUDFLARE_API_TOKEN and that workers.dev is registered, or set repository variable VITE_LUGIN_GOLDFISH_PROXY_URL manually."
           fi
 
   build:

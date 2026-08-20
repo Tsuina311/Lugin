@@ -1,3 +1,5 @@
 name = "lugin-goldfish"
 main = "workers/goldfish-proxy.js"
 compatibility_date = "2024-01-01"
+# Cloudflare account that owns gwenaeloppitz.workers.dev
+account_id = "f951da6eadeff328cc65bebc2911ee87"
