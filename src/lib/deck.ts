@@ -78,6 +78,12 @@ export interface Deck {
   name: string;
   /** Where it came from: an uploaded filename, or 'manual'. */
   source: string;
+  /**
+   * Overview sections that auto-bucket main-deck cards by deck-building tags
+   * (ids from `DECK_TAGS`). Order is priority — a card lands in the first
+   * matching section. Empty / absent = no tag sections.
+   */
+  tagSections?: string[];
   updatedAt: number;
 }
 

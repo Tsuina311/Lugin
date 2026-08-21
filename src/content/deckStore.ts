@@ -315,6 +315,11 @@ async replaceAll(decks: Deck[]): Promise<void> {
     });
   },
 
+  /** Replace the overview's auto-bucket tag section list (DECK_TAGS ids). */
+  async setTagSections(id: string, tagSections: string[]): Promise<void> {
+    await mutateDeck(id, d => ({ ...d, tagSections: [...tagSections] }));
+  },
+
   subscribe(listener: () => void): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);

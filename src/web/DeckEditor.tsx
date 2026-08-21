@@ -39,6 +39,8 @@ import {
   type DeckFormat,
   type DeckSection,
 } from '@/lib/deck';
+import { bucketMainByTagSections, type TagSectionBucket } from '@/lib/deckTagSections';
+import { deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
 import { fetchEdhrec } from '@/lib/edhrec';
 import { deckFile } from '@/lib/export';
 import { fetchRemote } from '@/lib/fetchRemote';
@@ -73,7 +75,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 const VIEW_KEY = 'lugin:webDeckView';
 
 const DECK_VIEWS = [
-  { id: 'deck', label: 'Deck', title: 'The cards in this deck' },
+  { id: 'deck', label: 'Overview', title: 'The cards in this deck' },
   { id: 'tags', label: 'Tags', title: 'Find cards by mechanic or theme' },
   { id: 'edhrec', label: 'EDHREC', title: 'Recommended cards for this commander' },
   { id: 'goldfish', label: 'Goldfish', title: 'Most-played cards for this commander' },
@@ -211,6 +213,56 @@ export const DeckEditor = ({
     }
     return map;
   }, [deck.cards]);
+
+  const tagSectionIds = deck.tagSections ?? [];
+  const [tagBuckets, setTagBuckets] = useState<TagSectionBucket[]>([]);
+  const [mainRest, setMainRest] = useState<DeckCard[]>([]);
+  const [tagBucketsLoading, setTagBucketsLoading] = useState(false);
+  const [addingTagSection, setAddingTagSection] = useState(false);
+  const [tagPickerQuery, setTagPickerQuery] = useState('');
+
+  useEffect(() => {
+    const main = deck.cards.filter(c => c.section === 'main');
+    if (tagSectionIds.length === 0) {
+      setTagBuckets([]);
+      setMainRest(main);
+      setTagBucketsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const controller = new AbortController();
+    setTagBucketsLoading(true);
+    void bucketMainByTagSections(main, tagSectionIds, controller.signal).then(result => {
+      if (cancelled) return;
+      setTagBuckets(result.buckets);
+      setMainRest(result.rest);
+      setTagBucketsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [deck.cards, tagSectionIds.join('|')]);
+
+  const setTagSections = (next: string[]) => {
+    void syncStore.updateDeck(deck.id, d => ({ ...d, tagSections: next }));
+  };
+
+  const addTagSection = (tagId: string) => {
+    if (tagSectionIds.includes(tagId)) return;
+    setTagSections([...tagSectionIds, tagId]);
+    setAddingTagSection(false);
+    setTagPickerQuery('');
+  };
+
+  const removeTagSection = (tagId: string) => {
+    setTagSections(tagSectionIds.filter(id => id !== tagId));
+  };
+
+  const pickerTags = useMemo(() => {
+    const filtered = filterDeckTags(tagPickerQuery).filter(t => !tagSectionIds.includes(t.id));
+    return deckTagsByCategory(filtered);
+  }, [tagPickerQuery, tagSectionIds]);
 
   const zones = useMemo(
     () => SECTIONS.filter(s => s.id !== 'commander' || formatInfo(deck.format).commanderZone),
@@ -531,71 +583,188 @@ export const DeckEditor = ({
         </p>
       ) : null}
 
-      {SECTIONS.map(section => {
-        const cards = deck.cards.filter(card => card.section === section.id);
-        if (cards.length === 0) return null;
-        return (
-          <section key={section.id}>
-            <h2 className="bg-panel px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              {section.label}
-              <span className="ml-2 tabular-nums opacity-70">{copies(deck, section.id)}</span>
-            </h2>
-            {view === 'box' ? (
-              <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3">
-                {cards.map(card => (
-                  <div key={rowKey(card)} className="flex flex-col gap-1">
+      {deck.cards.length > 0 ? (
+        <section className="border-b border-line px-4 py-3">
+          <div className="flex items-center gap-2">
+            <p className="min-w-0 flex-1 text-[11px] leading-snug text-ink-faint">
+              Tag sections auto-sort main-deck cards (first match wins).
+            </p>
+            <button
+              className="shrink-0 rounded-lg bg-raised px-2.5 py-1.5 text-xs font-medium text-ink active:bg-tint"
+              onClick={() => setAddingTagSection(v => !v)}
+              type="button"
+            >
+              {addingTagSection ? 'Done' : '+ Tag section'}
+            </button>
+          </div>
+          {tagSectionIds.length > 0 ? (
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {tagSectionIds.map(id => (
+                <li key={id}>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-line-strong bg-panel px-2 py-0.5 text-[11px] text-ink">
+                    {deckTagById(id)?.label ?? id}
+                    <button
+                      aria-label={`Remove ${deckTagById(id)?.label ?? id} section`}
+                      className="text-ink-faint"
+                      onClick={() => removeTagSection(id)}
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {addingTagSection ? (
+            <div className="mt-2 rounded-lg border border-line bg-raised p-2">
+              <input
+                aria-label="Search tags"
+                className="mb-2 w-full rounded-md border border-line-strong bg-panel px-2 py-1.5 text-sm text-ink placeholder:text-ink-faint"
+                onChange={e => setTagPickerQuery(e.target.value)}
+                placeholder="Search tags…"
+                value={tagPickerQuery}
+              />
+              <div className="max-h-48 overflow-auto">
+                {pickerTags.length === 0 ? (
+                  <p className="px-1 py-2 text-xs text-ink-faint">No matching tags left to add.</p>
+                ) : (
+                  pickerTags.map(group => (
+                    <div key={group.category} className="mb-2">
+                      <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                        {group.category}
+                      </p>
+                      <ul className="mt-1 flex flex-wrap gap-1">
+                        {group.tags.map(tag => (
+                          <li key={tag.id}>
+                            <button
+                              className="rounded-full border border-line-strong px-2 py-0.5 text-[11px] text-ink-muted active:bg-panel"
+                              onClick={() => addTagSection(tag.id)}
+                              type="button"
+                            >
+                              {tag.label}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+          {tagBucketsLoading ? (
+            <p className="mt-2 text-[11px] text-ink-faint">Sorting cards into tag sections…</p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {(() => {
+        const renderCardList = (cards: DeckCard[]) =>
+          view === 'box' ? (
+            <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3">
+              {cards.map(card => (
+                <div key={rowKey(card)} className="flex flex-col gap-1">
+                  <CollectionThumb
+                    candidates={candidatesOf(card.name)}
+                    className="aspect-[488/680] w-full overflow-hidden rounded-lg bg-raised"
+                    imgStyle={{ objectPosition: '50% 17%' }}
+                    name={card.name}
+                    previewKey={`deck|box|${deck.id}|${rowKey(card)}`}
+                  />
+                  <span className="truncate text-xs text-ink" title={card.name}>
+                    {card.name}
+                  </span>
+                  <Stepper
+                    onChange={quantity => setQuantity(card, quantity)}
+                    quantity={card.quantity}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ul className="divide-y divide-line">
+              {cards.map(card => {
+                const key = rowKey(card);
+                return (
+                  <li key={key} className="flex items-center gap-2 px-2 py-1">
                     <CollectionThumb
                       candidates={candidatesOf(card.name)}
-                      className="aspect-[488/680] w-full overflow-hidden rounded-lg bg-raised"
-                      imgStyle={{ objectPosition: '50% 17%' }}
                       name={card.name}
-                      previewKey={`deck|box|${deck.id}|${rowKey(card)}`}
+                      previewKey={`deck|list|${deck.id}|${key}`}
                     />
-                    <span className="truncate text-xs text-ink" title={card.name}>
-                      {card.name}
-                    </span>
-                    {/* No separate remove button here: stepping to zero already
-                        takes the card out, and a picture is a big enough target
-                        that an extra × beside it invites the wrong tap. */}
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{card.name}</span>
                     <Stepper
                       onChange={quantity => setQuantity(card, quantity)}
                       quantity={card.quantity}
                     />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <ul className="divide-y divide-line">
-                {cards.map(card => {
-                  const key = rowKey(card);
-                  return (
-                    <li key={key} className="flex items-center gap-2 px-2 py-1">
-                      <Stepper
-                        onChange={quantity => setQuantity(card, quantity)}
-                        quantity={card.quantity}
-                      />
-                      <CollectionThumb
-                        candidates={candidatesOf(card.name)}
-                        name={card.name}
-                        previewKey={`deck|list|${deck.id}|${key}`}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-sm text-ink">{card.name}</span>
-                      <button
-                        aria-label={`Remove ${card.name}`}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
-                        onClick={() => setQuantity(card, 0)}
-                        type="button"
-                      >
-                        ×
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+                    <button
+                      aria-label={`Remove ${card.name}`}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
+                      onClick={() => setQuantity(card, 0)}
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          );
+
+        const qty = (cards: DeckCard[]) => cards.reduce((sum, c) => sum + c.quantity, 0);
+
+        const overviewBlocks: { key: string; label: string; cards: DeckCard[]; removable?: string }[] =
+          [];
+        const commanders = deck.cards.filter(c => c.section === 'commander');
+        if (commanders.length > 0) {
+          overviewBlocks.push({ key: 'commander', label: 'Commander', cards: commanders });
+        }
+        for (const bucket of tagBuckets) {
+          if (bucket.cards.length === 0 && !tagBucketsLoading) continue;
+          overviewBlocks.push({
+            key: `tag:${bucket.tagId}`,
+            label: bucket.label,
+            cards: bucket.cards,
+            removable: bucket.tagId,
+          });
+        }
+        if (mainRest.length > 0 || (tagSectionIds.length === 0 && deck.cards.some(c => c.section === 'main'))) {
+          const main =
+            tagSectionIds.length === 0
+              ? deck.cards.filter(c => c.section === 'main')
+              : mainRest;
+          if (main.length > 0) {
+            overviewBlocks.push({ key: 'main', label: 'Main deck', cards: main });
+          }
+        }
+        const side = deck.cards.filter(c => c.section === 'sideboard');
+        if (side.length > 0) {
+          overviewBlocks.push({ key: 'sideboard', label: 'Sideboard', cards: side });
+        }
+
+        return overviewBlocks.map(block => (
+          <section key={block.key}>
+            <h2 className="flex items-center gap-2 bg-panel px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+              <span className="min-w-0 flex-1 truncate">
+                {block.label}
+                <span className="ml-2 tabular-nums opacity-70">{qty(block.cards)}</span>
+              </span>
+              {block.removable ? (
+                <button
+                  aria-label={`Remove ${block.label} section`}
+                  className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-ink-faint active:bg-raised"
+                  onClick={() => removeTagSection(block.removable!)}
+                  type="button"
+                >
+                  Remove section
+                </button>
+              ) : null}
+            </h2>
+            {block.cards.length > 0 ? renderCardList(block.cards) : null}
           </section>
-        );
-      })}
+        ));
+      })()}
 
       {collection && deck.cards.length > 0 ? (
         <section className="border-t border-line px-4 py-4">

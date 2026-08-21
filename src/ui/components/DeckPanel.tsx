@@ -38,6 +38,8 @@ import {
 import { collectionStore } from '@/content/collectionStore';
 import { countCards, deckStore, type DeckCardRef } from '@/content/deckStore';
 import { cardKey } from '@/lib/cardName';
+import { bucketMainByTagSections, type TagSectionBucket } from '@/lib/deckTagSections';
+import { deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
 import {
   DECK_FORMATS,
   deckShortfall,
@@ -389,7 +391,7 @@ const SECTION_LABEL: Record<DeckSection, string> = {
 
 // The editor's panes: the deck itself plus one per recommendation source.
 const DECK_VIEWS = [
-  { id: 'deck', label: 'Deck', title: 'The cards in this deck' },
+  { id: 'deck', label: 'Overview', title: 'The cards in this deck' },
   { id: 'tags', label: 'Tags', title: 'Find cards by mechanic or theme' },
   { id: 'edhrec', label: 'EDHREC', title: 'Recommended cards for this commander (EDHREC)' },
   {
@@ -595,30 +597,100 @@ const DeckEditor = ({
     return map;
   }, [deck.cards]);
 
-  const sections: DeckSection[] = ['main', 'sideboard'];
+  const tagSectionIds = deck.tagSections ?? [];
+  const [tagBuckets, setTagBuckets] = useState<TagSectionBucket[]>([]);
+  const [mainRest, setMainRest] = useState<DeckCard[]>([]);
+  const [addingTagSection, setAddingTagSection] = useState(false);
+  const [tagPickerQuery, setTagPickerQuery] = useState('');
 
-  // The main and sideboard rows exactly as they'll be laid out: sorted, then
-  // grouped if the split checkboxes are on. Doing it here rather than inline in
-  // the JSX gives the selection the rows in the order they appear on screen,
-  // which is the order its ranges and arrow keys follow.
-  const layout = useMemo(
-    () =>
-      sections
-        .map(section => {
-          const cards = deck.cards
-            .filter(c => c.section === section)
-            .sort((a, b) => a.name.localeCompare(b.name));
-          return {
-            cards,
-            groups: groupDeckCards(cards, metaByName, { cost: splitCost, type: splitType }),
-            section,
-          };
-        })
-        .filter(s => s.cards.length > 0),
-    // `sections` is a constant literal, so it isn't a dependency.
+  useEffect(() => {
+    const main = deck.cards.filter(c => c.section === 'main');
+    if (tagSectionIds.length === 0) {
+      setTagBuckets([]);
+      setMainRest(main);
+      return;
+    }
+    let cancelled = false;
+    const controller = new AbortController();
+    void bucketMainByTagSections(main, tagSectionIds, controller.signal).then(result => {
+      if (cancelled) return;
+      setTagBuckets(result.buckets);
+      setMainRest(result.rest);
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [deck.cards, tagSectionIds.join('|')]);
+
+  const pickerTags = useMemo(() => {
+    const filtered = filterDeckTags(tagPickerQuery).filter(t => !tagSectionIds.includes(t.id));
+    return deckTagsByCategory(filtered);
+  }, [tagPickerQuery, tagSectionIds]);
+
+  // Main (optionally split by tag sections) and sideboard, then type/cost groups.
+  const layout = useMemo(() => {
+    type Block = {
+      cards: DeckCard[];
+      groups: ReturnType<typeof groupDeckCards>;
+      key: string;
+      label: string;
+      section: DeckSection;
+      tagId?: string;
+    };
+    const blocks: Block[] = [];
+    if (tagSectionIds.length > 0) {
+      for (const bucket of tagBuckets) {
+        const cards = [...bucket.cards].sort((a, b) => a.name.localeCompare(b.name));
+        if (cards.length === 0) continue;
+        blocks.push({
+          cards,
+          groups: groupDeckCards(cards, metaByName, { cost: splitCost, type: splitType }),
+          key: `tag:${bucket.tagId}`,
+          label: bucket.label,
+          section: 'main',
+          tagId: bucket.tagId,
+        });
+      }
+      const rest = [...mainRest].sort((a, b) => a.name.localeCompare(b.name));
+      if (rest.length > 0) {
+        blocks.push({
+          cards: rest,
+          groups: groupDeckCards(rest, metaByName, { cost: splitCost, type: splitType }),
+          key: 'main',
+          label: SECTION_LABEL.main,
+          section: 'main',
+        });
+      }
+    } else {
+      const cards = deck.cards
+        .filter(c => c.section === 'main')
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (cards.length > 0) {
+        blocks.push({
+          cards,
+          groups: groupDeckCards(cards, metaByName, { cost: splitCost, type: splitType }),
+          key: 'main',
+          label: SECTION_LABEL.main,
+          section: 'main',
+        });
+      }
+    }
+    const side = deck.cards
+      .filter(c => c.section === 'sideboard')
+      .sort((a, b) => a.name.localeCompare(b.name));
+    if (side.length > 0) {
+      blocks.push({
+        cards: side,
+        groups: groupDeckCards(side, metaByName, { cost: splitCost, type: splitType }),
+        key: 'sideboard',
+        label: SECTION_LABEL.sideboard,
+        section: 'sideboard',
+      });
+    }
+    return blocks;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [deck.cards, metaByName, splitCost, splitType],
-  );
+  }, [deck.cards, metaByName, splitCost, splitType, tagBuckets, mainRest, tagSectionIds.join('|')]);
 
   const rows = useMemo(() => {
     const ids: string[] = [];
@@ -875,34 +947,111 @@ const DeckEditor = ({
           )}
 
           {deck.cards.length > 0 && (
-            <div className="flex flex-none flex-wrap items-center gap-1 border-b border-line px-2 py-1">
-              <span className="mr-0.5 text-2xs uppercase tracking-wide text-ink-faint">group</span>
-              <Button
-                active={splitType}
-                onClick={() => setSplitType(v => !v)}
-                size="xs"
-                title="Group each section by card type"
-              >
-                type
-              </Button>
-              <Button
-                active={splitCost}
-                onClick={() => setSplitCost(v => !v)}
-                size="xs"
-                title="Group by mana value. Lands get their own group — they're not part of the curve."
-              >
-                cost
-              </Button>
-              <Button
-                active={showCurve}
-                className="ml-auto"
-                icon={BarChart3}
-                onClick={() => setShowCurve(v => !v)}
-                size="xs"
-                title="Show the deck's mana curve as a column chart"
-              >
-                curve
-              </Button>
+            <div className="flex flex-none flex-col gap-1 border-b border-line px-2 py-1">
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="mr-0.5 text-2xs uppercase tracking-wide text-ink-faint">group</span>
+                <Button
+                  active={splitType}
+                  onClick={() => setSplitType(v => !v)}
+                  size="xs"
+                  title="Group each section by card type"
+                >
+                  type
+                </Button>
+                <Button
+                  active={splitCost}
+                  onClick={() => setSplitCost(v => !v)}
+                  size="xs"
+                  title="Group by mana value. Lands get their own group — they're not part of the curve."
+                >
+                  cost
+                </Button>
+                <Button
+                  active={addingTagSection || tagSectionIds.length > 0}
+                  onClick={() => setAddingTagSection(v => !v)}
+                  size="xs"
+                  title="Add overview sections that auto-sort main-deck cards by mechanic tags"
+                >
+                  tags{tagSectionIds.length > 0 ? ` · ${tagSectionIds.length}` : ''}
+                </Button>
+                <Button
+                  active={showCurve}
+                  className="ml-auto"
+                  icon={BarChart3}
+                  onClick={() => setShowCurve(v => !v)}
+                  size="xs"
+                  title="Show the deck's mana curve as a column chart"
+                >
+                  curve
+                </Button>
+              </div>
+              {(addingTagSection || tagSectionIds.length > 0) && (
+                <div className="space-y-1">
+                  {tagSectionIds.length > 0 && (
+                    <ul className="flex flex-wrap gap-1">
+                      {tagSectionIds.map(id => (
+                        <li key={id}>
+                          <span className="inline-flex items-center gap-0.5 rounded-full border border-line px-1.5 py-0.5 text-2xs text-ink">
+                            {deckTagById(id)?.label ?? id}
+                            <button
+                              aria-label={`Remove ${deckTagById(id)?.label ?? id}`}
+                              className="text-ink-faint hover:text-ink"
+                              onClick={() =>
+                                void deckStore.setTagSections(
+                                  deck.id,
+                                  tagSectionIds.filter(t => t !== id),
+                                )
+                              }
+                              type="button"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {addingTagSection && (
+                    <div className="rounded border border-line bg-raised p-1.5">
+                      <SearchInput
+                        onChange={e => setTagPickerQuery(e.target.value)}
+                        placeholder="Search tags to add as a section…"
+                        value={tagPickerQuery}
+                      />
+                      <div className="mt-1 max-h-40 overflow-auto">
+                        {pickerTags.map(group => (
+                          <div key={group.category} className="mb-1">
+                            <div className="px-0.5 text-2xs font-semibold uppercase tracking-wide text-ink-faint">
+                              {group.category}
+                            </div>
+                            <div className="mt-0.5 flex flex-wrap gap-1">
+                              {group.tags.map(tag => (
+                                <Button
+                                  key={tag.id}
+                                  onClick={() => {
+                                    void deckStore.setTagSections(deck.id, [
+                                      ...tagSectionIds,
+                                      tag.id,
+                                    ]);
+                                    setTagPickerQuery('');
+                                  }}
+                                  size="xs"
+                                  title={tag.label}
+                                >
+                                  {tag.label}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        {pickerTags.length === 0 && (
+                          <p className="px-0.5 py-1 text-2xs text-ink-faint">No tags left to add.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -947,14 +1096,30 @@ const DeckEditor = ({
           )}
 
           <div className="min-h-0 flex-1 overflow-auto outline-none" {...selection.listProps}>
-            {layout.map(({ cards, groups, section }) => {
+            {layout.map(({ cards, groups, key, label, section, tagId }) => {
               return (
-                <div key={section}>
+                <div key={key}>
                   <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b border-line bg-panel px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-ink-muted">
-                    {SECTION_LABEL[section]}
-                    <span className="font-normal tabular-nums text-ink-faint">
-                      {countCards(cards)}
+                    <span className="min-w-0 flex-1 truncate">
+                      {label}
+                      <span className="ml-1.5 font-normal tabular-nums text-ink-faint">
+                        {countCards(cards)}
+                      </span>
                     </span>
+                    {tagId ? (
+                      <button
+                        className="shrink-0 text-2xs font-medium normal-case tracking-normal text-ink-faint hover:text-ink"
+                        onClick={() =>
+                          void deckStore.setTagSections(
+                            deck.id,
+                            tagSectionIds.filter(t => t !== tagId),
+                          )
+                        }
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    ) : null}
                   </div>
                   {groups.map(group => (
                     <div key={group.key}>
@@ -1059,8 +1224,23 @@ const DeckRow = ({
         <span aria-hidden className="text-sm text-warn" title="Commander">
           ♛
         </span>
-      ) : (
+      ) : null}
+
+      <span className="min-w-0 flex-1 truncate text-ink" title={card.name}>
+        {card.name}
+        {auto && (
+          <span
+            className="ml-1 text-2xs uppercase text-accent"
+            title="Count is managed by auto balance lands"
+          >
+            auto
+          </span>
+        )}
+      </span>
+
+      {!commander ? (
         // A stepper, quiet until hovered so a long list doesn't read as buttons.
+        // Sits after the name, just before ownership badges / remove.
         <div className="flex flex-none items-center">
           <IconButton
             className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
@@ -1084,19 +1264,7 @@ const DeckRow = ({
             size="xs"
           />
         </div>
-      )}
-
-      <span className="min-w-0 flex-1 truncate text-ink" title={card.name}>
-        {card.name}
-        {auto && (
-          <span
-            className="ml-1 text-2xs uppercase text-accent"
-            title="Count is managed by auto balance lands"
-          >
-            auto
-          </span>
-        )}
-      </span>
+      ) : null}
 
       {basic ? (
         <Badge title="Basic lands aren’t tracked in your collection">basic</Badge>

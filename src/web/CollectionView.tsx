@@ -282,7 +282,6 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
         <ul className="divide-y divide-line">
           {shown.map(row => (
             <li key={row.key} className="flex items-center gap-2 px-2 py-1">
-              <Stepper onChange={quantity => setQuantity(row, quantity)} quantity={row.total} />
               <CollectionThumb
                 candidates={row.candidates}
                 name={row.name}
@@ -294,6 +293,7 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
                   {row.foil} foil
                 </span>
               ) : null}
+              <Stepper onChange={quantity => setQuantity(row, quantity)} quantity={row.total} />
             </li>
           ))}
         </ul>
