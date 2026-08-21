@@ -21,7 +21,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { ExportBar } from './ExportBar';
 import { syncStore } from './syncStore';
 
 import { candidatesByName, deckCardCandidates } from '@/lib/cardImage';
@@ -42,7 +41,6 @@ import {
 import { bucketMainByTagSections, type TagSectionBucket } from '@/lib/deckTagSections';
 import { deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
 import { fetchEdhrec } from '@/lib/edhrec';
-import { deckFile } from '@/lib/export';
 import { fetchRemote } from '@/lib/fetchRemote';
 import { fetchGoldfishArchetype } from '@/lib/mtggoldfish';
 import { sortWubrg } from '@/lib/mtg';
@@ -509,22 +507,112 @@ export const DeckEditor = ({
       {/* Adding sits above the cards: it's what this screen is for, and hunting
           for it under a hundred rows would be absurd on a phone. */}
       <section className="border-b border-line px-4 py-3">
-        {zones.length > 1 ? (
-          <div className="mb-2 flex gap-1">
-            {zones.map(zone => (
-              <button
-                key={zone.id}
-                aria-pressed={into === zone.id}
-                className={`rounded-md px-2.5 py-1.5 text-xs font-medium ${
-                  into === zone.id ? 'bg-accent text-accent-ink' : 'bg-raised text-ink-faint'
-                }`}
-                onClick={() => setInto(zone.id)}
-                type="button"
-              >
-                {zone.label}
-              </button>
-            ))}
+        <div className="mb-2 flex items-center gap-1">
+          {zones.length > 1 ? (
+            <div className="flex min-w-0 flex-1 flex-wrap gap-1">
+              {zones.map(zone => (
+                <button
+                  key={zone.id}
+                  aria-pressed={into === zone.id}
+                  className={`rounded-md px-2.5 py-1.5 text-xs font-medium ${
+                    into === zone.id ? 'bg-accent text-accent-ink' : 'bg-raised text-ink-faint'
+                  }`}
+                  onClick={() => setInto(zone.id)}
+                  type="button"
+                >
+                  {zone.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="min-w-0 flex-1" />
+          )}
+          {deck.cards.length > 0 ? (
+            <button
+              className="shrink-0 rounded-md bg-raised px-2.5 py-1.5 text-xs font-medium text-ink active:bg-tint"
+              onClick={() => setAddingTagSection(v => !v)}
+              type="button"
+            >
+              {addingTagSection ? 'Done' : '+ Tag section'}
+            </button>
+          ) : null}
+        </div>
+        {addingTagSection ? (
+          <div className="mb-2 rounded-lg border border-line bg-raised p-2">
+            {tagSectionIds.length > 0 ? (
+              <ul className="mb-2 flex flex-wrap gap-1.5">
+                {tagSectionIds.map(id => (
+                  <li key={id}>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-line-strong bg-panel px-2 py-0.5 text-[11px] text-ink">
+                      {deckTagById(id)?.label ?? id}
+                      <button
+                        aria-label={`Remove ${deckTagById(id)?.label ?? id} section`}
+                        className="text-ink-faint"
+                        onClick={() => removeTagSection(id)}
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <input
+              aria-label="Search tags"
+              className="mb-2 w-full rounded-md border border-line-strong bg-panel px-2 py-1.5 text-sm text-ink placeholder:text-ink-faint"
+              onChange={e => setTagPickerQuery(e.target.value)}
+              placeholder="Search tags…"
+              value={tagPickerQuery}
+            />
+            <div className="max-h-48 overflow-auto">
+              {pickerTags.length === 0 ? (
+                <p className="px-1 py-2 text-xs text-ink-faint">No matching tags left to add.</p>
+              ) : (
+                pickerTags.map(group => (
+                  <div key={group.category} className="mb-2">
+                    <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                      {group.category}
+                    </p>
+                    <ul className="mt-1 flex flex-wrap gap-1">
+                      {group.tags.map(tag => (
+                        <li key={tag.id}>
+                          <button
+                            className="rounded-full border border-line-strong px-2 py-0.5 text-[11px] text-ink-muted active:bg-panel"
+                            onClick={() => addTagSection(tag.id)}
+                            type="button"
+                          >
+                            {tag.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              )}
+            </div>
+            {tagBucketsLoading ? (
+              <p className="mt-1 text-[11px] text-ink-faint">Sorting cards into tag sections…</p>
+            ) : null}
           </div>
+        ) : tagSectionIds.length > 0 ? (
+          <ul className="mb-2 flex flex-wrap gap-1.5">
+            {tagSectionIds.map(id => (
+              <li key={id}>
+                <span className="inline-flex items-center gap-1 rounded-full border border-line-strong bg-panel px-2 py-0.5 text-[11px] text-ink">
+                  {deckTagById(id)?.label ?? id}
+                  <button
+                    aria-label={`Remove ${deckTagById(id)?.label ?? id} section`}
+                    className="text-ink-faint"
+                    onClick={() => removeTagSection(id)}
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
         ) : null}
         <div className="flex gap-2">
           <input
@@ -569,94 +657,10 @@ export const DeckEditor = ({
         ) : null}
       </section>
 
-      <section className="flex items-center gap-3 border-b border-line px-4 py-3">
-        <p className="min-w-0 flex-1 text-[11px] leading-snug text-ink-faint">
-          Copy the list to paste into ManaBox, Moxfield or Archidekt — all three import a deck as
-          text.
-        </p>
-        <ExportBar actions={['copy', 'save', 'share']} file={() => deckFile(deck)} />
-      </section>
-
       {deck.cards.length === 0 ? (
         <p className="px-6 py-10 text-center text-sm text-ink-muted">
           Nothing in this deck yet. Add cards above, or paste a list you already have.
         </p>
-      ) : null}
-
-      {deck.cards.length > 0 ? (
-        <section className="border-b border-line px-4 py-3">
-          <div className="flex items-center gap-2">
-            <p className="min-w-0 flex-1 text-[11px] leading-snug text-ink-faint">
-              Tag sections auto-sort main-deck cards (first match wins).
-            </p>
-            <button
-              className="shrink-0 rounded-lg bg-raised px-2.5 py-1.5 text-xs font-medium text-ink active:bg-tint"
-              onClick={() => setAddingTagSection(v => !v)}
-              type="button"
-            >
-              {addingTagSection ? 'Done' : '+ Tag section'}
-            </button>
-          </div>
-          {tagSectionIds.length > 0 ? (
-            <ul className="mt-2 flex flex-wrap gap-1.5">
-              {tagSectionIds.map(id => (
-                <li key={id}>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-line-strong bg-panel px-2 py-0.5 text-[11px] text-ink">
-                    {deckTagById(id)?.label ?? id}
-                    <button
-                      aria-label={`Remove ${deckTagById(id)?.label ?? id} section`}
-                      className="text-ink-faint"
-                      onClick={() => removeTagSection(id)}
-                      type="button"
-                    >
-                      ×
-                    </button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {addingTagSection ? (
-            <div className="mt-2 rounded-lg border border-line bg-raised p-2">
-              <input
-                aria-label="Search tags"
-                className="mb-2 w-full rounded-md border border-line-strong bg-panel px-2 py-1.5 text-sm text-ink placeholder:text-ink-faint"
-                onChange={e => setTagPickerQuery(e.target.value)}
-                placeholder="Search tags…"
-                value={tagPickerQuery}
-              />
-              <div className="max-h-48 overflow-auto">
-                {pickerTags.length === 0 ? (
-                  <p className="px-1 py-2 text-xs text-ink-faint">No matching tags left to add.</p>
-                ) : (
-                  pickerTags.map(group => (
-                    <div key={group.category} className="mb-2">
-                      <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
-                        {group.category}
-                      </p>
-                      <ul className="mt-1 flex flex-wrap gap-1">
-                        {group.tags.map(tag => (
-                          <li key={tag.id}>
-                            <button
-                              className="rounded-full border border-line-strong px-2 py-0.5 text-[11px] text-ink-muted active:bg-panel"
-                              onClick={() => addTagSection(tag.id)}
-                              type="button"
-                            >
-                              {tag.label}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          ) : null}
-          {tagBucketsLoading ? (
-            <p className="mt-2 text-[11px] text-ink-faint">Sorting cards into tag sections…</p>
-          ) : null}
-        </section>
       ) : null}
 
       {(() => {

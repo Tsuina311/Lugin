@@ -26,7 +26,7 @@ import { createSyncEngine } from '@/core/sync/engine';
 import type { ApplicationData, DomainKey } from '@/core/sync/model';
 import { UnsupportedSchemaError } from '@/core/sync/repository';
 import type { CollectionCard, StoredCollection } from '@/lib/collection';
-import { adjustCollectionQuantity } from '@/lib/collectionEdit';
+import { adjustCollectionQuantity, adjustPrintingQuantity } from '@/lib/collectionEdit';
 import { deckFromImport, newDeck, parseDeckList, type Deck, type DeckFormat } from '@/lib/deck';
 import { applyImport, findDuplicates } from '@/lib/duplicates';
 import type { ImportDecision, ImportFormat } from '@/lib/import';
@@ -342,9 +342,19 @@ async removeDeck(id: string): Promise<void> {
   },
 
   /** Set total copies for one card name (all printings rolled up). */
-async setCollectionQuantity(key: string, quantity: number, displayName?: string): Promise<void> {
+  async setCollectionQuantity(key: string, quantity: number, displayName?: string): Promise<void> {
     await writeCollection((cards, prev) => ({
       cards: adjustCollectionQuantity(cards, key, quantity, displayName),
+      format: prev?.format ?? 'list',
+      importedAt: prev?.importedAt ?? Date.now(),
+      source: prev?.source ?? 'manual',
+    }));
+  },
+
+  /** Set copies for one printing; other printings of the same card are unchanged. */
+  async setPrintingQuantity(identity: string, quantity: number): Promise<void> {
+    await writeCollection((cards, prev) => ({
+      cards: adjustPrintingQuantity(cards, identity, quantity),
       format: prev?.format ?? 'list',
       importedAt: prev?.importedAt ?? Date.now(),
       source: prev?.source ?? 'manual',

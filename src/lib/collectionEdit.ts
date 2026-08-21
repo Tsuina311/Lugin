@@ -1,5 +1,6 @@
 // Adjusting a collection by card identity — the phone rolls printings up per
-// name, so edits set the total copies rather than picking a printing.
+// name, so edits set the total copies rather than picking a printing. When a
+// row is unfolded, quantity can also be set per printing.
 
 import { cardKey } from './cardName';
 import type { CollectionCard } from './collection';
@@ -9,6 +10,18 @@ const printingScore = (card: CollectionCard): number =>
   (card.productId ? 3 : 0) +
   (card.setCode ? 2 : 0) +
   (card.imageUrl ? 1 : 0);
+
+/** Stable id for one printing+finish of a card (used for per-row edits). */
+export const printingIdentity = (card: CollectionCard): string =>
+  [
+    cardKey(card.name),
+    card.setCode ?? '',
+    card.collectorNumber ?? '',
+    card.productId ?? '',
+    card.scryfallId ?? '',
+    card.foil ? 'f' : 'n',
+    card.imageUrl ?? '',
+  ].join('|');
 
 /** Every row that shares a card identity key. */
 export const cardsForKey = (cards: readonly CollectionCard[], key: string): CollectionCard[] =>
@@ -57,4 +70,26 @@ export const adjustCollectionQuantity = (
       source: rep?.source ?? 'import',
     },
   ];
+};
+
+/**
+ * Set quantity on one printing. Quantity 0 removes that printing only; other
+ * printings of the same card stay.
+ */
+export const adjustPrintingQuantity = (
+  cards: readonly CollectionCard[],
+  identity: string,
+  quantity: number,
+): CollectionCard[] => {
+  let touched = false;
+  const next: CollectionCard[] = [];
+  for (const card of cards) {
+    if (printingIdentity(card) !== identity) {
+      next.push(card);
+      continue;
+    }
+    touched = true;
+    if (quantity > 0) next.push({ ...card, quantity });
+  }
+  return touched ? next : [...cards];
 };

@@ -11,14 +11,19 @@
 // phone is far more often in the clipboard — copied out of Moxfield or a forum
 // post — than it is a file, and the file route is already covered by the Import
 // tab and the ManaBox share sheet.
+//
+// Copy / save / share live on each list row: exporting is about the deck as a
+// whole, not something you do while editing cards.
 
 import { useState } from 'react';
 
 import { DeckEditor } from './DeckEditor';
+import { ExportBar } from './ExportBar';
 import { syncStore } from './syncStore';
 
 import type { Collection } from '@/lib/collection';
 import { DECK_FORMATS, deckShortfall, type Deck, type DeckFormat } from '@/lib/deck';
+import { deckFile } from '@/lib/export';
 
 const copies = (deck: Deck): number =>
   deck.cards
@@ -176,25 +181,29 @@ export const DeckList = ({
           {sorted.map(deck => {
             const missing = collection ? deckShortfall(deck.cards, collection.byKey).length : 0;
             return (
-              <li key={deck.id}>
-                <button
-                  className="flex w-full items-center gap-3 px-4 py-4 text-left active:bg-raised"
-                  onClick={() => setOpenId(deck.id)}
-                  type="button"
-                >
-                  <span className="min-w-0 flex-1">
+              <li key={deck.id} className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    className="min-w-0 flex-1 text-left active:opacity-80"
+                    onClick={() => setOpenId(deck.id)}
+                    type="button"
+                  >
                     <span className="block truncate text-sm font-medium text-ink">{deck.name}</span>
                     <span className="mt-0.5 block text-[11px] capitalize text-ink-faint">
                       {deck.format} · {copies(deck)} cards
+                      {missing > 0 ? ` · ${missing} missing` : ''}
                     </span>
-                  </span>
-                  {missing > 0 ? (
-                    <span className="shrink-0 rounded bg-neg-soft px-1.5 py-0.5 text-[10px] font-medium text-neg">
-                      {missing} missing
-                    </span>
-                  ) : null}
-                  <span className="shrink-0 text-ink-faint">›</span>
-                </button>
+                  </button>
+                  <ExportBar actions={['copy', 'save', 'share']} file={() => deckFile(deck)} />
+                  <button
+                    aria-label={`Open ${deck.name}`}
+                    className="shrink-0 px-1 text-ink-faint"
+                    onClick={() => setOpenId(deck.id)}
+                    type="button"
+                  >
+                    ›
+                  </button>
+                </div>
               </li>
             );
           })}

@@ -5,9 +5,8 @@
 // actually uses this screen is "do I own X" — so search narrows it, and the cap
 // keeps scrolling smooth without a windowing dependency.
 //
-// You can add cards by name and step quantities up or down per row. Printings
-// roll up to one line per card name; changing the count keeps the best-known
-// printing and writes through to sync like a deck edit.
+// One list row per card name. When you own several printings, the row unfolds to
+// show each edition with its own picture and quantity stepper.
 //
 // List rows show small thumbnails like the Tags search — tap to enlarge. Box view
 // is a grid of larger pictures for browsing; it shows fewer rows at once.
@@ -21,6 +20,7 @@ import { syncStore } from './syncStore';
 import { cardImageCandidates, printingRank } from '@/lib/cardImage';
 import { cardKey, stripVersion } from '@/lib/cardName';
 import type { Collection, CollectionCard } from '@/lib/collection';
+import { printingIdentity } from '@/lib/collectionEdit';
 import { parseDeckList } from '@/lib/deck';
 import { collectionFile } from '@/lib/export';
 import { collectionValue, money, signedMoney, type CollectionValue } from '@/lib/prices';
@@ -63,35 +63,61 @@ const Stepper = ({
   </span>
 );
 
-/** A card name, and fallback URLs for the printing you own. */
+/** One printing under a rolled-up card name. */
+interface PrintingLine {
+  candidates: string[];
+  edition: string;
+  foil: boolean;
+  identity: string;
+  quantity: number;
+}
+
+/** A card name, with its printings available to unfold. */
 interface Row {
   candidates: string[];
   foil: number;
   key: string;
   name: string;
+  printings: PrintingLine[];
   total: number;
 }
 
+const editionLabel = (card: CollectionCard): string => {
+  const set = card.setName || card.setCode;
+  const num = card.collectorNumber ? `#${card.collectorNumber}` : null;
+  if (set && num) return `${set} ${num}`;
+  if (set) return set;
+  if (num) return num;
+  if (card.productId) return `CM ${card.productId}`;
+  return 'Unknown edition';
+};
+
 /**
- * Roll the raw rows up per card, keeping one printing to show a picture of.
+ * Roll the raw rows up per card, keeping every distinct printing for unfold.
  *
  * Keyed exactly as `buildCollection` keys `byKey`, so the list length and the
  * "unique" count in the header can't drift apart and quietly disagree.
- *
- * The representative printing prefers whichever source pins the printing down
- * hardest — a Scryfall id, then a Cardmarket product id, then a set code — since
- * that decides whether the picture is your card or merely a card of that name.
  */
 const rollUp = (collection: Collection): Row[] => {
   const map = new Map<string, Row & { rank: number }>();
+  const printingsByKey = new Map<string, Map<string, PrintingLine>>();
 
   for (const card of collection.cards) {
     const key = cardKey(card.name);
     if (!key) continue;
     let row = map.get(key);
     if (!row) {
-      row = { candidates: [], foil: 0, key, name: stripVersion(card.name), rank: 0, total: 0 };
+      row = {
+        candidates: [],
+        foil: 0,
+        key,
+        name: stripVersion(card.name),
+        printings: [],
+        rank: 0,
+        total: 0,
+      };
       map.set(key, row);
+      printingsByKey.set(key, new Map());
     }
     const qty = card.quantity || 0;
     row.total += qty;
@@ -105,10 +131,30 @@ const rollUp = (collection: Collection): Row[] => {
         row.rank = rank;
       }
     }
+
+    const identity = printingIdentity(card);
+    const byPrinting = printingsByKey.get(key)!;
+    const existing = byPrinting.get(identity);
+    if (existing) {
+      existing.quantity += qty;
+    } else {
+      byPrinting.set(identity, {
+        candidates: cardImageCandidates(card),
+        edition: editionLabel(card),
+        foil: card.foil,
+        identity,
+        quantity: qty,
+      });
+    }
   }
 
   return [...map.values()]
-    .map(({ rank: _rank, ...row }) => row)
+    .map(({ rank: _rank, ...row }) => ({
+      ...row,
+      printings: [...(printingsByKey.get(row.key)?.values() ?? [])].sort((a, b) =>
+        a.edition.localeCompare(b.edition),
+      ),
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 };
 
@@ -155,6 +201,7 @@ const Worth = ({ value, stale }: { stale: boolean; value: CollectionValue }) => 
 export const CollectionView = ({ collection }: { collection: Collection | null }) => {
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const { snapshot, stale } = usePrices(loadPrices);
   const value = useMemo(
     () => collectionValue(collection?.cards ?? [], snapshot),
@@ -199,6 +246,18 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
 
   const setQuantity = (row: Row, quantity: number) =>
     void syncStore.setCollectionQuantity(row.key, quantity, row.name);
+
+  const setPrintingQty = (identity: string, quantity: number) =>
+    void syncStore.setPrintingQuantity(identity, quantity);
+
+  const toggleExpanded = (key: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const empty = !collection || collection.cards.length === 0;
 
@@ -280,22 +339,96 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
         </div>
       ) : !empty ? (
         <ul className="divide-y divide-line">
-          {shown.map(row => (
-            <li key={row.key} className="flex items-center gap-2 px-2 py-1">
-              <CollectionThumb
-                candidates={row.candidates}
-                name={row.name}
-                previewKey={`collection|list|${row.key}`}
-              />
-              <span className="min-w-0 flex-1 truncate text-sm text-ink">{row.name}</span>
-              {row.foil > 0 ? (
-                <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                  {row.foil} foil
-                </span>
-              ) : null}
-              <Stepper onChange={quantity => setQuantity(row, quantity)} quantity={row.total} />
-            </li>
-          ))}
+          {shown.map(row => {
+            const canExpand = row.printings.length > 1;
+            const open = canExpand && expanded.has(row.key);
+            return (
+              <li key={row.key}>
+                <div className="flex items-center gap-2 px-2 py-1">
+                  {canExpand ? (
+                    <button
+                      aria-expanded={open}
+                      aria-label={open ? `Collapse ${row.name}` : `Show printings of ${row.name}`}
+                      className="flex h-9 w-7 shrink-0 items-center justify-center text-ink-faint"
+                      onClick={() => toggleExpanded(row.key)}
+                      type="button"
+                    >
+                      <span
+                        aria-hidden
+                        className={`inline-block text-xs transition-transform ${open ? 'rotate-90' : ''}`}
+                      >
+                        ›
+                      </span>
+                    </button>
+                  ) : (
+                    <span className="w-7 shrink-0" />
+                  )}
+                  <CollectionThumb
+                    candidates={row.candidates}
+                    name={row.name}
+                    previewKey={`collection|list|${row.key}`}
+                  />
+                  <button
+                    className="min-w-0 flex-1 truncate text-left text-sm text-ink"
+                    onClick={() => {
+                      if (canExpand) toggleExpanded(row.key);
+                    }}
+                    type="button"
+                  >
+                    <span className="block truncate">{row.name}</span>
+                    {canExpand ? (
+                      <span className="block text-[10px] text-ink-faint">
+                        {row.printings.length} editions
+                      </span>
+                    ) : row.printings[0] && row.printings[0].edition !== 'Unknown edition' ? (
+                      <span className="block truncate text-[10px] text-ink-faint">
+                        {row.printings[0].edition}
+                        {row.printings[0].foil ? ' · foil' : ''}
+                      </span>
+                    ) : null}
+                  </button>
+                  {row.foil > 0 ? (
+                    <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                      {row.foil} foil
+                    </span>
+                  ) : null}
+                  {!open ? (
+                    <Stepper onChange={quantity => setQuantity(row, quantity)} quantity={row.total} />
+                  ) : (
+                    <span className="w-[5.5rem] shrink-0 text-right text-xs tabular-nums text-ink-faint">
+                      {row.total}
+                    </span>
+                  )}
+                </div>
+                {open ? (
+                  <ul className="border-l border-line ml-4 divide-y divide-line/50 bg-raised/40">
+                    {row.printings.map(printing => (
+                      <li
+                        key={printing.identity}
+                        className="flex items-center gap-2 px-2 py-1.5"
+                      >
+                        <CollectionThumb
+                          candidates={printing.candidates}
+                          name={row.name}
+                          previewKey={`collection|printing|${printing.identity}`}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs text-ink">{printing.edition}</span>
+                          {printing.foil ? (
+                            <span className="text-[10px] text-accent">foil</span>
+                          ) : null}
+                        </span>
+                        <Stepper
+                          onChange={quantity => setPrintingQty(printing.identity, quantity)}
+                          quantity={printing.quantity}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
 
