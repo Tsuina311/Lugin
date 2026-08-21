@@ -24,6 +24,7 @@ import {
 import { useSequentialImages } from './useSequentialImages';
 
 import { cartStore } from '@/content/cartStore';
+import { catalogueSearchStore } from '@/content/catalogueSearchStore';
 import { collectionStore } from '@/content/collectionStore';
 import { previewStore } from '@/content/previewStore';
 import { purchaseStore } from '@/content/purchaseStore';
@@ -409,7 +410,7 @@ export const WantsPanel = () => {
   const [search, setSearch] = useState<SearchState>(initialSearch);
   const searchAbort = useRef<AbortController | null>(null);
 
-  const runCatalogueSearch = async (term: string) => {
+  const runCatalogueSearch = async (term: string, opts: { exact?: boolean } = {}) => {
     searchAbort.current?.abort();
     const controller = new AbortController();
     searchAbort.current = controller;
@@ -422,8 +423,14 @@ export const WantsPanel = () => {
       status: 'searching',
     });
     try {
-      const catalogue = await searchCatalogue(term, controller.signal);
+      let catalogue = await searchCatalogue(term, controller.signal);
       if (controller.signal.aborted) return;
+      // Want-list clicks ask for one card's printings — drop near-name noise.
+      if (opts.exact) {
+        const key = cardKey(term);
+        const only = catalogue.filter(p => cardKey(p.name) === key);
+        if (only.length > 0) catalogue = only;
+      }
       setSearch({
         catalogue,
         error: null,
@@ -444,6 +451,20 @@ export const WantsPanel = () => {
       });
     }
   };
+
+  const [searchSeed, setSearchSeed] = useState<{ id: number; term: string } | null>(null);
+  const pendingCatalogue = useSyncExternalStore(
+    catalogueSearchStore.subscribe,
+    catalogueSearchStore.getSnapshot,
+  );
+  useEffect(() => {
+    if (!pendingCatalogue) return;
+    const req = catalogueSearchStore.take();
+    if (!req) return;
+    setSearchSeed({ id: req.id, term: req.term });
+    void runCatalogueSearch(req.term, { exact: req.exact });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCatalogue?.id]);
 
   const openProduct = async (product: ProductSuggestion) => {
     searchAbort.current?.abort();
@@ -2298,6 +2319,7 @@ export const WantsPanel = () => {
       <CardSearch
         busy={search.status === 'searching' || search.status === 'loading'}
         onSearch={term => void runCatalogueSearch(term)}
+        seed={searchSeed}
       />
 
       {/* Breadcrumb for catalogue → printing offers. */}

@@ -899,12 +899,11 @@ export const CollectionPanel = () => {
     return out;
   };
 
-  // In box view, prefer real Scryfall metadata images (direct CDN, browser
-  // cached) over the name-only API redirect, so load metadata for the rows.
+  // Prefer printing-accurate art in list view too (not only the grid).
   useEffect(() => {
-    if (resultsView === 'box') void loadMeta();
+    void loadMeta();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resultsView, rowNames]);
+  }, [rowNames]);
 
   const toggleColor = (code: string) =>
     setFColors(prev => {

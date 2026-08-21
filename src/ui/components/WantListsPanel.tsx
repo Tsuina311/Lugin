@@ -6,6 +6,7 @@ import { useWideLayout } from '../useWideLayout';
 
 import { Badge } from './Badge';
 import { Button } from './Button';
+import { CollectionThumb } from './CollectionThumb';
 import { EmptyState } from './EmptyState';
 import { TextInput, SearchInput, Select } from './Field';
 import { IconButton } from './IconButton';
@@ -28,6 +29,8 @@ import {
 } from './icons';
 
 import { previewStore } from '@/content/previewStore';
+import { catalogueSearchStore } from '@/content/catalogueSearchStore';
+import { imageUrlFor } from '@/lib/cardImage';
 import { askForLogin, cmToken } from '@/content/session';
 import { taskQueue } from '@/content/taskQueue';
 import {
@@ -189,10 +192,17 @@ const ListPane = ({
   const heldCmd = useRef(false);
   const [snag, setSnag] = useState<string | null>(null);
 
+  const openCardSearch = (name: string) => {
+    catalogueSearchStore.request(name, { exact: true });
+  };
+
   const art = (card: ListCard): string[] => {
     const meta = metaByKey[card.key];
     const faces = meta?.faceImages ?? [];
-    return faces.length >= 2 ? faces : meta?.imageUrl ? [meta.imageUrl] : [];
+    if (faces.length >= 2) return faces;
+    if (meta?.imageUrl) return [meta.imageUrl];
+    const byName = imageUrlFor(undefined, card.name);
+    return byName ? [byName] : [];
   };
 
   // Split, when asked for, puts the cards both lists want in their own section.
@@ -463,21 +473,41 @@ const ListPane = ({
                         {urls.length > 0 ? (
                           <img
                             alt={card.name}
-                            className="block aspect-[63/88] w-full cursor-zoom-in"
+                            className="block aspect-[63/88] w-full cursor-pointer"
                             decoding="async"
                             loading="lazy"
                             src={urls[0]}
+                            title={`Search Cardmarket for ${card.name}`}
                             {...handlers}
+                            onClick={e => {
+                              e.stopPropagation();
+                              openCardSearch(card.name);
+                            }}
                           />
                         ) : (
-                          <div className="flex aspect-[63/88] items-center justify-center px-1 text-center text-2xs text-ink-faint">
+                          <button
+                            className="flex aspect-[63/88] w-full items-center justify-center px-1 text-center text-2xs text-ink-faint"
+                            onClick={e => {
+                              e.stopPropagation();
+                              openCardSearch(card.name);
+                            }}
+                            type="button"
+                          >
                             {card.name}
-                          </div>
+                          </button>
                         )}
                         <div className="flex items-center gap-1 px-1 py-0.5">
-                          <span className="truncate text-2xs text-ink-dim" title={card.name}>
+                          <button
+                            className="min-w-0 flex-1 truncate text-left text-2xs text-ink-dim hover:text-accent hover:underline"
+                            onClick={e => {
+                              e.stopPropagation();
+                              openCardSearch(card.name);
+                            }}
+                            title={`Search Cardmarket for ${card.name}`}
+                            type="button"
+                          >
                             {card.name}
-                          </span>
+                          </button>
                           {removeButton(card)}
                         </div>
                       </div>
@@ -486,10 +516,7 @@ const ListPane = ({
                 </div>
               ) : (
                 <ul>
-                  {group.cards.map(card => {
-                    const urls = art(card);
-                    const { handlers } = preview(`${list.id}|${card.key}`, card.name, urls);
-                    return (
+                  {group.cards.map(card => (
                       <li
                         key={card.key}
                         {...selection.rowProps(
@@ -500,12 +527,22 @@ const ListPane = ({
                         )}
                         {...dragProps(card)}
                       >
-                        <span
-                          className={`truncate text-xs text-ink ${urls.length > 0 ? 'cursor-zoom-in' : ''}`}
-                          {...handlers}
+                        <CollectionThumb
+                          candidates={art(card)}
+                          name={card.name}
+                          previewKey={`${list.id}|${card.key}`}
+                        />
+                        <button
+                          className="min-w-0 flex-1 truncate text-left text-xs text-ink hover:text-accent hover:underline"
+                          onClick={e => {
+                            e.stopPropagation();
+                            openCardSearch(card.name);
+                          }}
+                          title={`Search Cardmarket for ${card.name}`}
+                          type="button"
                         >
                           {card.name}
-                        </span>
+                        </button>
                         {card.alsoOn.length > 0 && (
                           <Badge title={`Also on ${card.alsoOn.join(', ')}`} tone="neutral">
                             +{card.alsoOn.length}
@@ -513,8 +550,7 @@ const ListPane = ({
                         )}
                         {removeButton(card)}
                       </li>
-                    );
-                  })}
+                  ))}
                 </ul>
               )}
             </section>

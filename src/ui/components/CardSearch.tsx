@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { SearchInput } from './Field';
 import { Loader2 } from './icons';
@@ -21,14 +21,26 @@ const DEBOUNCE_MS = 400;
 export const CardSearch = ({
   busy = false,
   onSearch,
+  seed = null,
 }: {
   /** True while catalogue results or a product's offers are loading. */
   busy?: boolean;
   onSearch: (term: string) => void;
+  /** When set (e.g. from a want-list click), fill the box with this term. */
+  seed?: { id: number; term: string } | null;
 }) => {
   const [query, setQuery] = useState('');
   const latest = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seedSeen = useRef(0);
+
+  useEffect(() => {
+    if (!seed || seed.id === seedSeen.current) return;
+    seedSeen.current = seed.id;
+    if (timer.current) clearTimeout(timer.current);
+    latest.current++;
+    setQuery(seed.term);
+  }, [seed]);
 
   const submit = (raw: string) => {
     const term = raw.trim();

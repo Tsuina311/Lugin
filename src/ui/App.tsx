@@ -40,6 +40,7 @@ import { useCalls } from './useCalls';
 
 import { callStore } from '@/content/callStore';
 import { cartStore } from '@/content/cartStore';
+import { catalogueSearchStore } from '@/content/catalogueSearchStore';
 import { OVERLAY_HIDE_EVENT, OVERLAY_VIEW_KEY } from '@/content/overlay';
 import { taskQueue } from '@/content/taskQueue';
 import { flags } from '@/lib/flags';
@@ -148,6 +149,15 @@ export const App = () => {
   const [filter, setFilter] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const cart = useSyncExternalStore(cartStore.subscribe, cartStore.getSnapshot);
+  const catalogueRequest = useSyncExternalStore(
+    catalogueSearchStore.subscribe,
+    catalogueSearchStore.getSnapshot,
+  );
+
+  // A want-list (or other) click asked to search a card — open the Search tab.
+  useEffect(() => {
+    if (catalogueRequest) setTab('search');
+  }, [catalogueRequest?.id]);
 
   // `null` until the stores have read storage — see useFirstRun for why this is
   // not a plain subscription.

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 
 import { Badge } from './Badge';
 import { Button } from './Button';
+import { CollectionThumb } from './CollectionThumb';
 import { CutsPanel } from './CutsPanel';
 import { DeckFromWants } from './DeckFromWants';
 import { DeckWantList } from './DeckWantList';
@@ -38,6 +39,7 @@ import {
 import { collectionStore } from '@/content/collectionStore';
 import { countCards, deckStore, type DeckCardRef } from '@/content/deckStore';
 import { cardKey } from '@/lib/cardName';
+import { candidatesByName, deckCardCandidates } from '@/lib/cardImage';
 import { bucketMainByTagSections, type TagSectionBucket } from '@/lib/deckTagSections';
 import { deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
 import {
@@ -50,6 +52,7 @@ import {
   type DeckFormat,
   type DeckSection,
 } from '@/lib/deck';
+import type { Collection } from '@/lib/collection';
 import { basicsMatchPlan, isBasicLand, planBasicLands } from '@/lib/lands';
 import { requestScryfall } from '@/lib/messaging';
 import {
@@ -142,6 +145,7 @@ export const DeckPanel = () => {
     <div className="flex h-full min-h-0 flex-col text-slate-200">
       {editing ? (
         <DeckEditor
+          collection={collection}
           collectionByKey={collection?.byKey ?? {}}
           deck={editing}
           onBack={() => setEditingId(null)}
@@ -407,11 +411,13 @@ type DeckView = (typeof DECK_VIEWS)[number]['id'];
 const COMMANDER_VIEWS = new Set<DeckView>(['edhrec', 'goldfish', 'cuts']);
 
 const DeckEditor = ({
+  collection,
   collectionByKey,
   deck,
   onBack,
   onMergeUpload,
 }: {
+  collection: Collection | null;
   collectionByKey: OwnedIndex;
   deck: Deck;
   onBack: () => void;
@@ -435,10 +441,25 @@ const DeckEditor = ({
 
   const ownedOf = (name: string): number => collectionByKey[cardKey(name)]?.total ?? 0;
 
-  const previewUrls = (name: string): string[] => {
+  const ownedCandidates = useMemo(
+    () => candidatesByName(collection?.cards ?? []),
+    [collection],
+  );
+
+  /** Same picture ladder as the phone: your copy first, then Scryfall by name. */
+  const thumbOf = (name: string): { candidates: readonly string[]; faceImages?: string[] } => {
     const meta = metaByName[cardKey(name)];
-    if (meta?.faceImages && meta.faceImages.length >= 2) return meta.faceImages;
-    return meta?.imageUrl ? [meta.imageUrl] : [];
+    const fromOwned = deckCardCandidates(name, ownedCandidates);
+    const candidates =
+      fromOwned.length > 0
+        ? fromOwned
+        : meta?.imageUrl
+          ? [meta.imageUrl]
+          : [];
+    return {
+      candidates,
+      faceImages: meta?.faceImages,
+    };
   };
 
   const fmt = formatInfo(deck.format);
@@ -810,16 +831,20 @@ const DeckEditor = ({
           </div>
           {commanders.length > 0 ? (
             <ul className="list-none divide-y divide-line">
-              {commanders.map(c => (
-                <DeckRow
-                  key={`commander|${cardKey(c.name)}`}
-                  card={c}
-                  commander
-                  deckId={deck.id}
-                  owned={ownedOf(c.name)}
-                  urls={previewUrls(c.name)}
-                />
-              ))}
+              {commanders.map(c => {
+                const thumb = thumbOf(c.name);
+                return (
+                  <DeckRow
+                    key={`commander|${cardKey(c.name)}`}
+                    card={c}
+                    commander
+                    deckId={deck.id}
+                    faceImages={thumb.faceImages}
+                    owned={ownedOf(c.name)}
+                    candidates={thumb.candidates}
+                  />
+                );
+              })}
             </ul>
           ) : (
             <div className="px-2 py-1 text-2xs text-ink-faint">
@@ -1140,18 +1165,24 @@ const DeckEditor = ({
                             </div>
                           )}
                           <ul className="list-none divide-y divide-line">
-                            {part.cards.map(c => (
-                              <DeckRow
-                                key={`${section}|${cardKey(c.name)}`}
-                                auto={!!deck.autoLands && section === 'main' && isBasicLand(c.name)}
-                                card={c}
-                                deckId={deck.id}
-                                owned={ownedOf(c.name)}
-                                rowId={`${section}|${cardKey(c.name)}`}
-                                selection={selection}
-                                urls={previewUrls(c.name)}
-                              />
-                            ))}
+                            {part.cards.map(c => {
+                              const thumb = thumbOf(c.name);
+                              return (
+                                <DeckRow
+                                  key={`${section}|${cardKey(c.name)}`}
+                                  auto={
+                                    !!deck.autoLands && section === 'main' && isBasicLand(c.name)
+                                  }
+                                  card={c}
+                                  candidates={thumb.candidates}
+                                  deckId={deck.id}
+                                  faceImages={thumb.faceImages}
+                                  owned={ownedOf(c.name)}
+                                  rowId={`${section}|${cardKey(c.name)}`}
+                                  selection={selection}
+                                />
+                              );
+                            })}
                           </ul>
                         </div>
                       ))}
@@ -1181,44 +1212,39 @@ const DeckEditor = ({
 const DeckRow = ({
   auto = false,
   card,
+  candidates,
   commander = false,
   deckId,
+  faceImages,
   owned,
   rowId,
   selection,
-  urls,
 }: {
   /** Managed by auto-balance — quantity edits here get recalculated away. */
   auto?: boolean;
   card: DeckCard;
+  candidates: readonly string[];
   commander?: boolean;
   deckId: string;
+  faceImages?: string[];
   owned: number;
   /** Selection id; omitted (with `selection`) for rows that can't be picked. */
   rowId?: string;
   selection?: RowSelection;
-  urls: string[];
 }) => {
   const need = Math.max(0, card.quantity - owned);
   const basic = skipOwnership(card.name);
   const status = owned >= card.quantity ? 'owned' : owned > 0 ? 'partial' : 'buy';
-  const preview = useCardPreview();
-  const { flippable, handlers } = preview(`deck|${cardKey(card.name)}`, card.name, urls);
   // `group` so the row's remove button can hide until the pointer arrives.
   const base = 'group flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-tint';
   return (
     <li {...(selection && rowId ? selection.rowProps(rowId, base) : { className: base })}>
-      <div className="h-7 w-7 flex-none overflow-hidden rounded-sm bg-raised" {...handlers}>
-        {urls[0] ? (
-          <img
-            alt={card.name}
-            className={`h-full w-full object-cover ${flippable ? 'cursor-flip' : 'cursor-zoom-in'}`}
-            src={urls[0]}
-            style={{ objectPosition: '50% 18%' }}
-            title={flippable ? 'Click to flip to the other side' : undefined}
-          />
-        ) : null}
-      </div>
+      <CollectionThumb
+        candidates={candidates}
+        faceImages={faceImages}
+        name={card.name}
+        previewKey={`deck|${card.section}|${cardKey(card.name)}`}
+      />
 
       {commander ? (
         <span aria-hidden className="text-sm text-warn" title="Commander">

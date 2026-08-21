@@ -15,20 +15,41 @@
 // Copy / save / share live on each list row: exporting is about the deck as a
 // whole, not something you do while editing cards.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { DeckEditor } from './DeckEditor';
 import { ExportBar } from './ExportBar';
 import { syncStore } from './syncStore';
 
+import { candidatesByName, deckCardCandidates } from '@/lib/cardImage';
 import type { Collection } from '@/lib/collection';
-import { DECK_FORMATS, deckShortfall, type Deck, type DeckFormat } from '@/lib/deck';
+import {
+  DECK_FORMATS,
+  deckShortfall,
+  formatInfo,
+  type Deck,
+  type DeckFormat,
+} from '@/lib/deck';
 import { deckFile } from '@/lib/export';
+import { CollectionThumb } from '@/ui/components/CollectionThumb';
 
 const copies = (deck: Deck): number =>
   deck.cards
     .filter(card => card.section !== 'sideboard')
     .reduce((sum, card) => sum + card.quantity, 0);
+
+/** Face for the list row: commander when the format has one, else the first main card. */
+const previewCardName = (deck: Deck): string | null => {
+  if (formatInfo(deck.format).commanderZone) {
+    const commander = deck.cards.find(card => card.section === 'commander');
+    if (commander) return commander.name;
+  }
+  const first =
+    deck.cards.find(card => card.section === 'main') ??
+    deck.cards.find(card => card.section !== 'sideboard') ??
+    deck.cards[0];
+  return first?.name ?? null;
+};
 
 const FormatPicker = ({
   onChange,
@@ -141,6 +162,11 @@ export const DeckList = ({
 
   const sorted = [...decks].sort((a, b) => b.updatedAt - a.updatedAt);
 
+  const ownedCandidates = useMemo(
+    () => candidatesByName(collection?.cards ?? []),
+    [collection],
+  );
+
   return (
     <div>
       <div className="flex items-center gap-2 border-b border-line px-4 py-3">
@@ -180,18 +206,33 @@ export const DeckList = ({
         <ul className="divide-y divide-line">
           {sorted.map(deck => {
             const missing = collection ? deckShortfall(deck.cards, collection.byKey).length : 0;
+            const face = previewCardName(deck);
+            const candidates = face ? deckCardCandidates(face, ownedCandidates) : [];
             return (
               <li key={deck.id} className="px-4 py-3">
                 <div className="flex items-center gap-2">
                   <button
-                    className="min-w-0 flex-1 text-left active:opacity-80"
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left active:opacity-80"
                     onClick={() => setOpenId(deck.id)}
                     type="button"
                   >
-                    <span className="block truncate text-sm font-medium text-ink">{deck.name}</span>
-                    <span className="mt-0.5 block text-[11px] capitalize text-ink-faint">
-                      {deck.format} · {copies(deck)} cards
-                      {missing > 0 ? ` · ${missing} missing` : ''}
+                    {face ? (
+                      <CollectionThumb
+                        candidates={candidates}
+                        className="h-14 w-10 flex-none overflow-hidden rounded-md bg-raised"
+                        imgStyle={{ objectPosition: '50% 18%' }}
+                        name={face}
+                        previewKey={`decklist|${deck.id}|${face}`}
+                      />
+                    ) : (
+                      <span className="h-14 w-10 flex-none rounded-md bg-raised" />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-ink">{deck.name}</span>
+                      <span className="mt-0.5 block text-[11px] capitalize text-ink-faint">
+                        {deck.format} · {copies(deck)} cards
+                        {missing > 0 ? ` · ${missing} missing` : ''}
+                      </span>
                     </span>
                   </button>
                   <ExportBar actions={['copy', 'save', 'share']} file={() => deckFile(deck)} />
