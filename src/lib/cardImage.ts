@@ -46,12 +46,22 @@ export const cdnImageFromId = (scryfallId?: string): string | undefined => {
 };
 
 /**
- * Image URL only when we already know a Scryfall id (CDN). Name-only lookups
- * must go through the metadata queue (`requestScryfall`) so we get a CDN URI —
- * never put `named?format=image` in an `<img src>` (rate-limit stalls).
+ * Scryfall API image URL by id or exact name. Prefer {@link cdnImageFromId} and
+ * {@link cardImageCandidates} for `<img src>` — CDN first, API as fallback when
+ * the file 404s. Name lookups here are a last resort; hot paths should resolve
+ * through `requestScryfall` when possible.
  */
-export const imageUrlFor = (scryfallId?: string, _name?: string): string | undefined =>
-  cdnImageFromId(scryfallId);
+export const imageUrlFor = (scryfallId?: string, name?: string): string | undefined => {
+  if (scryfallId && SCRYFALL_ID_RE.test(scryfallId)) {
+    return `https://api.scryfall.com/cards/${scryfallId}?format=image&version=normal`;
+  }
+  if (name?.trim()) {
+    return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(
+      name,
+    )}&format=image&version=normal`;
+  }
+  return undefined;
+};
 
 /**
  * Scryfall API image URL for an *exact* printing, keyed by set code + collector
