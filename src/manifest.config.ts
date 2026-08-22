@@ -2,11 +2,15 @@ import { defineManifest } from '@crxjs/vite-plugin';
 import { loadEnv } from 'vite';
 
 import { buildVersion } from '../build/version';
+import { DESKTOP_VERSION } from './desktopVersion';
 import pkg from '../package.json';
 
 // Same source as the phone build's stamp, so the two surfaces of one product
 // can't report different versions of the same commit.
 const BUILD = buildVersion(`${process.cwd()}/`);
+// Chat-iteration stamp (0.1.0, 0.1.1, …) — independent of git; shown next to
+// the commit label so a reload after a fix is visibly a new build.
+const DESKTOP_LABEL = `${BUILD.label} · d${DESKTOP_VERSION}`;
 
 // ---------------------------------------------------------------------------
 // EXTENSION IDENTITY
@@ -138,7 +142,8 @@ export default defineManifest({
 
   // Free-form, and shown in chrome://extensions instead of the above. The commit
   // is the part that answers "is this the build with the fix in it".
-  version_name: BUILD.label,
+  // Commit answers "which git"; d0.1.N answers "did this chat's reload land".
+  version_name: DESKTOP_LABEL,
 
   web_accessible_resources: [
     {

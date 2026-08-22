@@ -45,13 +45,13 @@ export const cdnImageFromId = (scryfallId?: string): string | undefined => {
   return `https://cards.scryfall.io/normal/front/${scryfallId[0]}/${scryfallId[1]}/${scryfallId}.jpg`;
 };
 
-/** Last-resort image URL via the Scryfall API (only when no CDN url is known). */
-export const imageUrlFor = (scryfallId?: string, name?: string): string | undefined => {
-  if (scryfallId) return `https://api.scryfall.com/cards/${scryfallId}?format=image&version=normal`;
-  if (name)
-    return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=normal`;
-  return undefined;
-};
+/**
+ * Image URL only when we already know a Scryfall id (CDN). Name-only lookups
+ * must go through the metadata queue (`requestScryfall`) so we get a CDN URI —
+ * never put `named?format=image` in an `<img src>` (rate-limit stalls).
+ */
+export const imageUrlFor = (scryfallId?: string, _name?: string): string | undefined =>
+  cdnImageFromId(scryfallId);
 
 /**
  * Scryfall API image URL for an *exact* printing, keyed by set code + collector

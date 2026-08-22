@@ -1,12 +1,11 @@
 import type { CSSProperties } from 'react';
 
 import { CardResultThumb } from './CardResultThumb';
-import { useFirstLoadedImage } from './useFirstLoadedImage';
 
 /** Tag-search-style thumbnail with collection image fallbacks. */
 export const CollectionThumb = ({
   candidates,
-  className = 'h-8 w-8 flex-none overflow-hidden rounded bg-raised',
+  className = 'relative h-8 w-8 flex-none overflow-hidden rounded bg-raised',
   faceImages,
   imgStyle,
   name,
@@ -18,23 +17,13 @@ export const CollectionThumb = ({
   imgStyle?: CSSProperties;
   name: string;
   previewKey: string;
-}) => {
-  const { failed, ready, src } = useFirstLoadedImage(candidates);
-  const urls =
-    src && faceImages && faceImages.length >= 2
-      ? [src, ...faceImages.slice(1)]
-      : src
-        ? [src]
-        : [];
-
-  return (
-    <CardResultThumb
-      className={className}
-      imgStyle={imgStyle}
-      loading={!ready && !failed && candidates.length > 0}
-      name={name}
-      previewKey={previewKey}
-      urls={urls}
-    />
-  );
-};
+}) => (
+  <CardResultThumb
+    candidates={candidates}
+    className={className}
+    faceImages={faceImages}
+    imgStyle={imgStyle}
+    name={name}
+    previewKey={previewKey}
+  />
+);

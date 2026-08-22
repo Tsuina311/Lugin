@@ -131,6 +131,11 @@ export const DeckList = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const ownedCandidates = useMemo(
+    () => candidatesByName(collection?.cards ?? []),
+    [collection],
+  );
+
   const open = decks.find(deck => deck.id === openId);
   if (open) return <DeckEditor collection={collection} deck={open} onBack={() => setOpenId(null)} />;
 
@@ -161,11 +166,6 @@ export const DeckList = ({
   };
 
   const sorted = [...decks].sort((a, b) => b.updatedAt - a.updatedAt);
-
-  const ownedCandidates = useMemo(
-    () => candidatesByName(collection?.cards ?? []),
-    [collection],
-  );
 
   return (
     <div>

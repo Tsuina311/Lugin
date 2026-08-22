@@ -6,12 +6,14 @@ import { callStore } from './callStore';
 import { cartStore } from './cartStore';
 import { isSecurityChallenge } from './challenge';
 import { startExtraction } from './extractionRunner';
+import { openOverlayCart } from './overlay';
 import { startSync } from './syncStore';
 import { verificationCleared } from './verify';
 
 import { isInterceptorEnvelope } from '@/lib/messaging';
 import { adoptRenamedPageKeys } from '@/lib/renamedKeys';
 import { watchLocalChanges } from '@/platform/chrome/localRepository';
+import { DESKTOP_VERSION } from '@/desktopVersion';
 import { App } from '@/ui/App';
 import { ErrorBoundary } from '@/ui/ErrorBoundary';
 // `?inline` gives us the compiled CSS as a string so we can inject it into the
@@ -77,6 +79,7 @@ const mountOverlay = () => {
   // the floating restore button onto Cardmarket's burger menu underneath.
   const host = document.createElement('div');
   host.id = HOST_ID;
+  host.dataset.luginDesktop = DESKTOP_VERSION;
   host.style.all = 'initial';
   host.style.position = 'fixed';
   host.style.inset = '0';
@@ -202,6 +205,44 @@ const isContextInvalidated = (v: unknown) =>
 window.addEventListener('unhandledrejection', e => {
   if (isContextInvalidated(e.reason)) e.preventDefault();
 });
+
+// Cardmarket's header cart often uses target=_blank. Steal those clicks so the
+// Lugin cart opens in this tab instead of a second window.
+const CART_PATH_RE = /\/Magic\/ShoppingCart\/?$/i;
+const cartAnchorFrom = (node: EventTarget | null): HTMLAnchorElement | null => {
+  const el = node instanceof Element ? node : null;
+  const a = el?.closest?.('a');
+  if (!a?.href) return null;
+  try {
+    const url = new URL(a.href, location.href);
+    if (url.origin !== location.origin) return null;
+    if (!CART_PATH_RE.test(url.pathname)) return null;
+    return a;
+  } catch {
+    return null;
+  }
+};
+
+document.addEventListener(
+  'click',
+  e => {
+    if (e.defaultPrevented || e.button !== 0) return;
+    // Let modified clicks keep their usual "open elsewhere" behaviour.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const el = e.target instanceof Element ? e.target : null;
+    if (!el || el.closest(`#${HOST_ID}`)) return;
+
+    // Header cart widget (often target=_blank) or any ShoppingCart link.
+    const a = cartAnchorFrom(el);
+    const inCartWidget = !!el.closest('#cart');
+    if (!a && !inCartWidget) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    openOverlayCart();
+  },
+  true,
+);
 
 syncOverlay();
 

@@ -12,7 +12,7 @@
  */
 
 import { ajaxBox } from './ajax';
-import { findCmToken } from './cart';
+import { extractCmToken, findCmToken } from './cart';
 import { expansionFromProductUrl } from './productUrl';
 import {
   MIN_SEARCH_LENGTH,
@@ -20,8 +20,9 @@ import {
   cardmarketSearchUrl,
   productFactsFromImage,
 } from './searchArgs';
-import { currentLang, fetchDoc } from './wants';
+import { currentLang, fetchDoc, isChallengeResponse } from './wants';
 
+import { rememberCmToken } from '@/content/session';
 import { replayInPage } from '@/lib/messaging';
 
 export interface ProductSuggestion {
@@ -178,7 +179,8 @@ export const searchCatalogue = async (
 ): Promise<ProductSuggestion[]> => {
   const term = query.trim();
   if (term.length < MIN_SEARCH_LENGTH) return [];
-  const { doc } = await fetchDoc(cardmarketSearchUrl(term, currentLang()), signal);
+  const { doc, html } = await fetchDoc(cardmarketSearchUrl(term, currentLang()), signal);
+  rememberCmToken(extractCmToken(html));
   return parseCatalogueResults(doc);
 };
 
@@ -216,6 +218,9 @@ export const searchProducts = async (
     url: `/${currentLang()}/Magic/AjaxAction`,
   });
 
+  if (isChallengeResponse(res.status, res.body)) {
+    throw new Error(`CHALLENGE: search HTTP ${res.status}`);
+  }
   if (!res.ok) throw new Error(`Search failed (HTTP ${res.status})`);
 
   const html = ajaxBox(res.body, 'autocompleteBox');

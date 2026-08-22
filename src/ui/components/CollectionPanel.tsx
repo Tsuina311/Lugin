@@ -13,7 +13,15 @@ import { PurchaseDuplicates } from './PurchaseDuplicates';
 import { SelectionBar } from './Selection';
 import { ViewToggle } from './ViewToggle';
 import { rememberFaces } from './cardPreview';
-import { Library, Loader2, Pencil, ReceiptEuro, RefreshCw } from './icons';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Library,
+  Loader2,
+  Pencil,
+  ReceiptEuro,
+  RefreshCw,
+} from './icons';
 
 import { cardImageOverrideStore } from '@/content/cardImageOverrideStore';
 import {
@@ -25,6 +33,8 @@ import { deckStore } from '@/content/deckStore';
 import { expansionIconStore, normalizeSetName } from '@/content/expansionIconStore';
 import { previewStore } from '@/content/previewStore';
 import { purchaseStore } from '@/content/purchaseStore';
+import { askForLogin } from '@/content/session';
+import { sessionStore } from '@/content/sessionStore';
 import { taskQueue } from '@/content/taskQueue';
 import { arrivedOnly, inTransitCopies } from '@/lib/arrivedPurchases';
 import {
@@ -54,6 +64,11 @@ import { usePrices } from '@/ui/usePrices';
 import { useRowSelection } from '@/ui/useRowSelection';
 import { useSetIndex } from '@/ui/useSetIndex';
 import { useStickySet, useStickyValue } from '@/ui/useStickyState';
+
+// How many rows (and therefore thumbs) mount at once. A full collection can
+// be thousands of cards; without a page limit every CollectionThumb starts
+// image requests as soon as the panel opens.
+const PAGE_SIZE = 50;
 
 // Quick primary-type toggles that filter the collection directly.
 const TYPE_TOGGLES = [
@@ -120,6 +135,7 @@ export const CollectionPanel = () => {
   // one click from the cards you just added.
   useEffect(() => setConfirmClear(false), [collection?.importedAt, collection?.totalCards]);
   const purchases = useSyncExternalStore(purchaseStore.subscribe, purchaseStore.getSnapshot);
+  const session = useSyncExternalStore(sessionStore.subscribe, sessionStore.getSnapshot);
 
   // ---- Past purchases as a source of collection rows ------------------------
   // The preference existed, but only in the Search tab, and it only took effect on
@@ -130,6 +146,17 @@ export const CollectionPanel = () => {
   const [folding, setFolding] = useState(false);
   const [foldError, setFoldError] = useState<string | null>(null);
   const syncingPurchases = purchases.status === 'queued' || purchases.status === 'syncing';
+  const purchasesNeedLogin = session.signedIn !== true;
+  const purchasesLoginHint =
+    session.signedIn === null
+      ? 'Checking Cardmarket sign-in…'
+      : 'Sign in to Cardmarket to read your order history.';
+
+  const syncPurchasesNow = () => {
+    if (purchasesNeedLogin) return;
+    purchaseStore.markQueued();
+    taskQueue.enqueue('syncPurchases', 'Sync purchases');
+  };
 
   /**
    * What the button would actually add: cards, arrived, counted exactly as
@@ -647,16 +674,36 @@ export const CollectionPanel = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, search, metaByName, fQuery, fColors, fCmc, fSubtype, fType, fEditions, setIndex]);
 
+  // Only the current page mounts CollectionThumbs (each one starts image
+  // fetches). Jump back to page 1 when the filtered set changes.
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  useEffect(() => {
+    setPage(1);
+  }, [search, fQuery, fColors, fCmc, fSubtype, fType, fEditions]);
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage);
+  }, [page, safePage]);
+  const pageRows = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return visibleRows.slice(start, start + PAGE_SIZE);
+  }, [visibleRows, safePage]);
+  const listRef = useRef<HTMLDivElement>(null);
+  const goToPage = (next: number) => {
+    setPage(Math.min(pageCount, Math.max(1, next)));
+    listRef.current?.scrollTo({ top: 0 });
+  };
+
   // ---- Multi-select ---------------------------------------------------------
-  // Both views show the same rows in the same order, so one selection serves
-  // them: send a batch of cards to a deck, copy their names, or drop them from
-  // the collection.
-  const selection = useRowSelection(visibleRows.map(r => r.key));
+  // Selection follows the page on screen — only those rows are mounted, and
+  // "select all" should mean this page, not every filtered card.
+  const selection = useRowSelection(pageRows.map(r => r.key));
   const { decks } = useSyncExternalStore(deckStore.subscribe, deckStore.getSnapshot);
   const [deckTarget, setDeckTarget] = useState('');
   const nameByKey = useMemo(
-    () => new Map(visibleRows.map(r => [r.key, r.name] as const)),
-    [visibleRows],
+    () => new Map(pageRows.map(r => [r.key, r.name] as const)),
+    [pageRows],
   );
   const selectedNames = (): string[] =>
     selection.ids.map(id => nameByKey.get(id) ?? '').filter(Boolean);
@@ -1012,14 +1059,19 @@ export const CollectionPanel = () => {
                   </span>
                   <Button
                     className="ml-auto"
-                    disabled={folding}
+                    disabled={folding || purchasesNeedLogin}
                     icon={folding ? Loader2 : foldedCopies > 0 ? RefreshCw : Library}
-                    onClick={() => void foldPurchasesIn()}
+                    onClick={() => {
+                      if (purchasesNeedLogin) return;
+                      void foldPurchasesIn();
+                    }}
                     size="xs"
                     title={
-                      foldedCopies > 0
-                        ? 'Rebuild the purchased rows from your current order history'
-                        : 'Add every card you have bought to your collection'
+                      purchasesNeedLogin
+                        ? purchasesLoginHint
+                        : foldedCopies > 0
+                          ? 'Rebuild purchased rows from the order history already on this device'
+                          : 'Add every card you have bought to your collection from the history already on this device'
                     }
                     variant={foldedCopies > 0 ? 'neutral' : 'primary'}
                   >
@@ -1029,6 +1081,11 @@ export const CollectionPanel = () => {
                         ? 'Refresh from history'
                         : 'Add them to my collection'}
                   </Button>
+                  {session.signedIn === false && (
+                    <Button onClick={() => askForLogin()} size="xs" variant="subtle">
+                      Sign in
+                    </Button>
+                  )}
                 </>
               ) : (
                 <span className="text-[10px] text-slate-500">
@@ -1038,26 +1095,37 @@ export const CollectionPanel = () => {
             ) : (
               <>
                 <span className="text-[10px] text-slate-500">
-                  {syncingPurchases
-                    ? 'Reading your orders…'
-                    : 'Lugin hasn’t read your Cardmarket orders yet.'}
+                  {purchasesNeedLogin
+                    ? purchasesLoginHint
+                    : syncingPurchases
+                      ? 'Reading your orders…'
+                      : 'Lugin hasn’t read your Cardmarket orders yet.'}
                 </span>
                 <Button
                   className="ml-auto"
-                  disabled={syncingPurchases}
+                  disabled={syncingPurchases || purchasesNeedLogin}
                   icon={syncingPurchases ? Loader2 : undefined}
-                  onClick={() => {
-                    purchaseStore.markQueued();
-                    taskQueue.enqueue('syncPurchases', 'Sync purchases');
-                  }}
+                  onClick={syncPurchasesNow}
                   size="xs"
+                  title={purchasesNeedLogin ? purchasesLoginHint : undefined}
                   variant="primary"
                 >
                   {syncingPurchases ? 'Syncing…' : 'Read my purchases'}
                 </Button>
+                {session.signedIn === false && (
+                  <Button onClick={() => askForLogin()} size="xs" variant="subtle">
+                    Sign in
+                  </Button>
+                )}
               </>
             )}
           </div>
+
+          {session.signedIn === false && purchases.index && (
+            <div className="mt-1.5 text-[10px] text-slate-500">
+              {purchasesLoginHint} Past-purchase actions stay locked until you sign in.
+            </div>
+          )}
 
           {/* Separate from the button on purpose: one adds what is there now, the
               other decides what happens next time. Conflating them is why the old
@@ -1160,23 +1228,33 @@ export const CollectionPanel = () => {
           )}
 
           {purchases.index && (
-            <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-600">
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-600">
               <span>
                 {purchases.index.orderIds.length} order
                 {purchases.index.orderIds.length === 1 ? '' : 's'} · read{' '}
                 {timeAgo(purchases.index.syncedAt)}
               </span>
               <Button
-                disabled={syncingPurchases}
-                onClick={() => {
-                  purchaseStore.markQueued();
-                  taskQueue.enqueue('syncPurchases', 'Sync purchases');
-                }}
+                disabled={syncingPurchases || purchasesNeedLogin}
+                onClick={syncPurchasesNow}
                 size="xs"
+                title={
+                  purchasesNeedLogin
+                    ? purchasesLoginHint
+                    : 'Fetch your Cardmarket orders again'
+                }
                 variant="subtle"
               >
                 Re-read
               </Button>
+              {session.signedIn === false && (
+                <>
+                  <span className="text-slate-500">{purchasesLoginHint}</span>
+                  <Button onClick={() => askForLogin()} size="xs" variant="subtle">
+                    Sign in
+                  </Button>
+                </>
+              )}
               <Button
                 className="ml-auto"
                 onClick={() => void purchaseStore.clear()}
@@ -1436,7 +1514,7 @@ export const CollectionPanel = () => {
         <SelectionBar selection={selection}>{bulkActions}</SelectionBar>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div ref={listRef} className="min-h-0 flex-1 overflow-auto">
         {loading ? (
           <div className="flex h-full items-center justify-center text-xs text-slate-500">
             Loading…
@@ -1454,7 +1532,35 @@ export const CollectionPanel = () => {
             <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-line/60 bg-panel px-2 py-1 text-[10px] text-ink-faint">
               <span>
                 {visibleRows.length} card{visibleRows.length === 1 ? '' : 's'}
+                {visibleRows.length > PAGE_SIZE && (
+                  <span>
+                    {' '}
+                    · {(safePage - 1) * PAGE_SIZE + 1}–
+                    {Math.min(safePage * PAGE_SIZE, visibleRows.length)}
+                  </span>
+                )}
               </span>
+              {visibleRows.length > PAGE_SIZE && (
+                <div className="flex items-center gap-0.5">
+                  <IconButton
+                    disabled={safePage <= 1}
+                    icon={ChevronLeft}
+                    label="Previous page"
+                    onClick={() => goToPage(safePage - 1)}
+                    size="xs"
+                  />
+                  <span className="min-w-[4.5rem] text-center tabular-nums">
+                    {safePage} / {pageCount}
+                  </span>
+                  <IconButton
+                    disabled={safePage >= pageCount}
+                    icon={ChevronRight}
+                    label="Next page"
+                    onClick={() => goToPage(safePage + 1)}
+                    size="xs"
+                  />
+                </div>
+              )}
               <span className="ml-auto">
                 <ViewToggle onChange={setResultsView} value={resultsView} />
               </span>
@@ -1464,7 +1570,7 @@ export const CollectionPanel = () => {
                 className="grid gap-2 p-2 outline-none [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]"
                 {...selection.listProps}
               >
-                {visibleRows.map(r => {
+                {pageRows.map(r => {
                   const boughtEds = boughtEditions(r.name);
                   const override = overrides[r.key];
                   const meta = metaByName[cardKey(r.name)];
@@ -1587,7 +1693,7 @@ export const CollectionPanel = () => {
               </div>
             ) : (
               <ul className="outline-none" {...selection.listProps}>
-                {visibleRows.map(r => {
+                {pageRows.map(r => {
                   const override = overrides[r.key];
                   const meta = metaByName[cardKey(r.name)];
                   const candidates = rowImageCandidates(r);
@@ -1660,6 +1766,27 @@ export const CollectionPanel = () => {
                   );
                 })}
               </ul>
+            )}
+            {visibleRows.length > PAGE_SIZE && (
+              <div className="flex items-center justify-center gap-1 border-t border-line/60 px-2 py-1.5 text-[10px] text-ink-faint">
+                <IconButton
+                  disabled={safePage <= 1}
+                  icon={ChevronLeft}
+                  label="Previous page"
+                  onClick={() => goToPage(safePage - 1)}
+                  size="xs"
+                />
+                <span className="tabular-nums">
+                  Page {safePage} of {pageCount}
+                </span>
+                <IconButton
+                  disabled={safePage >= pageCount}
+                  icon={ChevronRight}
+                  label="Next page"
+                  onClick={() => goToPage(safePage + 1)}
+                  size="xs"
+                />
+              </div>
             )}
           </>
         )}

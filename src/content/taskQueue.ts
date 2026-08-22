@@ -11,9 +11,11 @@
 // next page reclaims the lock and retries the interrupted task — safe because
 // every task type is idempotent (re-sync rebuilds; cleanup re-removes harmlessly).
 
+import { cartStore } from './cartStore';
 import { collectionStore, shouldAddPurchasesToCollection } from './collectionStore';
 import { purchaseStore, PURCHASES_STORAGE_KEY } from './purchaseStore';
 import { cmToken } from './session';
+import { sessionStore } from './sessionStore';
 import { askForVerification, needsVerification, VERIFY_HELP } from './verify';
 import { wantsStore } from './wantsStore';
 
@@ -641,6 +643,13 @@ export const taskQueue = {
 
   /** Add a task and kick the runner. Returns the new task id. */
   enqueue(type: TaskType, label: string, params?: Task['params']): string {
+    if (
+      (type === 'syncWants' || type === 'syncPurchases') &&
+      sessionStore.getSnapshot().signedIn === false
+    ) {
+      cartStore.showNotice('Sign in to Cardmarket first.');
+      return '';
+    }
     // Collapse duplicate pending requests so a double-click can't stack them
     // (and, for deck → want list, can't create the same list twice): syncs
     // dedupe by type, cleanup by the order, want-list fills by the target list.

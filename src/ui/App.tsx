@@ -10,13 +10,16 @@ import { CollectionPanel } from './components/CollectionPanel';
 import { DeckPanel } from './components/DeckPanel';
 import { SearchInput } from './components/Field';
 import { IconButton } from './components/IconButton';
+import { CheckingSession, LoginGate, RequiresLogin } from './components/LoginGate';
 import { LuginMark } from './components/LuginMark';
+import { DESKTOP_VERSION } from '@/desktopVersion';
 import { MetadataFilter } from './components/MetadataFilter';
 import { PreviewLayer } from './components/PreviewLayer';
 import { SyncButton } from './components/SyncButton';
 import { Tabs } from './components/Tabs';
 import type { TabItem } from './components/Tabs';
 import { TaskIndicator } from './components/TaskIndicator';
+import { CartPanel } from './components/CartPanel';
 import { WantListsPanel } from './components/WantListsPanel';
 import { WantsPanel } from './components/WantsPanel';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -41,13 +44,29 @@ import { useCalls } from './useCalls';
 import { callStore } from '@/content/callStore';
 import { cartStore } from '@/content/cartStore';
 import { catalogueSearchStore } from '@/content/catalogueSearchStore';
-import { OVERLAY_HIDE_EVENT, OVERLAY_VIEW_KEY } from '@/content/overlay';
+import {
+  LAST_VISIBLE_VIEW_KEY,
+  OVERLAY_HIDE_EVENT,
+  OVERLAY_OPEN_CART_EVENT,
+  OVERLAY_SHOW_EVENT,
+  OVERLAY_VIEW_KEY,
+  reopenOverlayIfPending,
+} from '@/content/overlay';
+import { sessionStore } from '@/content/sessionStore';
 import { taskQueue } from '@/content/taskQueue';
 import { flags } from '@/lib/flags';
 import { PREFS_APPLIED_EVENT } from '@/platform/chrome/localRepository';
 import { useFirstRun } from '@/ui/useFirstRun';
 
-type Tab = 'search' | 'collection' | 'wantlists' | 'decks' | 'filter' | 'traffic' | 'api';
+type Tab =
+  | 'search'
+  | 'collection'
+  | 'wantlists'
+  | 'decks'
+  | 'cart'
+  | 'filter'
+  | 'traffic'
+  | 'api';
 
 // Dev-only tabs (Traffic + API) are hidden behind the feature flag.
 const TABS: TabItem<Tab>[] = [
@@ -55,6 +74,7 @@ const TABS: TabItem<Tab>[] = [
   { icon: Library, id: 'collection', label: 'Collection', title: 'The cards you own' },
   { icon: ClipboardList, id: 'wantlists', label: 'Wants', title: 'Your want lists' },
   { icon: Layers, id: 'decks', label: 'Decks', title: 'Build and price decks' },
+  { icon: ShoppingCart, id: 'cart', label: 'Cart', title: 'Your shopping cart' },
   { icon: Filter, id: 'filter', label: 'Filter', title: 'Filter the page you’re on' },
   ...(flags.devTools
     ? [
@@ -64,11 +84,38 @@ const TABS: TabItem<Tab>[] = [
     : []),
 ];
 
-const CART_URL = (() => {
+const TAB_KEY = 'lugin:tab';
+const ALL_TABS: Tab[] = [
+  'search',
+  'collection',
+  'wantlists',
+  'decks',
+  'cart',
+  'filter',
+  'traffic',
+  'api',
+];
+const isTab = (v: string | null): v is Tab => !!v && (ALL_TABS as string[]).includes(v);
+const onShoppingCartPage = (): boolean => /\/Magic\/ShoppingCart\/?$/i.test(location.pathname);
+const cartPageUrl = (): string => {
   const first = location.pathname.split('/').filter(Boolean)[0] ?? '';
   const lang = /^[a-z]{2}$/.test(first) ? first : 'en';
   return `${location.origin}/${lang}/Magic/ShoppingCart`;
-})();
+};
+const readTab = (): Tab => {
+  // Always restore the last tab the user was on. Opening Cart explicitly
+  // (header total, site cart link) still switches via setTab / openOverlayCart —
+  // being on Cardmarket’s cart URL must not trap them on the Cart tab forever.
+  try {
+    const saved = localStorage.getItem(TAB_KEY);
+    if (isTab(saved) && (saved !== 'traffic' && saved !== 'api' ? true : flags.devTools)) {
+      return saved;
+    }
+  } catch {
+    /* ignore */
+  }
+  return 'search';
+};
 
 // Remember the overlay's view mode across page navigations. We use the page
 // origin's localStorage (synchronous, so no flash before we know the
@@ -145,7 +192,15 @@ export const App = () => {
   const [side, setSide] = useState<Side>(readSide);
   const [width, setWidth] = useState<number>(readWidth);
   const [resizing, setResizing] = useState(false);
-  const [tab, setTab] = useState<Tab>('search');
+  const [tab, setTabState] = useState<Tab>(readTab);
+  const setTab = (next: Tab) => {
+    setTabState(next);
+    try {
+      localStorage.setItem(TAB_KEY, next);
+    } catch {
+      /* ignore */
+    }
+  };
   const [filter, setFilter] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const cart = useSyncExternalStore(cartStore.subscribe, cartStore.getSnapshot);
@@ -153,42 +208,89 @@ export const App = () => {
     catalogueSearchStore.subscribe,
     catalogueSearchStore.getSnapshot,
   );
+  const session = useSyncExternalStore(sessionStore.subscribe, sessionStore.getSnapshot);
 
   // A want-list (or other) click asked to search a card — open the Search tab.
   useEffect(() => {
     if (catalogueRequest) setTab('search');
   }, [catalogueRequest?.id]);
 
+  const openCart = () => {
+    // Persist before navigate — React's view effect may not flush before unload.
+    try {
+      localStorage.setItem(TAB_KEY, 'cart');
+      if (view === 'hidden') localStorage.setItem(VIEW_KEY, lastVisibleRef.current);
+    } catch {
+      /* ignore */
+    }
+    setTab('cart');
+    if (view === 'hidden') setView(lastVisibleRef.current);
+    // Same tab: load Cardmarket’s cart HTML, then show Lugin’s clearer view of it.
+    if (!onShoppingCartPage()) {
+      location.assign(cartPageUrl());
+      return;
+    }
+    void cartStore.refresh();
+  };
+
   // `null` until the stores have read storage — see useFirstRun for why this is
   // not a plain subscription.
   const { close: finishWelcome, welcome } = useFirstRun();
 
-  // Seed the cart total from the current page's header instantly, then refresh
-  // the authoritative contents from the server.
+  // Seed stores, wire overlay events, and reopen after Cardmarket login once the
+  // session check succeeds (listener must exist before sessionStore.init() runs).
   useEffect(() => {
-    cartStore.seedFromDom();
-    void cartStore.refresh();
-    // Start (or resume) the persistent task queue on this page.
-    taskQueue.init();
-  }, []);
-
-  // Toolbar icon (routed via background -> content script) toggles visibility,
-  // restoring the previous (panel/full) mode.
-  useEffect(() => {
+    const show = () => setView(readView());
     const toggle = () => setView(v => (v === 'hidden' ? lastVisibleRef.current : 'hidden'));
     const hide = () => setView('hidden');
+    const showCart = () => {
+      setTab('cart');
+      setView(v => (v === 'hidden' ? lastVisibleRef.current : v));
+      void cartStore.refresh();
+    };
+
     window.addEventListener('lugin:toggle', toggle);
     window.addEventListener(OVERLAY_HIDE_EVENT, hide);
+    window.addEventListener(OVERLAY_SHOW_EVENT, show);
+    window.addEventListener(OVERLAY_OPEN_CART_EVENT, showCart);
+
+    const tryReopenAfterLogin = () => {
+      reopenOverlayIfPending();
+      setView(readView());
+    };
+
+    let prevSignedIn = sessionStore.getSnapshot().signedIn;
+    const unsubSession = sessionStore.subscribe(() => {
+      const { signedIn } = sessionStore.getSnapshot();
+      if (signedIn === true && prevSignedIn !== true) tryReopenAfterLogin();
+      prevSignedIn = signedIn;
+    });
+
+    cartStore.seedFromDom();
+    void cartStore.refresh();
+    taskQueue.init();
+    sessionStore.init();
+
     return () => {
+      unsubSession();
       window.removeEventListener('lugin:toggle', toggle);
       window.removeEventListener(OVERLAY_HIDE_EVENT, hide);
+      window.removeEventListener(OVERLAY_SHOW_EVENT, show);
+      window.removeEventListener(OVERLAY_OPEN_CART_EVENT, showCart);
     };
   }, []);
 
   // Persist the view mode so it survives page navigations, and remember the
   // last visible mode for restoring from hidden.
   useEffect(() => {
-    if (view !== 'hidden') lastVisibleRef.current = view;
+    if (view !== 'hidden') {
+      lastVisibleRef.current = view;
+      try {
+        localStorage.setItem(LAST_VISIBLE_VIEW_KEY, view);
+      } catch {
+        /* ignore */
+      }
+    }
     try {
       localStorage.setItem(VIEW_KEY, view);
     } catch {
@@ -285,7 +387,7 @@ export const App = () => {
             side === 'left' ? 'left-4' : 'right-4'
           }`}
           onClick={() => setView(lastVisibleRef.current)}
-          title="Open Lugin"
+          title={`Open Lugin · v${DESKTOP_VERSION}`}
           type="button"
         >
           <LuginMark size={22} variant="color" />
@@ -344,18 +446,22 @@ export const App = () => {
               draggable={false}
               src={WORDMARK[theme]}
             />
+            <span
+              className="flex-none rounded bg-tint px-1 py-0.5 text-[11px] font-semibold tabular-nums text-ink"
+              title="Desktop code version — bumps every change so you can confirm a reload picked it up"
+            >
+              v{DESKTOP_VERSION}
+            </span>
 
-            <a
+            <button
               className={`ml-1 flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium tabular-nums transition-colors hover:bg-tint ${
                 cart.status === 'error' ? 'text-neg' : 'text-pos'
-              }`}
-              href={CART_URL}
-              onClick={() => void cartStore.refresh()}
-              rel="noreferrer"
-              target="_blank"
+              } ${tab === 'cart' ? 'bg-tint' : ''}`}
+              onClick={openCart}
               title={`Shopping cart${cart.count ? ` — ${cart.count} item${cart.count === 1 ? '' : 's'}` : ' (empty)'}${
                 cart.status === 'error' ? ` · ${cart.error ?? 'refresh failed'}` : ''
-              }${cart.fetchedAt ? ' · click to open & refresh' : ''}`}
+              }`}
+              type="button"
             >
               <ShoppingCart
                 aria-hidden
@@ -364,7 +470,7 @@ export const App = () => {
               />
               {cart.total ?? (cart.status === 'loading' ? '…' : '0,00 €')}
               {cart.count > 0 && <Badge tone="pos">{cart.count}</Badge>}
-            </a>
+            </button>
 
             <div className="ml-auto flex items-center gap-0.5">
               {flags.devTools && (
@@ -413,12 +519,24 @@ export const App = () => {
               on every page load for everyone who is already set up. */}
           {welcome ? (
             <ErrorBoundary label="Welcome">
-              <WelcomeScreen onDone={finishWelcome} />
+              {session.signedIn === false ? (
+                <LoginGate feature="Reading your want lists and purchases" />
+              ) : session.signedIn === null ? (
+                <CheckingSession />
+              ) : (
+                <WelcomeScreen onDone={finishWelcome} />
+              )}
             </ErrorBoundary>
           ) : (
             <>
               <Tabs
-                items={TABS.map(t => (t.id === 'traffic' ? { ...t, count: calls.length } : t))}
+                items={TABS.map(t =>
+                  t.id === 'traffic'
+                    ? { ...t, count: calls.length }
+                    : t.id === 'cart'
+                      ? { ...t, count: cart.count || undefined }
+                      : t,
+                )}
                 onChange={setTab}
                 value={tab}
               />
@@ -431,7 +549,9 @@ export const App = () => {
 
               <div className={panelClass(tab === 'search')}>
                 <ErrorBoundary label="Search">
-                  <WantsPanel />
+                  <RequiresLogin active={tab === 'search'} feature="Search">
+                    <WantsPanel />
+                  </RequiresLogin>
                 </ErrorBoundary>
               </div>
 
@@ -443,13 +563,23 @@ export const App = () => {
 
               <div className={panelClass(tab === 'wantlists')}>
                 <ErrorBoundary label="Wants">
-                  <WantListsPanel />
+                  <RequiresLogin active={tab === 'wantlists'} feature="Want lists">
+                    <WantListsPanel />
+                  </RequiresLogin>
                 </ErrorBoundary>
               </div>
 
               <div className={panelClass(tab === 'decks')}>
                 <ErrorBoundary label="Decks">
                   <DeckPanel />
+                </ErrorBoundary>
+              </div>
+
+              <div className={panelClass(tab === 'cart')}>
+                <ErrorBoundary label="Cart">
+                  <RequiresLogin active={tab === 'cart'} feature="Cart">
+                    <CartPanel />
+                  </RequiresLogin>
                 </ErrorBoundary>
               </div>
 

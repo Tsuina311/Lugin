@@ -1,0 +1,21 @@
+---
+description: Bump desktop code version on every extension change
+alwaysApply: true
+---
+
+# Desktop version bump
+
+Whenever you change **desktop / extension** code in this repo (anything under
+`src/ui`, `src/content`, `src/sites`, `src/background`, `src/interceptor`,
+`src/lib` used by the overlay, etc.), bump `DESKTOP_VERSION` in
+`src/desktopVersion.ts` in the **same** edit.
+
+- Format: `0.1.N` — base `0.1`, third digit +1 each time (`0.1.0` → `0.1.1` → …
+  `0.1.13`). Not git-based.
+- That string is shown in the overlay header as `v0.1.13` and in
+  `chrome://extensions` as `· d0.1.13`, so the user can confirm a reload picked
+  up the change.
+- Do **not** skip the bump on “tiny” fixes — the whole point is every prompt that
+  changes code gets a new number.
+- Phone / web (`src/web`) keeps using the existing git `build/version` stamp;
+  only bump `DESKTOP_VERSION` for extension/desktop work.

@@ -61,6 +61,17 @@ interface FetchedDoc {
   status: number;
 }
 
+/** Cloudflare interstitial markers in a response body. */
+const CHALLENGE_BODY =
+  /just a moment|cdn-cgi\/challenge-platform|cf-chl-|attention required/i;
+
+/**
+ * HTTP 403, or a body that is Cloudflare's checkbox page rather than the site.
+ * Those need a tab reload so the user can tick the check — see `verify.ts`.
+ */
+export const isChallengeResponse = (status: number, body: string): boolean =>
+  status === 403 || CHALLENGE_BODY.test(body);
+
 export const fetchDoc = async (url: string, signal?: AbortSignal): Promise<FetchedDoc> => {
   // Retry transient network failures (e.g. "TypeError: Failed to fetch" from a
   // dropped connection or a brief Cloudflare hiccup). HTTP errors and aborts are
@@ -71,8 +82,13 @@ export const fetchDoc = async (url: string, signal?: AbortSignal): Promise<Fetch
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     try {
       const res = await fetch(url, { credentials: 'include', signal });
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
       const html = await res.text();
+      // 403 / captcha HTML must become CHALLENGE: so the overlay reloads into the
+      // checkbox instead of surfacing a bare "HTTP 403" the user can't act on.
+      if (isChallengeResponse(res.status, html)) {
+        throw new Error(`CHALLENGE: HTTP ${res.status} for ${url}`);
+      }
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
       return { doc: new DOMParser().parseFromString(html, 'text/html'), html, status: res.status };
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') throw err;
@@ -86,12 +102,28 @@ export const fetchDoc = async (url: string, signal?: AbortSignal): Promise<Fetch
 };
 
 /**
+ * Cardmarket's inline login form (served when a signed-in page was asked for
+ * without a session). Must be checked *before* {@link looksSignedIn}: the guest
+ * header still links to Account and would otherwise read as signed in.
+ */
+export const looksLikeLoginPage = (html: string): boolean => {
+  if (/User_Logout|data-logged-in=["']true/i.test(html)) return false;
+  return (
+    /User_Login/i.test(html) ||
+    (/type=["']password["']/i.test(html) &&
+      (/>\s*Login\s*</i.test(html) || /name=["']username["']/i.test(html)))
+  );
+};
+
+/**
  * Was this page served to someone signed in? Only then does it have the account
  * nav / logout link. Worth asking of a page that carries a `__cmtkn`, since the
  * login form has one of its own and it works for nothing else.
  */
-export const looksSignedIn = (html: string): boolean =>
-  /User_Logout|account-dropdown|User_Account|data-logged-in|My\s*Account|\/Account["']/i.test(html);
+export const looksSignedIn = (html: string): boolean => {
+  if (looksLikeLoginPage(html)) return false;
+  return /User_Logout|account-dropdown|data-logged-in=["']true|My\s*Account/i.test(html);
+};
 
 /** Heuristic: did we get a real logged-in page, or a challenge/login shell? */
 const looksWrong = (doc: Document, html: string): string | null => {
@@ -113,8 +145,7 @@ const looksWrong = (doc: Document, html: string): string | null => {
  * challenged answers with the check where its own reply should be, so there's no
  * title and no ajax envelope — just a body carrying these, from the first byte.
  */
-export const looksLikeChallenge = (body: string): boolean =>
-  /just a moment|cdn-cgi\/challenge-platform|cf-chl-|attention required/i.test(body);
+export const looksLikeChallenge = (body: string): boolean => CHALLENGE_BODY.test(body);
 
 /** A single want row: the card name plus its per-list `idWant` (for removal). */
 export interface WantRow {
@@ -1731,7 +1762,7 @@ export const parseOffers = (
     if (!name || name.length < 2 || isLanguageName(name)) return;
 
     const articleId =
-      row.id.match(/(\d+)/)?.[1] ||
+      row.id.match(/^(?:article|stock)Row(\d+)$/i)?.[1] ||
       row.getAttribute('data-id-article') ||
       row.getAttribute('data-article-id') ||
       row.querySelector<HTMLInputElement>('input[name="idArticle"]')?.value ||
@@ -1799,7 +1830,7 @@ export const parseOffers = (
       if (!looksLikeOffer) return;
       const { price, value } = findPrice(row);
       const articleId =
-        row.id.match(/(\d+)/)?.[1] ||
+        row.id.match(/^(?:article|stock)Row(\d+)$/i)?.[1] ||
         row.getAttribute('data-id-article') ||
         row.getAttribute('data-article-id') ||
         row.querySelector<HTMLInputElement>('input[name="idArticle"]')?.value ||

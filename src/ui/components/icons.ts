@@ -36,6 +36,7 @@ export {
   Library,
   List,
   Loader2,
+  LogIn,
   Maximize2,
   Minimize2,
   Minus,

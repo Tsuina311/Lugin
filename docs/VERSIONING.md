@@ -44,8 +44,10 @@ deploys from `main`: a patch release and a commit are the same event.
 ## Where a version shows up
 
 - **Phone**: the header, on every screen, and the splash screens.
-- **Extension**: `chrome://extensions` shows `version_name`, which carries the
-  commit as well.
+- **Extension**: the overlay header shows `v0.1.N` from `src/desktopVersion.ts`
+  (base `0.1`, third digit +1 every desktop code change) so a reload is visibly
+  a new build. `chrome://extensions` shows `version_name`, which carries the
+  commit **and** `· d0.1.N`.
 - **Service worker**: the shell cache is `lugin-shell-<sha>`, so a deploy drops
   the previous offline copy instead of keeping it.
 

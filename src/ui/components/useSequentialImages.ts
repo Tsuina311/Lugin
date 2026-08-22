@@ -1,63 +1,71 @@
 import { useEffect, useRef, useState } from 'react';
 
-/**
- * Load a list of image URLs one at a time (never in parallel), returning the set
- * that has finished. New URLs appended to `urls` join the tail of the queue, so
- * the box/grid views fetch images for the cards on screen sequentially rather
- * than firing dozens of requests at once.
- *
- * Failures advance the queue *and* are remembered, so a parent re-render with
- * the same URLs does not retry them forever (which flooded DevTools when the
- * Cardmarket page kept mutating and re-feeding this hook).
- */
-export const useSequentialImages = (urls: string[]): Set<string> => {
-  const [loaded, setLoaded] = useState<Set<string>>(() => new Set());
-  const stateRef = useRef<{
-    active: boolean;
-    /** Succeeded or failed — either way, do not enqueue again. */
-    done: Set<string>;
-    loaded: Set<string>;
-    queue: string[];
-  }>({
-    active: false,
-    done: new Set(),
-    loaded: new Set(),
-    queue: [],
-  });
+/** Give up on a hung thumb so the rest of the list can proceed. */
+const LOAD_TIMEOUT_MS = 10_000;
+/** Load several visible thumbs at once — one-at-a-time felt sluggish in long lists. */
+const MAX_IN_FLIGHT = 8;
 
-  // Identity of the URL list, not the array reference — parents often allocate
-  // a fresh array with the same contents on every render.
+/**
+ * Unlock list thumbnails in order (top first) but allow several in flight at
+ * once. Prefer `<img src>` over `new Image()` preloads: Cardmarket CDN thumbs
+ * often never fire onload in the extension's isolated world when preloaded.
+ */
+export const useSequentialImages = (
+  urls: string[],
+): {
+  /** Call from the img's onLoad / onError once that URL was unlocked. */
+  markDone: (url: string) => void;
+  /** True once this URL may receive an `<img src>` (in flight or already done). */
+  unlocked: (url: string) => boolean;
+} => {
+  const [inFlight, setInFlight] = useState<Set<string>>(() => new Set());
+  const [finished, setFinished] = useState<Set<string>>(() => new Set());
+  const doneRef = useRef<Set<string>>(new Set());
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const urlsRef = useRef(urls);
+  urlsRef.current = urls;
+
   const key = urls.join('\0');
 
-  useEffect(() => {
-    const s = stateRef.current;
-    for (const u of urls) {
-      if (u && !s.done.has(u) && !s.queue.includes(u)) s.queue.push(u);
+  const fillQueue = () => {
+    const pending = urlsRef.current.filter(
+      u => u && !doneRef.current.has(u) && !inFlightRef.current.has(u),
+    );
+    const slots = MAX_IN_FLIGHT - inFlightRef.current.size;
+    if (slots <= 0 || pending.length === 0) return;
+    for (const url of pending.slice(0, slots)) {
+      inFlightRef.current.add(url);
     }
-    const pump = () => {
-      const next = s.queue.shift();
-      if (next == null) {
-        s.active = false;
-        return;
-      }
-      s.active = true;
-      const img = new Image();
-      const finish = (ok: boolean) => {
-        s.done.add(next);
-        if (ok) {
-          s.loaded.add(next);
-          setLoaded(new Set(s.loaded));
-        }
-        pump();
-      };
-      img.onload = () => finish(true);
-      img.onerror = () => finish(false);
-      img.src = next;
-    };
-    if (!s.active) pump();
-    // `urls` is read inside; `key` is the stable content fingerprint.
+    setInFlight(new Set(inFlightRef.current));
+  };
+
+  const finish = (url: string) => {
+    if (!url || doneRef.current.has(url)) return;
+    doneRef.current.add(url);
+    inFlightRef.current.delete(url);
+    setFinished(prev => new Set(prev).add(url));
+    setInFlight(new Set(inFlightRef.current));
+    fillQueue();
+  };
+
+  useEffect(() => {
+    fillQueue();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  return loaded;
+  // A stuck CDN response must not freeze the whole queue.
+  useEffect(() => {
+    if (inFlight.size === 0) return;
+    const timers = [...inFlight].map(url =>
+      window.setTimeout(() => finish(url), LOAD_TIMEOUT_MS),
+    );
+    return () => timers.forEach(t => window.clearTimeout(t));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inFlight]);
+
+  const markDone = (url: string) => finish(url);
+
+  const unlocked = (url: string) => !!url && (finished.has(url) || inFlight.has(url));
+
+  return { markDone, unlocked };
 };

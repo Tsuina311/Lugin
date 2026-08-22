@@ -369,7 +369,7 @@ const TagRow = ({
         }`,
       )}
     >
-      <CardResultThumb name={card.name} previewKey={`tags|${card.id}`} urls={urls} />
+      <CardResultThumb candidates={urls} name={card.name} previewKey={`tags|${card.id}`} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-ink" title={card.name}>
           {card.name}

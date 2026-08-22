@@ -21,6 +21,7 @@ import {
   Sparkles,
   Trash2,
 } from './icons';
+import { SequentialCoverImage, SequentialImage } from './SequentialImage';
 import { useSequentialImages } from './useSequentialImages';
 
 import { cartStore } from '@/content/cartStore';
@@ -28,16 +29,18 @@ import { catalogueSearchStore } from '@/content/catalogueSearchStore';
 import { collectionStore } from '@/content/collectionStore';
 import { previewStore } from '@/content/previewStore';
 import { purchaseStore } from '@/content/purchaseStore';
+import { askForLogin, clearCachedTokens, cmToken, rememberCmToken, rememberWriteToken } from '@/content/session';
 import { shippingStore } from '@/content/shippingStore';
 import { taskQueue } from '@/content/taskQueue';
 import { wantsStore } from '@/content/wantsStore';
+import { askForVerification, needsVerification, VERIFY_HELP } from '@/content/verify';
 import { cardKey, frontFaceName, stripVersion } from '@/lib/cardName';
 import { flags } from '@/lib/flags';
 import { requestPrices, requestScryfall, requestScryfallCached } from '@/lib/messaging';
 import { MANA_VALUE_BUCKETS, manaValueBucket, manaValueLabel, type CardMetadata } from '@/lib/mtg';
 import { money, priceOf } from '@/lib/prices';
 import { editionIdOf, groupEditionsByYear, tallyEditions } from '@/lib/sets';
-import { addArticleToCart, findCmToken } from '@/sites/cardmarket/cart';
+import { addArticleToCart, extractCmToken, findCmToken } from '@/sites/cardmarket/cart';
 import {
   searchCatalogue,
   type ProductSuggestion,
@@ -141,17 +144,6 @@ const detectSeller = (): SellerContext | null => {
   if (!m) return null;
   return { baseUrl: location.origin + location.pathname, name: decodeURIComponent(m[1]) };
 };
-
-/**
- * A Scryfall "card image by exact name" URL. Used as a fallback thumbnail for
- * offer rows that carry no Cardmarket image (e.g. spoiler-page cards, which have
- * no article/stock row and thus no product image). The front-face name keeps the
- * lookup exact for double-faced cards ("A // B" → "A").
- */
-const scryfallImageByName = (name?: string): string | undefined =>
-  name
-    ? `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(frontFaceName(name))}&format=image&version=normal`
-    : undefined;
 
 /**
  * Read the seller's country from the current page.
@@ -441,9 +433,24 @@ export const WantsPanel = () => {
       });
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
+      const message = err instanceof Error ? err.message : String(err);
+      // 403 / captcha: reload so the user can tick Cloudflare's check again.
+      if (needsVerification(message)) {
+        if (!(await askForVerification(message))) {
+          setSearch({
+            catalogue: [],
+            error: VERIFY_HELP,
+            matches: [],
+            product: null,
+            query: term,
+            status: 'error',
+          });
+        }
+        return;
+      }
       setSearch({
         catalogue: [],
-        error: err instanceof Error ? err.message : String(err),
+        error: message,
         matches: [],
         product: null,
         query: term,
@@ -480,6 +487,9 @@ export const WantsPanel = () => {
     try {
       const href = new URL(product.href, location.origin).href;
       const { doc, html } = await fetchDoc(href, controller.signal);
+      // Product HTML often carries `__cmtkn` even when the tab under the overlay
+      // doesn't — keep it for add-to-cart / wants writes.
+      rememberCmToken(extractCmToken(html));
       // Challenge / login shells have no seller table — say so instead of
       // "no offers" for a card that clearly has stock on the live site.
       const title = doc.querySelector('title')?.textContent?.trim() ?? '';
@@ -516,9 +526,22 @@ export const WantsPanel = () => {
       }));
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
+      const message = err instanceof Error ? err.message : String(err);
+      if (needsVerification(message)) {
+        if (!(await askForVerification(message))) {
+          setSearch(s => ({
+            ...s,
+            error: VERIFY_HELP,
+            matches: [],
+            product,
+            status: 'error',
+          }));
+        }
+        return;
+      }
       setSearch(s => ({
         ...s,
-        error: err instanceof Error ? err.message : String(err),
+        error: message,
         matches: [],
         product,
         status: 'error',
@@ -745,21 +768,27 @@ export const WantsPanel = () => {
   const addOne = async (offer: ScanMatch): Promise<boolean> => {
     const articleId = offer.articleId;
     if (!articleId) return false;
-    const token = findCmToken();
-    if (!token) {
-      setAdded(s => ({
-        ...s,
-        [articleId]: 'No session token found — add one card manually once, then retry.',
-      }));
-      return false;
-    }
     setAdded(s => ({ ...s, [articleId]: 'adding' }));
     try {
-      const r = await addArticleToCart(articleId, token);
+      const attempt = async (): Promise<{ message: string; ok: boolean }> => {
+        const token = await cmToken();
+        if (!token) {
+          return { message: 'Not signed in — sign in on Cardmarket, then retry.', ok: false };
+        }
+        rememberWriteToken(token);
+        return addArticleToCart(articleId, token);
+      };
+
+      let r = await attempt();
+      // Stale CSRF tokens answer with a generic "could not be completed" — drop
+      // caches and borrow a fresh signed-in token once before giving up.
+      if (!r.ok && /could not be completed|session|token|csrf|sign in/i.test(r.message)) {
+        clearCachedTokens();
+        r = await attempt();
+      }
+      if (!r.ok && /not signed in/i.test(r.message)) askForLogin();
       setAdded(s => ({ ...s, [articleId]: r.ok ? 'added' : r.message }));
-      // Re-read the authoritative server cart so the header total mirrors the
-      // site (its header widget won't refresh since we didn't click its button).
-      if (r.ok) void cartStore.refresh();
+      if (r.ok) await cartStore.refresh();
       return r.ok;
     } catch (err) {
       setAdded(s => ({ ...s, [articleId]: err instanceof Error ? err.message : String(err) }));
@@ -800,19 +829,20 @@ export const WantsPanel = () => {
     const url = o.productUrl;
     if (!url) return;
     setWantMenu(null);
-    const token = findCmToken();
-    if (!token) {
-      setWantAdd(s => ({
-        ...s,
-        [url]: {
-          msg: 'No session token found — add one card manually once, then retry.',
-          status: 'error',
-        },
-      }));
-      return;
-    }
     setWantAdd(s => ({ ...s, [url]: { status: 'adding' } }));
     try {
+      const token = await cmToken();
+      if (!token) {
+        setWantAdd(s => ({
+          ...s,
+          [url]: {
+            msg: 'Not signed in — sign in on Cardmarket, then retry.',
+            status: 'error',
+          },
+        }));
+        askForLogin();
+        return;
+      }
       const ids = await fetchProductIds(url);
       if (!ids?.idMetacard)
         throw new Error('Couldn\u2019t find this card\u2019s id on Cardmarket.');
@@ -1082,21 +1112,24 @@ export const WantsPanel = () => {
     [grouped, effectiveList, metaByName, fQuery, fColors, fCmc, fSubtype, showingProduct],
   );
 
-  /** Resolve the best front-image URL for a card (page image → cached CDN →
-   * Scryfall-by-name redirect fallback). */
+  /**
+   * Prefer Cardmarket's own thumb, then a Scryfall CDN URL from cached metadata.
+   * Never use `api.scryfall.com/...?format=image` as an `<img src>` — each one is
+   * a rate-limited API redirect, and a page of thumbs stalls then fails (red in
+   * DevTools). Metadata is loaded via the polite Scryfall queue and carries a
+   * direct `cards.scryfall.io` URL.
+   */
   const cardImageSrc = (url?: string, name?: string): string | undefined => {
     const key = name ? cardKey(name) : '';
-    return url ?? (key ? metaByName[key]?.imageUrl : undefined) ?? scryfallImageByName(name);
+    return url ?? (key ? metaByName[key]?.imageUrl : undefined);
   };
 
-  // Box view needs every visible card's image. Fetch metadata (batched + cached)
-  // so name-only want rows resolve to a direct CDN image instead of the slower
-  // Scryfall redirect. Then feed the resolved URLs through the sequential loader
-  // so on-screen cards fetch one after another rather than all at once.
+  // Resolve Scryfall CDN image URLs (and filter metadata) for visible cards.
+  // List and box both need this — never fall back to named?format=image in <img>.
   useEffect(() => {
-    if (resultsView === 'box') void loadMeta();
+    if (groupNames.length > 0) void loadMeta();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resultsView, groupNames]);
+  }, [groupNames, resultsView]);
 
   const boxSrcs = useMemo(
     () =>
@@ -1109,7 +1142,40 @@ export const WantsPanel = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [resultsView, visibleGrouped, metaByName],
   );
-  const loadedImages = useSequentialImages(boxSrcs);
+
+  // Which catalogue edition groups are unfolded — drives which thumbs we queue.
+  // Single-card results (exact / want-list search) start open via defaultOpen on
+  // the <details>; we mirror that here so images enqueue without waiting a click.
+  const [openEditions, setOpenEditions] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    if (catalogueGroups.length === 1) setOpenEditions(new Set([catalogueGroups[0].key]));
+    else setOpenEditions(new Set());
+  }, [catalogueGroups]);
+
+  const catalogueSrcs = useMemo(() => {
+    if (!showingCatalogue || resultsView === 'box') return [];
+    const urls: string[] = [];
+    const solo = catalogueGroups.length === 1;
+    for (const g of catalogueGroups) {
+      if (g.printings.length === 1) {
+        const u = g.printings[0]?.imageUrl;
+        if (u) urls.push(u);
+        continue;
+      }
+      const lead = g.printings.find(p => p.imageUrl) ?? g.printings[0];
+      if (lead?.imageUrl) urls.push(lead.imageUrl);
+      if (!solo && !openEditions.has(g.key)) continue;
+      for (const p of g.printings) {
+        if (p.imageUrl && p.imageUrl !== lead?.imageUrl) urls.push(p.imageUrl);
+      }
+    }
+    return urls;
+  }, [showingCatalogue, resultsView, catalogueGroups, openEditions]);
+
+  // One queue for whatever results are on screen — top row first, then the next.
+  const { markDone: markImageDone, unlocked: imageUnlocked } = useSequentialImages(
+    resultsView === 'box' ? boxSrcs : catalogueSrcs,
+  );
 
   // The "order" the shipping estimate is based on: the cheapest offer of each
   // currently-visible card (mirrors what "Add cheapest of each" would buy).
@@ -1427,15 +1493,16 @@ export const WantsPanel = () => {
     const placements = placementsFor(name);
     setConfirmKey(null);
     if (placements.length === 0 || !index) return;
-    const token = findCmToken();
+    setRemoveState(s => ({ ...s, [key]: 'removing' }));
+    const token = await cmToken();
     if (!token) {
       setRemoveState(s => ({
         ...s,
-        [key]: 'No session token found — remove one want manually once, then retry.',
+        [key]: 'Not signed in — sign in on Cardmarket, then retry.',
       }));
+      askForLogin();
       return;
     }
-    setRemoveState(s => ({ ...s, [key]: 'removing' }));
 
     const removed = new Set<string>(); // listIds successfully cleared
     let firstError: string | null = null;
@@ -3146,23 +3213,26 @@ export const WantsPanel = () => {
                               type="button"
                             >
                               {thumb ? (
-                                <img
+                                <SequentialImage
                                   alt=""
                                   className={`h-10 w-7 flex-none rounded-sm object-cover ${thumbCursor}`}
-                                  loading="lazy"
-                                  src={thumb}
-                                  title={
-                                    preview?.flippable
-                                      ? 'Click to flip to the other side'
-                                      : undefined
-                                  }
-                                  {...(preview?.handlers ?? {})}
+                                  markDone={markImageDone}
                                   onClick={e => {
                                     if (preview) {
                                       e.stopPropagation();
                                       preview.handlers.onClick(e);
                                     }
                                   }}
+                                  onMouseEnter={preview?.handlers.onMouseEnter}
+                                  onMouseLeave={preview?.handlers.onMouseLeave}
+                                  onMouseMove={preview?.handlers.onMouseMove}
+                                  src={thumb}
+                                  title={
+                                    preview?.flippable
+                                      ? 'Click to flip to the other side'
+                                      : undefined
+                                  }
+                                  unlocked={imageUnlocked(thumb)}
                                 />
                               ) : (
                                 <span className="h-10 w-7 flex-none rounded-sm bg-panel" />
@@ -3200,6 +3270,21 @@ export const WantsPanel = () => {
                           );
                         }
 
+                        // One card in the whole result set (want-list / exact search) →
+                        // show every printing flat. A <details defaultOpen> was still
+                        // landing collapsed in the shadow DOM.
+                        if (catalogueGroups.length === 1) {
+                          return (
+                            <div key={g.key} className="divide-y divide-line/40">
+                              {g.printings.map(item => (
+                                <div key={item.href}>
+                                  {renderPrinting(item, { showName: true })}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }
+
                         const lead = g.printings.find(p => p.imageUrl) ?? g.printings[0];
                         const thumb = lead?.imageUrl;
                         // Keep the Cardmarket "Front // Back" name so DFCs get
@@ -3209,28 +3294,43 @@ export const WantsPanel = () => {
                           : null;
                         const fromPrice = catalogueFromPrice(g.printings);
                         return (
-                          <details key={g.key} className="group/editions">
+                          <details
+                            key={g.key}
+                            className="group/editions"
+                            onToggle={e => {
+                              const open = (e.currentTarget as HTMLDetailsElement).open;
+                              setOpenEditions(prev => {
+                                const next = new Set(prev);
+                                if (open) next.add(g.key);
+                                else next.delete(g.key);
+                                return next;
+                              });
+                            }}
+                          >
                             <summary className="flex cursor-pointer list-none items-center gap-2 px-2 py-1.5 transition-colors hover:bg-tint">
                               {thumb ? (
-                                <img
+                                <SequentialImage
                                   alt=""
                                   className={`h-10 w-7 flex-none rounded-sm object-cover ${
                                     preview?.flippable ? 'cursor-flip' : 'cursor-zoom-in'
                                   }`}
-                                  loading="lazy"
-                                  src={thumb}
-                                  title={
-                                    preview?.flippable
-                                      ? 'Click to flip to the other side'
-                                      : undefined
-                                  }
-                                  {...(preview?.handlers ?? {})}
+                                  markDone={markImageDone}
                                   onClick={e => {
                                     // Preview / flip without toggling the editions list.
                                     e.preventDefault();
                                     e.stopPropagation();
                                     preview?.handlers.onClick(e);
                                   }}
+                                  onMouseEnter={preview?.handlers.onMouseEnter}
+                                  onMouseLeave={preview?.handlers.onMouseLeave}
+                                  onMouseMove={preview?.handlers.onMouseMove}
+                                  src={thumb}
+                                  title={
+                                    preview?.flippable
+                                      ? 'Click to flip to the other side'
+                                      : undefined
+                                  }
+                                  unlocked={imageUnlocked(thumb)}
                                 />
                               ) : (
                                 <span className="h-10 w-7 flex-none rounded-sm bg-panel" />
@@ -3284,7 +3384,7 @@ export const WantsPanel = () => {
                     {visibleGrouped.map(g => {
                       const key = cardKey(g.name);
                       const src = cardImageSrc(g.offers.find(o => o.imageUrl)?.imageUrl, g.name);
-                      const ready = !!src && loadedImages.has(src);
+                      const open = !!src && imageUnlocked(src);
                       const preview = src ? previewHandlers(src, g.name) : null;
                       // Hover actions: add the cheapest offer with an article id to
                       // the cart, and remove the card from all want lists (only when
@@ -3327,19 +3427,18 @@ export const WantsPanel = () => {
                               preview?.flippable ? 'Click to flip to the other side' : undefined
                             }
                           >
-                            {ready ? (
-                              // Blown up and pulled up-left until the art window
-                              // alone fills the box. Percentages, so it holds at
-                              // any tile size.
-                              <img
+                            {src ? (
+                              <SequentialCoverImage
                                 alt={g.name}
                                 className="absolute h-auto max-w-none"
+                                markDone={markImageDone}
                                 src={src}
                                 style={{
                                   left: `${(-ART_WINDOW.left / ART_WINDOW.width) * 100}%`,
                                   top: `${(-ART_WINDOW.top / ART_WINDOW.height) * 100}%`,
                                   width: `${(1 / ART_WINDOW.width) * 100}%`,
                                 }}
+                                unlocked={open}
                               />
                             ) : (
                               <div className="flex h-full w-full items-center justify-center">

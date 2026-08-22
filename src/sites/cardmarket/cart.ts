@@ -2,17 +2,29 @@ import { callStore } from '@/content/callStore';
 import { replayInPage } from '@/lib/messaging';
 import { sellerSlugFromHref } from '@/sites/cardmarket/order';
 import { tokenFromArgs } from '@/sites/cardmarket/searchArgs';
+import { countryId } from '@/sites/cardmarket/shipping';
 
 // Cardmarket adds an offer to the cart with a single AJAX POST:
-//   POST /en/Magic/AjaxAction/ShoppingCart_Add_AddArticlesFromUserOffers
+//   POST /<lang>/Magic/AjaxAction/ShoppingCart_Add_AddArticlesFromUserOffers
 //   __cmtkn=<token>&idArticle={"<id>":"<id>"}&amount={"<id>":"1"}
 // The `__cmtkn` is a per-session CSRF token. We reuse it from the page rather
 // than mint our own, and replay the POST in the page context so it carries the
 // user's session exactly like the site's own button does.
 
-const ADD_URL = '/en/Magic/AjaxAction/ShoppingCart_Add_AddArticlesFromUserOffers';
 const TOKEN_HEX = /([0-9a-f]{32,})/i;
 const TOKEN_IN_HTML = /__cmtkn['"\s:=]+([0-9a-f]{32,})/i;
+const CART_MUTATION_RE = /ShoppingCart_[A-Za-z]/i;
+
+const currentLang = (): string => {
+  const first = location.pathname.split('/').filter(Boolean)[0] ?? '';
+  return /^[a-z]{2}$/.test(first) ? first : 'en';
+};
+
+const addCartUrl = (): string =>
+  `/${currentLang()}/Magic/AjaxAction/ShoppingCart_Add_AddArticlesFromUserOffers`;
+
+const removeCartUrl = (): string =>
+  `/${currentLang()}/Magic/AjaxAction/ShoppingCart_RemoveArticle`;
 
 /** Read a session token out of a page's HTML, if it carries one. */
 export const extractCmToken = (html: string): string | null => {
@@ -39,18 +51,25 @@ const tokenFromCall = (call: { requestBody?: string; url?: string }): string | n
 
 /**
  * Find the session's `__cmtkn`. Prefers the live DOM (what the page would send
- * right now), then a token seen in a captured request body, then a scrape of
- * the HTML. Returns null if none can be found.
+ * right now), then a token from a recent cart mutation (the site's own add),
+ * then any captured request, then optionally a scrape of the page HTML.
  */
-export const findCmToken = (): string | null => {
+export const findCmToken = (opts: { allowHtmlScrape?: boolean } = {}): string | null => {
   const input = document.querySelector<HTMLInputElement>('input[name="__cmtkn"]');
   if (input?.value && TOKEN_HEX.test(input.value)) return input.value;
   const attr = document.querySelector('[data-token], [data-cmtkn]')?.getAttribute('data-token');
   if (attr && TOKEN_HEX.test(attr)) return attr;
-  for (const call of callStore.getSnapshot()) {
+  const calls = callStore.getSnapshot();
+  for (const call of calls) {
+    if (!CART_MUTATION_RE.test(call.url ?? '')) continue;
     const token = tokenFromCall(call);
     if (token) return token;
   }
+  for (const call of calls) {
+    const token = tokenFromCall(call);
+    if (token) return token;
+  }
+  if (opts.allowHtmlScrape === false) return null;
   return extractCmToken(document.documentElement.innerHTML);
 };
 
@@ -90,15 +109,67 @@ export const addArticleToCart = async (
       'X-Requested-With': 'XMLHttpRequest',
     },
     method: 'POST',
-    url: ADD_URL,
+    url: addCartUrl(),
   });
 
   const resultType = decodeB64(res.body.match(/<resultType>([^<]*)<\/resultType>/)?.[1] ?? '');
   const sysHtml = decodeB64(res.body.match(/<systemMessage>([^<]*)<\/systemMessage>/)?.[1] ?? '');
-  const heading = sysHtml.match(/alert-heading[^>]*>([^<]+)</)?.[1]?.trim();
+  const heading =
+    sysHtml.match(/alert-heading[^>]*>\s*([^<]+)</i)?.[1]?.trim() ||
+    sysHtml.match(/alert-(?:danger|warning|success)[^>]*>\s*([^<]+)</i)?.[1]?.trim();
   const ok = res.ok && /success/i.test(resultType);
   return {
     message: heading || resultType || (ok ? 'Added to cart' : `Failed (HTTP ${res.status})`),
+    ok,
+  };
+};
+/**
+ * Remove one cart line. Matches Cardmarket's own trash button:
+ *   POST /<lang>/Magic/AjaxAction/ShoppingCart_RemoveArticle
+ *   __cmtkn=…&idArticle=<id>&idSeller=<id>&amount-<id>=<n>
+ * (`idArticle` is a bare id, not the JSON map used by Add.)
+ */
+export const removeArticleFromCart = async (
+  articleId: string,
+  token: string,
+  opts: { amount?: number; sellerId: string },
+): Promise<AddToCartResult> => {
+  const amount = opts.amount ?? 1;
+  const body =
+    `__cmtkn=${encodeURIComponent(token)}` +
+    `&idArticle=${encodeURIComponent(articleId)}` +
+    `&idSeller=${encodeURIComponent(opts.sellerId)}` +
+    `&amount-${encodeURIComponent(articleId)}=${encodeURIComponent(String(amount))}`;
+
+  const res = await replayInPage({
+    body,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    method: 'POST',
+    url: removeCartUrl(),
+  });
+
+  // The site answers with `<resultsCode>` (base64 `"1"` on success), not the
+  // `<resultType>success</resultType>` shape the add endpoint uses.
+  const codeRaw =
+    res.body.match(/<resultsCode>([^<]*)<\/resultsCode>/i)?.[1] ??
+    res.body.match(/<resultCode>([^<]*)<\/resultCode>/i)?.[1] ??
+    '';
+  const resultsCode = decodeB64(codeRaw).trim() || codeRaw.trim();
+  const resultType = decodeB64(res.body.match(/<resultType>([^<]*)<\/resultType>/)?.[1] ?? '');
+  const sysHtml = decodeB64(res.body.match(/<systemMessage>([^<]*)<\/systemMessage>/)?.[1] ?? '');
+  const heading =
+    sysHtml.match(/alert-heading[^>]*>\s*([^<]+)</i)?.[1]?.trim() ||
+    sysHtml.match(/alert-(?:danger|warning|success)[^>]*>\s*([^<]+)</i)?.[1]?.trim();
+  const ok = res.ok && (resultsCode === '1' || /success/i.test(resultType));
+
+  return {
+    message:
+      heading ||
+      resultType ||
+      (ok ? 'Removed from cart' : resultsCode ? `Failed (code ${resultsCode})` : `Failed (HTTP ${res.status})`),
     ok,
   };
 };
@@ -112,11 +183,6 @@ export const addArticleToCart = async (
 // contents — that's how we mirror the real cart even after silent adds.
 
 const EURO_RE = /(\d[\d.\s]*,\d{2})\s*€/;
-
-const currentLang = (): string => {
-  const first = location.pathname.split('/').filter(Boolean)[0] ?? '';
-  return /^[a-z]{2}$/.test(first) ? first : 'en';
-};
 
 const euroValue = (raw: string): number | undefined => {
   const v = Number.parseFloat(raw.replace(/[.\s]/g, '').replace(',', '.'));
@@ -136,7 +202,34 @@ export interface CartItem {
   productId?: string;
   /** Seller username slug (from the seller header this row sits under). */
   seller?: string;
+  /** Seller's country (flag / item location), for shipping estimates. */
+  sellerCountry?: string;
+  /** Numeric seller id — required by ShoppingCart_RemoveArticle. */
+  sellerId?: string;
 }
+
+const COUNTRY_ATTRS = [
+  'aria-label',
+  'title',
+  'data-bs-original-title',
+  'data-bs-title',
+  'data-original-title',
+] as const;
+
+/** Country name from a flag / "Item location: …" tip under `root`, if any. */
+const countryHintFrom = (root: Element | null | undefined): string | undefined => {
+  if (!root) return undefined;
+  const nodes: Element[] = [root, ...root.querySelectorAll('*')];
+  for (const el of nodes) {
+    for (const attr of COUNTRY_ATTRS) {
+      const raw = el.getAttribute(attr)?.trim();
+      if (!raw) continue;
+      const cleaned = raw.replace(/^Item location:\s*/i, '').replace(/\s+/g, ' ').trim();
+      if (cleaned && countryId(cleaned) != null) return cleaned;
+    }
+  }
+  return undefined;
+};
 
 export interface ServerCart {
   count: number;
@@ -164,20 +257,61 @@ export const parseCartHeader = (
 
 /** Parse the /ShoppingCart article rows (deduped — the page renders them twice). */
 export const parseCartItems = (doc: ParentNode): CartItem[] => {
-  // The cart groups articles by seller. Walk seller-header links and article
-  // rows together in document order; each row belongs to the last seller header
-  // seen before it. (Skip `/Users/` links that live *inside* an article row so
-  // per-row links don't reassign the seller mid-table.)
-  const rowSeller = new Map<Element, string | undefined>();
-  let currentSeller: string | undefined;
-  doc.querySelectorAll('a[href*="/Users/"], tr[data-article-id]').forEach(node => {
-    if (node.matches('tr[data-article-id]')) {
-      rowSeller.set(node, currentSeller);
-    } else if (!node.closest('tr[data-article-id]')) {
-      const slug = sellerSlugFromHref(node.getAttribute('href'));
-      if (slug) currentSeller = slug;
+  // The cart groups articles by seller. Walk seller markers and article rows in
+  // document order; each row inherits the last seller name + id seen before it.
+  //
+  // Important: `#seller<digits>` anchors on the cart page are reservation block
+  // ids, *not* the numeric `idSeller` that ShoppingCart_RemoveArticle expects.
+  // Prefer hidden `input[name="idSeller"]` and explicit data attributes / the
+  // trash control's own payload.
+  const rowSeller = new Map<Element, { country?: string; id?: string; name?: string }>();
+  let current: { country?: string; id?: string; name?: string } = {};
+
+  const sellerIdOf = (el: Element): string | undefined => {
+    if (el instanceof HTMLInputElement && el.name === 'idSeller') {
+      const v = el.value.trim();
+      return /^\d+$/.test(v) ? v : undefined;
     }
-  });
+    for (const attr of ['data-seller-id', 'data-id-seller', 'data-idseller'] as const) {
+      const v = el.getAttribute(attr)?.trim();
+      if (v && /^\d+$/.test(v)) return v;
+    }
+    const onclick = el.getAttribute('onclick') ?? '';
+    const fromClick = onclick.match(/idSeller['"\s:=]+(\d+)/i)?.[1];
+    if (fromClick) return fromClick;
+    return undefined;
+  };
+
+  doc
+    .querySelectorAll(
+      'a[href*="/Users/"], input[name="idSeller"], [data-seller-id], [data-id-seller], [data-idseller], [onclick*="idSeller"], tr[data-article-id]',
+    )
+    .forEach(node => {
+      if (node.matches('tr[data-article-id]')) {
+        rowSeller.set(node, { ...current });
+        return;
+      }
+      // Inputs / data attrs inside a row belong to that row, not the running seller.
+      if (node.closest('tr[data-article-id]')) return;
+
+      const id = sellerIdOf(node);
+      if (id) current = { ...current, id };
+
+      if (node.matches('a[href*="/Users/"]')) {
+        const slug = sellerSlugFromHref(node.getAttribute('href'));
+        if (slug) {
+          // Flag / country tip usually sits next to the username in the seller header.
+          const country =
+            countryHintFrom(node.parentElement) ||
+            countryHintFrom(node.closest('div, section, header, h2, h3, td, th'));
+          current = {
+            ...current,
+            name: slug,
+            ...(country ? { country } : {}),
+          };
+        }
+      }
+    });
 
   const seen = new Set<string>();
   const items: CartItem[] = [];
@@ -188,7 +322,20 @@ export const parseCartItems = (doc: ParentNode): CartItem[] => {
     seen.add(articleId);
     const priceAttr = tr.getAttribute('data-price');
     const priceValue = priceAttr ? Number.parseFloat(priceAttr) : undefined;
-    const tip = tr.querySelector('.thumbnail-icon[data-bs-title]')?.getAttribute('data-bs-title');
+    const tip =
+      tr.querySelector('.thumbnail-icon[data-bs-title]')?.getAttribute('data-bs-title') ??
+      tr.querySelector('.thumbnail-icon[data-bs-original-title]')?.getAttribute(
+        'data-bs-original-title',
+      );
+    const inherited = rowSeller.get(tr);
+    const sellerId =
+      sellerIdOf(tr) ||
+      [...tr.querySelectorAll('input[name="idSeller"], [data-seller-id], [data-id-seller], [data-idseller], [onclick*="idSeller"]')]
+        .map(sellerIdOf)
+        .find(Boolean) ||
+      inherited?.id ||
+      undefined;
+    const sellerCountry = inherited?.country || countryHintFrom(tr);
     items.push({
       amount: Number.parseInt(tr.getAttribute('data-amount') ?? '1', 10) || 1,
       articleId,
@@ -198,7 +345,9 @@ export const parseCartItems = (doc: ParentNode): CartItem[] => {
       price: priceValue != null && Number.isFinite(priceValue) ? formatEuro(priceValue) : undefined,
       priceValue: priceValue != null && Number.isFinite(priceValue) ? priceValue : undefined,
       productId: tr.getAttribute('data-product-id') ?? undefined,
-      seller: rowSeller.get(tr),
+      seller: inherited?.name,
+      sellerCountry,
+      sellerId,
     });
   });
   return items;
