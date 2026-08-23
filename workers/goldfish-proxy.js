@@ -36,7 +36,7 @@ export default {
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9',
           'User-Agent':
-            'Mozilla/5.0 (compatible; Lugin/1.0; +https://github.com/tsuina311/lugin)',
+            'Mozilla/5.0 (compatible; Lugin/1.0; +https://github.com/Tsuina311/Lugin)',
         },
         redirect: 'follow',
       });

@@ -38,7 +38,7 @@ import { createGunzip } from 'node:zlib';
 const BULK_INDEX = 'https://api.scryfall.com/bulk-data';
 // Scryfall asks for a descriptive agent; an anonymous flood is what they're
 // trying to avoid by publishing these files in the first place.
-const AGENT = 'Lugin/1.0 (+https://github.com/Tsuina311/lugin)';
+const AGENT = 'Lugin/1.0 (+https://github.com/Tsuina311/Lugin)';
 
 const arg = name => {
   const i = process.argv.indexOf(`--${name}`);

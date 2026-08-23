@@ -34,7 +34,7 @@ import { PNG } from 'pngjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = join(root, 'scripts/fixtures/cards.json');
 const CACHE = join(root, '.scan-fixtures');
-const AGENT = 'Lugin/1.0 (+https://github.com/Tsuina311/lugin)';
+const AGENT = 'Lugin/1.0 (+https://github.com/Tsuina311/Lugin)';
 
 const flag = name => process.argv.includes(`--${name}`);
 const opt = name => {

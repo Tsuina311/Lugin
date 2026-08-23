@@ -236,7 +236,7 @@ allows more), category *Productivity*, language, and:
   public — GitHub renders the file, and that counts:
 
   ```
-  https://github.com/Tsuina311/lugin/blob/main/docs/PRIVACY.md
+  https://github.com/Tsuina311/Lugin/blob/main/docs/PRIVACY.md
   ```
 
 **Distribution** — **Visibility: Private**, then *Only trusted testers from the
@@ -304,11 +304,11 @@ it at all.
 The repository is already on GitHub and public, which Pages requires on a free
 account. What remains is three settings and a push.
 
-1. **Enable Pages**: <https://github.com/Tsuina311/lugin/settings/pages> → Build
+1. **Enable Pages**: <https://github.com/Tsuina311/Lugin/settings/pages> → Build
    and deployment → Source: **GitHub Actions**. Until this is on, the build
    succeeds and the deploy step has nowhere to publish to.
 2. **Add the client id**:
-   <https://github.com/Tsuina311/lugin/settings/variables/actions> → New
+   <https://github.com/Tsuina311/Lugin/settings/variables/actions> → New
    repository variable → `VITE_GOOGLE_CLIENT_ID`, the same one the extension uses.
    A variable rather than a secret deliberately: it ships in the bundle
    regardless. Omitting it still deploys — the app just reports itself
@@ -325,7 +325,7 @@ account. What remains is three settings and a push.
    nothing extension-id-shaped to keep in step here.
 4. **Push to `main`.** The workflow in `.github/workflows/pages.yml` runs the
    render checks, builds with the base path derived from the repository name, and
-   deploys to <https://tsuina311.github.io/lugin/>. `workflow_dispatch` is also
+   deploys to <https://tsuina311.github.io/Lugin/>. `workflow_dispatch` is also
    enabled, so a failed deploy can be re-run from the Actions tab without a
    commit.
 5. **On your phone**, open that URL, tap **Connect Google**, and your collection
