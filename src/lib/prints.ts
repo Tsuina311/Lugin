@@ -8,11 +8,18 @@ import { requestApi } from './messaging';
 
 /** One printing of a card, with just what the picker + override need. */
 export interface CardPrint {
+  /** Cardmarket `idProduct` when Scryfall knows it — ties a catalogue row to art. */
+  cardmarketId?: number;
   collectorNumber: string;
   /** e.g. ["nonfoil", "foil"] — shown so promos/foils are distinguishable. */
   finishes?: string[];
   /** Scryfall id (drives the browser-cached CDN image). */
   id: string;
+  /**
+   * Shared across reprints of the same artwork. Printings with the same value
+   * are the ones "any with this art" should merge; missing on some spoilers.
+   */
+  illustrationId?: string;
   /** Front image (normal size) for the picker thumbnail. */
   imageUrl?: string;
   /** Released date string ("2020-07-03"), for display/sorting. */
@@ -23,9 +30,11 @@ export interface CardPrint {
 
 interface ScryfallCard {
   card_faces?: Array<{ image_uris?: Record<string, string> }>;
+  cardmarket_id?: number;
   collector_number: string;
   finishes?: string[];
   id: string;
+  illustration_id?: string;
   image_uris?: Record<string, string>;
   released_at?: string;
   set: string;
@@ -44,9 +53,11 @@ const MAX_PAGES = 6; // 175 prints/page — plenty for even the most-reprinted c
 const toPrint = (c: ScryfallCard): CardPrint => {
   const images = c.image_uris ?? c.card_faces?.[0]?.image_uris;
   return {
+    cardmarketId: typeof c.cardmarket_id === 'number' ? c.cardmarket_id : undefined,
     collectorNumber: c.collector_number,
     finishes: c.finishes,
     id: c.id,
+    illustrationId: typeof c.illustration_id === 'string' ? c.illustration_id : undefined,
     imageUrl: images?.normal ?? images?.large ?? images?.small,
     releasedAt: c.released_at,
     setCode: c.set,

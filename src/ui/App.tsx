@@ -13,19 +13,18 @@ import { IconButton } from './components/IconButton';
 import { CheckingSession, LoginGate, RequiresLogin } from './components/LoginGate';
 import { LuginMark } from './components/LuginMark';
 import { DESKTOP_VERSION } from '@/desktopVersion';
-import { MetadataFilter } from './components/MetadataFilter';
 import { PreviewLayer } from './components/PreviewLayer';
 import { SyncButton } from './components/SyncButton';
 import { Tabs } from './components/Tabs';
 import type { TabItem } from './components/Tabs';
 import { TaskIndicator } from './components/TaskIndicator';
 import { CartPanel } from './components/CartPanel';
+import { PurchasesPanel } from './components/PurchasesPanel';
 import { WantListsPanel } from './components/WantListsPanel';
 import { WantsPanel } from './components/WantsPanel';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import {
   ClipboardList,
-  Filter,
   FlaskConical,
   Layers,
   Library,
@@ -33,6 +32,7 @@ import {
   Minimize2,
   PanelLeft,
   PanelRight,
+  ReceiptEuro,
   Search,
   ShoppingCart,
   SunMoon,
@@ -44,6 +44,7 @@ import { useCalls } from './useCalls';
 import { callStore } from '@/content/callStore';
 import { cartStore } from '@/content/cartStore';
 import { catalogueSearchStore } from '@/content/catalogueSearchStore';
+import { sellerBrowseStore } from '@/content/sellerBrowseStore';
 import {
   LAST_VISIBLE_VIEW_KEY,
   OVERLAY_HIDE_EVENT,
@@ -61,10 +62,10 @@ import { useFirstRun } from '@/ui/useFirstRun';
 type Tab =
   | 'search'
   | 'collection'
+  | 'purchases'
   | 'wantlists'
   | 'decks'
   | 'cart'
-  | 'filter'
   | 'traffic'
   | 'api';
 
@@ -72,10 +73,15 @@ type Tab =
 const TABS: TabItem<Tab>[] = [
   { icon: Search, id: 'search', label: 'Search', title: 'Find a card and see who has it' },
   { icon: Library, id: 'collection', label: 'Collection', title: 'The cards you own' },
+  {
+    icon: ReceiptEuro,
+    id: 'purchases',
+    label: 'Purchases',
+    title: 'Order history by seller — pick favourites from evidence',
+  },
   { icon: ClipboardList, id: 'wantlists', label: 'Wants', title: 'Your want lists' },
   { icon: Layers, id: 'decks', label: 'Decks', title: 'Build and price decks' },
   { icon: ShoppingCart, id: 'cart', label: 'Cart', title: 'Your shopping cart' },
-  { icon: Filter, id: 'filter', label: 'Filter', title: 'Filter the page you’re on' },
   ...(flags.devTools
     ? [
         { icon: TrendingUp, id: 'traffic' as Tab, label: 'Traffic' },
@@ -88,10 +94,10 @@ const TAB_KEY = 'lugin:tab';
 const ALL_TABS: Tab[] = [
   'search',
   'collection',
+  'purchases',
   'wantlists',
   'decks',
   'cart',
-  'filter',
   'traffic',
   'api',
 ];
@@ -108,6 +114,7 @@ const readTab = (): Tab => {
   // being on Cardmarket’s cart URL must not trap them on the Cart tab forever.
   try {
     const saved = localStorage.getItem(TAB_KEY);
+    if (saved === 'filter') return 'search';
     if (isTab(saved) && (saved !== 'traffic' && saved !== 'api' ? true : flags.devTools)) {
       return saved;
     }
@@ -208,12 +215,20 @@ export const App = () => {
     catalogueSearchStore.subscribe,
     catalogueSearchStore.getSnapshot,
   );
+  const sellerBrowseRequest = useSyncExternalStore(
+    sellerBrowseStore.subscribe,
+    sellerBrowseStore.getSnapshot,
+  );
   const session = useSyncExternalStore(sessionStore.subscribe, sessionStore.getSnapshot);
 
   // A want-list (or other) click asked to search a card — open the Search tab.
   useEffect(() => {
     if (catalogueRequest) setTab('search');
   }, [catalogueRequest?.id]);
+
+  useEffect(() => {
+    if (sellerBrowseRequest) setTab('search');
+  }, [sellerBrowseRequest?.id]);
 
   const openCart = () => {
     // Persist before navigate — React's view effect may not flush before unload.
@@ -541,16 +556,10 @@ export const App = () => {
                 value={tab}
               />
 
-              <div className={panelClass(tab === 'filter')}>
-                <ErrorBoundary label="Filter">
-                  <MetadataFilter />
-                </ErrorBoundary>
-              </div>
-
               <div className={panelClass(tab === 'search')}>
                 <ErrorBoundary label="Search">
                   <RequiresLogin active={tab === 'search'} feature="Search">
-                    <WantsPanel />
+                    <WantsPanel active={tab === 'search'} />
                   </RequiresLogin>
                 </ErrorBoundary>
               </div>
@@ -558,6 +567,12 @@ export const App = () => {
               <div className={panelClass(tab === 'collection')}>
                 <ErrorBoundary label="Collection">
                   <CollectionPanel />
+                </ErrorBoundary>
+              </div>
+
+              <div className={panelClass(tab === 'purchases')}>
+                <ErrorBoundary label="Purchases">
+                  <PurchasesPanel />
                 </ErrorBoundary>
               </div>
 

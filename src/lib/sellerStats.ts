@@ -21,6 +21,8 @@ export interface OrderFacts {
   sellerSlug?: string;
   sellerUrl?: string;
   sentTs?: number;
+  /** Delivery state when captured from the purchases list. */
+  state?: string;
 }
 
 export interface PurchaseLine {

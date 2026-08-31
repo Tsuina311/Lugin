@@ -1,8 +1,28 @@
 import { cardKey, frontFaceName, stripVersion } from '@/lib/cardName';
+import { editionIdOf, normalizeSetName, resolveSet, type EditionTally, type SetIndex } from '@/lib/sets';
 import { replayInPage, requestScryfall } from '@/lib/messaging';
-import { isLanguageName, languageOfRow } from '@/sites/cardmarket/language';
-import { parseOrderSeller, parseOrderTimeline } from '@/sites/cardmarket/order';
+import { extractCmToken, findCmToken } from '@/sites/cardmarket/cart';
+import { isChallengeResponse, looksLikeChallenge } from '@/sites/cardmarket/challenge';
+import { isLanguageName, isUiChromeName, languageOfRow } from '@/sites/cardmarket/language';
+import { parseOrderSeller, parseOrderTimeline, sellerSlugFromHref } from '@/sites/cardmarket/order';
 import { cardmarketSearchUrl } from '@/sites/cardmarket/searchArgs';
+import {
+  EXPANSION_FIELD,
+  EXPANSION_FIELD_MULTI,
+  FILTER_OWN_FIELDS,
+  FILTER_USER_INVENTORY_PATH,
+  expansionOptionsFrom,
+  inventoryIdsFromHtml,
+  matchExpansionIds,
+  parseFilterComponentProps,
+  samePagePath,
+  sellerInventoryFilterBody,
+  stockFilterProps,
+  withFilterDefaults,
+  type ExpansionFilterOption,
+  type RawFilterOption,
+  type SellerInventoryFilterFields,
+} from '@/sites/cardmarket/sellerInventoryFilter';
 
 // ---------------------------------------------------------------------------
 // Want lists: enumeration + local index building
@@ -59,18 +79,9 @@ interface FetchedDoc {
   doc: Document;
   html: string;
   status: number;
+  /** Final response URL after redirects, when the fetch exposed it. */
+  url?: string;
 }
-
-/** Cloudflare interstitial markers in a response body. */
-const CHALLENGE_BODY =
-  /just a moment|cdn-cgi\/challenge-platform|cf-chl-|attention required/i;
-
-/**
- * HTTP 403, or a body that is Cloudflare's checkbox page rather than the site.
- * Those need a tab reload so the user can tick the check — see `verify.ts`.
- */
-export const isChallengeResponse = (status: number, body: string): boolean =>
-  status === 403 || CHALLENGE_BODY.test(body);
 
 export const fetchDoc = async (url: string, signal?: AbortSignal): Promise<FetchedDoc> => {
   // Retry transient network failures (e.g. "TypeError: Failed to fetch" from a
@@ -89,7 +100,12 @@ export const fetchDoc = async (url: string, signal?: AbortSignal): Promise<Fetch
         throw new Error(`CHALLENGE: HTTP ${res.status} for ${url}`);
       }
       if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
-      return { doc: new DOMParser().parseFromString(html, 'text/html'), html, status: res.status };
+      return {
+        doc: new DOMParser().parseFromString(html, 'text/html'),
+        html,
+        status: res.status,
+        url: res.url || url,
+      };
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') throw err;
       lastErr = err;
@@ -137,15 +153,6 @@ const looksWrong = (doc: Document, html: string): string | null => {
   }
   return null;
 };
-
-/**
- * Cloudflare's interstitial, recognised from a response body alone.
- *
- * {@link looksWrong} needs a page to read a title off. A POST that gets
- * challenged answers with the check where its own reply should be, so there's no
- * title and no ajax envelope — just a body carrying these, from the first byte.
- */
-export const looksLikeChallenge = (body: string): boolean => CHALLENGE_BODY.test(body);
 
 /** A single want row: the card name plus its per-list `idWant` (for removal). */
 export interface WantRow {
@@ -558,6 +565,8 @@ export interface ParsedOffer {
   articleId?: string;
   condition?: string;
   edition?: string;
+  /** Cardmarket `idExpansion` from the row's expansion link, when present. */
+  expansionId?: number;
   /** Product image URL (S3), if we can find one in the row. */
   imageUrl?: string;
   isFoil: boolean;
@@ -689,6 +698,25 @@ const sellerProfileUrl = (sellerUrl: string): string => {
   url.search = '';
   url.hash = '';
   return url.href.replace(/\/$/, '');
+};
+
+/** Profile base URL for a seller link or slug-derived profile path. */
+export const sellerProfileBase = (sellerUrl: string): string => sellerProfileUrl(sellerUrl);
+
+/** Singles stock list for a seller (`…/Offers/Singles`). */
+export const sellerSinglesUrl = (sellerUrl: string): string => `${sellerProfileUrl(sellerUrl)}/Offers/Singles`;
+
+/** Resolve a profile + singles URL from an optional link and display name. */
+export const sellerStockUrls = (
+  name: string,
+  url?: string | null,
+): { baseUrl: string; profile: string } | null => {
+  const slug = sellerSlugFromHref(url ?? undefined) ?? name.trim();
+  if (!slug) return null;
+  const profile = url?.includes('/Users/')
+    ? sellerProfileUrl(url)
+    : `${location.origin}/${currentLang()}/Magic/Users/${encodeURIComponent(slug)}`;
+  return { baseUrl: `${profile}/Offers/Singles`, profile };
 };
 
 /**
@@ -1740,7 +1768,10 @@ export const parseOffers = (
       .querySelector<HTMLElement>('a[href*="/Products/Singles/"], a[href*="/Magic/Cards/"]')
       ?.textContent?.trim();
     let name = linkName ? cleanOfferName(linkName) : undefined;
-    if (!name) {
+    if (name && isUiChromeName(name)) name = undefined;
+    // Product pages: seller rows usually have no card link — trust the printing
+    // name we already know; thumbnail tooltips often carry alt="Scan" instead.
+    if (!name && !opts.defaultName) {
       const tipEl = row.querySelector<HTMLElement>(
         '.thumbnail-icon[data-bs-title], [data-bs-title*="alt="], [data-bs-original-title*="alt="], [title*="alt="]',
       );
@@ -1753,13 +1784,16 @@ export const parseOffers = (
         .replace(/&quot;/g, '"')
         .match(/alt=["']([^"']+)["']/)?.[1]
         ?.trim();
+      if (name && isUiChromeName(name)) name = undefined;
     }
-    if (!name) {
+    if (!name && !opts.defaultName) {
       const alt = row.querySelector<HTMLImageElement>('img[alt]')?.getAttribute('alt')?.trim();
-      if (alt && alt.length >= 2 && !isLanguageName(alt)) name = cleanOfferName(alt);
+      if (alt && alt.length >= 2 && !isLanguageName(alt) && !isUiChromeName(alt)) {
+        name = cleanOfferName(alt);
+      }
     }
     if (!name && opts.defaultName) name = opts.defaultName;
-    if (!name || name.length < 2 || isLanguageName(name)) return;
+    if (!name || name.length < 2 || isLanguageName(name) || isUiChromeName(name)) return;
 
     const articleId =
       row.id.match(/^(?:article|stock)Row(\d+)$/i)?.[1] ||
@@ -1771,6 +1805,8 @@ export const parseOffers = (
 
     // Edition: the expansion anchor carries it as aria-label / tooltip.
     const expA = row.querySelector<HTMLElement>('a[href*="/Expansions/"]');
+    const expHref = expA?.getAttribute('href');
+    const expansionId = parseExpansionId(expHref);
     const edition =
       expA?.getAttribute('aria-label') ??
       expA?.getAttribute('data-bs-original-title') ??
@@ -1808,6 +1844,7 @@ export const parseOffers = (
       articleId,
       condition,
       edition,
+      expansionId,
       imageUrl,
       isFoil,
       language,
@@ -1870,7 +1907,7 @@ export const parseOffers = (
       // "(V.n)" and the "From X €" price.
       const altName = a.querySelector<HTMLImageElement>('img[alt]')?.getAttribute('alt')?.trim();
       const name = cleanOfferName(altName || a.textContent || '');
-      if (!name || name.length < 2 || isLanguageName(name)) return;
+      if (!name || name.length < 2 || isLanguageName(name) || isUiChromeName(name)) return;
       const href = a.getAttribute('href');
       let productUrl: string | undefined;
       if (href) {
@@ -1902,6 +1939,26 @@ const maxSite = (doc: ParentNode): number => {
     }
   });
   return max;
+};
+
+/** Pager link for a given `site=N`, when the page exposes one. */
+const paginationHrefForSite = (doc: ParentNode, site: number): string | undefined => {
+  if (site <= 1) return undefined;
+  for (const a of doc.querySelectorAll<HTMLAnchorElement>('a[href*="site="]')) {
+    const href = a.getAttribute('href');
+    if (!href) continue;
+    const m = href.match(/[?&]site=(\d+)/);
+    if (m && Number.parseInt(m[1], 10) === site) return href;
+  }
+  return undefined;
+};
+
+/** Add or replace `site=` on a stock-list URL. */
+const withSiteParam = (url: string, site: number): string => {
+  const u = new URL(url, location.origin);
+  if (site > 1) u.searchParams.set('site', String(site));
+  else u.searchParams.delete('site');
+  return u.toString();
 };
 
 export type ScanStrategy = 'pages' | 'wantlists';
@@ -2150,6 +2207,770 @@ export const scanSeller = async (
     requests: requests + 1,
     strategy: 'wantlists',
     totalScanned: arr.length,
+  };
+};
+
+/**
+ * Fetch one page of a seller's Singles stock (no want-list filter).
+ * Use page 1 on open; load further pages on demand via `hasMore`.
+ * Pass `idExpansions` to filter via Cardmarket's FilterUserInventory POST.
+ */
+export interface SellerBrowsePageResult {
+  baseUrl: string;
+  diagnostics: string[];
+  /**
+   * Whether Cardmarket actually applied the edition filter. False when the POST
+   * couldn't be made, which tells the caller these offers are unfiltered and
+   * must be narrowed here instead.
+   */
+  expansionFilterApplied: boolean;
+  /** Edition filter dropdown on page 1, when present. */
+  expansionFilterOptions?: ExpansionFilterOption[];
+  hasMore: boolean;
+  idExpansions?: number[];
+  matches: ScanMatch[];
+  page: number;
+  profile: string;
+  requests: number;
+  /** Total singles from pagination "of N" on page 1, when known. */
+  totalListed?: number;
+}
+
+export interface SellerOffersFetchOpts {
+  /** POST the seller filter form with no expansions (clears a prior edition filter). */
+  clearExpansionFilter?: boolean;
+  /**
+   * Edition names to filter by when we don't know their Cardmarket ids yet.
+   * Resolved against the seller page's own edition dropdown, which is the only
+   * place guaranteed to name the expansions this seller actually stocks.
+   */
+  expansionLabels?: readonly string[];
+  /** @deprecated use idExpansions */
+  idExpansion?: number;
+  /** Cardmarket expansion ids — applied via FilterUserInventory POST. */
+  idExpansions?: readonly number[];
+}
+
+/**
+ * Serialize every control of the seller's stock filter, the way submitting it
+ * would. Read off the page rather than hand-listed, because Cardmarket's panel
+ * carries fields we have no business knowing about, and they change.
+ */
+const serializeFilterControls = (root: ParentNode): SellerInventoryFilterFields => {
+  const fields: SellerInventoryFilterFields = [];
+  root
+    .querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+      'input[name], select[name], textarea[name]',
+    )
+    .forEach(el => {
+      if (el.disabled || !el.name || FILTER_OWN_FIELDS.has(el.name)) return;
+      if (el instanceof HTMLSelectElement) {
+        for (const opt of el.selectedOptions) fields.push([el.name, opt.value]);
+        return;
+      }
+      if (el instanceof HTMLTextAreaElement) {
+        fields.push([el.name, el.value]);
+        return;
+      }
+      const type = el.type.toLowerCase();
+      if (type === 'submit' || type === 'button' || type === 'image' || type === 'file') return;
+      if ((type === 'checkbox' || type === 'radio') && !el.checked) return;
+      fields.push([el.name, el.value]);
+    });
+  return fields;
+};
+
+export interface SellerInventoryFilter {
+  /** Where to POST, when the page named it. */
+  action?: string;
+  /** `idExpansion`, or `idExpansions[]` if this page multi-selects editions. */
+  expansionField: string;
+  fields: SellerInventoryFilterFields;
+  /** Fields the page never stated — sent as blanks, and worth reporting. */
+  missing: string[];
+  /** The token this form was rendered with, when it carried one. */
+  token?: string;
+}
+
+/**
+ * The seller's stock filter, from the props its React component was given.
+ *
+ * This is the whole request in one attribute — target, token, ids, fields, and
+ * the expansion list — so it's tried before any of the DOM scraping below.
+ */
+export const parseSellerInventoryFilterProps = (
+  html: string,
+): { filter: SellerInventoryFilter; options: ExpansionFilterOption[] } | null => {
+  const props = stockFilterProps(parseFilterComponentProps(html));
+  if (!props) return null;
+  const names = new Set(props.fields.map(([name]) => name));
+  return {
+    filter: {
+      action: props.action,
+      expansionField: EXPANSION_FIELD,
+      fields: props.fields,
+      missing: ['idUser', 'idSeller'].filter(name => !names.has(name)),
+      token: props.token,
+    },
+    options: props.expansionOptions,
+  };
+};
+
+/**
+ * The stock filter's fields, from the page that renders it.
+ *
+ * Always returns something. Refusing to build the request when a field was
+ * missing is how this feature spent ten versions sending nothing at all: an
+ * incomplete POST that comes back rejected tells us which field it wanted,
+ * where silence tells us nothing.
+ */
+export const parseSellerInventoryFilterFields = (
+  doc: Document,
+  html?: string,
+): SellerInventoryFilter => {
+  const expansionField = doc.querySelector(`select[name="${EXPANSION_FIELD_MULTI}"]`)
+    ? EXPANSION_FIELD_MULTI
+    : EXPANSION_FIELD;
+
+  const candidates: ParentNode[] = [];
+  doc
+    .querySelectorAll<HTMLFormElement>(
+      'form[action*="FilterUserInventory" i], form[action*="UserInventory" i]',
+    )
+    .forEach(f => candidates.push(f));
+  for (const selector of [
+    `select[name="${EXPANSION_FIELD}"]`,
+    `select[name="${EXPANSION_FIELD_MULTI}"]`,
+    'input[name="idUser"]',
+  ]) {
+    doc.querySelectorAll<HTMLElement>(selector).forEach(el => {
+      const form = el.closest('form');
+      if (form && !candidates.includes(form)) candidates.push(form);
+    });
+  }
+
+  // The best root is the one that states both ids; failing that, the widest
+  // serialization we got, topped up from the raw HTML.
+  let best: SellerInventoryFilterFields = [];
+  for (const root of [...candidates, doc]) {
+    const fields = serializeFilterControls(root);
+    const names = new Set(fields.map(([name]) => name));
+    if (names.has('idUser') && names.has('idSeller')) {
+      return { expansionField, fields: withFilterDefaults(fields), missing: [] };
+    }
+    if (fields.length > best.length) best = fields;
+  }
+
+  const scraped = inventoryIdsFromHtml(html ?? doc.documentElement?.innerHTML ?? '');
+  const fields = [...best];
+  const missing: string[] = [];
+  for (const [name, value] of [
+    ['idUser', scraped.idUser],
+    ['idSeller', scraped.idSeller],
+  ] as const) {
+    if (fields.some(([n]) => n === name)) continue;
+    if (value) fields.push([name, value]);
+    else missing.push(name);
+  }
+  for (const [name, value] of [
+    ['name', ''],
+    ['comments', ''],
+    ['minPrice', ''],
+    ['maxPrice', ''],
+  ] as const) {
+    if (!fields.some(([n]) => n === name)) fields.push([name, value]);
+  }
+  return { expansionField, fields: withFilterDefaults(fields), missing };
+};
+
+/**
+ * Which edition a stock page says it's filtered to (0 = All).
+ *
+ * Only a marked-up `selected` counts. A page whose dropdown marks nothing is
+ * choosing its selection in script we can't see, and calling that "All" would
+ * throw away a filtered page that came back perfectly well.
+ */
+export const selectedExpansionId = (doc: ParentNode): number | undefined => {
+  const chosen = doc.querySelector<HTMLOptionElement>(
+    `select[name="${EXPANSION_FIELD}"] option[selected], select[name="${EXPANSION_FIELD_MULTI}"] option[selected]`,
+  );
+  if (!chosen) return undefined;
+  const n = Number.parseInt(chosen.value, 10);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+/**
+ * The tab's own document, but only when it *is* the stock page in question.
+ *
+ * The path carries the seller's name, so this is also what stops seller A's
+ * filter being built from seller B's open tab.
+ */
+const liveSellerSinglesDoc = (baseUrl: string): Document | null => {
+  if (typeof document === 'undefined') return null;
+  return samePagePath(location.href, baseUrl, location.origin) ? document : null;
+};
+
+const sessionCmToken = (): string | null =>
+  findCmToken({ allowHtmlScrape: false }) ?? findCmToken({ allowHtmlScrape: true });
+
+/**
+ * Submit a form the way the browser would, following the 302 to the page it
+ * lands on. Same-origin from the content script, so it carries the session.
+ */
+const postFormDoc = async (
+  url: string,
+  body: string,
+  signal?: AbortSignal,
+): Promise<FetchedDoc> => {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+  const res = await fetch(url, {
+    body,
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+    method: 'POST',
+    redirect: 'follow',
+    signal,
+  });
+  const html = await res.text();
+  if (isChallengeResponse(res.status, html)) {
+    throw new Error(`CHALLENGE: HTTP ${res.status} for ${url}`);
+  }
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
+  return {
+    doc: new DOMParser().parseFromString(html, 'text/html'),
+    html,
+    status: res.status,
+    url: res.url || url,
+  };
+};
+
+/**
+ * Apply (or clear) edition filters the way Cardmarket's own filter panel does.
+ *
+ * Submitted straight from the content script rather than replayed in the page:
+ * this is a plain form POST that redirects back to the stock list, and a replay
+ * depends on the MAIN-world interceptor answering — which it can't always.
+ */
+export const postSellerInventoryFilter = async (
+  filter: SellerInventoryFilter,
+  token: string,
+  idExpansions: readonly number[] | undefined,
+  signal?: AbortSignal,
+): Promise<FetchedDoc> => {
+  const body = sellerInventoryFilterBody({
+    expansionField: filter.expansionField,
+    fields: filter.fields,
+    idExpansions: idExpansions ?? [],
+    token,
+  });
+  const path = filter.action ?? `/${currentLang()}${FILTER_USER_INVENTORY_PATH}`;
+  const url = new URL(path, location.origin).toString();
+
+  try {
+    return await postFormDoc(url, body, signal);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err;
+    // Fall back to the page's own fetch — some responses are only served to a
+    // request that originates in the page context.
+    const res = await replayInPage({
+      body,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      method: 'POST',
+      url: path,
+    });
+    if (isChallengeResponse(res.status, res.body)) {
+      throw new Error(`CHALLENGE: inventory filter POST (${res.status})`);
+    }
+    if (!res.ok) throw new Error(`Inventory filter failed (HTTP ${res.status})`);
+    return {
+      doc: new DOMParser().parseFromString(res.body, 'text/html'),
+      html: res.body,
+      status: res.status,
+    };
+  }
+};
+
+const EXPANSION_ID_PATH = /\/Expansions\/(\d+)(?:\/|[?#]|$)/i;
+
+/** Cardmarket expansion id from an `/Expansions/<id>/…` link. */
+export const parseExpansionId = (href: string | null | undefined): number | undefined => {
+  if (!href) return undefined;
+  const n = Number.parseInt(href.match(EXPANSION_ID_PATH)?.[1] ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
+
+const isExpansionFilterSelect = (select: HTMLSelectElement): boolean => {
+  const hint = `${select.name} ${select.id} ${select.getAttribute('data-testid') ?? ''}`.toLowerCase();
+  return (
+    select.name === EXPANSION_FIELD ||
+    select.name === EXPANSION_FIELD_MULTI ||
+    /expansion|erweiterung|edition|extension/.test(hint)
+  );
+};
+
+/**
+ * The seller's edition dropdown — `<select name="idExpansion">`, whose options
+ * are this seller's own expansions with their listed counts.
+ */
+export const parseSellerExpansionFilter = (doc: Document): ExpansionFilterOption[] => {
+  const raw: RawFilterOption[] = [];
+  const seen = new Set<HTMLSelectElement>();
+  const take = (select: HTMLSelectElement | null) => {
+    if (!select || seen.has(select)) return;
+    seen.add(select);
+    for (const opt of select.options) raw.push({ label: opt.textContent ?? '', value: opt.value });
+  };
+
+  take(doc.querySelector<HTMLSelectElement>(`select[name="${EXPANSION_FIELD}"]`));
+  take(doc.querySelector<HTMLSelectElement>(`select[name="${EXPANSION_FIELD_MULTI}"]`));
+  doc.querySelectorAll<HTMLSelectElement>('select').forEach(select => {
+    if (isExpansionFilterSelect(select)) take(select);
+  });
+
+  return expansionOptionsFrom(raw);
+};
+
+/** @deprecated use parseSellerExpansionFilter — kept for callers expecting a name map. */
+export const parseExpansionFilterOptions = (doc: Document): Map<string, number> => {
+  const byNorm = new Map<string, number>();
+  for (const opt of parseSellerExpansionFilter(doc)) {
+    byNorm.set(normalizeSetName(opt.label), opt.id);
+  }
+  return byNorm;
+};
+
+/**
+ * Turn Cardmarket's edition dropdown into picker rows and their `idExpansion`s.
+ *
+ * One row per dropdown entry, labelled as Cardmarket labels it: the seller's
+ * page is what the user is looking at, and the filter takes Cardmarket's ids.
+ * That matters most where Scryfall would merge two entries — a set and its
+ * ":&nbsp;Extras" are one Scryfall set but two expansions with two ids, so a
+ * shared key would make one of them unpickable.
+ */
+export const expansionFilterToEditionState = (
+  options: readonly ExpansionFilterOption[],
+  setIndex: SetIndex,
+): { ids: Record<string, number>; tallies: EditionTally[] } => {
+  const perSet = new Map<string, number>();
+  for (const opt of options) {
+    const key = editionIdOf(setIndex, { setName: opt.label });
+    if (key) perSet.set(key, (perSet.get(key) ?? 0) + 1);
+  }
+
+  const ids: Record<string, number> = {};
+  const tallies: EditionTally[] = [];
+  for (const opt of options) {
+    const set = resolveSet(setIndex, { setName: opt.label });
+    const setKey = editionIdOf(setIndex, { setName: opt.label });
+    // Keep the set's own key where it's unambiguous, so a pick still means
+    // something to the views that filter on loaded offers instead of asking
+    // Cardmarket (search results, a single product).
+    const key = setKey && perSet.get(setKey) === 1 ? setKey : `cm-${opt.id}`;
+    ids[key] = opt.id;
+    ids[`cm-${opt.id}`] = opt.id;
+    ids[normalizeSetName(opt.label)] = opt.id;
+    tallies.push({
+      count: opt.count ?? 0,
+      key,
+      label: opt.label,
+      releasedAt: set?.releasedAt,
+    });
+  }
+  tallies.sort((a, b) => a.label.localeCompare(b.label));
+  return { ids, tallies };
+};
+
+/** Map edition filter keys and names → Cardmarket ids learned from offer rows. */
+export const indexExpansionIds = (
+  offers: readonly Pick<ParsedOffer, 'edition' | 'expansionId'>[],
+  setIndex: SetIndex,
+): Record<string, number> => {
+  const out: Record<string, number> = {};
+  for (const o of offers) {
+    if (o.expansionId == null) continue;
+    out[`cm-${o.expansionId}`] = o.expansionId;
+    if (o.edition) {
+      const key = editionIdOf(setIndex, { setName: o.edition });
+      if (key) out[key] = o.expansionId;
+      const norm = normalizeSetName(o.edition);
+      if (norm) out[norm] = o.expansionId;
+    }
+  }
+  return out;
+};
+
+/** Normalized expansion name → Cardmarket `idExpansion`, from `/Magic/Expansions`. */
+export const parseMagicExpansionCatalog = (doc: Document): Map<string, number> => {
+  const byNorm = new Map<string, number>();
+  const add = (name: string, id: number) => {
+    const key = normalizeSetName(name);
+    if (key) byNorm.set(key, id);
+  };
+  doc.querySelectorAll<HTMLAnchorElement>('a[href*="/Expansions/"]').forEach(a => {
+    const id = parseExpansionId(a.getAttribute('href'));
+    if (!id) return;
+    const label =
+      a.getAttribute('aria-label') ??
+      a.getAttribute('data-bs-original-title') ??
+      a.textContent?.trim() ??
+      '';
+    if (label) add(label, id);
+    const slug = a.getAttribute('href')?.match(/\/Expansions\/\d+\/([^/?#]+)/i)?.[1];
+    if (slug) add(slug.replace(/-+/g, ' '), id);
+  });
+  return byNorm;
+};
+
+let expansionIdCache: Map<string, number> | null = null;
+let expansionIdLoading: Promise<Map<string, number>> | null = null;
+
+/** Load (and cache) Cardmarket expansion ids for the current game. */
+export const ensureExpansionIds = async (signal?: AbortSignal): Promise<Map<string, number>> => {
+  if (expansionIdCache) return expansionIdCache;
+  if (!expansionIdLoading) {
+    expansionIdLoading = fetchDoc(`/${currentLang()}/Magic/Expansions`, signal)
+      .then(({ doc }) => {
+        expansionIdCache = parseMagicExpansionCatalog(doc);
+        return expansionIdCache;
+      })
+      .finally(() => {
+        expansionIdLoading = null;
+      });
+  }
+  return expansionIdLoading;
+};
+
+/** Map a filter edition key (Scryfall set code) to Cardmarket's `idExpansion`. */
+export const resolveExpansionId = (
+  catalog: ReadonlyMap<string, number>,
+  setIndex: SetIndex,
+  editionKey: string,
+  editionLabel?: string,
+  knownIds?: Readonly<Record<string, number>>,
+): number | undefined => {
+  if (knownIds?.[editionKey]) return knownIds[editionKey];
+  const cm = editionKey.match(/^cm-(\d+)$/);
+  if (cm) return Number(cm[1]);
+  if (editionLabel) {
+    const byLabel = catalog.get(normalizeSetName(editionLabel));
+    if (byLabel) return byLabel;
+    if (knownIds) {
+      const fromKnown = knownIds[normalizeSetName(editionLabel)];
+      if (fromKnown) return fromKnown;
+    }
+  }
+  const info = setIndex.byCode.get(editionKey);
+  if (info) {
+    const byName = catalog.get(normalizeSetName(info.name));
+    if (byName) return byName;
+  }
+  return catalog.get(normalizeSetName(editionKey));
+};
+
+/** Resolve edition picker keys to Cardmarket `idExpansions[]` values. */
+export const resolveEditionExpansionIds = (
+  editionKeys: readonly string[],
+  setIndex: SetIndex,
+  catalog: ReadonlyMap<string, number>,
+  knownIds: Readonly<Record<string, number>>,
+  labelByKey?: Readonly<Record<string, string>>,
+): number[] => {
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (const key of editionKeys) {
+    const id = resolveExpansionId(catalog, setIndex, key, labelByKey?.[key], knownIds);
+    if (id != null && id > 0 && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  return out;
+};
+
+const offerDedupeKey = (o: Pick<ParsedOffer, 'articleId' | 'name' | 'price'>): string =>
+  o.articleId ?? `${cardKey(o.name)}|${o.price ?? ''}`;
+
+interface SellerFilterState {
+  filter: SellerInventoryFilter;
+  options: ExpansionFilterOption[];
+}
+
+/**
+ * The last filter we read off each seller's stock page, keyed by that page.
+ *
+ * Every page load carries the whole filter — target, token, ids, expansions — so
+ * once page 1 has been read, ticking an edition needs no page of its own: the
+ * POST can go out on its own. Dropped when a POST is refused, in case the token
+ * it was built with has gone stale.
+ */
+const sellerFilters = new Map<string, SellerFilterState>();
+
+const rememberSellerFilter = (baseUrl: string, html: string): SellerFilterState | null => {
+  const parsed = parseSellerInventoryFilterProps(html);
+  if (parsed?.filter.token && parsed.filter.missing.length === 0) {
+    sellerFilters.set(baseUrl, parsed);
+  }
+  return parsed;
+};
+
+/** Keep the first reading of each expansion — live page before fetched copy. */
+const dedupeExpansionOptions = (
+  options: readonly ExpansionFilterOption[],
+): ExpansionFilterOption[] => {
+  const byId = new Map<number, ExpansionFilterOption>();
+  for (const opt of options) if (!byId.has(opt.id)) byId.set(opt.id, opt);
+  return [...byId.values()];
+};
+
+export const fetchSellerOffersPage = async (
+  name: string,
+  url: string | undefined | null,
+  page: number,
+  index: WantsIndex | null,
+  signal?: AbortSignal,
+  /** When loading page N>1, pass keys from earlier pages to detect repeats. */
+  existingKeys?: ReadonlySet<string>,
+  opts?: SellerOffersFetchOpts,
+): Promise<SellerBrowsePageResult> => {
+  const resolved = sellerStockUrls(name, url);
+  if (!resolved) throw new Error('Could not resolve seller profile URL.');
+  const { baseUrl, profile } = resolved;
+  const diagnostics: string[] = [];
+  let requests = 0;
+
+  const wantedLabels = (opts?.expansionLabels ?? []).filter(l => l.trim().length > 0);
+  let idExpansions =
+    opts?.idExpansions?.length
+      ? [...opts.idExpansions]
+      : opts?.idExpansion != null
+        ? [opts.idExpansion]
+        : undefined;
+  const useInventoryFilter =
+    !!idExpansions?.length || wantedLabels.length > 0 || opts?.clearExpansionFilter;
+
+  /** Every page this call read; several when several editions are picked. */
+  const pages: FetchedDoc[] = [];
+  let filterOptions: ExpansionFilterOption[] = [];
+  let expansionFilterApplied = false;
+
+  if (useInventoryFilter) {
+    const liveDoc = liveSellerSinglesDoc(baseUrl);
+    // Only fetched when the live page can't answer: sitting on the stock page,
+    // the filter POST should be the first request the pick makes, not the second.
+    let seeded: FetchedDoc | null = null;
+    const seed = async (): Promise<FetchedDoc> => {
+      if (!seeded) {
+        seeded = await fetchDoc(baseUrl, signal);
+        requests++;
+      }
+      return seeded;
+    };
+    const fetchedAlready = (): FetchedDoc | null => seeded;
+    const filterFromFetched = async (): Promise<SellerInventoryFilter> => {
+      const fetched = await seed();
+      return parseSellerInventoryFilterFields(fetched.doc, fetched.html);
+    };
+
+    // The seller's own filter is the authority on which expansions they stock
+    // and what Cardmarket calls them — resolve any names we couldn't map here.
+    // The live page beats the fetched copy: its controls carry current values.
+    const liveProps = liveDoc
+      ? parseSellerInventoryFilterProps(liveDoc.documentElement?.outerHTML ?? '')
+      : null;
+    const fromProps =
+      liveProps ??
+      sellerFilters.get(baseUrl) ??
+      rememberSellerFilter(baseUrl, (await seed()).html);
+    const fetchedSeed = fetchedAlready();
+    filterOptions = [
+      ...(fromProps?.options ?? []),
+      ...(liveDoc ? parseSellerExpansionFilter(liveDoc) : []),
+      ...(fetchedSeed ? parseSellerExpansionFilter(fetchedSeed.doc) : []),
+    ];
+    if (filterOptions.length === 0) {
+      filterOptions = parseSellerExpansionFilter((await seed()).doc);
+    }
+    if (wantedLabels.length > 0) {
+      const { ids, missing } = matchExpansionIds(wantedLabels, filterOptions);
+      idExpansions = [...new Set([...(idExpansions ?? []), ...ids])];
+      if (missing.length > 0) {
+        diagnostics.push(
+          filterOptions.length === 0
+            ? `The seller page carried no edition filter options, so "${missing.join('", "')}" can only be filtered on what's loaded.`
+            : `Cardmarket's edition filter (${filterOptions.length} options) has no entry for "${missing.join('", "')}".`,
+        );
+      }
+    }
+
+    // The component's props if the page carried them, else the form's controls —
+    // live page first, since its values are the ones the user is looking at.
+    const live = liveDoc ? parseSellerInventoryFilterFields(liveDoc) : null;
+    const filter =
+      fromProps?.filter ?? (live && live.missing.length === 0 ? live : await filterFromFetched());
+    const token = filter.token ?? sessionCmToken() ?? extractCmToken((await seed()).html);
+    if (filter.missing.length > 0) {
+      diagnostics.push(
+        `The seller page never stated ${filter.missing.join(' or ')} — sending the filter without it.`,
+      );
+    }
+    if (!token) {
+      diagnostics.push('No session token for the stock filter — sign in on Cardmarket.');
+      pages.push(await seed());
+    } else if (!idExpansions?.length) {
+      // Nothing to filter by: clear a previous filter so the session stops
+      // narrowing the plain page loads that follow.
+      if (opts?.clearExpansionFilter) {
+        pages.push(await postSellerInventoryFilter(filter, token, [], signal));
+        requests++;
+      } else {
+        pages.push(await seed());
+      }
+    } else {
+      // `idExpansion` takes one edition, so several picks mean several rounds:
+      // POST the filter, then read the page it lands on (or its page N).
+      const single = filter.expansionField !== EXPANSION_FIELD_MULTI;
+      const rounds: number[][] = single ? idExpansions.map(id => [id]) : [idExpansions];
+      let applied = 0;
+      for (const [i, ids] of rounds.entries()) {
+        if (i > 0) await pace(signal);
+        let filtered: FetchedDoc;
+        try {
+          filtered = await postSellerInventoryFilter(filter, token, ids, signal);
+          requests++;
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') throw err;
+          sellerFilters.delete(baseUrl);
+          diagnostics.push(
+            `Edition filter POST failed for expansion ${ids.join(', ')}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          continue;
+        }
+        // Cardmarket answers 302 → stock list either way, so the only proof it
+        // honoured the pick is the page coming back stating that expansion.
+        const echoed =
+          stockFilterProps(parseFilterComponentProps(filtered.html))?.expansionValue ??
+          selectedExpansionId(filtered.doc);
+        if (single && echoed != null && echoed !== ids[0]) {
+          sellerFilters.delete(baseUrl);
+          diagnostics.push(
+            `Cardmarket answered the filter with expansion ${echoed || 'All'} instead of ${ids[0]}.`,
+          );
+          continue;
+        }
+        applied++;
+        if (page === 1) {
+          pages.push(filtered);
+        } else if (page > maxSite(filtered.doc)) {
+          // This edition's filtered list is shorter than the page we want (e.g.
+          // Eternal has one page while Extras has dozens) — skip it rather than
+          // falling through to the unfiltered Singles pager.
+          diagnostics.push(
+            `Expansion ${ids.join(', ')} has no page ${page} (only ${maxSite(filtered.doc)}).`,
+          );
+        } else {
+          // Page 2+ must stay inside the filtered list. Hitting bare
+          // `Singles?site=N` drops the filter and appends unrelated stock — the
+          // bug "load more" used to show. Prefer the pager link from the
+          // filtered page; otherwise `site=` on the post-redirect URL.
+          const href = paginationHrefForSite(filtered.doc, page);
+          const nextUrl = href
+            ? new URL(href, filtered.url ?? baseUrl).toString()
+            : withSiteParam(filtered.url ?? baseUrl, page);
+          pages.push(await fetchDoc(nextUrl, signal));
+          requests++;
+        }
+      }
+      expansionFilterApplied = applied === rounds.length;
+      if (pages.length === 0) {
+        // Page 1 with a failed filter can fall back to the seed list; page 2+
+        // must not — that seed is the unfiltered Singles catalogue.
+        if (page === 1) pages.push(await seed());
+        else {
+          diagnostics.push(
+            `No filtered stock for page ${page} of the selected edition${idExpansions.length > 1 ? 's' : ''}.`,
+          );
+        }
+      }
+    }
+  } else {
+    const pageUrl = page > 1 ? `${baseUrl}?site=${page}` : baseUrl;
+    pages.push(await fetchDoc(pageUrl, signal));
+    requests = 1;
+  }
+
+  const [first] = pages;
+  if (page === 1) {
+    const wrong = looksWrong(first.doc, first.html);
+    if (wrong) diagnostics.push(`First page looks off: ${wrong}`);
+  }
+  const parsed: ParsedOffer[] = [];
+  const seenOffers = new Set<string>();
+  for (const { doc } of pages) {
+    for (const offer of parseOffers(doc)) {
+      const key = offerDedupeKey(offer);
+      if (seenOffers.has(key)) continue;
+      seenOffers.add(key);
+      parsed.push(offer);
+    }
+  }
+  // Drop rows outside the requested expansions. Load-more used to hit the
+  // unfiltered Singles pager; even with that fixed, a soft mismatch (wrong
+  // redirect, stale session) must not leak other editions into the list.
+  if (idExpansions?.length) {
+    const want = new Set(idExpansions);
+    for (let i = parsed.length - 1; i >= 0; i--) {
+      const id = parsed[i].expansionId;
+      if (id != null && !want.has(id)) parsed.splice(i, 1);
+    }
+  }
+  // More to load only if some edition's own pagination says so — otherwise a
+  // filtered list of one page would keep asking for page 2 forever.
+  let hasMore = parsed.length > 0 && pages.some(p => page < maxSite(p.doc));
+  if (parsed.length === 0) {
+    hasMore = false;
+    if (page > 1) diagnostics.push(`Page ${page} had no offers.`);
+    else if (idExpansions?.length) {
+      diagnostics.push(
+        `Edition filter returned no offers (expansion id${idExpansions.length > 1 ? 's' : ''}: ${idExpansions.join(', ')}).`,
+      );
+    }
+  } else if (existingKeys && parsed.every(o => existingKeys.has(offerDedupeKey(o)))) {
+    hasMore = false;
+    diagnostics.push(`Page ${page} repeated the previous page — stopping.`);
+  } else if (page >= MAX_SELLER_PAGES) {
+    hasMore = false;
+    diagnostics.push(`Hit page cap (${MAX_SELLER_PAGES}).`);
+  }
+  const matches: ScanMatch[] = parsed.map(o => ({
+    ...o,
+    lists: index?.cards[cardKey(o.name)]?.lists ?? [],
+  }));
+  // The seller's whole edition list, so the picker offers every edition they
+  // stock rather than only the ones on the pages loaded so far. It comes from the
+  // filter component's props: the `<select>` is built from them in the browser,
+  // so a fetched page has the props but not yet the dropdown.
+  const options =
+    filterOptions.length > 0
+      ? filterOptions
+      : [
+          // Reading page 1 also banks the filter itself, so a later edition pick
+          // is one POST rather than a page load and a POST.
+          ...(rememberSellerFilter(baseUrl, first.html)?.options ?? []),
+          ...parseSellerExpansionFilter(first.doc),
+        ];
+  return {
+    baseUrl,
+    diagnostics,
+    expansionFilterApplied,
+    expansionFilterOptions: page === 1 ? dedupeExpansionOptions(options) : undefined,
+    hasMore,
+    idExpansions,
+    matches,
+    page,
+    profile,
+    requests,
+    totalListed: page === 1 ? parseSellerOffersTotal(first.doc) : undefined,
   };
 };
 

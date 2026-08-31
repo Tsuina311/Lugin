@@ -51,6 +51,7 @@ export {
   Settings2,
   ShoppingCart,
   Sparkles,
+  Star,
   SunMoon,
   Trash2,
   TrendingUp,

@@ -155,6 +155,52 @@ export const readCollector = async (
   return { parts, samples };
 };
 
+export interface TypeLineReading {
+  raw: string;
+  /** Folded tokens useful for soft evidence (creature, artifact, …). */
+  tokens: string[];
+  samples: OcrSample[];
+}
+
+const TYPE_WHITELIST =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz -—–';
+
+/** Soft type-line OCR — only used as secondary evidence when identity is unclear. */
+export const readTypeLine = async (
+  card: ScanImage,
+  recognizer: TextRecognizer,
+  options: ReadOptions = {},
+): Promise<TypeLineReading> => {
+  const profile = options.profile ?? STANDARD_PROFILE;
+  const pass: NamedRegion = {
+    mode: 'line',
+    name: 'type-line',
+    region: profile.typeLine,
+  };
+  const crop = enhanceForOcr(cropImage(card, pass.region));
+  const began = Date.now();
+  const result = await recognizer.recognize(crop, {
+    mode: 'line',
+    whitelist: TYPE_WHITELIST,
+  });
+  const sample: OcrSample = {
+    confidence: result.confidence,
+    ...(options.keepCrops ? { crop } : {}),
+    cropHeight: crop.height,
+    cropWidth: crop.width,
+    ms: Date.now() - began,
+    normalizedText: result.text.trim().toLowerCase(),
+    rawText: result.text,
+    region: pass.name,
+    variant: PRODUCTION_VARIANT,
+  };
+  const tokens = result.text
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter(t => t.length >= 4);
+  return { raw: result.text, samples: [sample], tokens };
+};
+
 /** Fresh diagnostics seeded from a capture, for callers that record a whole scan. */
 export const startDiagnostics = (frame: ScanImage) => ({
   ...emptyDiagnostics(),

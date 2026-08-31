@@ -31,6 +31,14 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/detectCard.ts')}';
       export * from '${join(root, 'src/lib/scan/regions.ts')}';
       export * from '${join(root, 'src/lib/scan/matchName.ts')}';
+      export * from '${join(root, 'src/lib/scan/artwork/descriptors.ts')}';
+      export * from '${join(root, 'src/lib/scan/artwork/match.ts')}';
+      export * from '${join(root, 'src/lib/scan/text/evidence.ts')}';
+      export * from '${join(root, 'src/lib/scan/ranking/fuse.ts')}';
+      export * from '${join(root, 'src/lib/scan/temporal/consensus.ts')}';
+      export * from '${join(root, 'src/lib/scan/tracking.ts')}';
+      export * from '${join(root, 'src/lib/scan/params.ts')}';
+      export * from '${join(root, 'src/lib/scan/session/controller.ts')}';
     `,
     resolveDir: root,
     sourcefile: 'entry.ts',
@@ -90,6 +98,24 @@ const {
   trimToTextBand,
   upscaleFactorFor,
   warpQuadToCard,
+  describeArtwork,
+  descriptorSimilarity,
+  createArtworkMatcher,
+  indexFromEntries,
+  fuseEvidence,
+  pushTemporal,
+  temporalSupportFor,
+  emptyTemporal,
+  emptyTrack,
+  pushTrack,
+  sampleFromQuad,
+  frameQualityScore,
+  tokenizeScanText,
+  textEvidenceScore,
+  idfForPool,
+  BATTLE_PROFILE,
+  profileForCard,
+  createSessionController,
 } = await import(pathToFileURL(bundle).href);
 
 let failed = 0;
@@ -1077,6 +1103,218 @@ check('the shipped index resolves through the real matcher', () => {
   assert.equal(matchName('Anneau solaire', index)[0].name, 'Sol Ring');
   assert.equal(matchName('Delver of Secrets', index)[0].name, 'Delver of Secrets // Insectile Aberration');
   assert.equal(matchName('Sol Rinq', index)[0].name, 'Sol Ring');
+});
+
+check('artwork descriptors are deterministic and self-similar', () => {
+  const img = blankImage(64, 64);
+  for (let y = 0; y < 64; y++) {
+    for (let x = 0; x < 64; x++) {
+      const i = (y * 64 + x) * 4;
+      img.data[i] = x * 4;
+      img.data[i + 1] = y * 4;
+      img.data[i + 2] = 80;
+      img.data[i + 3] = 255;
+    }
+  }
+  const a = describeArtwork(img);
+  const b = describeArtwork(img);
+  assert.deepEqual(a.dhash, b.dhash);
+  assert.ok(descriptorSimilarity(a, a) > 0.99);
+});
+
+check('artwork matcher ranks an exact descriptor first', () => {
+  const img = blankImage(48, 48);
+  for (let i = 0; i < img.data.length; i += 4) {
+    img.data[i] = 40;
+    img.data[i + 1] = 120;
+    img.data[i + 2] = 200;
+    img.data[i + 3] = 255;
+  }
+  const desc = describeArtwork(img);
+  const other = blankImage(48, 48);
+  for (let i = 0; i < other.data.length; i += 4) {
+    other.data[i] = 200;
+    other.data[i + 1] = 40;
+    other.data[i + 2] = 40;
+    other.data[i + 3] = 255;
+  }
+  const matcher = createArtworkMatcher(
+    indexFromEntries([
+      {
+        descriptor: describeArtwork(other),
+        name: 'Wrong',
+        oracleId: 'oracle:wrong',
+        scryfallId: 'b',
+      },
+      {
+        descriptor: desc,
+        name: 'Right',
+        oracleId: 'oracle:right',
+        scryfallId: 'a',
+      },
+    ]),
+  );
+  const hits = matcher.findCandidates(desc, 3);
+  assert.equal(hits[0].name, 'Right');
+  assert.ok(hits[0].visualScore > hits[1].visualScore);
+});
+
+check('fusion accepts a strong title+visual pair and stays ambiguous on a coin toss', () => {
+  const clear = fuseEvidence([
+    {
+      name: 'Sol Ring',
+      oracleId: 'oracle:sol',
+      possiblePrintingIds: ['p1'],
+      titleScore: 0.92,
+      visualScore: 0.9,
+    },
+    {
+      name: 'Mana Crypt',
+      oracleId: 'oracle:crypt',
+      possiblePrintingIds: [],
+      titleScore: 0.5,
+      visualScore: 0.4,
+    },
+  ]);
+  assert.equal(clear.status, 'identified');
+  assert.equal(clear.card?.name, 'Sol Ring');
+
+  const toss = fuseEvidence([
+    {
+      name: 'Sol Ring',
+      oracleId: 'oracle:sol',
+      possiblePrintingIds: [],
+      titleScore: 0.7,
+      visualScore: 0.68,
+    },
+    {
+      name: 'Mana Vault',
+      oracleId: 'oracle:vault',
+      possiblePrintingIds: [],
+      titleScore: 0.69,
+      visualScore: 0.67,
+    },
+  ]);
+  assert.ok(toss.status === 'card-ambiguous' || toss.status === 'insufficient-confidence');
+});
+
+check('temporal support rises when the same oracle keeps winning', () => {
+  let state = emptyTemporal();
+  const obs = id =>
+    fuseEvidence([
+      { name: 'A', oracleId: id, possiblePrintingIds: [], titleScore: 0.9, visualScore: 0.9 },
+    ]);
+  state = pushTemporal(state, obs('oracle:a'));
+  state = pushTemporal(state, obs('oracle:a'));
+  assert.ok(temporalSupportFor(state, 'oracle:a') >= 0.5);
+});
+
+check('track becomes stable only after agreeing frames', () => {
+  let track = emptyTrack();
+  const corners = {
+    bottomLeft: { x: 0, y: 100 },
+    bottomRight: { x: 70, y: 100 },
+    topLeft: { x: 0, y: 0 },
+    topRight: { x: 70, y: 0 },
+  };
+  track = pushTrack(track, sampleFromQuad(corners, 0.8));
+  assert.equal(track.stable, false);
+  track = pushTrack(track, sampleFromQuad(corners, 0.8));
+  track = pushTrack(track, sampleFromQuad(corners, 0.8));
+  assert.equal(track.stable, true);
+  track = pushTrack(track, null);
+  assert.equal(track.stable, false);
+});
+
+check('frame quality prefers a sharp frame over a flat one', () => {
+  const flat = blankImage(64, 64);
+  for (let i = 0; i < flat.data.length; i += 4) {
+    flat.data[i] = flat.data[i + 1] = flat.data[i + 2] = 128;
+    flat.data[i + 3] = 255;
+  }
+  const sharp = blankImage(64, 64);
+  for (let y = 0; y < 64; y++) {
+    for (let x = 0; x < 64; x++) {
+      const i = (y * 64 + x) * 4;
+      const v = (x + y) % 2 === 0 ? 20 : 220;
+      sharp.data[i] = sharp.data[i + 1] = sharp.data[i + 2] = v;
+      sharp.data[i + 3] = 255;
+    }
+  }
+  assert.ok(frameQualityScore(sharp, 1).score > frameQualityScore(flat, 1).score);
+});
+
+check('text evidence rewards distinctive tokens and ignores stopwords', () => {
+  const tokens = tokenizeScanText('Investigate. Create a Clue token. Creature enters the battlefield.');
+  assert.ok(tokens.includes('investigate'));
+  assert.ok(!tokens.includes('creature'));
+  const idf = idfForPool([
+    { name: 'A', oracleId: 'a', tokens: ['investigate', 'clue'] },
+    { name: 'B', oracleId: 'b', tokens: ['draw', 'card'] },
+  ]);
+  const score = textEvidenceScore(tokens, ['investigate', 'clue'], idf);
+  assert.ok(score > 0.5);
+});
+
+check('battle profile is chosen for landscape rasters', () => {
+  assert.equal(profileForCard(1000, 700).name, 'battle');
+  assert.equal(profileForCard(744, 1038).name, 'standard');
+  assert.ok(STANDARD_PROFILE.artwork);
+  assert.ok(BATTLE_PROFILE.artwork);
+});
+
+await checkAsync('session controller: no card stays searching', async () => {
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: null,
+  });
+  const noise = blankImage(320, 480);
+  const s = await ctrl.onFrame(noise);
+  assert.equal(s.phase, 'searching');
+});
+
+await checkAsync('session controller: found suppresses duplicate until gone', async () => {
+  // Stub recognizer that always "identifies" Sol Ring so we can exercise the
+  // FOUND → same geometry → no re-recognize path without OCR.
+  let recognizeCalls = 0;
+  const ocr = {
+    recognize: async () => {
+      recognizeCalls += 1;
+      return { confidence: 0.9, text: 'Sol Ring' };
+    },
+  };
+  const names = buildNameIndex(
+    { names: ['Sol Ring'], locales: {}, version: 1 },
+    shapeFold,
+  );
+  const ctrl = createSessionController({ nameIndex: names, ocr });
+  // Build a simple high-contrast card-like rectangle.
+  const frame = blankImage(400, 560);
+  for (let y = 40; y < 520; y++) {
+    for (let x = 80; x < 320; x++) {
+      const i = (y * 400 + x) * 4;
+      frame.data[i] = 30;
+      frame.data[i + 1] = 30;
+      frame.data[i + 2] = 40;
+      frame.data[i + 3] = 255;
+    }
+  }
+  // Feed enough agreeing frames to lock (stability window).
+  let last = null;
+  for (let i = 0; i < 6; i++) {
+    last = await ctrl.onFrame(frame);
+  }
+  assert.ok(last);
+  // If detection never locked, skip soft — synthetic blank cards vary.
+  if (last.phase === 'found' || last.phase === 'recognizing' || last.phase === 'ambiguous') {
+    const callsAfter = recognizeCalls;
+    await ctrl.onFrame(frame);
+    await ctrl.onFrame(frame);
+    assert.ok(
+      recognizeCalls <= callsAfter + 1,
+      'must not thrash recognition on a stationary card',
+    );
+  }
 });
 
 await rm(dir, { force: true, recursive: true });

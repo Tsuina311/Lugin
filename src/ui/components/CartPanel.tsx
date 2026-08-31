@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
+import { compareFavouriteFirst, useFavouriteSellers, type FavouriteMap } from '../useFavouriteSellers';
+import { useWideLayout } from '../useWideLayout';
+
 import { Badge } from './Badge';
+import { Button } from './Button';
 import { EmptyState } from './EmptyState';
+import { FavouriteSellerBadge, FavouriteSellerControl } from './FavouriteSellerControl';
 import { IconButton } from './IconButton';
+import { SellerNameButton } from './SellerNameButton';
 import { Tabs, type TabItem } from './Tabs';
 import {
   CircleAlert,
@@ -12,22 +18,22 @@ import {
   ShoppingCart,
   Trash2,
 } from './icons';
-import { useWideLayout } from '../useWideLayout';
 
 import { cartStore, type CartItem } from '@/content/cartStore';
-import { shippingStore } from '@/content/shippingStore';
 import {
   askForLogin,
   clearCachedTokens,
   cmToken,
   rememberWriteToken,
 } from '@/content/session';
+import { shippingStore } from '@/content/shippingStore';
 import { cardKey } from '@/lib/cardName';
 import { removeArticleFromCart } from '@/sites/cardmarket/cart';
 import {
   COUNTRIES,
   countryId,
   countryName,
+  estimateShipping,
   shippingTiers,
   type ShipTier,
 } from '@/sites/cardmarket/shipping';
@@ -42,6 +48,8 @@ const SELLER_COLS_NARROW = 'grid-cols-[minmax(0,1fr)_4.25rem_4.75rem_4.75rem_1.5
 
 const OVERVIEW = 'overview';
 type CartTab = typeof OVERVIEW | (string & {});
+
+type ShippingSnap = ReturnType<typeof shippingStore.getSnapshot>;
 
 interface CardGroup {
   key: string;
@@ -60,6 +68,11 @@ interface SellerBucket {
   total: number;
 }
 
+interface RemoveShipImpact {
+  removesSeller: boolean;
+  saves: number;
+}
+
 /** Prev / current / next weight tiers for a cart line count. */
 const adjacentTiers = (
   tiers: ShipTier[],
@@ -73,6 +86,61 @@ const adjacentTiers = (
     next: tiers[i + 1] ?? null,
     prev: i > 0 ? (tiers[i - 1] ?? null) : null,
   };
+};
+
+const goodsFromLines = (lines: CartItem[]): number =>
+  lines.reduce((s, l) => s + (l.priceValue ?? 0) * l.amount, 0);
+
+const cardCountFromLines = (lines: CartItem[]): number =>
+  lines.reduce((n, l) => n + l.amount, 0);
+
+/** Estimated shipping € for a seller bucket at a given card count and goods value. */
+const shippingEstimate = (
+  bucket: SellerBucket,
+  cardCount: number,
+  goodsValue: number,
+  shipping: ShippingSnap,
+): number | null => {
+  const fromId = countryId(bucket.sellerCountry) ?? null;
+  if (fromId == null || shipping.toCountry == null) return null;
+  const matrix = shipping.matrices[fromId];
+  if (!matrix?.length) return null;
+  return estimateShipping(matrix, cardCount, goodsValue)?.method.price ?? null;
+};
+
+/** How much shipping drops if this line is removed (null if unknown or unchanged). */
+const removeShippingImpact = (
+  bucket: SellerBucket,
+  item: CartItem,
+  shipping: ShippingSnap,
+): RemoveShipImpact | null => {
+  const afterCount = bucket.count - item.amount;
+  const current = shippingEstimate(bucket, bucket.count, bucket.total, shipping);
+  if (current == null) return null;
+
+  if (afterCount <= 0) {
+    return { removesSeller: true, saves: current };
+  }
+
+  const remaining = bucket.lines.filter(l => l.articleId !== item.articleId);
+  const afterGoods = goodsFromLines(remaining);
+  const after = shippingEstimate(bucket, afterCount, afterGoods, shipping);
+  if (after == null || after >= current) return null;
+  return { removesSeller: false, saves: Math.round((current - after) * 100) / 100 };
+};
+
+/** Best single-line shipping saving for this seller (for the overview row hint). */
+const bestRemoveSaving = (
+  bucket: SellerBucket,
+  shipping: ShippingSnap,
+): RemoveShipImpact | null => {
+  let best: RemoveShipImpact | null = null;
+  for (const line of bucket.lines) {
+    const impact = removeShippingImpact(bucket, line, shipping);
+    if (!impact) continue;
+    if (!best || impact.saves > best.saves) best = impact;
+  }
+  return best;
 };
 
 const groupByCard = (items: CartItem[]): CardGroup[] => {
@@ -120,26 +188,43 @@ const groupBySeller = (items: CartItem[]): SellerBucket[] => {
       const sorted = [...lines].sort((a, b) => a.name.localeCompare(b.name));
       const sellerCountry = sorted.find(l => l.sellerCountry)?.sellerCountry;
       return {
-        count: sorted.reduce((n, l) => n + l.amount, 0),
+        count: cardCountFromLines(sorted),
         lines: sorted,
         seller,
         sellerCountry,
-        total: sorted.reduce((s, l) => s + (l.priceValue ?? 0) * l.amount, 0),
+        total: goodsFromLines(sorted),
       };
     })
     .sort((a, b) => a.seller.localeCompare(b.seller));
 };
 
+const bucketForItem = (bySeller: SellerBucket[], item: CartItem): SellerBucket | undefined =>
+  bySeller.find(b => b.lines.some(l => l.articleId === item.articleId));
+
 /** Current estimated shipping € for a seller bucket, or null if unknown. */
 const useSellerShipPrice = (bucket: SellerBucket): number | null => {
   const shipping = useSyncExternalStore(shippingStore.subscribe, shippingStore.getSnapshot);
-  const fromId = countryId(bucket.sellerCountry) ?? null;
-  const matrix = fromId != null ? shipping.matrices[fromId] : undefined;
-  const tiers = useMemo(() => (matrix ? shippingTiers(matrix) : []), [matrix]);
-  const { current } = adjacentTiers(tiers, bucket.count);
-  if (shipping.toCountry == null || fromId == null || !current) return null;
-  return current.price;
+  return shippingEstimate(bucket, bucket.count, bucket.total, shipping);
 };
+
+const ShippingSaveHint = ({
+  className = '',
+  impact,
+}: {
+  className?: string;
+  impact: RemoveShipImpact;
+}) => (
+  <span
+    className={`flex-none text-[10px] font-medium tabular-nums text-pos ${className}`}
+    title={
+      impact.removesSeller
+        ? `Removes this seller — saves ${formatEuro(impact.saves)} shipping`
+        : `Drops a shipping tier — saves ${formatEuro(impact.saves)}`
+    }
+  >
+    −{formatEuro(impact.saves)} ship
+  </span>
+);
 
 /** Current shipping as a single amount — next tier only in the hover title. */
 const SellerShipStrip = ({ bucket }: { bucket: SellerBucket }) => {
@@ -176,6 +261,7 @@ const SellerShipStrip = ({ bucket }: { bucket: SellerBucket }) => {
 
   const title = [
     route,
+    `Tier up to ${current.maxCards} cards`,
     next
       ? `Next: ${formatEuro(next.price)} up to ${next.maxCards} cards` +
         (next.isTracked ? ' (tracked)' : '')
@@ -190,7 +276,6 @@ const SellerShipStrip = ({ bucket }: { bucket: SellerBucket }) => {
     </span>
   );
 };
-
 
 /** Goods+shipping for the overview total column. */
 const SellerTotalCell = ({ bucket }: { bucket: SellerBucket }) => {
@@ -207,154 +292,211 @@ const SellerTotalCell = ({ bucket }: { bucket: SellerBucket }) => {
   );
 };
 
-
-const LineRow = ({
+const CartLineRow = ({
+  bucket,
   item,
   onRemove,
+  shipping,
+  showSeller = false,
 }: {
+  bucket: SellerBucket | undefined;
   item: CartItem;
   onRemove: (item: CartItem) => void;
-}) => (
-  <div className="flex items-start gap-2 border-b border-line px-2 py-1.5 text-xs">
-    {item.imageUrl ? (
-      <img
-        alt=""
-        className="mt-0.5 h-8 w-8 flex-none rounded bg-raised object-cover"
-        src={item.imageUrl}
-      />
-    ) : (
-      <div className="mt-0.5 h-8 w-8 flex-none rounded bg-raised" />
-    )}
-    <div className="min-w-0 flex-1">
-      <div className="truncate font-medium text-ink">{item.name}</div>
-      <div className="truncate text-2xs text-ink-faint">{item.expansion ?? ''}</div>
-    </div>
-    <span className="flex-none tabular-nums text-ink">
-      {item.amount > 1 ? `${item.amount} × ` : ''}
-      {item.price ?? '—'}
-    </span>
-    <IconButton
-      icon={Trash2}
-      label={`Remove ${item.name} from cart`}
-      onClick={() => onRemove(item)}
-      size="xs"
-      tone="danger"
-    />
-  </div>
-);
-
-/** One shared card: sellers as columns, price + remove in each cell. */
-const DuplicateTable = ({
-  group,
-  onRemove,
-}: {
-  group: CardGroup;
-  onRemove: (item: CartItem) => void;
+  shipping: ShippingSnap;
+  showSeller?: boolean;
 }) => {
-  const minPrice = Math.min(
-    ...group.lines.map(l => l.priceValue ?? Number.POSITIVE_INFINITY),
+  const impact = bucket ? removeShippingImpact(bucket, item, shipping) : null;
+  const minPrice =
+    bucket?.lines.reduce(
+      (m, l) => Math.min(m, l.priceValue ?? Number.POSITIVE_INFINITY),
+      Number.POSITIVE_INFINITY,
+    ) ?? Number.POSITIVE_INFINITY;
+  const isCheapest = (item.priceValue ?? Number.POSITIVE_INFINITY) === minPrice;
+
+  return (
+    <div className="group grid grid-cols-[1.75rem_minmax(0,1fr)_auto_auto] items-center gap-x-1.5 border-b border-line px-2 py-1 text-xs last:border-b-0 hover:bg-tint/40">
+      {item.imageUrl ? (
+        <img
+          alt=""
+          className="h-7 w-7 flex-none rounded bg-raised object-cover"
+          src={item.imageUrl}
+        />
+      ) : (
+        <div className="h-7 w-7 flex-none rounded bg-raised" />
+      )}
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-baseline gap-1">
+          <span className="truncate font-medium text-ink">{item.name}</span>
+          {showSeller && (
+            <span className="truncate text-[10px] text-ink-faint" title={item.seller ?? undefined}>
+              · {item.seller ?? 'Unknown'}
+            </span>
+          )}
+        </div>
+        <div className="flex min-w-0 items-center gap-1.5 truncate text-[10px] text-ink-faint">
+          {item.expansion ? <span className="truncate">{item.expansion}</span> : null}
+          {isCheapest && bucket && bucket.lines.length > 1 ? (
+            <span className="flex-none font-medium text-pos">Cheapest</span>
+          ) : null}
+        </div>
+      </div>
+      <span className="flex-none tabular-nums text-ink">
+        {item.amount > 1 ? `${item.amount} × ` : ''}
+        {item.price ?? '—'}
+      </span>
+      <div className="flex flex-none items-center gap-0.5">
+        {impact ? <ShippingSaveHint impact={impact} /> : null}
+        <IconButton
+          className="opacity-70 group-hover:opacity-100"
+          icon={Trash2}
+          label={
+            impact
+              ? `Remove ${item.name}${impact.removesSeller ? ' and drop shipping' : ` — save ${formatEuro(impact.saves)} shipping`}`
+              : `Remove ${item.name} from cart`
+          }
+          onClick={() => onRemove(item)}
+          size="xs"
+          tone="danger"
+        />
+      </div>
+    </div>
   );
-  const hasCostlier = group.lines.some(
-    l => (l.priceValue ?? Number.POSITIVE_INFINITY) > minPrice,
+};
+
+/** Compact duplicate block: one card, multiple cart lines — compare and trim. */
+const DuplicateGroup = ({
+  bySeller,
+  favourites,
+  group,
+  onKeepCheapest,
+  onRemove,
+  shipping,
+}: {
+  bySeller: SellerBucket[];
+  favourites: FavouriteMap;
+  group: CardGroup;
+  onKeepCheapest: (group: CardGroup) => void;
+  onRemove: (item: CartItem) => void;
+  shipping: ShippingSnap;
+}) => {
+  const crossSeller = group.sellers.length > 1;
+  const sortedLines = useMemo(
+    () =>
+      [...group.lines].sort((a, b) =>
+        compareFavouriteFirst(
+          favourites,
+          a,
+          b,
+          line => ({ name: line.seller ?? '' }),
+          (x, y) => (x.priceValue ?? Infinity) - (y.priceValue ?? Infinity),
+        ),
+      ),
+    [favourites, group.lines],
   );
 
   return (
-    <section className="border-b border-line bg-warn-soft/20">
-      <header className="flex items-center gap-1.5 px-2 pt-2 pb-1">
+    <section className="border-b border-line">
+      <header className="flex items-center gap-1.5 bg-warn-soft/30 px-2 py-1">
         {group.lines[0]?.imageUrl ? (
           <img
             alt=""
-            className="h-8 w-8 flex-none rounded bg-raised object-cover"
+            className="h-7 w-7 flex-none rounded bg-raised object-cover"
             src={group.lines[0].imageUrl}
           />
         ) : (
-          <div className="h-8 w-8 flex-none rounded bg-raised" />
+          <div className="h-7 w-7 flex-none rounded bg-raised" />
         )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-medium text-ink">{group.name}</div>
-          <div className="truncate text-2xs text-ink-faint">
-            {group.lines[0]?.expansion ?? 'Same card from multiple sellers'}
+          <div className="truncate text-[10px] text-ink-faint">
+            {group.lines[0]?.expansion ?? 'Same card in cart more than once'}
           </div>
         </div>
-        <Badge tone="warn">
-          {group.sellers.length} sellers · {group.lines.length} offers
+        <Badge title={`${group.lines.length} separate cart lines`} tone="warn">
+          ×{group.lines.length}
         </Badge>
+        <Button
+          onClick={() => onKeepCheapest(group)}
+          size="xs"
+          title="Remove every line except the cheapest offer"
+          variant="neutral"
+        >
+          Keep cheapest
+        </Button>
       </header>
 
-      <div className="overflow-x-auto px-2 pb-2">
-        <table className="w-full min-w-[16rem] border-collapse text-2xs">
-          <thead>
-            <tr className="text-left text-ink-faint">
-              {group.sellers.map(seller => (
-                <th
-                  key={seller}
-                  className="border-b border-line px-1.5 py-1 font-semibold normal-case tracking-normal"
-                >
-                  <span className="block max-w-[9rem] truncate" title={seller}>
-                    {seller}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="align-top">
-              {group.sellers.map(seller => {
-                const lines = group.lines.filter(
-                  l => (l.seller ?? 'Unknown seller').toLowerCase() === seller.toLowerCase(),
-                );
-                return (
-                  <td key={seller} className="border-b border-line px-1.5 py-1.5">
-                    {lines.length === 0 ? (
-                      <span className="text-ink-faint">—</span>
-                    ) : (
-                      <div className="flex flex-col gap-1">
-                        {lines.map(item => {
-                          const cheap =
-                            hasCostlier &&
-                            (item.priceValue ?? Number.POSITIVE_INFINITY) === minPrice;
-                          return (
-                            <div
-                              key={item.articleId}
-                              className={`flex items-center gap-1 rounded px-1 py-0.5 ${
-                                cheap ? 'bg-pos-soft/50' : 'bg-raised'
-                              }`}
-                            >
-                              <div className="min-w-0 flex-1">
-                                <div className="tabular-nums text-ink">
-                                  {item.amount > 1 ? `${item.amount} × ` : ''}
-                                  {item.price ?? '—'}
-                                </div>
-                                {cheap && (
-                                  <div className="text-[9px] font-medium text-pos">Cheapest</div>
-                                )}
-                              </div>
-                              <IconButton
-                                icon={Trash2}
-                                label={`Remove ${item.name} from ${seller}`}
-                                onClick={() => onRemove(item)}
-                                size="xs"
-                                tone="danger"
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </td>
-                );
-              })}
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      {crossSeller && (
+        <p className="border-b border-line bg-warn-soft/15 px-2 py-0.5 text-[10px] text-warn">
+          From {group.sellers.length} sellers — pick one offer and drop the rest.
+        </p>
+      )}
+
+      {sortedLines.map(item => (
+        <CartLineRow
+          key={item.articleId}
+          bucket={bucketForItem(bySeller, item)}
+          item={item}
+          onRemove={onRemove}
+          shipping={shipping}
+          showSeller
+        />
+      ))}
     </section>
+  );
+};
+
+const CartTotalsFooter = ({
+  bySeller,
+  shipping,
+}: {
+  bySeller: SellerBucket[];
+  shipping: ShippingSnap;
+}) => {
+  const { goods, grand, ship, shipKnown } = useMemo(() => {
+    let goods = 0;
+    let ship = 0;
+    let shipKnown = 0;
+    for (const b of bySeller) {
+      goods += b.total;
+      const s = shippingEstimate(b, b.count, b.total, shipping);
+      if (s != null) {
+        ship += s;
+        shipKnown += 1;
+      }
+    }
+    return {
+      goods,
+      grand: goods + ship,
+      ship,
+      shipKnown,
+    };
+  }, [bySeller, shipping]);
+
+  const shipLabel =
+    shipping.toCountry == null
+      ? 'Pick ship-to for estimates'
+      : shipKnown === bySeller.length
+        ? `${formatEuro(ship)} shipping`
+        : shipKnown > 0
+          ? `${formatEuro(ship)}+ shipping (loading…)`
+          : 'Shipping loading…';
+
+  return (
+    <div className="flex flex-none flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-t border-line bg-panel px-2 py-1.5 text-xs">
+      <span className="text-ink-faint">
+        {formatEuro(goods)} cards · {shipLabel}
+      </span>
+      <span className="font-semibold tabular-nums text-ink" title="Cards + estimated shipping">
+        Est. {formatEuro(grand)}
+      </span>
+    </div>
   );
 };
 
 export const CartPanel = () => {
   const cart = useSyncExternalStore(cartStore.subscribe, cartStore.getSnapshot);
   const shipping = useSyncExternalStore(shippingStore.subscribe, shippingStore.getSnapshot);
+  const { favourites, isFavourite, toggle: toggleFavourite } = useFavouriteSellers();
   const { ref: wideRef, wide } = useWideLayout(560);
   const [tab, setTab] = useState<CartTab>(OVERVIEW);
   const [detectingCountry, setDetectingCountry] = useState(false);
@@ -364,7 +506,6 @@ export const CartPanel = () => {
     void cartStore.refresh();
   }, []);
 
-  // Same as Search: auto-detect home country once so shipping estimates work.
   useEffect(() => {
     if (shipping.loading || shipping.toCountry != null || autoDetectedRef.current) return;
     autoDetectedRef.current = true;
@@ -373,10 +514,22 @@ export const CartPanel = () => {
   }, [shipping.loading, shipping.toCountry]);
 
   const byCard = useMemo(() => groupByCard(cart.items), [cart.items]);
-  const bySeller = useMemo(() => groupBySeller(cart.items), [cart.items]);
-  const duplicates = useMemo(() => byCard.filter(g => g.sellers.length > 1), [byCard]);
+  const bySeller = useMemo(
+    () =>
+      groupBySeller(cart.items).sort((a, b) =>
+        compareFavouriteFirst(
+          favourites,
+          a,
+          b,
+          bucket => ({ name: bucket.seller }),
+          (x, y) => x.seller.localeCompare(y.seller),
+        ),
+      ),
+    [cart.items, favourites],
+  );
+  /** Same card added more than once — any seller, any duplicate lines. */
+  const duplicates = useMemo(() => byCard.filter(g => g.lines.length > 1), [byCard]);
 
-  // Prefetch each seller's route for the overview shipping strip.
   useEffect(() => {
     if (shipping.toCountry == null) return;
     for (const bucket of bySeller) {
@@ -397,7 +550,7 @@ export const CartPanel = () => {
         icon: LayoutGrid,
         id: OVERVIEW,
         label: 'Overview',
-        title: 'Cart summary and cards shared across sellers',
+        title: 'Cart summary, duplicates, and per-seller totals',
       },
       ...bySeller.map(s => ({
         count: s.count,
@@ -412,8 +565,6 @@ export const CartPanel = () => {
   const removeItem = async (item: CartItem) => {
     cartStore.clearNotice();
 
-    // Sunshine path: drop the line immediately. Cardmarket is asked afterwards;
-    // a failure restores the row and shows a notice.
     const snapshot = cartStore.removeOptimistic(item.articleId);
     if (!snapshot) return;
 
@@ -444,7 +595,6 @@ export const CartPanel = () => {
       if (!r.ok && /not signed in/i.test(r.message)) askForLogin();
       if (r.ok) {
         cartStore.confirmRemove(item.articleId);
-        // Reconcile totals with the server when quiet — don't block the UI.
         cartStore.refreshSoon();
       } else {
         cartStore.revertRemove(snapshot, r.message);
@@ -457,9 +607,21 @@ export const CartPanel = () => {
     }
   };
 
+  const removeMany = (items: CartItem[]) => {
+    for (const item of items) void removeItem(item);
+  };
+
+  const keepCheapest = (group: CardGroup) => {
+    const sorted = [...group.lines].sort(
+      (a, b) => (a.priceValue ?? Infinity) - (b.priceValue ?? Infinity),
+    );
+    const keep = sorted[0];
+    if (!keep) return;
+    const extras = group.lines.filter(l => l.articleId !== keep.articleId);
+    void removeMany(extras);
+  };
 
   const removeSeller = async (bucket: SellerBucket) => {
-    // Snapshot lines first — optimistic removes mutate cart.items immediately.
     const lines = [...bucket.lines];
     if (lines.length === 0) return;
 
@@ -534,22 +696,40 @@ export const CartPanel = () => {
 
   return (
     <div ref={wideRef} className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-line px-2 py-1.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line px-2 py-1">
         <div className="min-w-0 flex-1">
           <div className="text-xs font-medium text-ink">
             {cart.total ?? (cart.status === 'loading' ? '…' : '0,00 €')}
             {cart.count > 0 && (
-              <span className="ml-1.5 text-ink-faint">
-                · {cart.count} item{cart.count === 1 ? '' : 's'}
+              <span className="ml-1.5 font-normal text-ink-faint">
+                · {cart.count} card{cart.count === 1 ? '' : 's'}
                 {bySeller.length > 0 &&
                   ` · ${bySeller.length} seller${bySeller.length === 1 ? '' : 's'}`}
               </span>
             )}
           </div>
           {(cart.notice || cart.error) && (
-            <div className="text-2xs text-neg">{cart.notice ?? cart.error}</div>
+            <div className="text-[10px] text-neg">{cart.notice ?? cart.error}</div>
           )}
         </div>
+        <label className="flex items-center gap-1 text-[10px] text-ink-faint">
+          <span className="sr-only">Ship to</span>
+          <select
+            className="max-w-[7.5rem] rounded border border-line bg-raised px-1 py-0.5 text-ink"
+            onChange={e =>
+              void shippingStore.setToCountry(e.target.value ? Number(e.target.value) : null)
+            }
+            title="Your country — shipping is calculated to here"
+            value={shipping.toCountry ?? ''}
+          >
+            <option value="">{detectingCountry ? 'Detecting…' : 'Ship to…'}</option>
+            {COUNTRIES.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <IconButton
           className={cart.status === 'loading' ? 'animate-spin' : ''}
           icon={RefreshCw}
@@ -578,42 +758,28 @@ export const CartPanel = () => {
           <div className="min-h-0 flex-1 overflow-auto">
             {tab === OVERVIEW ? (
               <>
-                <div className="border-b border-line px-2 py-2">
-                  <div className="text-xs text-ink">
-                    <span className="font-medium">{cart.count}</span>
-                    <span className="text-ink-faint">
-                      {' '}
-                      card{cart.count === 1 ? '' : 's'} from{' '}
-                    </span>
-                    <span className="font-medium">{bySeller.length}</span>
-                    <span className="text-ink-faint">
-                      {' '}
-                      seller{bySeller.length === 1 ? '' : 's'}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-ink-faint">
-                    <span>Ship to</span>
-                    <select
-                      className="rounded border border-line bg-raised px-1 py-0.5 text-ink"
-                      onChange={e =>
-                        void shippingStore.setToCountry(
-                          e.target.value ? Number(e.target.value) : null,
-                        )
-                      }
-                      title="Your country — shipping is calculated to here"
-                      value={shipping.toCountry ?? ''}
-                    >
-                      <option value="">{detectingCountry ? 'Detecting…' : 'Pick…'}</option>
-                      {COUNTRIES.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                {duplicates.length > 0 ? (
+                  <>
+                    <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b border-line bg-panel px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                      <CircleAlert aria-hidden className="text-warn" size={12} />
+                      Duplicates
+                      <Badge tone="warn">{duplicates.length}</Badge>
+                    </div>
+                    {duplicates.map(group => (
+                      <DuplicateGroup
+                        key={group.key}
+                        bySeller={bySeller}
+                        favourites={favourites}
+                        group={group}
+                        onKeepCheapest={keepCheapest}
+                        onRemove={item => void removeItem(item)}
+                        shipping={shipping}
+                      />
+                    ))}
+                  </>
+                ) : null}
 
-                <div className="border-b border-line px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-ink-faint">
+                <div className="sticky top-0 z-10 border-b border-line bg-panel px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
                   Per seller
                 </div>
                 {wide && (
@@ -622,99 +788,111 @@ export const CartPanel = () => {
                   >
                     <span>Seller</span>
                     <span>Country</span>
-                    <span className="text-right">Shipping</span>
+                    <span className="text-right">Ship</span>
                     <span className="text-right">Cards</span>
                     <span className="text-right">Total</span>
                     <span />
                   </div>
                 )}
-                {bySeller.map(bucket => (
-                  <div
-                    key={bucket.seller}
-                    className={`grid w-full items-center gap-x-2 border-b border-line px-2 py-1 text-xs ${
-                      wide ? SELLER_COLS_WIDE : SELLER_COLS_NARROW
-                    }`}
-                  >
-                    <button
-                      className="min-w-0 truncate text-left font-medium text-ink hover:underline"
-                      onClick={() => setTab(bucket.seller)}
-                      title={bucket.seller}
-                      type="button"
+                {bySeller.map(bucket => {
+                  const fav = isFavourite(undefined, bucket.seller);
+                  const shipSave = bestRemoveSaving(bucket, shipping);
+                  return (
+                    <div
+                      key={bucket.seller}
+                      className={`grid w-full items-center gap-x-2 border-b px-2 py-0.5 text-xs ${
+                        fav ? 'border-amber-500/30 bg-amber-500/5' : 'border-line'
+                      } ${wide ? SELLER_COLS_WIDE : SELLER_COLS_NARROW}`}
                     >
-                      {bucket.seller}
-                      {!wide && bucket.sellerCountry && (
-                        <span className="ml-1 font-normal text-ink-faint">
-                          · {bucket.sellerCountry}
+                      <div className="flex min-w-0 items-center gap-0.5">
+                        <FavouriteSellerControl
+                          active={fav}
+                          name={bucket.seller}
+                          onToggle={() => void toggleFavourite(undefined, bucket.seller)}
+                        />
+                        <SellerNameButton
+                          className="truncate text-left font-medium text-ink hover:underline"
+                          name={bucket.seller}
+                        />
+                        {!wide && bucket.sellerCountry && (
+                          <span className="truncate font-normal text-ink-faint">
+                            · {bucket.sellerCountry}
+                          </span>
+                        )}
+                        <IconButton
+                          icon={LayoutGrid}
+                          label={`View ${bucket.seller}'s lines in cart`}
+                          onClick={() => setTab(bucket.seller)}
+                          size="xs"
+                          tone="default"
+                        />
+                        {fav ? <FavouriteSellerBadge className="flex-none" /> : null}
+                      </div>
+                      {wide && (
+                        <span
+                          className="min-w-0 truncate text-ink-faint"
+                          title={bucket.sellerCountry ?? undefined}
+                        >
+                          {bucket.sellerCountry ?? '—'}
                         </span>
                       )}
-                    </button>
-                    {wide && (
-                      <span
-                        className="min-w-0 truncate text-ink-faint"
-                        title={bucket.sellerCountry ?? undefined}
-                      >
-                        {bucket.sellerCountry ?? '—'}
+                      <span className="text-right tabular-nums">
+                        <SellerShipStrip bucket={bucket} />
+                        {shipSave ? (
+                          <span
+                            className="ml-0.5 block text-[9px] font-medium text-pos"
+                            title={
+                              shipSave.removesSeller
+                                ? 'Removing a line can drop this seller entirely'
+                                : 'Removing a line can drop a shipping tier'
+                            }
+                          >
+                            ↓ tier
+                          </span>
+                        ) : null}
                       </span>
-                    )}
-                    <span className="text-right tabular-nums">
-                      <SellerShipStrip bucket={bucket} />
-                    </span>
-                    <span className="text-right tabular-nums text-ink-faint">
-                      {bucket.count} · {formatEuro(bucket.total)}
-                    </span>
-                    <SellerTotalCell bucket={bucket} />
-                    <IconButton
-                      icon={Trash2}
-                      label={`Remove all cards from ${bucket.seller}`}
-                      onClick={() => void removeSeller(bucket)}
-                      size="xs"
-                      tone="danger"
-                    />
-                  </div>
-                ))}
-
-                <div className="sticky top-0 z-10 border-b border-t border-line bg-panel px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-ink-faint">
-                  In common
-                  {duplicates.length > 0 ? (
-                    <span className="ml-1 font-normal normal-case text-warn">
-                      · {duplicates.length} card{duplicates.length === 1 ? '' : 's'} from more than
-                      one seller
-                    </span>
-                  ) : (
-                    <span className="ml-1 font-normal normal-case">· none</span>
-                  )}
-                </div>
-
-                {duplicates.length > 0 ? (
-                  <>
-                    <div className="flex items-start gap-2 border-b border-line bg-warn-soft px-2 py-1.5 text-2xs text-warn">
-                      <CircleAlert aria-hidden className="mt-0.5 flex-none" size={14} />
-                      <div>
-                        Same card in the cart from different sellers — compare prices and remove the
-                        extras you don’t want.
-                      </div>
-                    </div>
-                    {duplicates.map(group => (
-                      <DuplicateTable
-                        key={group.key}
-                        group={group}
-                        onRemove={item => void removeItem(item)}
+                      <span className="text-right tabular-nums text-ink-faint">
+                        {bucket.count} · {formatEuro(bucket.total)}
+                      </span>
+                      <SellerTotalCell bucket={bucket} />
+                      <IconButton
+                        icon={Trash2}
+                        label={`Remove all cards from ${bucket.seller}`}
+                        onClick={() => void removeSeller(bucket)}
+                        size="xs"
+                        tone="danger"
                       />
-                    ))}
-                  </>
-                ) : (
-                  <p className="px-2 py-3 text-2xs text-ink-faint">
-                    No card appears under more than one seller.
+                    </div>
+                  );
+                })}
+
+                {duplicates.length === 0 && (
+                  <p className="px-2 py-2 text-[10px] text-ink-faint">
+                    No duplicate cards in the cart.
                   </p>
                 )}
               </>
             ) : activeSeller ? (
               <>
-                <header className="flex items-center gap-2 border-b border-line px-2 py-1.5">
+                <header className="flex items-center gap-1.5 border-b border-line px-2 py-1">
+                  <FavouriteSellerControl
+                    active={isFavourite(undefined, activeSeller.seller)}
+                    name={activeSeller.seller}
+                    onToggle={() => void toggleFavourite(undefined, activeSeller.seller)}
+                  />
                   <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">
-                    {activeSeller.seller}
+                    <SellerNameButton
+                      className="truncate text-left font-medium text-ink hover:underline"
+                      name={activeSeller.seller}
+                    />
+                    {isFavourite(undefined, activeSeller.seller) ? (
+                      <FavouriteSellerBadge className="ml-1.5 align-middle" />
+                    ) : null}
                   </span>
-                  <span className="flex-none text-2xs tabular-nums text-ink-faint">
+                  <span className="flex-none text-[10px] tabular-nums text-ink-faint">
+                    <SellerShipStrip bucket={activeSeller} />
+                  </span>
+                  <span className="flex-none text-[10px] tabular-nums text-ink-faint">
                     {activeSeller.count} · {formatEuro(activeSeller.total)}
                   </span>
                   <IconButton
@@ -726,15 +904,19 @@ export const CartPanel = () => {
                   />
                 </header>
                 {activeSeller.lines.map(item => (
-                  <LineRow
+                  <CartLineRow
                     key={item.articleId}
+                    bucket={activeSeller}
                     item={item}
                     onRemove={row => void removeItem(row)}
+                    shipping={shipping}
                   />
                 ))}
               </>
             ) : null}
           </div>
+
+          <CartTotalsFooter bySeller={bySeller} shipping={shipping} />
         </>
       )}
     </div>

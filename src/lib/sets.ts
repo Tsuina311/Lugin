@@ -216,6 +216,28 @@ export const tallyEditions = (
   return [...found.values()];
 };
 
+/**
+ * Union edition picker rows — dropdown catalogue plus editions seen in loaded
+ * offers. Counts use the higher of the two tallies (seller total vs loaded).
+ */
+export const mergeEditionTallies = (
+  primary: readonly EditionTally[],
+  secondary: readonly EditionTally[],
+): EditionTally[] => {
+  const byKey = new Map<string, EditionTally>();
+  for (const t of primary) byKey.set(t.key, { ...t });
+  for (const t of secondary) {
+    const existing = byKey.get(t.key);
+    if (existing) {
+      existing.count = Math.max(existing.count, t.count);
+      if (!existing.releasedAt && t.releasedAt) existing.releasedAt = t.releasedAt;
+      continue;
+    }
+    byKey.set(t.key, { ...t });
+  }
+  return [...byKey.values()];
+};
+
 export interface EditionYear {
   /** How many rows fall in this year, across all its editions. */
   count: number;

@@ -254,5 +254,6 @@ export default defineConfig({
     },
     host: true,
     port: 5174,
+    strictPort: false,
   },
 });

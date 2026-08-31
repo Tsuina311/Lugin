@@ -29,6 +29,14 @@ export const timeAgo = (ts: number): string => {
   return `${Math.round(hrs / 24)} d ago`;
 };
 
+/** Calendar date for an order row — locale-aware, no time-of-day noise. */
+export const formatShortDate = (ts: number): string =>
+  new Date(ts).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
 export const shortUrl = (url: string): string => {
   try {
     const u = new URL(url);

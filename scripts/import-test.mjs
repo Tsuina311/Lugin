@@ -33,9 +33,13 @@ await writeFile(
    export * from '${root}src/lib/purchaseCost';
    export * from '${root}src/lib/purchaseDuplicates';
    export * from '${root}src/lib/sellerStats';
+   export * from '${root}src/lib/purchasesBySeller';
    export * from '${root}src/sites/cardmarket/searchArgs';
+   export * from '${root}src/sites/cardmarket/sellerInventoryFilter';
+   export * from '${root}src/sites/cardmarket/challenge';
    export * from '${root}src/sites/cardmarket/productUrl';
    export * from '${root}src/lib/sets';
+   export * from '${root}src/lib/catalogueArt';
    export { cardKey } from '${root}src/lib/cardName';
    export { sellerFrom, sellerSlugFromHref, timelineFrom } from '${root}src/sites/cardmarket/order';
    export { shouldWelcome } from '${root}src/ui/firstRun';
@@ -91,6 +95,8 @@ const {
   inTransitCopies,
   daysSince,
   ordersWithoutSeller,
+  groupPurchasesBySeller,
+  sellerMatchesQuery,
   buildArgs,
   cardmarketSearchUrl,
   encodeArgs,
@@ -98,6 +104,8 @@ const {
   tokenFromArgs,
   productFactsFromImage,
   expansionFromProductUrl,
+  groupCatalogueByArt,
+  matchCataloguePrint,
   buildSetIndex,
   editionIdOf,
   groupEditionsByYear,
@@ -115,6 +123,16 @@ const {
   deckTagById,
   applyDefaultSearchFilters,
   goldfishArchetypeSlug,
+  expansionOptionsFrom,
+  inventoryIdsFromHtml,
+  isChallengeResponse,
+  looksLikeChallenge,
+  matchExpansionIds,
+  parseFilterComponentProps,
+  samePagePath,
+  sellerInventoryFilterBody,
+  stockFilterProps,
+  withFilterDefaults,
 } = await import(pathToFileURL(bundle).href);
 
 let failed = 0;
@@ -998,6 +1016,20 @@ check('the display name falls back to the slug rather than showing blank', () =>
   assert.equal(stats[0].name, 'quietshop');
 });
 
+check('purchase history groups by seller with one row per order date', () => {
+  const groups = groupPurchasesBySeller(HISTORY);
+  assert.equal(groups.length, 2);
+  const alice = groups.find(g => g.slug === 'alice');
+  assert.equal(alice?.orders, 2);
+  assert.equal(alice?.orderRows.length, 2);
+  assert.equal(alice?.orderRows[0].orderId, 'a2', 'newest paid date first');
+  assert.equal(alice?.orderRows[0].copies, 3);
+  assert.equal(alice?.orderRows[1].orderId, 'a1');
+  assert.ok(alice?.cardRows.some(c => /sol ring/i.test(c.name)), 'cards bought per seller');
+  assert.ok(alice && sellerMatchesQuery(alice, 'sol ring'), 'find seller by card name');
+  assert.equal(alice && sellerMatchesQuery(alice, 'zzzzz'), false);
+});
+
 // ---------------------------------------------------------------------------
 // Reading the seller and the timeline off an order page
 // ---------------------------------------------------------------------------
@@ -1502,6 +1534,59 @@ check('a thumbnail we cannot read leaves the printing unpinned rather than guess
   assert.deepEqual(productFactsFromImage('/img/placeholder.svg'), {});
 });
 
+check('catalogue printings with the same illustration_id fold into one art row', () => {
+  const prints = [
+    {
+      cardmarketId: 1,
+      collectorNumber: '1',
+      id: 'a',
+      illustrationId: 'art-coldsnap',
+      setCode: 'csp',
+      setName: 'Coldsnap',
+    },
+    {
+      cardmarketId: 2,
+      collectorNumber: '2',
+      id: 'b',
+      illustrationId: 'art-coldsnap',
+      setCode: 'mma',
+      setName: 'Modern Masters',
+    },
+    {
+      cardmarketId: 3,
+      collectorNumber: '3',
+      id: 'c',
+      illustrationId: 'art-list',
+      setCode: 'plist',
+      setName: 'The List',
+    },
+  ];
+  const items = [
+    { href: '/p/1', name: 'Adarkar Valkyrie', productId: '1', expansion: 'Coldsnap' },
+    { href: '/p/2', name: 'Adarkar Valkyrie', productId: '2', expansion: 'Modern Masters' },
+    { href: '/p/3', name: 'Adarkar Valkyrie', productId: '3', expansion: 'The List' },
+  ];
+  const groups = groupCatalogueByArt(items, prints);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].sharedArt, true);
+  assert.equal(groups[0].printings.length, 2);
+  assert.equal(groups[1].sharedArt, false);
+  assert.equal(groups[1].printings.length, 1);
+  assert.equal(matchCataloguePrint(items[0], prints)?.illustrationId, 'art-coldsnap');
+});
+
+check('catalogue printings without a Scryfall match stay as solo edition rows', () => {
+  const groups = groupCatalogueByArt(
+    [
+      { href: '/p/9', name: 'Odd Card', expansion: 'Mystery Box' },
+      { href: '/p/8', name: 'Odd Card', expansion: 'Other Box' },
+    ],
+    [],
+  );
+  assert.equal(groups.length, 2);
+  assert.equal(groups.every(g => !g.sharedArt), true);
+});
+
 // ---------------------------------------------------------------------------
 // Editions: dating a set, and reconciling three catalogues' spellings of it
 // ---------------------------------------------------------------------------
@@ -1708,6 +1793,264 @@ check('goldfish slugs keep possessive s', () => {
     goldfishArchetypeSlug(["Caesar, Legion's Emperor"]),
     'commander-caesar-legion-s-emperor',
   );
+});
+
+// A seller's real edition dropdown, copied off a Singles page. Kept verbatim
+// (counts, "Extras" suffixes, zero-count entries and all) because our picker is
+// supposed to mirror it exactly — if the two disagree, a pick can't be sent.
+const EXPANSION_SELECT = `<select name="idExpansion" class="form-select" id="IdExpansion" data-testid="expansion-select"><option value="0" selected="">All</option><option value="6261">Avatar: The Last Airbender (8)</option><option value="6262">Avatar: The Last Airbender: Eternal (1)</option><option value="5658">Bloomburrow (9)</option><option value="5789">Bloomburrow: Promos (0)</option><option value="5808">Commander: Duskmourn: House of Horror (1)</option><option value="5809">Commander: Duskmourn: House of Horror: Extras (5)</option><option value="6439">Commander: Lorwyn Eclipsed: Extras (0)</option><option value="3048">Core 2021 (0)</option><option value="5806">Duskmourn: House of Horror (6)</option><option value="5807">Duskmourn: House of Horror: Extras (16)</option><option value="6063">Edge of Eternities (2)</option><option value="6106">Edge of Eternities: Promos (0)</option><option value="5442">Enchanting Tales (1)</option><option value="6057">FINAL FANTASY (13)</option><option value="6059">FINAL FANTASY Through the Ages (0)</option><option value="6137">FINAL FANTASY: Extras (2)</option><option value="4362">Innistrad: Midnight Hunt (1)</option><option value="4383">Innistrad: Midnight Hunt: Promos (0)</option><option value="40">Judgment (0)</option><option value="3660">Kaldheim (1)</option><option value="3680">Kaldheim: Extras (1)</option><option value="84">Lorwyn (2)</option><option value="6325">Lorwyn Eclipsed (7)</option><option value="6421">Lorwyn Eclipsed: Extras (3)</option><option value="1449">Magic 2014 (1)</option><option value="6305">Marvel Source Material Cards (0)</option><option value="6312">Marvel's Spider-Man: Promos (0)</option><option value="4219">Modern Horizons 2 (3)</option><option value="6474">Secrets of Strixhaven (5)</option><option value="6547">Secrets of Strixhaven: Mystical Archive (1)</option><option value="95">Shadowmoor (2)</option><option value="5523">Special Guests (2)</option><option value="6060">Tarkir: Dragonstorm (7)</option><option value="6091">Tarkir: Dragonstorm: Extras (1)</option><option value="6570">The Hobbit (1)</option><option value="1457">Theros (1)</option><option value="56">Time Spiral (2)</option><option value="5428">Wilds of Eldraine: Extras (1)</option><option value="3404">Zendikar Rising (2)</option></select>`;
+
+const selectOptions = html =>
+  [...html.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/g)].map(m => ({
+    label: m[2],
+    value: m[1],
+  }));
+
+// The filter form as the page renders it, minus the token (which is per session).
+const FILTER_FIELDS = [
+  ['userInventoryFilterMode', ''],
+  ['idUser', '1454828'],
+  ['idSeller', '991307718'],
+  ['category', '1'],
+  ['name', ''],
+  ['idExpansion', '0'],
+  ['idRarity', '0'],
+  ['condition', '7'],
+  ['idLanguage', '0'],
+  ['comments', ''],
+  ['minPrice', ''],
+  ['maxPrice', ''],
+  ['minAmt', '0'],
+  ['isFoil', '0'],
+  ['isSigned', '0'],
+  ['isAltered', '0'],
+  ['sortBy', 'name_asc'],
+];
+const TOKEN = '8e5982d80dbfb875ec68f5b86d4c14d017b74d0b3d7dd1d5173eceea7e60fbcb';
+
+check("edition picker lists exactly the seller's dropdown", () => {
+  const raw = selectOptions(EXPANSION_SELECT);
+  const options = expansionOptionsFrom(raw);
+  // Every option but "All" (value 0), counts stripped off the labels.
+  assert.equal(options.length, raw.length - 1);
+  assert.deepEqual(options[0], { count: 8, id: 6261, label: 'Avatar: The Last Airbender' });
+  assert.deepEqual(options.at(-1), { count: 2, id: 3404, label: 'Zendikar Rising' });
+  assert.ok(!options.some(o => o.label === 'All'));
+  // Editions the seller lists nothing from are still offered, as on the page.
+  assert.deepEqual(options.find(o => o.id === 40), { count: 0, id: 40, label: 'Judgment' });
+  // "Extras" and base sets are separate editions with separate ids.
+  assert.equal(options.find(o => o.label === 'Duskmourn: House of Horror')?.id, 5806);
+  assert.equal(options.find(o => o.label === 'Duskmourn: House of Horror: Extras')?.id, 5807);
+  assert.equal(options.find(o => o.label === "Marvel's Spider-Man: Promos")?.id, 6312);
+});
+
+check('ticking an edition sends the FilterUserInventory POST Cardmarket expects', () => {
+  const body = sellerInventoryFilterBody({
+    fields: FILTER_FIELDS,
+    idExpansions: [5809],
+    token: TOKEN,
+  });
+  assert.equal(
+    body,
+    new URLSearchParams([
+      ['__cmtkn', TOKEN],
+      ['userInventoryFilterMode', ''],
+      ['idUser', '1454828'],
+      ['idSeller', '991307718'],
+      ['category', '1'],
+      ['name', ''],
+      ['idRarity', '0'],
+      ['condition', '7'],
+      ['idLanguage', '0'],
+      ['comments', ''],
+      ['minPrice', ''],
+      ['maxPrice', ''],
+      ['minAmt', '0'],
+      ['isFoil', '0'],
+      ['isSigned', '0'],
+      ['isAltered', '0'],
+      ['sortBy', 'name_asc'],
+      ['idExpansion', '5809'],
+      ['apply', ''],
+    ]).toString(),
+  );
+  // The page's own idExpansion=0 must not survive alongside our pick, or the
+  // server filters by whichever it reads last — which is how "All" came back.
+  assert.equal(new URLSearchParams(body).getAll('idExpansion').length, 1);
+});
+
+check('the expansion field is singular, so no idExpansions[] array', () => {
+  const body = sellerInventoryFilterBody({
+    fields: FILTER_FIELDS,
+    idExpansions: [5809, 6057],
+    token: TOKEN,
+  });
+  assert.ok(!body.includes('idExpansions'));
+  assert.equal(new URLSearchParams(body).get('idExpansion'), '5809');
+  // A page that does multi-select gets every pick in one POST instead.
+  const multi = sellerInventoryFilterBody({
+    expansionField: 'idExpansions[]',
+    fields: FILTER_FIELDS,
+    idExpansions: [5809, 6057],
+    token: TOKEN,
+  });
+  assert.deepEqual(new URLSearchParams(multi).getAll('idExpansions[]'), ['5809', '6057']);
+});
+
+check('clearing the edition filter posts All', () => {
+  const body = sellerInventoryFilterBody({ fields: FILTER_FIELDS, idExpansions: [], token: TOKEN });
+  assert.equal(new URLSearchParams(body).get('idExpansion'), '0');
+});
+
+check('a page missing filter controls still posts what Cardmarket defaults to', () => {
+  const fields = withFilterDefaults([
+    ['idUser', '1454828'],
+    ['idSeller', '991307718'],
+  ]);
+  const params = new URLSearchParams(
+    sellerInventoryFilterBody({ fields, idExpansions: [5658], token: TOKEN }),
+  );
+  assert.equal(params.get('category'), '1');
+  assert.equal(params.get('condition'), '7');
+  assert.equal(params.get('sortBy'), 'name_asc');
+  assert.equal(params.get('idExpansion'), '5658');
+  // Values the page did render are never overwritten by a default.
+  const kept = new URLSearchParams(
+    sellerInventoryFilterBody({
+      fields: withFilterDefaults([...FILTER_FIELDS, ['sortBy', 'price_asc']]),
+      idExpansions: [5658],
+      token: TOKEN,
+    }),
+  );
+  assert.deepEqual(kept.getAll('sortBy'), ['name_asc', 'price_asc']);
+});
+
+// The stock filter as Cardmarket ships it: a React component whose `data-props`
+// carries the POST target, the token, the ids, every field, and the expansion
+// list. Verbatim (entity-encoded) apart from trimming the option list and the
+// localisation strings, because the point of the fixture is the encoding.
+const FILTER_COMPONENT = `<div data-component-name="CategoryOffersFilterComponent" data-props="{&quot;action&quot;:&quot;/en/Magic/PostGetAction/User_Account_Filter_FilterUserInventory&quot;,&quot;currencySymbol&quot;:&quot;€&quot;,&quot;inputs&quot;:[{&quot;name&quot;:&quot;name&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;minPrice&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;maxPrice&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;comments&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;minAmt&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;maxAmt&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;sortBy&quot;,&quot;value&quot;:&quot;name_asc&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;idExpansion&quot;,&quot;value&quot;:&quot;5809&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;idLanguage&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;condition&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;idRarity&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;isFoil&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;isSigned&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;isAltered&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false}],&quot;options&quot;:{&quot;expansionOptions&quot;:[{&quot;label&quot;:&quot;All&quot;,&quot;value&quot;:&quot;0&quot;},{&quot;label&quot;:&quot;Commander: Duskmourn: House of Horror: Extras (5)&quot;,&quot;value&quot;:5809},{&quot;label&quot;:&quot;Marvel's Spider-Man: Promos (0)&quot;,&quot;value&quot;:6312},{&quot;label&quot;:&quot;Time Spiral (2)&quot;,&quot;value&quot;:56}]},&quot;idUser&quot;:1454828,&quot;idSeller&quot;:991307718,&quot;idCategory&quot;:1,&quot;csrftoken&quot;:&quot;8e5982d80dbfb875ec68f5b86d4c14d017b74d0b3d7dd1d5173eceea7e60fbcb&quot;,&quot;isFilterDropdownRendered&quot;:true}" class="react-component"></div>`;
+
+// The second component on the same page — the Wants tab, which shares the action
+// but knows no expansions.
+const WANTS_COMPONENT = `<div data-component-name="CategoryOffersFilterComponent" data-props="{&quot;action&quot;:&quot;/en/Magic/PostGetAction/User_Account_Filter_FilterUserInventory&quot;,&quot;inputs&quot;:[{&quot;name&quot;:&quot;idWantslist&quot;,&quot;value&quot;:&quot;&quot;,&quot;isMultiSelect&quot;:false},{&quot;name&quot;:&quot;sortBy&quot;,&quot;value&quot;:&quot;name_asc&quot;,&quot;isMultiSelect&quot;:false}],&quot;options&quot;:{&quot;expansionOptions&quot;:[{&quot;label&quot;:&quot;All&quot;,&quot;value&quot;:&quot;0&quot;}]},&quot;idUser&quot;:1454828,&quot;idSeller&quot;:991307718,&quot;idCategory&quot;:1,&quot;csrftoken&quot;:&quot;8e5982d80dbfb875ec68f5b86d4c14d017b74d0b3d7dd1d5173eceea7e60fbcb&quot;}" class="react-component"></div>`;
+
+check("the filter reads off the page's own component props", () => {
+  const props = stockFilterProps(parseFilterComponentProps(FILTER_COMPONENT));
+  assert.equal(props.action, '/en/Magic/PostGetAction/User_Account_Filter_FilterUserInventory');
+  assert.equal(props.token, TOKEN);
+  assert.equal(props.expansionValue, 5809);
+  assert.deepEqual(props.expansionOptions.map(o => o.id), [5809, 6312, 56]);
+  assert.equal(props.expansionOptions[0].count, 5);
+
+  const params = new URLSearchParams(
+    sellerInventoryFilterBody({ ...props, idExpansions: [5809], token: props.token }),
+  );
+  assert.equal(params.get('idUser'), '1454828');
+  assert.equal(params.get('idSeller'), '991307718');
+  assert.equal(params.get('category'), '1');
+  assert.equal(params.get('idExpansion'), '5809');
+  // Controls the props leave empty are submitted as Cardmarket's own defaults —
+  // an empty `condition` means Poor, which is "any condition".
+  assert.equal(params.get('condition'), '7');
+  assert.equal(params.get('idRarity'), '0');
+  assert.equal(params.get('idLanguage'), '0');
+  assert.equal(params.get('minAmt'), '0');
+  assert.equal(params.get('sortBy'), 'name_asc');
+  assert.equal(params.get('name'), '');
+  assert.equal(params.get('apply'), '');
+});
+
+check('the wants filter on the same page is not mistaken for the stock filter', () => {
+  const all = parseFilterComponentProps(`${WANTS_COMPONENT}${FILTER_COMPONENT}`);
+  assert.equal(all.length, 2);
+  assert.equal(stockFilterProps(all).expansionOptions.length, 3);
+  // Components that aren't this filter at all are ignored.
+  assert.deepEqual(
+    parseFilterComponentProps('<div data-props="{&quot;action&quot;:&quot;/en/Magic/Cart&quot;}">'),
+    [],
+  );
+  assert.deepEqual(parseFilterComponentProps('<div data-props="not json">'), []);
+});
+
+check('a page Cloudflare merely watched over is not a challenge', () => {
+  // Cloudflare adds this script to ordinary pages; a stock page that loaded fine
+  // used to be thrown away over it and reported as "CHALLENGE: HTTP 200".
+  const stockPage = `<html><head><script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script></head>
+    <body><a href="/en/Magic/Users/Dobi-trading-DE/Offers/Singles">Singles</a>
+    <div data-component-name="CategoryOffersFilterComponent"></div></body></html>`;
+  assert.equal(looksLikeChallenge(stockPage), false);
+  assert.equal(isChallengeResponse(200, stockPage), false);
+  // The same page is still a failure when the status says so.
+  assert.equal(isChallengeResponse(403, stockPage), true);
+});
+
+check('the interstitial itself is still recognised', () => {
+  const interstitial = `<html><head><title>Just a moment...</title>
+    <script src="/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1"></script></head>
+    <body class="no-js"><div id="cf-chl-widget"></div></body></html>`;
+  assert.equal(looksLikeChallenge(interstitial), true);
+  assert.equal(isChallengeResponse(200, interstitial), true);
+  // Cloudflare's block page (error 1020) and a bare check body count too.
+  assert.equal(looksLikeChallenge('<h1>Attention Required!</h1>'), true);
+  assert.equal(looksLikeChallenge('<div class="challenge-error-text"></div>'), true);
+  // An ajax fragment that is the check, with none of the site in it.
+  assert.equal(looksLikeChallenge('<script src="/cdn-cgi/challenge-platform/x"></script>'), true);
+  assert.equal(looksLikeChallenge('<tr><td>Lightning Bolt</td></tr>'), false);
+});
+
+check("one seller's stock page is never mistaken for another's", () => {
+  const origin = 'https://www.cardmarket.com';
+  const a = '/en/Magic/Users/cernyrytir/Offers/Singles';
+  const b = '/en/Magic/Users/somebodyelse/Offers/Singles';
+  // Reading the open tab as the stock page is only allowed when it is that page:
+  // a tab on another seller would otherwise supply that seller's filter.
+  assert.equal(samePagePath(`${origin}${a}`, a, origin), true);
+  assert.equal(samePagePath(`${origin}${b}`, a, origin), false);
+  // Query and trailing slash are page state, not identity.
+  assert.equal(samePagePath(`${origin}${a}?site=3`, `${a}/`, origin), true);
+  assert.equal(samePagePath('not a url', a, origin), false);
+});
+
+check('the ids the filter needs are found however the page states them', () => {
+  assert.deepEqual(
+    inventoryIdsFromHtml(
+      '<input type="hidden" name="idUser" value="1454828"><input type="hidden" name="idSeller" value="991307718">',
+    ),
+    { idSeller: '991307718', idUser: '1454828' },
+  );
+  assert.deepEqual(inventoryIdsFromHtml('<div data-id-user="1454828" data-id-seller="991307718">'), {
+    idSeller: '991307718',
+    idUser: '1454828',
+  });
+  assert.deepEqual(
+    inventoryIdsFromHtml('<script>window.CM = {"idUser":"1454828","idSeller":991307718};</script>'),
+    { idSeller: '991307718', idUser: '1454828' },
+  );
+  // A page stating neither leaves both blank rather than inventing an id.
+  assert.deepEqual(inventoryIdsFromHtml('<p>nothing here</p>'), {
+    idSeller: undefined,
+    idUser: undefined,
+  });
+  // Short numbers aren't ids — "user 1" in prose shouldn't become one.
+  assert.equal(inventoryIdsFromHtml('idUser: 7').idUser, undefined);
+});
+
+check('picked edition names resolve to the dropdown ids', () => {
+  const options = expansionOptionsFrom(selectOptions(EXPANSION_SELECT));
+  assert.deepEqual(matchExpansionIds(['Bloomburrow', 'Time Spiral'], options), {
+    ids: [5658, 56],
+    missing: [],
+  });
+  // Punctuation and case differ between Scryfall's names and Cardmarket's.
+  assert.deepEqual(matchExpansionIds(["Marvel's Spider-Man: Promos"], options).ids, [6312]);
+  assert.deepEqual(matchExpansionIds(['final fantasy'], options).ids, [6057]);
+  // A seller who stocks nothing from an edition gets it named back, not dropped,
+  // so the panel can say why the pick couldn't be filtered server-side.
+  assert.deepEqual(matchExpansionIds(['Murders at Karlov Manor'], options), {
+    ids: [],
+    missing: ['Murders at Karlov Manor'],
+  });
 });
 
 await rm(out, { force: true, recursive: true });

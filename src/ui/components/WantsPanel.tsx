@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
 
+import { compareFavouriteFirst, useFavouriteSellers } from '../useFavouriteSellers';
 import { useWideLayout } from '../useWideLayout';
 
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { CardSearch } from './CardSearch';
 import { EditionFilter } from './EditionFilter';
+import { FavouriteSellerBadge, FavouriteSellerControl } from './FavouriteSellerControl';
 import { IconButton } from './IconButton';
 import { SelectionBar } from './Selection';
+import { SellerNameButton } from './SellerNameButton';
+import { SequentialCoverImage, SequentialImage } from './SequentialImage';
 import { ViewToggle } from './ViewToggle';
 import {
   ArrowLeft,
@@ -21,11 +25,11 @@ import {
   Sparkles,
   Trash2,
 } from './icons';
-import { SequentialCoverImage, SequentialImage } from './SequentialImage';
 import { useSequentialImages } from './useSequentialImages';
 
 import { cartStore } from '@/content/cartStore';
 import { catalogueSearchStore } from '@/content/catalogueSearchStore';
+import { sellerBrowseStore } from '@/content/sellerBrowseStore';
 import { collectionStore } from '@/content/collectionStore';
 import { previewStore } from '@/content/previewStore';
 import { purchaseStore } from '@/content/purchaseStore';
@@ -35,11 +39,15 @@ import { taskQueue } from '@/content/taskQueue';
 import { wantsStore } from '@/content/wantsStore';
 import { askForVerification, needsVerification, VERIFY_HELP } from '@/content/verify';
 import { cardKey, frontFaceName, stripVersion } from '@/lib/cardName';
+import { groupCatalogueByArt, type CatalogueArtGroup } from '@/lib/catalogueArt';
+import { cardKeysFromSeller } from '@/lib/purchasesBySeller';
+import { isUiChromeName } from '@/sites/cardmarket/language';
 import { flags } from '@/lib/flags';
 import { requestPrices, requestScryfall, requestScryfallCached } from '@/lib/messaging';
 import { MANA_VALUE_BUCKETS, manaValueBucket, manaValueLabel, type CardMetadata } from '@/lib/mtg';
+import { fetchCardPrints, type CardPrint } from '@/lib/prints';
 import { money, priceOf } from '@/lib/prices';
-import { editionIdOf, groupEditionsByYear, tallyEditions } from '@/lib/sets';
+import { editionIdOf, groupEditionsByYear, mergeEditionTallies, tallyEditions, type EditionTally } from '@/lib/sets';
 import { addArticleToCart, extractCmToken, findCmToken } from '@/sites/cardmarket/cart';
 import {
   searchCatalogue,
@@ -59,13 +67,19 @@ import {
   deleteWant,
   fetchAllWantLists,
   fetchDoc,
+  fetchSellerOffersPage,
+  ensureExpansionIds,
+  expansionFilterToEditionState,
+  indexExpansionIds,
+  resolveEditionExpansionIds,
+  pace,
+  sellerStockUrls,
   fetchPriceGuide,
   fetchProductIds,
   fetchSellerListOffers,
   fetchSellerStockSummary,
   fetchSellersWithMostWants,
   getLastGuideHtml,
-  pace,
   parseOffers,
   scanSeller,
   type PriceGuide,
@@ -195,6 +209,27 @@ const detectSellerCountry = (): string | null => {
 
 type ScanMatch = ScanMatchT;
 interface ScanState {
+  /** Seller browse: more Cardmarket pages available after the last load. */
+  browseHasMore: boolean;
+  browseLoading: boolean;
+  browsePage: number;
+  /** Per-edition pagination when using Cardmarket's `idExpansion` filter. */
+  browseEditionHasMore: Record<string, boolean>;
+  browseEditionPages: Record<string, number>;
+  /** Cardmarket ids learned from this seller's offers / filter dropdown. */
+  browseEditionIds: Record<string, number>;
+  /** Full edition list from Cardmarket's filter dropdown (seller browse). */
+  browseEditionFilter: EditionTally[];
+  /** Edition counts from loaded offers (merged into picker when browsing). */
+  browseEditionTally: EditionTally[];
+  /**
+   * Whether the offers on screen came back already narrowed by Cardmarket. When
+   * false the edition picks still have to be applied here, or the list would
+   * claim to be filtered while showing the seller's whole stock.
+   */
+  browseEditionServerFiltered: boolean;
+  /** Total singles from Cardmarket pagination, when known (page 1). */
+  browseTotal?: number;
   diagnostics: string[];
   error: string | null;
   matches: ScanMatch[];
@@ -240,6 +275,15 @@ const persistPrice = async (url: string, guide: PriceGuide): Promise<void> => {
 };
 
 const initialScan: ScanState = {
+  browseEditionFilter: [],
+  browseEditionHasMore: {},
+  browseEditionIds: {},
+  browseEditionPages: {},
+  browseEditionServerFiltered: false,
+  browseEditionTally: [],
+  browseHasMore: false,
+  browseLoading: false,
+  browsePage: 0,
   diagnostics: [],
   error: null,
   matches: [],
@@ -251,13 +295,34 @@ const initialScan: ScanState = {
 };
 
 /**
- * Catalogue search + a printing's offers.
+ * Fold a newly loaded page into what's on screen, in arrival order.
+ *
+ * Deliberately unsorted: "load more" adds to the bottom of a list you may be
+ * halfway down, and re-sorting the whole thing would move rows out from under
+ * the pointer. An offer we already had keeps its place (`Map.set` on an existing
+ * key doesn't move it) and only its data is refreshed.
+ */
+const mergeBrowseMatches = (prev: ScanMatch[], next: ScanMatch[]): ScanMatch[] => {
+  const byKey = new Map<string, ScanMatch>();
+  for (const m of prev) byKey.set(m.articleId ?? `${cardKey(m.name)}|${m.price ?? ''}`, m);
+  for (const m of next) byKey.set(m.articleId ?? `${cardKey(m.name)}|${m.price ?? ''}`, m);
+  return [...byKey.values()];
+};
+
+/**
+ * Catalogue search + a printing's (or art group's) offers.
  *
  * First the Search 2.0 results page is fetched into `catalogue` (same printings
- * Cardmarket would show). Picking one loads that product's offers into
- * `matches`, which shares the price / cart / owned UI with seller scans.
+ * Cardmarket would show). Picking one printing — or an art group of several —
+ * loads that product's first-page offers into `matches`, which shares the
+ * price / cart / owned UI with seller scans.
  */
 interface SearchState {
+  /**
+   * When the user picked "this art" across several printings, the catalogue
+   * rows that were merged. Null for a single-edition open.
+   */
+  artPrintings: ProductSuggestion[] | null;
   catalogue: ProductSuggestion[];
   error: string | null;
   matches: ScanMatch[];
@@ -267,6 +332,7 @@ interface SearchState {
 }
 
 const initialSearch: SearchState = {
+  artPrintings: null,
   catalogue: [],
   error: null,
   matches: [],
@@ -275,10 +341,11 @@ const initialSearch: SearchState = {
   status: 'idle',
 };
 
-export const WantsPanel = () => {
+export const WantsPanel = ({ active = true }: { active?: boolean }) => {
   const { index: rawIndex } = useWants();
   const cart = useSyncExternalStore(cartStore.subscribe, cartStore.getSnapshot);
   const cartItems = cart.items;
+  const { favourites, isFavourite, toggle: toggleFavourite } = useFavouriteSellers();
 
   // Lookups for the "in cart" tag: by exact article and by card (any printing).
   const cartArticleIds = useMemo(() => new Set(cartItems.map(i => i.articleId)), [cartItems]);
@@ -407,6 +474,7 @@ export const WantsPanel = () => {
     const controller = new AbortController();
     searchAbort.current = controller;
     setSearch({
+      artPrintings: null,
       catalogue: [],
       error: null,
       matches: [],
@@ -424,6 +492,7 @@ export const WantsPanel = () => {
         if (only.length > 0) catalogue = only;
       }
       setSearch({
+        artPrintings: null,
         catalogue,
         error: null,
         matches: [],
@@ -438,6 +507,7 @@ export const WantsPanel = () => {
       if (needsVerification(message)) {
         if (!(await askForVerification(message))) {
           setSearch({
+            artPrintings: null,
             catalogue: [],
             error: VERIFY_HELP,
             matches: [],
@@ -449,6 +519,7 @@ export const WantsPanel = () => {
         return;
       }
       setSearch({
+        artPrintings: null,
         catalogue: [],
         error: message,
         matches: [],
@@ -464,6 +535,10 @@ export const WantsPanel = () => {
     catalogueSearchStore.subscribe,
     catalogueSearchStore.getSnapshot,
   );
+  const pendingBrowse = useSyncExternalStore(
+    sellerBrowseStore.subscribe,
+    sellerBrowseStore.getSnapshot,
+  );
   useEffect(() => {
     if (!pendingCatalogue) return;
     const req = catalogueSearchStore.take();
@@ -473,55 +548,78 @@ export const WantsPanel = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingCatalogue?.id]);
 
-  const openProduct = async (product: ProductSuggestion) => {
+  /**
+   * Load the first page of offers for one printing, or for every printing that
+   * shares an artwork. Several pages are fetched in order (paced) and the rows
+   * are sorted cheapest-first so "any with this art" is one price-ranked list.
+   */
+  const openCatalogueRow = async (
+    printings: ProductSuggestion[],
+    opts: { artGroup?: boolean } = {},
+  ) => {
+    if (printings.length === 0) return;
+    const lead = printings[0];
+    const artGroup = opts.artGroup === true && printings.length > 1;
     searchAbort.current?.abort();
     const controller = new AbortController();
     searchAbort.current = controller;
+    // Seller-scan edition picks belong to that seller's stock, not to a product
+    // / art-group offer list — leave them on and the filter would hide every row.
+    setFEditions(new Set());
     setSearch(s => ({
       ...s,
+      artPrintings: artGroup ? printings : null,
       error: null,
       matches: [],
-      product,
+      product: lead,
       status: 'loading',
     }));
     try {
-      const href = new URL(product.href, location.origin).href;
-      const { doc, html } = await fetchDoc(href, controller.signal);
-      // Product HTML often carries `__cmtkn` even when the tab under the overlay
-      // doesn't — keep it for add-to-cart / wants writes.
-      rememberCmToken(extractCmToken(html));
-      // Challenge / login shells have no seller table — say so instead of
-      // "no offers" for a card that clearly has stock on the live site.
-      const title = doc.querySelector('title')?.textContent?.trim() ?? '';
-      if (/just a moment|attention required|access denied|cloudflare/i.test(title)) {
-        throw new Error('Cardmarket blocked the product page (Cloudflare). Refresh and try again.');
+      const matches: ScanMatch[] = [];
+      const seen = new Set<string>();
+      for (let i = 0; i < printings.length; i++) {
+        if (i > 0) await pace(controller.signal);
+        const product = printings[i];
+        const href = new URL(product.href, location.origin).href;
+        const { doc, html } = await fetchDoc(href, controller.signal);
+        rememberCmToken(extractCmToken(html));
+        const title = doc.querySelector('title')?.textContent?.trim() ?? '';
+        if (/just a moment|attention required|access denied|cloudflare/i.test(title)) {
+          throw new Error('Cardmarket blocked the product page (Cloudflare). Refresh and try again.');
+        }
+        if (html.length < 2000) {
+          throw new Error('Product page response was empty — refresh Cardmarket and try again.');
+        }
+        const offers = parseOffers(doc.body, {
+          allowNameFallback: false,
+          defaultName: product.name,
+        });
+        for (const o of offers) {
+          const name = o.name && !isUiChromeName(o.name) ? o.name : product.name;
+          const match: ScanMatch = {
+            ...o,
+            edition: o.edition ?? product.expansion,
+            imageUrl: o.imageUrl ?? product.imageUrl,
+            lists: index?.cards[cardKey(name)]?.lists ?? [],
+            name,
+            productUrl: o.productUrl ?? href,
+          };
+          const key = match.articleId ?? `${cardKey(match.name)}|${match.seller}|${match.price ?? ''}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          matches.push(match);
+        }
       }
-      if (html.length < 2000) {
-        throw new Error('Product page response was empty — refresh Cardmarket and try again.');
-      }
-      // Product pages must not use the name-only link fallback — that turns
-      // related printings into a fake single row with no sellers (and can feed
-      // expansion URLs into the editions lookup). Seller rows on those pages
-      // usually omit the card name; pass it in so rows aren't dropped.
-      const offers = parseOffers(doc.body, {
-        allowNameFallback: false,
-        defaultName: product.name,
-      });
-      const matches = offers.map(o => ({
-        ...o,
-        edition: o.edition ?? product.expansion,
-        imageUrl: o.imageUrl ?? product.imageUrl,
-        lists: index?.cards[cardKey(o.name || product.name)]?.lists ?? [],
-        name: o.name || product.name,
-        productUrl: o.productUrl ?? href,
-      }));
-      // Seller rows read better as a list than a single gallery tile.
+      matches.sort(
+        (a, b) => (a.priceValue ?? Infinity) - (b.priceValue ?? Infinity),
+      );
       if (matches.length > 0) setResultsView('list');
       setSearch(s => ({
         ...s,
+        artPrintings: artGroup ? printings : null,
         error: null,
         matches,
-        product,
+        product: lead,
         status: 'done',
       }));
     } catch (err) {
@@ -531,9 +629,10 @@ export const WantsPanel = () => {
         if (!(await askForVerification(message))) {
           setSearch(s => ({
             ...s,
+            artPrintings: artGroup ? printings : null,
             error: VERIFY_HELP,
             matches: [],
-            product,
+            product: lead,
             status: 'error',
           }));
         }
@@ -541,13 +640,19 @@ export const WantsPanel = () => {
       }
       setSearch(s => ({
         ...s,
+        artPrintings: artGroup ? printings : null,
         error: message,
         matches: [],
-        product,
+        product: lead,
         status: 'error',
       }));
     }
   };
+
+  const openProduct = (product: ProductSuggestion) => openCatalogueRow([product]);
+
+  const openArtGroup = (printings: ProductSuggestion[]) =>
+    openCatalogueRow(printings, { artGroup: true });
 
   const clearSearch = () => {
     searchAbort.current?.abort();
@@ -562,6 +667,7 @@ export const WantsPanel = () => {
       if (s.catalogue.length > 0) {
         return {
           ...s,
+          artPrintings: null,
           error: null,
           matches: [],
           product: null,
@@ -573,6 +679,7 @@ export const WantsPanel = () => {
         queueMicrotask(() => void runCatalogueSearch(term));
         return {
           ...s,
+          artPrintings: null,
           error: null,
           matches: [],
           product: null,
@@ -585,19 +692,33 @@ export const WantsPanel = () => {
 
   // ---- Seller scan (find everything a seller has on my want lists) ---------
   const seller = useMemo(() => detectSeller(), []);
+  const sellerRef = useRef(seller);
+  sellerRef.current = seller;
+  const [scanSubject, setScanSubject] = useState<{
+    baseUrl: string;
+    name: string;
+    profile: string;
+  } | null>(null);
+  const [browseFetchSeq, setBrowseFetchSeq] = useState(0);
+  const scanSubjectRef = useRef(scanSubject);
+  scanSubjectRef.current = scanSubject;
   const [scan, setScan] = useState<ScanState>(initialScan);
+  const scanBrowseRef = useRef(scan);
+  scanBrowseRef.current = scan;
   const [forced, setForced] = useState<'auto' | ScanStrategy>('auto');
   const abortRef = useRef<AbortController | null>(null);
 
   // Rehydrate a previously-saved scan for this seller so reloading the page
   // (e.g. to clear a Cloudflare human-check) doesn't lose the results.
+  // Spread over `initialScan`: scans saved by an earlier version are missing
+  // whatever fields have been added since, and the UI reads them unguarded.
   useEffect(() => {
     if (!seller) return;
     let cancelled = false;
     void chrome.storage.local.get(scanStorageKey(seller.baseUrl)).then(stored => {
       const saved = stored[scanStorageKey(seller.baseUrl)] as ScanState | undefined;
       if (!cancelled && saved && saved.status === 'done') {
-        setScan(cur => (cur.status === 'idle' ? saved : cur));
+        setScan(cur => (cur.status === 'idle' ? { ...initialScan, ...saved } : cur));
       }
     });
     return () => {
@@ -607,6 +728,7 @@ export const WantsPanel = () => {
 
   const runScan = async () => {
     if (!index || !seller) return;
+    setScanSubject(null);
     const controller = new AbortController();
     abortRef.current = controller;
     setScan({ ...initialScan, status: 'scanning' });
@@ -619,6 +741,7 @@ export const WantsPanel = () => {
         forced === 'auto' ? undefined : forced,
       );
       const done: ScanState = {
+        ...initialScan,
         diagnostics: result.diagnostics,
         error: null,
         matches: result.matches,
@@ -646,6 +769,54 @@ export const WantsPanel = () => {
       abortRef.current = null;
     }
   };
+
+  /** Load page 1 of a seller's singles stock; further pages on demand. */
+  const browseSeller = async (name: string, url?: string, cardQuery?: string) => {
+    searchAbort.current?.abort();
+    setSearch(initialSearch);
+
+    // Fresh seller context — sticky colour/edition picks from a prior scan hide
+    // everything here with no obvious cue (sidebar still shows "Clear 1", etc.).
+    setFEditions(new Set());
+    setFColors(new Set());
+    setFCmc(new Set());
+    setFSubtype('');
+    setFQuery(cardQuery?.trim() ?? '');
+    setBoughtFromThemOnly(false);
+
+    const resolved = sellerStockUrls(name, url);
+    if (!resolved) {
+      setScanSubject(null);
+      setScan({
+        ...initialScan,
+        error: 'Could not resolve seller profile URL.',
+        status: 'error',
+      });
+      return;
+    }
+
+    setScanSubject({ baseUrl: resolved.baseUrl, name, profile: resolved.profile });
+    setScan({ ...initialScan, browseLoading: true, status: 'scanning' });
+    setBrowseFetchSeq(s => s + 1);
+  };
+
+  const clearBrowse = () => {
+    abortRef.current?.abort();
+    setScanSubject(null);
+    setScan(initialScan);
+  };
+
+  // Search stays mounted while other tabs are open, so a seller we opened from
+  // Purchases / a name click would otherwise still be on screen when you come
+  // back. Leaving Search drops that browse so the tab is ready for a card search.
+  useEffect(() => {
+    if (active) return;
+    if (!scanSubjectRef.current) return;
+    clearBrowse();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
+  const stockSeller = seller ?? (scanSubject ? { baseUrl: scanSubject.baseUrl, name: scanSubject.name } : null);
 
   // ---- Best sellers for the current want list ------------------------------
   // On `/Wants/<id>` Cardmarket can rank sellers by how many of the list's cards
@@ -877,7 +1048,11 @@ export const WantsPanel = () => {
     (search.status === 'catalogue' || search.status === 'searching' || search.status === 'error') &&
     search.query != null;
   const showingSearch = showingProduct || showingCatalogue;
-  const showingScan = !showingSearch && scan.status === 'done';
+  const browsingStock = seller != null || scanSubject != null;
+  const showingScan =
+    !showingSearch &&
+    browsingStock &&
+    (scan.status === 'done' || scan.status === 'scanning' || scan.status === 'error');
   const displayMatches = showingProduct ? search.matches : showingScan ? scan.matches : [];
 
   /** Catalogue hits folded by card name — one parent, printings as sub-rows. */
@@ -896,6 +1071,84 @@ export const WantsPanel = () => {
     }
     return order.map(k => byKey.get(k)!);
   }, [search.catalogue]);
+
+  // Scryfall printings (with illustration_id) for cards that have several
+  // catalogue hits — enough to collapse same-art editions into one row.
+  const [printsByCard, setPrintsByCard] = useState<Record<string, CardPrint[]>>({});
+  useEffect(() => {
+    if (search.status !== 'catalogue') return;
+    const needed = catalogueGroups.filter(g => g.printings.length > 1);
+    if (needed.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const next: Record<string, CardPrint[]> = {};
+      for (const g of needed) {
+        if (printsByCard[g.key]?.length) {
+          next[g.key] = printsByCard[g.key];
+          continue;
+        }
+        try {
+          next[g.key] = await fetchCardPrints(g.name);
+        } catch {
+          next[g.key] = [];
+        }
+        if (cancelled) return;
+      }
+      if (cancelled) return;
+      setPrintsByCard(prev => ({ ...prev, ...next }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Re-run when the catalogue set of multi-printing cards changes, not on
+    // every printsByCard write (that would loop).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.status, catalogueGroups]);
+
+  /** Per card-name group: catalogue rows folded by shared artwork. */
+  const catalogueArtByCard = useMemo(() => {
+    const map = new Map<string, CatalogueArtGroup[]>();
+    for (const g of catalogueGroups) {
+      const prints = printsByCard[g.key] ?? [];
+      map.set(
+        g.key,
+        prints.length > 0 ? groupCatalogueByArt(g.printings, prints) : g.printings.map(p => ({
+          key: `solo:${p.href}`,
+          lead: p,
+          printings: [p],
+          sharedArt: false,
+        })),
+      );
+    }
+    return map;
+  }, [catalogueGroups, printsByCard]);
+
+  /**
+   * Which card's printings we're picking from. Want-list / exact search lands
+   * here with one card already; free search shows the card list first, then
+   * this focus after you pick one — same screen either way.
+   */
+  const [catalogueCardKey, setCatalogueCardKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (search.status !== 'catalogue') {
+      setCatalogueCardKey(null);
+      return;
+    }
+    if (catalogueGroups.length === 1) {
+      setCatalogueCardKey(catalogueGroups[0].key);
+      return;
+    }
+    // Multi-card: keep a pick that still exists (back from offers), else the
+    // card list. Don't wipe focus just because we re-entered catalogue status.
+    setCatalogueCardKey(prev =>
+      prev && catalogueGroups.some(g => g.key === prev) ? prev : null,
+    );
+  }, [search.status, search.catalogue, catalogueGroups]);
+
+  const focusedCatalogueCard = useMemo(() => {
+    if (!catalogueCardKey) return null;
+    return catalogueGroups.find(g => g.key === catalogueCardKey) ?? null;
+  }, [catalogueCardKey, catalogueGroups]);
 
   const catalogueFromPrice = (printings: ProductSuggestion[]) => {
     let best: string | undefined;
@@ -919,33 +1172,83 @@ export const WantsPanel = () => {
   // only the printings you asked for, not vanish or arrive whole.
   const { index: setIndex, status: setStatus } = useSetIndex();
   const [fEditions, setFEditions] = useStickySet<string>('lugin:cards:editions');
+  const browseEditionFetch =
+    (scanSubject != null || seller != null) && fEditions.size > 0;
 
   // Options come from every offer on screen rather than the ones surviving this
   // filter: derive them from the filtered list and picking one set would erase
   // all the others, leaving no way back.
-  const editionYears = useMemo(
-    () =>
-      groupEditionsByYear(
-        tallyEditions(
-          displayMatches.map(m => ({ setName: m.edition })),
-          setIndex,
-        ),
-      ),
-    [displayMatches, setIndex],
-  );
+  const editionYears = useMemo(() => {
+    let tallies: EditionTally[];
+    // Product / "any with this art" results: only the editions actually in the
+    // loaded offers. A seller page underneath must not leak its whole stock
+    // dropdown into this picker — that list is tens of thousands of singles,
+    // not the handful of printings on screen.
+    if (showingProduct) {
+      tallies = tallyEditions(
+        displayMatches.map(m => ({ setName: m.edition })),
+        setIndex,
+      );
+    } else if (scanSubject || seller) {
+      const fromLoaded = tallyEditions(
+        (scan.matches ?? []).map(m => ({ setName: m.edition })),
+        setIndex,
+      );
+      const fromDropdown = scan.browseEditionFilter ?? [];
+      const fromScan = scan.browseEditionTally ?? [];
+      if (fromDropdown.length > 0) {
+        // Cardmarket's own dropdown, entry for entry: it lists every edition
+        // this seller stocks with their real counts, and its ids are the only
+        // ones the filter accepts. Folding loaded offers in would double up
+        // rows under two keys for one edition.
+        tallies = fromDropdown;
+      } else if (fromScan.length > 0) {
+        tallies = mergeEditionTallies(fromScan, fromLoaded);
+      } else {
+        tallies = fromLoaded;
+      }
+    } else {
+      tallies = tallyEditions(
+        displayMatches.map(m => ({ setName: m.edition })),
+        setIndex,
+      );
+    }
+    // Cardmarket's dropdown lists editions the seller has nothing from — "(0)"
+    // in the option text — next to the ones it stocks. Filtering to one is a
+    // guaranteed empty page, so they stay out of the picker. A pick that's
+    // somehow still on survives the cut, or there'd be no way to clear it.
+    return groupEditionsByYear(tallies.filter(t => t.count > 0 || fEditions.has(t.key)));
+  }, [
+    displayMatches,
+    fEditions,
+    scan.browseEditionFilter,
+    scan.browseEditionTally,
+    scan.matches,
+    scanSubject,
+    seller,
+    setIndex,
+    showingProduct,
+  ]);
 
   const editionMatches = useMemo(() => {
-    // A single printing from search shouldn't inherit sticky edition picks from
-    // a prior seller scan — those often wipe every offer for an unrelated set.
-    if (showingProduct || fEditions.size === 0) return displayMatches;
+    if (fEditions.size === 0) return displayMatches;
+    // Always narrow here too: seller stock may claim the server filtered while a
+    // later page still slipped unfiltered rows in (load-more used to do that).
     return displayMatches.filter(m => {
       const key = editionIdOf(setIndex, { setName: m.edition });
-      return key != null && fEditions.has(key);
+      if (key != null && fEditions.has(key)) return true;
+      // Editions Scryfall can't place are keyed by their Cardmarket id.
+      return m.expansionId != null && fEditions.has(`cm-${m.expansionId}`);
     });
-  }, [displayMatches, fEditions, setIndex, showingProduct]);
+  }, [displayMatches, fEditions, setIndex]);
 
   // Group offers by card name: a card with several editions collapses into one
   // row, cheapest offer first. Single-offer cards render flat.
+  //
+  // Rows keep the order their offers arrived in — Cardmarket's own, which the
+  // pages already come sorted by — rather than being re-sorted here. Sorting
+  // again would shuffle the whole list every time another page loads, and a
+  // printing found on page 3 would drag its card up out of its place.
   const grouped = useMemo(() => {
     const map = new Map<string, { lists: Set<string>; name: string; offers: ScanMatch[] }>();
     for (const m of editionMatches) {
@@ -955,16 +1258,22 @@ export const WantsPanel = () => {
       m.lists.forEach(l => g.lists.add(l));
       map.set(key, g);
     }
-    return [...map.values()]
-      .map(g => ({
-        lists: [...g.lists],
-        name: g.name,
-        offers: g.offers
-          .slice()
-          .sort((a, b) => (a.priceValue ?? Infinity) - (b.priceValue ?? Infinity)),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [editionMatches]);
+    return [...map.values()].map(g => ({
+      lists: [...g.lists],
+      name: g.name,
+      offers: g.offers
+        .slice()
+        .sort((a, b) =>
+          compareFavouriteFirst(
+            favourites,
+            a,
+            b,
+            o => ({ name: o.seller, url: o.sellerUrl }),
+            (x, y) => (x.priceValue ?? Infinity) - (y.priceValue ?? Infinity),
+          ),
+        ),
+    }));
+  }, [editionMatches, favourites]);
 
   // ---- Sub-tabs: split the results by want list ----------------------------
   // "All" plus one tab per want list that actually has a matching card here
@@ -1013,6 +1322,26 @@ export const WantsPanel = () => {
   const [fColors, setFColors] = useStickySet<string>('lugin:cards:colors');
   const [fCmc, setFCmc] = useStickySet<number>('lugin:cards:cmc');
   const [fSubtype, setFSubtype] = useStickyValue('lugin:cards:subtype', '');
+  const [boughtFromThemOnly, setBoughtFromThemOnly] = useState(false);
+
+  const browseSellerSlug = scanSubject?.name ?? seller?.name ?? null;
+  const boughtFromSellerKeys = useMemo(() => {
+    if (!purchases.index || !browseSellerSlug) return null;
+    const keys = cardKeysFromSeller(purchases.index, browseSellerSlug);
+    return keys.size > 0 ? keys : null;
+  }, [browseSellerSlug, purchases.index]);
+
+  useEffect(() => {
+    setBoughtFromThemOnly(false);
+  }, [browseSellerSlug]);
+
+  useEffect(() => {
+    if (!pendingBrowse) return;
+    const req = sellerBrowseStore.take();
+    if (!req) return;
+    void browseSeller(req.name, req.url, req.cardQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingBrowse?.id]);
 
   const groupNames = useMemo(() => grouped.map(g => g.name), [grouped]);
 
@@ -1077,6 +1406,12 @@ export const WantsPanel = () => {
     fSubtype !== '' ||
     fEditions.size > 0;
 
+  /** Unique card names loaded in seller-stock browse (before client-side filters). */
+  const browseLoadedCardCount = useMemo(() => {
+    if (!scanSubject) return 0;
+    return new Set(scan.matches.map(m => cardKey(m.name))).size;
+  }, [scanSubject, scan.matches]);
+
   const metaMatch = (name: string): boolean => {
     if (!filtersActive) return true;
     const meta = metaByName[cardKey(name)];
@@ -1104,13 +1439,296 @@ export const WantsPanel = () => {
       // seller scan would hide it for irrelevant reasons (wrong color query, …).
       showingProduct
         ? grouped
-        : grouped.filter(
-            g => (!effectiveList || g.lists.includes(effectiveList)) && metaMatch(g.name),
-          ),
+        : grouped.filter(g => {
+            if (effectiveList && !g.lists.includes(effectiveList)) return false;
+            if (
+              boughtFromThemOnly &&
+              boughtFromSellerKeys &&
+              !boughtFromSellerKeys.has(stripVersion(cardKey(g.name)))
+            ) {
+              return false;
+            }
+            return metaMatch(g.name);
+          }),
     // metaMatch reads these; listing them keeps the memo correct.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [grouped, effectiveList, metaByName, fQuery, fColors, fCmc, fSubtype, showingProduct],
+    [
+      boughtFromSellerKeys,
+      boughtFromThemOnly,
+      grouped,
+      effectiveList,
+      metaByName,
+      fQuery,
+      fColors,
+      fCmc,
+      fSubtype,
+      showingProduct,
+    ],
   );
+
+  /** Non-edition client-side filters on seller-stock browse. */
+  const browseMetaFiltersActive =
+    !!scanSubject &&
+    (fTerms.length > 0 ||
+      fColors.size > 0 ||
+      fCmc.size > 0 ||
+      fSubtype !== '' ||
+      boughtFromThemOnly ||
+      effectiveList != null);
+
+  const editionFilterKey = useMemo(() => [...fEditions].sort().join('\0'), [fEditions]);
+  const editionFilterKeyRef = useRef(editionFilterKey);
+  editionFilterKeyRef.current = editionFilterKey;
+  const prevEditionFilterKeyRef = useRef('');
+
+  useEffect(() => {
+    prevEditionFilterKeyRef.current = '';
+  }, [scanSubject?.name]);
+
+  const runBrowseFetch = async (
+    mode: 'reset' | 'more',
+    signal: AbortSignal,
+    activeEditionKey = editionFilterKeyRef.current,
+  ) => {
+    const editionKeys = activeEditionKey ? activeEditionKey.split('\0').filter(Boolean) : [];
+    const useEditionFilter = editionKeys.length > 0;
+    const subject =
+      scanSubjectRef.current ??
+      (useEditionFilter && sellerRef.current
+        ? (() => {
+            const resolved = sellerStockUrls(
+              sellerRef.current!.name,
+              sellerRef.current!.baseUrl,
+            );
+            return resolved
+              ? {
+                  baseUrl: resolved.baseUrl,
+                  name: sellerRef.current!.name,
+                  profile: resolved.profile,
+                }
+              : null;
+          })()
+        : scanSubjectRef.current);
+    if (!subject) return;
+    const cur = scanBrowseRef.current;
+    const prevEditionFilterKey = prevEditionFilterKeyRef.current;
+    prevEditionFilterKeyRef.current = activeEditionKey;
+
+    if (mode === 'reset') {
+      setScan(s => ({ ...s, browseLoading: true, error: null, status: 'scanning' }));
+    } else {
+      setScan(s => ({ ...s, browseLoading: true, error: null }));
+    }
+
+    try {
+      const loaded = cur.matches ?? [];
+      let matches = mode === 'more' ? loaded : [];
+      let requestsAdded = 0;
+      const diagnostics: string[] = [];
+      let browseTotal = mode === 'more' ? cur.browseTotal : undefined;
+      let browsePage = mode === 'more' ? (cur.browsePage ?? 0) : 0;
+      let browseHasMore = false;
+
+      let browseEditionIds = { ...(cur.browseEditionIds ?? {}) };
+      let browseEditionFilter = cur.browseEditionFilter ?? [];
+      let browseEditionTally = cur.browseEditionTally ?? [];
+
+      const absorbExpansionPage = (
+        offers: ScanMatch[],
+        options?: { count?: number; id: number; label: string }[],
+      ) => {
+        browseEditionIds = {
+          ...browseEditionIds,
+          ...indexExpansionIds(offers, setIndex),
+        };
+        if (options?.length) {
+          const { ids, tallies } = expansionFilterToEditionState(options, setIndex);
+          browseEditionIds = { ...browseEditionIds, ...ids };
+          browseEditionFilter =
+            browseEditionFilter.length > 0
+              ? mergeEditionTallies(browseEditionFilter, tallies)
+              : tallies;
+        }
+      };
+
+      if (!useEditionFilter) {
+        const page = mode === 'more' ? cur.browsePage + 1 : 1;
+        const existingKeys =
+          mode === 'more'
+            ? new Set(matches.map(m => m.articleId ?? `${cardKey(m.name)}|${m.price ?? ''}`))
+            : undefined;
+        const result = await fetchSellerOffersPage(
+          subject.name,
+          subject.profile,
+          page,
+          index,
+          signal,
+          existingKeys,
+          {
+            clearExpansionFilter:
+              mode === 'reset' && !useEditionFilter && prevEditionFilterKey !== '',
+          },
+        );
+        requestsAdded += result.requests;
+        diagnostics.push(...result.diagnostics);
+        matches = mode === 'more' ? mergeBrowseMatches(matches, result.matches) : result.matches;
+        absorbExpansionPage(result.matches, result.expansionFilterOptions);
+        browseEditionTally = tallyEditions(
+          matches.map(m => ({ setName: m.edition })),
+          setIndex,
+        );
+        if (mode !== 'more' && browseEditionFilter.length === 0) {
+          browseEditionFilter = browseEditionTally;
+        }
+        browseHasMore = result.hasMore;
+        browsePage = page;
+        browseTotal ??= result.totalListed;
+
+        setScan(s => ({
+          ...s,
+          browseEditionFilter,
+          browseEditionHasMore: {},
+          browseEditionIds,
+          browseEditionPages: {},
+          browseEditionServerFiltered: false,
+          browseEditionTally,
+          browseHasMore,
+          browseLoading: false,
+          browsePage,
+          browseTotal,
+          diagnostics: mode === 'more' ? [...s.diagnostics, ...diagnostics] : diagnostics,
+          error: null,
+          matches,
+          progress: null,
+          requests: (mode === 'more' ? s.requests : 0) + requestsAdded,
+          scannedAt: Date.now(),
+          status: 'done',
+          strategy: 'pages',
+          totalScanned: matches.length,
+        }));
+        if (mode === 'reset' && matches.length > 0) setResultsView('list');
+        return;
+      }
+
+      // Learn ids from every offer we've already loaded before hitting the network.
+      browseEditionIds = {
+        ...browseEditionIds,
+        ...indexExpansionIds(loaded, setIndex),
+      };
+
+      const editionLabelByKey = (key: string): string | undefined =>
+        browseEditionFilter.find(t => t.key === key)?.label ??
+        browseEditionTally.find(t => t.key === key)?.label;
+      const labelByKey = Object.fromEntries(
+        editionKeys.map(k => [k, editionLabelByKey(k) ?? k]),
+      );
+
+      // Ids we already know shortcut the lookup, but the names always travel with
+      // the request: the seller's own dropdown resolves whatever we can't map,
+      // so a set we've never placed still filters server-side.
+      let idExpansions: number[] = [];
+      try {
+        idExpansions = resolveEditionExpansionIds(
+          editionKeys,
+          setIndex,
+          await ensureExpansionIds(signal),
+          browseEditionIds,
+          labelByKey,
+        );
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') throw err;
+        idExpansions = resolveEditionExpansionIds(
+          editionKeys,
+          setIndex,
+          new Map(),
+          browseEditionIds,
+          labelByKey,
+        );
+      }
+
+      const page = mode === 'more' ? cur.browsePage + 1 : 1;
+      const existingKeys =
+        mode === 'more'
+          ? new Set(matches.map(m => m.articleId ?? `${cardKey(m.name)}|${m.price ?? ''}`))
+          : undefined;
+      const result = await fetchSellerOffersPage(
+        subject.name,
+        subject.profile,
+        page,
+        index,
+        signal,
+        existingKeys,
+        { expansionLabels: editionKeys.map(k => labelByKey[k]), idExpansions },
+      );
+      requestsAdded += result.requests;
+      diagnostics.push(...result.diagnostics);
+      matches = mode === 'more' ? mergeBrowseMatches(matches, result.matches) : result.matches;
+      absorbExpansionPage(result.matches, result.expansionFilterOptions);
+      browseHasMore = result.hasMore;
+      browsePage = page;
+      browseTotal ??= result.totalListed;
+
+      setScan(s => ({
+        ...s,
+        browseEditionFilter,
+        browseEditionHasMore: {},
+        browseEditionIds,
+        browseEditionPages: {},
+        browseEditionServerFiltered: result.expansionFilterApplied,
+        browseEditionTally,
+        browseHasMore,
+        browseLoading: false,
+        browsePage,
+        browseTotal,
+        diagnostics: mode === 'more' ? [...s.diagnostics, ...diagnostics] : diagnostics,
+        error: null,
+        matches,
+        progress: null,
+        requests: (mode === 'more' ? s.requests : 0) + requestsAdded,
+        scannedAt: Date.now(),
+        status: 'done',
+        strategy: 'pages',
+        totalScanned: matches.length,
+      }));
+      if (mode === 'reset' && matches.length > 0) setResultsView('list');
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setScan(s => ({ ...s, browseLoading: false }));
+        return;
+      }
+      setScan(s => ({
+        ...s,
+        browseLoading: false,
+        error: err instanceof Error ? err.message : String(err),
+        progress: null,
+        status: 'error',
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (!scanSubject) {
+      if (!seller || !editionFilterKey) return;
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+    void runBrowseFetch('reset', controller.signal, editionFilterKey).finally(() => {
+      if (abortRef.current === controller) abortRef.current = null;
+    });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanSubject?.name, seller?.name, editionFilterKey, browseFetchSeq]);
+
+  const loadMoreBrowse = async () => {
+    if ((!scanSubject && !seller) || !scan.browseHasMore || scan.browseLoading) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      await runBrowseFetch('more', controller.signal, editionFilterKeyRef.current);
+    } finally {
+      abortRef.current = null;
+    }
+  };
 
   /**
    * Prefer Cardmarket's own thumb, then a Scryfall CDN URL from cached metadata.
@@ -1143,39 +1761,47 @@ export const WantsPanel = () => {
     [resultsView, visibleGrouped, metaByName],
   );
 
-  // Which catalogue edition groups are unfolded — drives which thumbs we queue.
-  // Single-card results (exact / want-list search) start open via defaultOpen on
-  // the <details>; we mirror that here so images enqueue without waiting a click.
-  const [openEditions, setOpenEditions] = useState<Set<string>>(() => new Set());
-  useEffect(() => {
-    if (catalogueGroups.length === 1) setOpenEditions(new Set([catalogueGroups[0].key]));
-    else setOpenEditions(new Set());
-  }, [catalogueGroups]);
-
-  const catalogueSrcs = useMemo(() => {
-    if (!showingCatalogue || resultsView === 'box') return [];
+  const scanListSrcs = useMemo(() => {
+    if (resultsView !== 'list' || !showingScan) return [];
     const urls: string[] = [];
-    const solo = catalogueGroups.length === 1;
-    for (const g of catalogueGroups) {
-      if (g.printings.length === 1) {
-        const u = g.printings[0]?.imageUrl;
-        if (u) urls.push(u);
-        continue;
-      }
-      const lead = g.printings.find(p => p.imageUrl) ?? g.printings[0];
-      if (lead?.imageUrl) urls.push(lead.imageUrl);
-      if (!solo && !openEditions.has(g.key)) continue;
-      for (const p of g.printings) {
-        if (p.imageUrl && p.imageUrl !== lead?.imageUrl) urls.push(p.imageUrl);
+    for (const g of visibleGrouped) {
+      for (const o of g.offers) {
+        const src = cardImageSrc(o.imageUrl, g.name);
+        if (src) urls.push(src);
       }
     }
     return urls;
-  }, [showingCatalogue, resultsView, catalogueGroups, openEditions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultsView, showingScan, visibleGrouped, metaByName]);
+
+  // Thumbs for the catalogue: card-list leads always, every printing once a
+  // card is focused (want-list / picked card) so the edition picker fills in.
+  const catalogueSrcs = useMemo(() => {
+    if (!showingCatalogue || resultsView === 'box') return [];
+    const urls: string[] = [];
+    const focused = focusedCatalogueCard;
+    if (focused) {
+      for (const p of focused.printings) {
+        if (p.imageUrl) urls.push(p.imageUrl);
+      }
+      return urls;
+    }
+    for (const g of catalogueGroups) {
+      const lead = g.printings.find(p => p.imageUrl) ?? g.printings[0];
+      if (lead?.imageUrl) urls.push(lead.imageUrl);
+    }
+    return urls;
+  }, [showingCatalogue, resultsView, catalogueGroups, focusedCatalogueCard]);
+
+  const thumbQueueSrcs = useMemo(() => {
+    if (resultsView === 'box') return boxSrcs;
+    if (showingCatalogue) return catalogueSrcs;
+    if (showingScan) return scanListSrcs;
+    return [];
+  }, [resultsView, boxSrcs, catalogueSrcs, showingScan, scanListSrcs]);
 
   // One queue for whatever results are on screen — top row first, then the next.
-  const { markDone: markImageDone, unlocked: imageUnlocked } = useSequentialImages(
-    resultsView === 'box' ? boxSrcs : catalogueSrcs,
-  );
+  const { markDone: markImageDone, unlocked: imageUnlocked } = useSequentialImages(thumbQueueSrcs);
 
   // The "order" the shipping estimate is based on: the cheapest offer of each
   // currently-visible card (mirrors what "Add cheapest of each" would buy).
@@ -1584,25 +2210,30 @@ export const WantsPanel = () => {
     [o.edition, o.condition, o.language].filter(Boolean).join(' · ');
 
   /** Seller-facing cells for product-search offers (columnar, not a · soup). */
-  const productSellerLink = (o: ScanMatch) =>
-    o.seller ? (
-      o.sellerUrl ? (
-        <a
-          className="truncate font-medium text-sky-300 hover:underline"
-          href={o.sellerUrl}
-          onClick={e => e.stopPropagation()}
-          rel="noreferrer"
-          target="_blank"
-          title={o.seller}
-        >
-          {o.seller}
-        </a>
-      ) : (
-        <span className="truncate font-medium text-slate-200">{o.seller}</span>
-      )
-    ) : (
-      <span className="text-slate-600">—</span>
+  const productSellerLink = (o: ScanMatch) => {
+    const fav = isFavourite(o.sellerUrl, o.seller);
+    return (
+      <span className="flex min-w-0 items-center gap-0.5">
+        {o.seller ? (
+          <FavouriteSellerControl
+            active={fav}
+            name={o.seller}
+            onToggle={() => void toggleFavourite(o.sellerUrl, o.seller)}
+          />
+        ) : null}
+        {o.seller ? (
+          <SellerNameButton
+            className="truncate font-medium text-sky-300 hover:underline"
+            name={o.seller}
+            url={o.sellerUrl}
+          />
+        ) : (
+          <span className="text-slate-600">—</span>
+        )}
+        {fav ? <FavouriteSellerBadge className="flex-none" /> : null}
+      </span>
     );
+  };
 
   const productStockCell = (o: ScanMatch) => {
     if (!o.sellerUrl) return <span className="text-slate-600">—</span>;
@@ -2008,6 +2639,42 @@ export const WantsPanel = () => {
   };
 
   /**
+   * Catalogue-style list thumbnail (h-10 × w-7) with hover preview / DFC flip.
+   * Used for seller scans and seller-stock browse — not the tiny zoom icon.
+   */
+  const listThumb = (url?: string, name?: string, sizeClass = 'h-10 w-7') => {
+    const src = cardImageSrc(url, name);
+    const preview = src ? previewHandlers(src, name) : null;
+    const thumbCursor = preview?.flippable
+      ? 'cursor-flip'
+      : src
+        ? 'cursor-zoom-in'
+        : '';
+    if (!src) {
+      return <span className={`flex-none rounded-sm bg-panel ${sizeClass}`} />;
+    }
+    return (
+      <SequentialImage
+        alt=""
+        className={`flex-none rounded-sm object-cover ${thumbCursor} ${sizeClass}`}
+        markDone={markImageDone}
+        onClick={e => {
+          if (preview) {
+            e.stopPropagation();
+            preview.handlers.onClick(e);
+          }
+        }}
+        onMouseEnter={preview?.handlers.onMouseEnter}
+        onMouseLeave={preview?.handlers.onMouseLeave}
+        onMouseMove={preview?.handlers.onMouseMove}
+        src={src}
+        title={preview?.flippable ? 'Click to flip to the other side' : undefined}
+        unlocked={imageUnlocked(src)}
+      />
+    );
+  };
+
+  /**
    * Small image icon that shows a hover preview of the card. For double-faced
    * cards it becomes clickable (flip cursor) to switch the shown side.
    */
@@ -2374,9 +3041,13 @@ export const WantsPanel = () => {
           ? 'Loading card data from Scryfall…'
           : metaState === 'error'
             ? 'Couldn\u2019t load card data — try again.'
-            : filtersActive
-              ? `${visibleGrouped.length} of ${effectiveList ? grouped.filter(g => g.lists.includes(effectiveList)).length : grouped.length} shown`
-              : 'Pick a color, subtype, or type a creature type to filter.'}
+            : scanSubject && scan.matches.length > 0
+              ? filtersActive
+                ? `${visibleGrouped.length} of ${browseLoadedCardCount} loaded card${browseLoadedCardCount === 1 ? '' : 's'} shown`
+                : `${visibleGrouped.length} card${visibleGrouped.length === 1 ? '' : 's'} · ${scan.totalScanned} offer${scan.totalScanned === 1 ? '' : 's'} loaded`
+              : filtersActive
+                ? `${visibleGrouped.length} of ${effectiveList ? grouped.filter(g => g.lists.includes(effectiveList)).length : grouped.length} shown`
+                : 'Pick a color, subtype, or type a creature type to filter.'}
       </div>
     </div>
   );
@@ -2392,7 +3063,7 @@ export const WantsPanel = () => {
       {/* Breadcrumb for catalogue → printing offers. */}
       {showingSearch && (
         <div className="flex items-center gap-2 border-b border-line bg-raised px-2 py-1 text-2xs">
-          {showingProduct && (
+          {showingProduct ? (
             <Button
               className="flex-none"
               icon={ArrowLeft}
@@ -2403,14 +3074,43 @@ export const WantsPanel = () => {
             >
               Printings
             </Button>
-          )}
+          ) : focusedCatalogueCard && catalogueGroups.length > 1 ? (
+            <Button
+              className="flex-none"
+              icon={ArrowLeft}
+              onClick={() => setCatalogueCardKey(null)}
+              size="xs"
+              title="Back to search results"
+              variant="neutral"
+            >
+              Cards
+            </Button>
+          ) : null}
           <span className="min-w-0 flex-1 truncate text-ink">
             {showingProduct ? (
               <>
                 {search.product?.name}
-                {search.product?.expansion && (
-                  <span className="text-ink-faint"> · {search.product.expansion}</span>
+                {search.artPrintings && search.artPrintings.length > 1 ? (
+                  <span className="text-ink-faint">
+                    {' '}
+                    · {search.artPrintings.length} editions · this art
+                  </span>
+                ) : (
+                  search.product?.expansion && (
+                    <span className="text-ink-faint"> · {search.product.expansion}</span>
+                  )
                 )}
+              </>
+            ) : focusedCatalogueCard ? (
+              <>
+                {focusedCatalogueCard.name}
+                <span className="text-ink-faint">
+                  {' '}
+                  · pick a printing
+                  {focusedCatalogueCard.printings.length > 1
+                    ? ` (${focusedCatalogueCard.printings.length})`
+                    : ''}
+                </span>
               </>
             ) : (
               <>
@@ -2431,7 +3131,9 @@ export const WantsPanel = () => {
               {showingProduct ? 'Couldn’t load the offers' : 'Search failed'}
             </span>
           )}
-          {showingProduct && search.product?.href && (
+          {showingProduct &&
+            search.product?.href &&
+            !(search.artPrintings && search.artPrintings.length > 1) && (
             <a
               className="flex flex-none items-center gap-1 text-accent hover:underline"
               href={search.product.href}
@@ -2662,10 +3364,65 @@ export const WantsPanel = () => {
             </div>
           )}
 
+          {scanSubject && !seller && (
+            <div className="border-b border-slate-800 p-2 text-[11px]">
+              <div className="flex flex-wrap items-center gap-2">
+                <FavouriteSellerControl
+                  active={isFavourite(scanSubject.profile, scanSubject.name)}
+                  name={scanSubject.name}
+                  onToggle={() => void toggleFavourite(scanSubject.profile, scanSubject.name)}
+                />
+                <span className="font-medium text-slate-200">{scanSubject.name}</span>
+                {isFavourite(scanSubject.profile, scanSubject.name) ? (
+                  <FavouriteSellerBadge />
+                ) : null}
+                {scan.status === 'scanning' || scan.browseLoading ? (
+                  <span className="text-slate-400">
+                    {scan.browsePage > 0 ? 'Loading next page' : 'Loading stock'}
+                    {scan.browsePage > 0 ? ` ${scan.browsePage + 1}` : '…'}
+                    {scan.totalScanned > 0 ? ` · ${scan.totalScanned} offers so far` : ''}
+                  </span>
+                ) : scan.status === 'done' ? (
+                  <span className="text-slate-500">
+                    {scan.totalScanned} offer{scan.totalScanned === 1 ? '' : 's'} loaded
+                    {scan.browseTotal != null && scan.browseTotal > scan.totalScanned
+                      ? ` · ${scan.browseTotal.toLocaleString()} listed`
+                      : ''}
+                    {scan.browsePage > 1 ? ` · ${scan.browsePage} pages` : ''}
+                  </span>
+                ) : null}
+                {scan.status === 'scanning' || scan.browseLoading ? (
+                  <Button
+                    className="ml-auto"
+                    onClick={() => abortRef.current?.abort()}
+                    size="xs"
+                    variant="neutral"
+                  >
+                    Stop
+                  </Button>
+                ) : (
+                  <Button className="ml-auto" onClick={clearBrowse} size="xs" variant="subtle">
+                    Close
+                  </Button>
+                )}
+              </div>
+              {scan.error && <div className="mt-1 text-red-400">{scan.error}</div>}
+            </div>
+          )}
+
           {/* Seller scan controls — this tab's other headline action, so it is
               always in view when there is a seller to scan. */}
           {index && seller && (
             <div className="border-b border-slate-800 p-2 text-[11px]">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <FavouriteSellerControl
+                  active={isFavourite(seller.baseUrl, seller.name)}
+                  name={seller.name}
+                  onToggle={() => void toggleFavourite(seller.baseUrl, seller.name)}
+                />
+                <span className="font-medium text-slate-200">{seller.name}</span>
+                {isFavourite(seller.baseUrl, seller.name) ? <FavouriteSellerBadge /> : null}
+              </div>
               {scan.status === 'scanning' ? (
                 <div className="flex items-center gap-2">
                   <span className="text-slate-300">
@@ -2772,22 +3529,40 @@ export const WantsPanel = () => {
 
               {sellers.rows.length > 0 && (
                 <div className="mt-2 space-y-1">
-                  {sellers.rows.map(row => {
+                  {[...sellers.rows]
+                    .sort((a, b) =>
+                      compareFavouriteFirst(
+                        favourites,
+                        a,
+                        b,
+                        row => ({ name: row.name, url: row.url }),
+                        (x, y) => y.count - x.count || x.name.localeCompare(y.name),
+                      ),
+                    )
+                    .map(row => {
                     const p = priced[row.idSeller];
+                    const fav = isFavourite(row.url, row.name);
                     return (
                       <div
                         key={row.idSeller}
-                        className="rounded border border-slate-800 bg-slate-900/40 p-1.5"
+                        className={`rounded border p-1.5 ${
+                          fav
+                            ? 'border-amber-500/40 bg-amber-500/5'
+                            : 'border-slate-800 bg-slate-900/40'
+                        }`}
                       >
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <a
+                          <FavouriteSellerControl
+                            active={fav}
+                            name={row.name}
+                            onToggle={() => void toggleFavourite(row.url, row.name)}
+                          />
+                          <SellerNameButton
                             className="font-semibold text-sky-300 hover:underline"
-                            href={`${row.url}/Offers/Singles?idWantslist=${wantListId}`}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            {row.name}
-                          </a>
+                            name={row.name}
+                            url={row.url}
+                          />
+                          {fav ? <FavouriteSellerBadge /> : null}
                           <span className="text-slate-400">
                             {row.count}
                             {listCards.size > 0 ? `/${listCards.size}` : ''} · {row.pct}%
@@ -2957,22 +3732,50 @@ export const WantsPanel = () => {
                             ? 'Searching…'
                             : search.status === 'error'
                               ? 'Search failed'
-                              : `${catalogueGroups.length} card${catalogueGroups.length === 1 ? '' : 's'} · ${search.catalogue.length} printing${search.catalogue.length === 1 ? '' : 's'}`}
-                          {search.query && search.status === 'catalogue' && ` for “${search.query}”`}
+                              : focusedCatalogueCard
+                                ? `${focusedCatalogueCard.printings.length} printing${focusedCatalogueCard.printings.length === 1 ? '' : 's'} · pick an edition or art`
+                                : `${catalogueGroups.length} card${catalogueGroups.length === 1 ? '' : 's'} · ${search.catalogue.length} printing${search.catalogue.length === 1 ? '' : 's'}`}
+                          {search.query && search.status === 'catalogue' && !focusedCatalogueCard && ` for “${search.query}”`}
                         </>
                       ) : showingProduct ? (
                         <>
                           {search.status === 'loading'
-                            ? 'Loading offers…'
+                            ? search.artPrintings && search.artPrintings.length > 1
+                              ? `Loading offers from ${search.artPrintings.length} editions…`
+                              : 'Loading offers…'
                             : `${displayMatches.length} offer${displayMatches.length === 1 ? '' : 's'}`}
-                          {search.status === 'done' && ' for this printing'}
+                          {search.status === 'done' &&
+                            (search.artPrintings && search.artPrintings.length > 1
+                              ? ` · ${search.artPrintings.length} editions · this art`
+                              : ' for this printing')}
                         </>
                       ) : showingScan ? (
-                        <>
-                          {visibleGrouped.length} card{visibleGrouped.length === 1 ? '' : 's'}
-                          {effectiveList ? ` in "${effectiveList}"` : ' on your want lists'}
-                          {scan.strategy === 'pages' && ` (scanned ${scan.totalScanned} offers)`}
-                        </>
+                        scan.status === 'scanning' || scan.browseLoading ? (
+                          <>
+                            {scanSubject && scan.browsePage > 0
+                              ? `Loading page ${scan.browsePage + 1}…`
+                              : `Loading ${stockSeller?.name ?? 'seller'}'s stock…`}
+                          </>
+                        ) : scan.status === 'error' ? (
+                          <span className="text-red-400">{scan.error ?? 'Could not load stock'}</span>
+                        ) : (
+                          <>
+                            {stockSeller?.name ? `${stockSeller.name}'s stock · ` : ''}
+                            {visibleGrouped.length} card{visibleGrouped.length === 1 ? '' : 's'}
+                            {scanSubject
+                              ? ` · ${
+                                  scan.browseTotal != null && scan.browseTotal > scan.totalScanned
+                                    ? `${scan.totalScanned} of ${scan.browseTotal.toLocaleString()} offers loaded`
+                                    : `${scan.totalScanned} offer${scan.totalScanned === 1 ? '' : 's'} loaded`
+                                }`
+                              : effectiveList
+                                ? ` in "${effectiveList}"`
+                                : ' on your want lists'}
+                            {!scanSubject &&
+                              scan.strategy === 'pages' &&
+                              ` (scanned ${scan.totalScanned} offers)`}
+                          </>
+                        )
                       ) : (
                         <>Search a card or scan a seller</>
                       )}
@@ -2992,6 +3795,17 @@ export const WantsPanel = () => {
                           variant="neutral"
                         >
                           Filters{filtersActive ? ' •' : ''}
+                        </Button>
+                      )}
+                      {showingScan && boughtFromSellerKeys && (
+                        <Button
+                          active={boughtFromThemOnly}
+                          onClick={() => setBoughtFromThemOnly(v => !v)}
+                          size="xs"
+                          title="Show only cards you have bought from this seller before"
+                          variant="neutral"
+                        >
+                          Bought from them ({boughtFromSellerKeys.size})
                         </Button>
                       )}
                         </>
@@ -3129,6 +3943,22 @@ export const WantsPanel = () => {
                       ))}
                     </div>
                   )}
+                  {/* An edition pick that Cardmarket didn't honour has to say so
+                      here: the sidebar's diagnostics only exist on a seller's own
+                      page, and silence reads as "these are all their cards". */}
+                  {browseEditionFetch &&
+                    !scan.browseLoading &&
+                    !scan.browseEditionServerFiltered && (
+                      <div className="border-t border-slate-800/60 px-2 py-1 text-[10px] text-amber-300/90">
+                        Cardmarket didn’t apply the edition filter — showing matches from loaded
+                        pages.
+                        {scan.diagnostics.map((d, i) => (
+                          <div className="text-slate-400" key={i}>
+                            {d}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   {!wide && showFilters && filterControls}
                   {visibleGrouped.length > 0 && (
                     <SelectionBar selection={selection}>
@@ -3195,119 +4025,165 @@ export const WantsPanel = () => {
                     </div>
                   ) : (
                     <div className="divide-y divide-line">
-                      {catalogueGroups.map(g => {
-                        const renderPrinting = (
-                          item: ProductSuggestion,
-                          opts: { showName: boolean },
-                        ) => {
-                          const thumb = item.imageUrl;
-                          const preview = thumb ? previewHandlers(thumb, item.name) : null;
-                          const thumbCursor = preview?.flippable
-                            ? 'cursor-flip'
-                            : 'cursor-zoom-in';
-                          return (
-                            <button
-                              key={item.href}
-                              className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-tint"
-                              onClick={() => void openProduct(item)}
-                              type="button"
-                            >
-                              {thumb ? (
-                                <SequentialImage
-                                  alt=""
-                                  className={`h-10 w-7 flex-none rounded-sm object-cover ${thumbCursor}`}
-                                  markDone={markImageDone}
-                                  onClick={e => {
-                                    if (preview) {
-                                      e.stopPropagation();
-                                      preview.handlers.onClick(e);
+                      {focusedCatalogueCard ? (
+                        (() => {
+                          const g = focusedCatalogueCard;
+                          const artGroups = catalogueArtByCard.get(g.key) ?? [];
+                          const renderEdition = (item: ProductSuggestion) => {
+                            const thumb = item.imageUrl;
+                            const preview = thumb ? previewHandlers(thumb, item.name) : null;
+                            const thumbCursor = preview?.flippable
+                              ? 'cursor-flip'
+                              : 'cursor-zoom-in';
+                            return (
+                              <button
+                                key={item.href}
+                                className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-tint"
+                                onClick={() => void openProduct(item)}
+                                type="button"
+                              >
+                                {thumb ? (
+                                  <SequentialImage
+                                    alt=""
+                                    className={`h-10 w-7 flex-none rounded-sm object-cover ${thumbCursor}`}
+                                    markDone={markImageDone}
+                                    onClick={e => {
+                                      if (preview) {
+                                        e.stopPropagation();
+                                        preview.handlers.onClick(e);
+                                      }
+                                    }}
+                                    onMouseEnter={preview?.handlers.onMouseEnter}
+                                    onMouseLeave={preview?.handlers.onMouseLeave}
+                                    onMouseMove={preview?.handlers.onMouseMove}
+                                    src={thumb}
+                                    title={
+                                      preview?.flippable
+                                        ? 'Click to flip to the other side'
+                                        : undefined
                                     }
-                                  }}
-                                  onMouseEnter={preview?.handlers.onMouseEnter}
-                                  onMouseLeave={preview?.handlers.onMouseLeave}
-                                  onMouseMove={preview?.handlers.onMouseMove}
-                                  src={thumb}
-                                  title={
-                                    preview?.flippable
-                                      ? 'Click to flip to the other side'
-                                      : undefined
-                                  }
-                                  unlocked={imageUnlocked(thumb)}
-                                />
-                              ) : (
-                                <span className="h-10 w-7 flex-none rounded-sm bg-panel" />
-                              )}
-                              <span className="min-w-0 flex-1">
-                                {opts.showName ? (
-                                  <>
-                                    <span className="block truncate text-xs text-ink">
-                                      {item.name}
-                                    </span>
-                                    {item.expansion && (
-                                      <span className="block truncate text-2xs text-ink-faint">
-                                        {item.expansion}
-                                      </span>
-                                    )}
-                                  </>
+                                    unlocked={imageUnlocked(thumb)}
+                                  />
                                 ) : (
-                                  <span className="block truncate text-xs text-ink">
-                                    {item.expansion || item.name}
+                                  <span className="h-10 w-7 flex-none rounded-sm bg-panel" />
+                                )}
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-xs text-ink">{item.name}</span>
+                                  {item.expansion && (
+                                    <span className="block truncate text-2xs text-ink-faint">
+                                      {item.expansion}
+                                    </span>
+                                  )}
+                                </span>
+                                {item.fromPrice && (
+                                  <span className="flex-none text-2xs tabular-nums text-ink-muted">
+                                    from {item.fromPrice}
                                   </span>
                                 )}
-                              </span>
-                              {item.fromPrice && (
-                                <span className="flex-none text-2xs tabular-nums text-ink-muted">
-                                  from {item.fromPrice}
+                              </button>
+                            );
+                          };
+
+                          const renderAnyArt = (art: CatalogueArtGroup) => {
+                            const printings = art.printings as ProductSuggestion[];
+                            const lead = art.lead as ProductSuggestion;
+                            const thumb = lead.imageUrl;
+                            const preview = thumb
+                              ? previewHandlers(thumb, lead.name)
+                              : null;
+                            const fromPrice = catalogueFromPrice(printings);
+                            const expansions = printings
+                              .map(p => p.expansion)
+                              .filter((v): v is string => !!v);
+                            return (
+                              <button
+                                key={`any-${art.key}`}
+                                className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-tint"
+                                onClick={() => void openArtGroup(printings)}
+                                type="button"
+                              >
+                                {thumb ? (
+                                  <SequentialImage
+                                    alt=""
+                                    className={`h-10 w-7 flex-none rounded-sm object-cover ${
+                                      preview?.flippable ? 'cursor-flip' : 'cursor-zoom-in'
+                                    }`}
+                                    markDone={markImageDone}
+                                    onClick={e => {
+                                      if (preview) {
+                                        e.stopPropagation();
+                                        preview.handlers.onClick(e);
+                                      }
+                                    }}
+                                    onMouseEnter={preview?.handlers.onMouseEnter}
+                                    onMouseLeave={preview?.handlers.onMouseLeave}
+                                    onMouseMove={preview?.handlers.onMouseMove}
+                                    src={thumb}
+                                    title={
+                                      preview?.flippable
+                                        ? 'Click to flip to the other side'
+                                        : undefined
+                                    }
+                                    unlocked={imageUnlocked(thumb)}
+                                  />
+                                ) : (
+                                  <span className="h-10 w-7 flex-none rounded-sm bg-panel" />
+                                )}
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-xs text-ink">
+                                    Any with this art
+                                  </span>
+                                  <span className="block truncate text-2xs text-ink-faint">
+                                    {printings.length} editions
+                                    {expansions.length
+                                      ? ` · ${expansions.slice(0, 3).join(', ')}${
+                                          expansions.length > 3 ? '…' : ''
+                                        }`
+                                      : ''}
+                                  </span>
                                 </span>
-                              )}
-                            </button>
-                          );
-                        };
+                                <span className="flex-none rounded bg-slate-700 px-1 text-[9px] text-slate-300">
+                                  same art
+                                </span>
+                                {fromPrice && (
+                                  <span className="flex-none text-2xs tabular-nums text-ink-muted">
+                                    from {fromPrice}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          };
 
-                        if (g.printings.length === 1) {
+                          // Shared-art groups: "Any with this art" then each
+                          // edition underneath so you can still pick one set.
                           return (
-                            <div key={g.key}>{renderPrinting(g.printings[0], { showName: true })}</div>
-                          );
-                        }
-
-                        // One card in the whole result set (want-list / exact search) →
-                        // show every printing flat. A <details defaultOpen> was still
-                        // landing collapsed in the shadow DOM.
-                        if (catalogueGroups.length === 1) {
-                          return (
-                            <div key={g.key} className="divide-y divide-line/40">
-                              {g.printings.map(item => (
-                                <div key={item.href}>
-                                  {renderPrinting(item, { showName: true })}
+                            <div className="divide-y divide-line/40">
+                              {artGroups.map(art => (
+                                <div key={art.key} className="divide-y divide-line/40">
+                                  {art.sharedArt && renderAnyArt(art)}
+                                  {art.printings.map(p =>
+                                    renderEdition(p as ProductSuggestion),
+                                  )}
                                 </div>
                               ))}
                             </div>
                           );
-                        }
-
-                        const lead = g.printings.find(p => p.imageUrl) ?? g.printings[0];
-                        const thumb = lead?.imageUrl;
-                        // Keep the Cardmarket "Front // Back" name so DFCs get
-                        // the flip cursor before Scryfall resolves faces.
-                        const preview = thumb
-                          ? previewHandlers(thumb, lead.name)
-                          : null;
-                        const fromPrice = catalogueFromPrice(g.printings);
-                        return (
-                          <details
-                            key={g.key}
-                            className="group/editions"
-                            onToggle={e => {
-                              const open = (e.currentTarget as HTMLDetailsElement).open;
-                              setOpenEditions(prev => {
-                                const next = new Set(prev);
-                                if (open) next.add(g.key);
-                                else next.delete(g.key);
-                                return next;
-                              });
-                            }}
-                          >
-                            <summary className="flex cursor-pointer list-none items-center gap-2 px-2 py-1.5 transition-colors hover:bg-tint">
+                        })()
+                      ) : (
+                        catalogueGroups.map(g => {
+                          const lead = g.printings.find(p => p.imageUrl) ?? g.printings[0];
+                          const thumb = lead?.imageUrl;
+                          const preview = thumb
+                            ? previewHandlers(thumb, lead.name)
+                            : null;
+                          const fromPrice = catalogueFromPrice(g.printings);
+                          return (
+                            <button
+                              key={g.key}
+                              className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-tint"
+                              onClick={() => setCatalogueCardKey(g.key)}
+                              type="button"
+                            >
                               {thumb ? (
                                 <SequentialImage
                                   alt=""
@@ -3316,8 +4192,6 @@ export const WantsPanel = () => {
                                   }`}
                                   markDone={markImageDone}
                                   onClick={e => {
-                                    // Preview / flip without toggling the editions list.
-                                    e.preventDefault();
                                     e.stopPropagation();
                                     preview?.handlers.onClick(e);
                                   }}
@@ -3339,33 +4213,22 @@ export const WantsPanel = () => {
                                 {g.name}
                               </span>
                               <span className="flex-none rounded bg-slate-700 px-1 text-[9px] text-slate-300">
-                                {g.printings.length} editions
+                                {g.printings.length} edition
+                                {g.printings.length === 1 ? '' : 's'}
                               </span>
                               {fromPrice && (
                                 <span className="flex-none text-2xs tabular-nums text-ink-muted">
                                   from {fromPrice}
                                 </span>
                               )}
-                              <ChevronDown
-                                aria-hidden
-                                className="flex-none text-ink-faint transition-transform group-open/editions:rotate-180"
-                                size={13}
-                              />
-                            </summary>
-                            <ul className="list-none divide-y divide-line/40 border-l border-line ml-4">
-                              {g.printings.map(item => (
-                                <li key={item.href}>
-                                  {renderPrinting(item, { showName: false })}
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
-                        );
-                      })}
+                            </button>
+                          );
+                        })
+                      )}
                     </div>
                   )
                 ) : visibleGrouped.length === 0 ? (
-                  <div className="p-4 text-center text-[11px] text-slate-500">
+                  <div className="space-y-2 p-4 text-center text-[11px] text-slate-500">
                     {showingProduct
                       ? search.status === 'loading'
                         ? 'Loading offers…'
@@ -3373,8 +4236,35 @@ export const WantsPanel = () => {
                           ? search.error || 'Could not load offers for this printing.'
                           : 'No offers found for this printing.'
                       : showingScan
-                        ? `None of ${seller?.name ?? 'this seller'}'s offers match your want lists.`
+                        ? scan.status === 'scanning'
+                          ? `Loading ${stockSeller?.name ?? 'seller'}'s stock…`
+                          : scan.status === 'error'
+                            ? scan.error ?? 'Could not load this seller\'s stock.'
+                            : scanSubject
+                              ? scan.matches.length === 0
+                                ? browseEditionFetch
+                                  ? 'No singles from the selected edition(s).'
+                                  : `${stockSeller?.name ?? 'Seller'} has no singles listed (or the fetch failed).`
+                                : browseMetaFiltersActive
+                                  ? `Your filters hide all loaded stock (${scan.totalScanned} offer${scan.totalScanned === 1 ? '' : 's'} from ${browseLoadedCardCount} card${browseLoadedCardCount === 1 ? '' : 's'}). Clear filters or load more.`
+                                  : `${stockSeller?.name ?? 'Seller'} has no singles listed (or the fetch failed).`
+                              : `None of ${stockSeller?.name ?? 'this seller'}'s offers match your want lists.`
                         : 'Search for a card above, or scan the seller you’re browsing.'}
+                    {scanSubject && (browseMetaFiltersActive || browseEditionFetch) && (
+                      <Button
+                        onClick={() => {
+                          setFQuery('');
+                          setFColors(new Set());
+                          setFCmc(new Set());
+                          setFSubtype('');
+                          setFEditions(new Set());
+                        }}
+                        size="xs"
+                        variant="neutral"
+                      >
+                        Clear filters
+                      </Button>
+                    )}
                   </div>
                 ) : resultsView === 'box' ? (
                   <div
@@ -3588,7 +4478,6 @@ export const WantsPanel = () => {
                         }
                         const nameCell = (
                           <>
-                            {imageIcon(o.imageUrl, o.name)}
                             <span className="truncate">{o.name}</span>
                             {foilTag(o.isFoil)}
                             {offerInCart(o)}
@@ -3601,8 +4490,11 @@ export const WantsPanel = () => {
                           return (
                             <li key={key} {...selection.rowProps(key, 'group px-2 py-1')}>
                               <div className={ROW_COLUMNS}>
-                                <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-100">
-                                  {nameCell}
+                                <div className="flex min-w-0 items-center gap-2 text-[12px] text-slate-100">
+                                  {listThumb(o.imageUrl, o.name)}
+                                  <div className="flex min-w-0 items-center gap-1.5 truncate">
+                                    {nameCell}
+                                  </div>
                                 </div>
                                 <div
                                   className="min-w-0 truncate text-[10px] text-slate-400"
@@ -3623,6 +4515,7 @@ export const WantsPanel = () => {
                         return (
                           <li key={key} {...selection.rowProps(key, 'px-2 py-1.5')}>
                             <div className="flex items-start gap-2">
+                              {listThumb(o.imageUrl, o.name)}
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 text-[12px] text-slate-100">
                                   {nameCell}
@@ -3650,7 +4543,10 @@ export const WantsPanel = () => {
                         : `${g.offers.length} editions`;
                       const groupName = (
                         <>
-                          {imageIcon(g.offers[0].imageUrl, g.name)}
+                          {listThumb(
+                            g.offers.find(of => of.imageUrl)?.imageUrl ?? g.offers[0]?.imageUrl,
+                            g.name,
+                          )}
                           <span className="truncate">{g.name}</span>
                           <span className="rounded bg-slate-700 px-1 text-[9px] text-slate-300">
                             {countLabel}
@@ -3701,7 +4597,7 @@ export const WantsPanel = () => {
                           {g.offers.map((o, i) => {
                             const offerTags = (
                               <>
-                                {imageIcon(o.imageUrl, g.name)}
+                                {listThumb(o.imageUrl, g.name, 'h-8 w-6')}
                                 {foilTag(o.isFoil)}
                                 {offerInCart(o)}
                               </>
@@ -3712,7 +4608,7 @@ export const WantsPanel = () => {
                             if (oneLine) {
                               return (
                                 <li key={o.articleId ?? i} className={`${ROW_COLUMNS} py-0.5`}>
-                                  <span className="col-span-2 flex min-w-0 items-center gap-1.5 truncate text-[11px] text-slate-300">
+                                  <span className="col-span-2 flex min-w-0 items-center gap-2 truncate text-[11px] text-slate-300">
                                     {offerTags}
                                     {offerMeta}
                                   </span>
@@ -3731,9 +4627,11 @@ export const WantsPanel = () => {
                             return (
                               <li key={o.articleId ?? i}>
                                 <div className="flex items-start gap-2">
+                                  {listThumb(o.imageUrl, g.name, 'h-8 w-6')}
                                   <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-300">
-                                      {offerTags}
+                                      {foilTag(o.isFoil)}
+                                      {offerInCart(o)}
                                       <span>{offerMeta}</span>
                                     </div>
                                   </div>
@@ -3753,7 +4651,7 @@ export const WantsPanel = () => {
                               <summary
                                 className={`${ROW_COLUMNS} cursor-pointer list-none px-0 py-0.5`}
                               >
-                                <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-100">
+                                <span className="flex min-w-0 items-center gap-2 text-[12px] text-slate-100">
                                   {groupName}
                                 </span>
                                 <span
@@ -3791,6 +4689,31 @@ export const WantsPanel = () => {
                       );
                     })}
                   </ul>
+                )}
+                {scanSubject && (scan.browseHasMore || scan.browseLoading) && (
+                  <div className="flex flex-col items-center gap-1 border-t border-line/60 px-2 py-2">
+                    <Button
+                      disabled={scan.browseLoading || !scan.browseHasMore}
+                      onClick={() => void loadMoreBrowse()}
+                      size="sm"
+                      variant="neutral"
+                    >
+                      {scan.browseLoading
+                        ? 'Loading…'
+                        : browseEditionFetch
+                          ? `Load more (${fEditions.size} edition${fEditions.size === 1 ? '' : 's'} · ${visibleGrouped.length} cards)`
+                          : scan.browseTotal != null && scan.browseTotal > scan.totalScanned
+                            ? `Load more (${scan.totalScanned.toLocaleString()} of ${scan.browseTotal.toLocaleString()})`
+                            : `Load next page (${scan.browsePage} loaded)`}
+                    </Button>
+                    {browseEditionFetch && !scan.browseLoading && (
+                      <span className="text-center text-[10px] text-slate-500">
+                        {scan.browseEditionServerFiltered
+                          ? 'Cardmarket is filtering this stock by the selected editions.'
+                          : 'Cardmarket kept the full stock — showing matches from the pages loaded so far.'}
+                      </span>
+                    )}
+                  </div>
                 )}
                 </div>
               </>

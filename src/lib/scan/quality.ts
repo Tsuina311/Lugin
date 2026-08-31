@@ -74,3 +74,57 @@ export const exposure = (image: ScanImage): number => {
   }
   return n ? sum / n : 0;
 };
+
+export interface FrameQuality {
+  /** Combined 0–1 score used to pick the best frame in a pool. */
+  score: number;
+  sharpness: number;
+  glare: number;
+  exposure: number;
+  /**
+   * Detector confidence for the frame, when known. Frames without a card score
+   * 0 regardless of sharpness.
+   */
+  detectionScore: number;
+}
+
+/**
+ * Rank a candidate recognition frame.
+ *
+ * Sharpness dominates; glare and extreme exposure penalize; a weak detection
+ * cannot win even if the pixels look crisp (they may be crisp background).
+ */
+export const frameQualityScore = (
+  image: ScanImage,
+  detectionScore = 1,
+): FrameQuality => {
+  const sharp = sharpnessScore(image);
+  const glare = glareRatio(image);
+  const exp = exposure(image);
+  // Sharpness is unbounded variance — squash with a soft curve so typical phone
+  // mid-band values land in a useful 0–1 range without clipping outliers.
+  const sharpNorm = 1 - Math.exp(-sharp / 180);
+  const glarePen = Math.min(1, glare / 0.18);
+  const expPen =
+    exp < 40 ? (40 - exp) / 40 : exp > 210 ? (exp - 210) / 45 : 0;
+  const detect = Math.max(0, Math.min(1, detectionScore));
+  const score = Math.max(
+    0,
+    sharpNorm * (1 - 0.55 * glarePen) * (1 - 0.4 * Math.min(1, expPen)) * (0.35 + 0.65 * detect),
+  );
+  return { detectionScore: detect, exposure: exp, glare, score, sharpness: sharp };
+};
+
+/**
+ * Keep the best `limit` frames by quality score (newest wins ties so a fresher
+ * equally-sharp frame replaces a stale one).
+ */
+export const pushQualityPool = <T extends { quality: FrameQuality }>(
+  pool: readonly T[],
+  item: T,
+  limit: number,
+): T[] =>
+  [...pool, item]
+    .sort((a, b) => b.quality.score - a.quality.score)
+    .slice(0, Math.max(1, limit));
+

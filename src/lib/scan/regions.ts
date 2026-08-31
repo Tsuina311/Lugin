@@ -69,6 +69,21 @@ export const SET_REGION: Region = { h: 0.035, w: 0.28, x: 0.035, y: 0.928 };
 export const COLLECTOR_REGION: Region = { h: 0.085, w: 0.94, x: 0.03, y: 0.875 };
 
 /**
+ * Artwork window on a modern portrait frame — between the title bar and the
+ * type line. Used for visual descriptors; not OCR'd.
+ */
+export const ARTWORK_REGION: Region = { h: 0.42, w: 0.84, x: 0.08, y: 0.12 };
+
+/**
+ * Rules / oracle text box (modern frame). Secondary evidence only — never the
+ * sole identification path.
+ */
+export const TEXT_BOX_REGION: Region = { h: 0.28, w: 0.84, x: 0.08, y: 0.58 };
+
+/** Type line strip (creature / artifact / …). */
+export const TYPE_LINE_REGION: Region = { h: 0.045, w: 0.84, x: 0.08, y: 0.545 };
+
+/**
  * A card layout the scanner knows how to read.
  *
  * One profile today. It exists as a named group rather than eight loose exports
@@ -77,12 +92,18 @@ export const COLLECTOR_REGION: Region = { h: 0.085, w: 0.94, x: 0.03, y: 0.875 }
  * profile, not a wider set of tolerances on this one.
  */
 export interface ScanProfile {
+  /** Artwork crop for visual matching. */
+  artwork: Region;
   collector: readonly NamedRegion[];
   name: string;
+  /** Rules/printed text box — secondary evidence only. */
+  textBox: Region;
   title: readonly NamedRegion[];
+  typeLine: Region;
 }
 
 export const STANDARD_PROFILE: ScanProfile = {
+  artwork: ARTWORK_REGION,
   collector: [
     { mode: 'block', name: 'number', region: NUMBER_REGION },
     { mode: 'block', name: 'number-classic', region: CLASSIC_NUMBER_REGION },
@@ -91,10 +112,27 @@ export const STANDARD_PROFILE: ScanProfile = {
     { mode: 'block', name: 'collector', region: COLLECTOR_REGION },
   ],
   name: 'standard',
+  textBox: TEXT_BOX_REGION,
   title: [
     { mode: 'line', name: 'title', region: NAME_REGION },
     { mode: 'line', name: 'title-wide', region: NAME_WIDE_REGION },
   ],
+  typeLine: TYPE_LINE_REGION,
+};
+
+/**
+ * Landscape battle cards: the whole "card" raster is wider than tall, so
+ * fractions are relative to that warped rectangle.
+ */
+export const BATTLE_PROFILE: ScanProfile = {
+  artwork: { h: 0.55, w: 0.42, x: 0.04, y: 0.12 },
+  collector: STANDARD_PROFILE.collector,
+  name: 'battle',
+  textBox: { h: 0.55, w: 0.42, x: 0.5, y: 0.2 },
+  title: [
+    { mode: 'line', name: 'title', region: { h: 0.1, w: 0.45, x: 0.04, y: 0.04 } },
+  ],
+  typeLine: { h: 0.06, w: 0.42, x: 0.5, y: 0.12 },
 };
 
 /**
@@ -105,3 +143,7 @@ export const NAMED_REGIONS: readonly NamedRegion[] = [
   ...STANDARD_PROFILE.title,
   ...STANDARD_PROFILE.collector,
 ];
+
+/** Pick a profile from a warped card's aspect (battle ≈ landscape). */
+export const profileForCard = (width: number, height: number): ScanProfile =>
+  width > height * 1.15 ? BATTLE_PROFILE : STANDARD_PROFILE;

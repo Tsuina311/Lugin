@@ -13,6 +13,7 @@
 
 import { ajaxBox } from './ajax';
 import { extractCmToken, findCmToken } from './cart';
+import { isChallengeResponse } from './challenge';
 import { expansionFromProductUrl } from './productUrl';
 import {
   MIN_SEARCH_LENGTH,
@@ -20,7 +21,7 @@ import {
   cardmarketSearchUrl,
   productFactsFromImage,
 } from './searchArgs';
-import { currentLang, fetchDoc, isChallengeResponse } from './wants';
+import { currentLang, fetchDoc } from './wants';
 
 import { rememberCmToken } from '@/content/session';
 import { replayInPage } from '@/lib/messaging';

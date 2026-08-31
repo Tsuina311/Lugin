@@ -68,6 +68,25 @@ export const LANGUAGE_NAMES: ReadonlySet<string> = new Set(
 export const isLanguageName = (name: string): boolean =>
   LANGUAGE_NAMES.has(name.trim().toLowerCase());
 
+/** Cardmarket UI labels that sometimes land in thumbnail tooltips / img alt text. */
+const UI_CHROME_NAMES = new Set([
+  'card',
+  'enlarge',
+  'expand',
+  'image',
+  'photo',
+  'picture',
+  'preview',
+  'scan',
+  'thumbnail',
+  'view',
+  'zoom',
+]);
+
+/** True when a parsed "name" is really a zoom/scan icon label, not a card title. */
+export const isUiChromeName = (name: string): boolean =>
+  UI_CHROME_NAMES.has(name.trim().toLowerCase());
+
 /**
  * The offer's language, or undefined if the row doesn't say.
  *

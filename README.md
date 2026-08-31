@@ -182,22 +182,32 @@ URL and hand back the worse picture.
 
 ### Measuring the card scanner
 
+Full continuous-scanner design: [`docs/SCANNER.md`](docs/SCANNER.md).
+
 ```bash
-yarn scan:fixtures   # resolve the test corpus from Scryfall (writes scripts/fixtures/cards.json)
-yarn scan:index      # build the card-name index the matcher needs
-yarn scan:eval       # run the corpus, print accuracy and timings
-yarn scan:variants   # benchmark preprocessing chains against each other
-yarn scan:calibrate  # measure where the title actually sits on each layout
-yarn scan:folds      # compare name-normalization strategies
+yarn scan:fixtures          # resolve the test corpus from Scryfall (writes scripts/fixtures/cards.json)
+yarn scan:index             # build the card-name index the matcher needs
+yarn scan:art-index:fixtures # compact artwork descriptors for the fixture set
+yarn scan:eval              # classic title-only corpus (accuracy + timings)
+yarn scan:pipeline          # compare TITLE_ONLY / ART_ONLY / ART_PLUS_TITLE / FULL_PIPELINE
+yarn scan:pipeline:real     # optional gitignored real-photo corpus
+yarn scan:variants          # benchmark preprocessing chains against each other
+yarn scan:calibrate         # measure where the title actually sits on each layout
+yarn scan:folds             # compare name-normalization strategies
+yarn test:scan              # unit tests (portable core, no camera)
 ```
 
 The scanner is the one feature where "that feels better" is worthless: a change
 that rescues the card on your desk routinely breaks five others, and nobody
-notices until a shop trip. So `scripts/scan-eval.mjs` runs the real pipeline —
-the same `src/lib/scan/` modules the phone runs, which is why none of them may
-touch the DOM — over a fixed set of cards under synthetic tilt, blur, glare, dim
-light and filmed-screen conditions, and reports detection rate, title accuracy
-and per-stage time.
+notices until a shop trip. So `scripts/scan-eval.mjs` / `scan-pipeline-eval.mjs`
+run the real pipeline — the same `src/lib/scan/` modules the phone runs, which is
+why none of them may touch the DOM — over a fixed set of cards under synthetic
+tilt, blur, glare, dim light and filmed-screen conditions, and report detection
+rate, title accuracy, multi-signal accuracy and per-stage time.
+
+The phone UX is continuous: camera opens, detects a stable card, recognizes
+without a mandatory shutter, suppresses duplicates until the card leaves, and
+shows candidates when identity is ambiguous.
 
 The corpus is a committed manifest of **Scryfall ids only**; the card images are
 downloaded on demand into a gitignored `.scan-fixtures/`. Card art is
@@ -555,7 +565,7 @@ and the seller-side ones are not addressed at all.**
 | Wants management / a "shopping wizard" | **Partly.** Deep list management, any-printing wants, best-single-seller ranking with shipping. No multi-seller basket optimisation. |
 | Filters that persist and don't collapse | **Solved** for Lugin's own filters. Cardmarket's panel is untouched. |
 | An edition list you can navigate | **Solved.** Grouped by release year, newest first, instead of alphabetically. |
-| Favourite or followed sellers | **No.** |
+| Favourite or followed sellers | **Yes** — pin with the star on seller rows (card search, best-sellers, cart). Favourites float to the top of offer lists and get a **Fav** badge. |
 | Prices broken down by language and condition | **Partly.** Captured per offer; not aggregated, and no history. |
 | Bulk listing cards for sale | **No.** |
 | Inventory export and bulk editing | **Partly.** ManaBox round trip and multi-select actions; no bulk field edit, no seller inventory. |

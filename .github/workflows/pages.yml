@@ -133,6 +133,13 @@ jobs:
         continue-on-error: true
         run: node scripts/build-card-index.mjs --out dist-web/card-names.json
 
+      # Compact artwork descriptors (+ text tokens) for continuous scanning.
+      # Fixture-scoped in CI so deploys stay fast; full catalogue:
+      #   yarn scan:art-index --out dist-web/art-index.json
+      - name: Artwork index (fixtures)
+        continue-on-error: true
+        run: node scripts/build-art-index.mjs --from-fixtures --out dist-web/art-index.json
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

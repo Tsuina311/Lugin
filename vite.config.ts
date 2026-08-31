@@ -32,11 +32,9 @@ export default defineConfig({
     },
   },
   server: {
-    hmr: {
-      port: 5173,
-    },
-    // Fixed port keeps the CRXJS HMR websocket stable while an extension is loaded.
+    // If 5173 is taken, Vite tries 5174, 5175, … HMR uses the same port (no
+    // separate hmr.port — pinning that broke HMR when the server moved).
     port: 5173,
-    strictPort: true,
+    strictPort: false,
   },
 });
