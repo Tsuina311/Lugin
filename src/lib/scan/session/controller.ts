@@ -1,6 +1,8 @@
 // Continuous scan session state machine (portable — no React / DOM).
 
 import { describeArtwork, descriptorSimilarity } from '../artwork/descriptors';
+import type { DetectionDebug } from '../detection/types';
+import { emptyDetectionDebug } from '../detection/types';
 import {
   DETECT_MIN_SCORE,
   GONE_FRAMES,
@@ -19,6 +21,7 @@ import {
   latestCorners,
   pushTrack,
   sampleFromQuad,
+  trackMotion,
   type TrackState,
 } from '../tracking';
 import { cropImage, type CardCorners, type ScanImage } from '../types';
@@ -43,22 +46,37 @@ export interface ScanContext {
   preferSets?: readonly string[];
 }
 
+/** What acquisition hands the recognition layer. */
+export interface CardAcquisition {
+  geometry: CardCorners;
+  normalizedCard: ScanImage;
+  quality: FrameQuality;
+  stability: number;
+}
+
 export interface SessionSnapshot {
+  /** Analysis frame size corners are expressed in. */
+  analysisSize: { height: number; width: number } | null;
   corners: CardCorners | null;
+  detection: DetectionDebug;
   fused?: FusedResult;
   message: string;
+  /** Mean corner motion (fraction of diagonal); lower = more stable. */
+  motion: number;
   phase: ScannerPhase;
   quality?: FrameQuality;
   recognition?: RecognizeResult;
+  /** Frames currently held in the track. */
+  trackFrames: number;
 }
 
 export interface SessionController {
-  /** Feed a camera/analysis frame (latest-frame semantics — caller drops stale). */
   onFrame(frame: ScanImage): Promise<SessionSnapshot>;
-  /** Manual still (photo library / shutter fallback). */
   recognizeStill(frame: ScanImage): Promise<SessionSnapshot>;
   reset(): void;
   snapshot(): SessionSnapshot;
+  /** Last locked/recognized normalized card, if any (for corpus / debug). */
+  lastNormalized(): ScanImage | null;
 }
 
 interface QualFrame {
@@ -80,16 +98,23 @@ export const createSessionController = (
   let lastFused: FusedResult | undefined;
   let lastRecognition: RecognizeResult | undefined;
   let lastQuality: FrameQuality | undefined;
+  let lastDetection: DetectionDebug = emptyDetectionDebug();
+  let analysisSize: { height: number; width: number } | null = null;
   let recognizing = false;
   let message = 'Place a card in view';
+  let lastNormalized: ScanImage | null = null;
 
   const snap = (): SessionSnapshot => ({
+    analysisSize,
     corners: latestCorners(track) ?? foundCorners,
+    detection: lastDetection,
     fused: lastFused,
     message,
+    motion: trackMotion(track),
     phase,
     quality: lastQuality,
     recognition: lastRecognition,
+    trackFrames: track.history.length,
   });
 
   const clearLock = () => {
@@ -99,6 +124,7 @@ export const createSessionController = (
     foundCorners = null;
     lastFused = undefined;
     lastRecognition = undefined;
+    lastNormalized = null;
   };
 
   const enterSearching = (why: string) => {
@@ -118,7 +144,8 @@ export const createSessionController = (
     if (recognizing) return;
     recognizing = true;
     phase = 'recognizing';
-    message = 'Identifying…';
+    message = 'Recognizing…';
+    lastNormalized = card.image;
     try {
       const opts: RecognizeOptions = { preferSets: context.preferSets };
       const { result, temporal: nextTemp } = await recognizeCard(
@@ -153,7 +180,9 @@ export const createSessionController = (
 
   return {
     async onFrame(frame) {
+      analysisSize = { height: frame.height, width: frame.width };
       const prepared = prepareCard(frame);
+      lastDetection = prepared.detection;
       lastQuality = frameQualityScore(
         prepared.detected ? prepared.image : frame,
         prepared.score,
@@ -164,8 +193,11 @@ export const createSessionController = (
         if (phase === 'found' || phase === 'ambiguous') {
           gone += 1;
           if (gone >= GONE_FRAMES) enterSearching('Place a card in view');
-        } else if (phase !== 'searching' && phase !== 'recognizing') {
+        } else if (phase !== 'searching' && phase !== 'recognizing' && !track.history.length) {
           enterSearching('Place a card in view');
+        } else if (track.history.length && phase !== 'recognizing') {
+          phase = 'detected';
+          message = 'Hold steady…';
         }
         return snap();
       }
@@ -180,7 +212,6 @@ export const createSessionController = (
           return snap();
         }
         enterSearching('New card…');
-        // Fall through to start tracking the replacement.
         track = pushTrack(emptyTrack(), sampleFromQuad(prepared.corners, prepared.score));
       }
 
@@ -203,6 +234,7 @@ export const createSessionController = (
         );
         const best = pool[0];
         if (best && best.quality.score >= QUALITY_MIN_SCORE && !recognizing) {
+          lastNormalized = best.card.image;
           await runRecognize(best.card);
         }
       }
@@ -211,10 +243,13 @@ export const createSessionController = (
     },
 
     async recognizeStill(frame) {
+      analysisSize = { height: frame.height, width: frame.width };
       clearLock();
       track = emptyTrack();
       const prepared = prepareCard(frame);
+      lastDetection = prepared.detection;
       lastQuality = frameQualityScore(prepared.image, prepared.score);
+      lastNormalized = prepared.image;
       if (prepared.corners) {
         track = pushTrack(track, sampleFromQuad(prepared.corners, prepared.score));
         track = { ...track, stable: true };
@@ -225,8 +260,12 @@ export const createSessionController = (
 
     reset() {
       enterSearching('Place a card in view');
+      lastDetection = emptyDetectionDebug();
+      analysisSize = null;
     },
 
     snapshot: snap,
+
+    lastNormalized: () => lastNormalized,
   };
 };

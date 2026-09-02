@@ -22,14 +22,18 @@ On your own computer, in the browser's extension storage.
 
 If — and only if — you press **Connect Google**, your collection, decks,
 printing choices and preferences are also written to your own Google Drive, in
-the hidden per-application folder Google calls `appDataFolder`. This is the sole
-purpose of the Google connection: to move your data between your own devices.
+the hidden per-application folder Google calls `appDataFolder`.
 
-That folder is private to this application. Lugin requests exactly one Google
-permission, `drive.appdata`, which cannot see, read or alter anything else in
-your Drive: not your documents, not your photos, not your other files. The data
-lives in your Google account, under your control, and can be deleted by
-disconnecting and removing the folder from your account's app settings.
+If you separately enable **Help development** on the scanner, selected scanner
+frames may also be saved under a visible folder you can find as
+**Lugin / Scanner Corpus** in your Drive. Those samples stay in your account
+unless you choose to share or export them; they are not sent to a Lugin server.
+
+Lugin requests Google permissions `drive.appdata` (hidden sync data) and
+`drive.file` (files and folders this app creates, including Scanner Corpus).
+Neither scope grants a blanket read of your other Drive documents, photos, or
+mail. Sync data lives in your Google account under your control; Scanner Corpus
+files can be deleted in Drive like any other folder.
 
 Your want lists, your purchase history and all cached card data are deliberately
 **not** synchronised. They stay on the device that produced them.

@@ -6,16 +6,31 @@
 // whenever `yarn scan:eval` moves.
 
 /** Detector score below which we treat the frame as "no card". */
-export const DETECT_MIN_SCORE = 0.35;
+export const DETECT_MIN_SCORE = 0.28;
 
 /** Max mean corner displacement (fraction of card diagonal) across recent frames. */
-export const STABILITY_MAX_CORNER_MOVE = 0.035;
+export const STABILITY_MAX_CORNER_MOVE = 0.04;
 
 /** Max relative area change between consecutive tracked quads. */
-export const STABILITY_MAX_AREA_CHANGE = 0.08;
+export const STABILITY_MAX_AREA_CHANGE = 0.1;
 
 /** How many recent detections must agree before we lock. */
 export const STABILITY_WINDOW = 3;
+
+/** Brief detector misses while tracking before clearing the candidate. */
+export const TRACK_COAST_FRAMES = 3;
+
+/** EMA factor when smoothing tracked corners (0 = raw, 1 = freeze). */
+export const TRACK_SMOOTH_ALPHA = 0.45;
+
+/** Minimum share of the analysis frame a card blob must occupy. */
+export const DETECT_MIN_AREA_SHARE = 0.04;
+
+/** Blob covering nearly the whole frame ⇒ background estimation failed. */
+export const DETECT_MAX_AREA_SHARE = 0.82;
+
+/** How many component candidates to score per mask. */
+export const DETECT_TOP_COMPONENTS = 4;
 
 /** Rolling pool of candidate frames while locking. */
 export const QUALITY_POOL_SIZE = 4;
@@ -44,8 +59,14 @@ export const REPLACE_VISUAL_DELTA = 0.28;
 /** After FOUND, frames without a detectable card before returning to SEARCHING. */
 export const GONE_FRAMES = 4;
 
-/** Cheap detection rate target (ms between analysis frames). */
-export const DETECT_INTERVAL_MS = 80;
+/**
+ * Cheap detection cadence (ms between analysis frames).
+ * ~10–12 Hz default — tune via detect-eval, not by hardcoding elsewhere.
+ */
+export const DETECT_INTERVAL_MS = 90;
+
+/** Max analysis width for live detection (keeps CV cheap). */
+export const DETECT_ANALYSIS_MAX_WIDTH = 640;
 
 /** Full recognition cooldown after a failed/ambiguous pass (ms). */
 export const RECOGNIZE_COOLDOWN_MS = 350;

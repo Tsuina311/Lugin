@@ -1,20 +1,24 @@
 // Find the card quadrilateral in a frame. Pure JS, no OpenCV.
 //
 // Strategy: separate the card from the background as a *region*, then read its
-// corners off the convex hull.
+// corners off the convex hull — plus multi-threshold / chroma / edge fallbacks
+// for real phone scenes where a single luminance ring threshold fails.
 //
-// The previous implementation traced contours of a dilated Sobel edge map and
-// demanded that Douglas–Peucker simplify one to exactly four points. Measured
-// over the fixture corpus that succeeded on 0 of 220 frames, including a flat,
-// centred, evenly lit card — while 98.7% of the true card outline was present in
-// the edge map. Edges were never the problem; requiring a four-point contour out
-// of a ribbon-shaped trace was.
-//
-// A region has three advantages here: the card is a solid blob whatever its
-// artwork does, a convex hull has no notion of "wrong number of points", and
-// fitting the four sides recovers true corners even though real cards are
-// rounded.
+// History: the old contour+Douglas–Peucker path scored 0/220 on fixtures while
+// edges were fine. Region separation recovered synthetic detection. Real tables
+// then showed luminance-only masks failing on playmats and low-contrast desks,
+// which is what the hybrid candidate path below addresses.
 
+import {
+  DETECT_MAX_AREA_SHARE,
+  DETECT_MIN_AREA_SHARE,
+  DETECT_TOP_COMPONENTS,
+} from './params';
+import type {
+  DetectionCandidateDebug,
+  DetectionDebug,
+  DetectionScoreParts,
+} from './detection/types';
 import {
   dist,
   orderCorners,
@@ -27,54 +31,208 @@ import type { CardCorners, ScanImage } from './types';
 
 export interface DetectResult {
   corners: CardCorners | null;
+  /** Structured candidates for debug / eval — always populated. */
+  debug: DetectionDebug;
   quad: Quad | null;
   /** Confidence-ish score from scoreCardQuad; 0 if none. */
   score: number;
 }
 
-const NONE: DetectResult = { corners: null, quad: null, score: 0 };
-
-
 /** Analysis resolution. Corners are mapped back to full resolution at the end. */
 const WORK_WIDTH = 320;
 
-/** Minimum share of the frame a card must occupy to be worth reading. */
-const MIN_AREA_SHARE = 0.06;
-
-/**
- * A component covering essentially the whole frame means background estimation
- * failed, not that the card is enormous.
- */
-const MAX_AREA_SHARE = 0.985;
-
 export const detectCardQuad = (image: ScanImage): DetectResult => {
+  const began =
+    typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
   const { height: fullH, width: fullW } = image;
   const scale = fullW > WORK_WIDTH ? WORK_WIDTH / fullW : 1;
   const w = Math.max(32, Math.round(fullW * scale));
   const h = Math.max(32, Math.round(fullH * scale));
   const gray = downscaleGray(image, w, h);
+  const rgb = downscaleRgb(image, w, h);
 
-  const mask = foregroundMask(gray, w, h);
-  if (!mask) return NONE;
+  const candidates: DetectionCandidateDebug[] = [];
+  const chosen: {
+    current: { corners: CardCorners; index: number; quad: Quad; score: number } | null;
+  } = { current: null };
 
-  const component = largestComponent(mask, w, h);
-  if (!component) return NONE;
-  const area = component.area / (w * h);
-  if (area < MIN_AREA_SHARE || area > MAX_AREA_SHARE) return NONE;
+  const consider = (
+    mask: Uint8Array,
+    method: string,
+    extras?: Partial<DetectionScoreParts>,
+  ) => {
+    const comps = topComponents(mask, w, h, DETECT_TOP_COMPONENTS);
+    for (const component of comps) {
+      const areaShare = component.area / (w * h);
+      const rejectedBecause: string[] = [];
+      if (areaShare < DETECT_MIN_AREA_SHARE) rejectedBecause.push('insufficient area');
+      if (areaShare > DETECT_MAX_AREA_SHARE) rejectedBecause.push('covers whole frame');
 
-  const boundary = boundaryPoints(component.pixels, w, h);
-  const hull = convexHull(boundary);
-  if (hull.length < 4) return NONE;
+      let corners: CardCorners | null = null;
+      let score = 0;
+      let parts: DetectionScoreParts = {
+        aspect: 0,
+        area: 0,
+        center: 0,
+        parallel: 0,
+        ...extras,
+      };
 
-  const approx = extremalCorners(hull);
-  if (!approx) return NONE;
-  // Corners come from the hull, sides from the full boundary: the hull drops
-  // collinear points, which is exactly the evidence a straight side is made of.
-  const corners = refineCorners(boundary, approx) ?? approx;
+      if (!rejectedBecause.length) {
+        const boundary = boundaryPoints(component.pixels, w, h);
+        const hull = convexHull(boundary);
+        if (hull.length < 4) {
+          rejectedBecause.push('hull too small');
+        } else {
+          const approx = extremalCorners(hull);
+          if (!approx) {
+            rejectedBecause.push('degenerate corners');
+          } else {
+            const refined = refineCorners(boundary, approx) ?? approx;
+            const quad = orderCorners(
+              refined.map(p => ({ x: p.x / scale, y: p.y / scale })),
+            );
+            score = scoreCardQuad(quad, fullW, fullH);
+            parts = scoreParts(quad, fullW, fullH, extras);
+            if (score < 0.15) rejectedBecause.push('low silhouette score');
+            if (parts.aspect < 0.25) rejectedBecause.push('aspect ratio');
+            if ((method.startsWith('edge') || method.startsWith('chroma')) && score < 0.45) {
+              rejectedBecause.push('weak non-luma candidate');
+            }
+            if (!rejectedBecause.length) {
+              corners = quadToCorners(quad);
+              const entry: DetectionCandidateDebug = {
+                components: parts,
+                corners,
+                method,
+                rejectedBecause: [],
+                score,
+              };
+              const idx = candidates.length;
+              candidates.push(entry);
+              if (!chosen.current || score > chosen.current.score) {
+                chosen.current = { corners, index: idx, quad, score };
+              }
+              continue;
+            }
+          }
+        }
+      }
 
-  const quad = orderCorners(corners.map(p => ({ x: p.x / scale, y: p.y / scale })));
-  const score = scoreCardQuad(quad, fullW, fullH);
-  return { corners: quadToCorners(quad), quad, score };
+      candidates.push({
+        components: parts,
+        corners,
+        method,
+        rejectedBecause,
+        score,
+      });
+    }
+  };
+
+  // --- luminance difference masks (multi-threshold) ---
+  const ringStats = sampleRingStats(gray, w, h);
+  if (ringStats) {
+    const { background, spread } = ringStats;
+    for (const mult of [2.5, 3.5, 5, 7]) {
+      const thr = Math.max(10, spread * mult);
+      consider(diffMask(gray, w, h, background, thr), `luma×${mult}`);
+    }
+    // Absolute fixed thresholds help when MAD collapses on flat desks.
+    for (const thr of [12, 18, 28]) {
+      consider(diffMask(gray, w, h, background, thr), `luma@${thr}`);
+    }
+  }
+
+  // --- chroma difference (playmat / wood grain) ---
+  const chromaBg = sampleRingRgb(rgb, w, h);
+  if (chromaBg) {
+    for (const thr of [18, 28, 40]) {
+      consider(chromaMask(rgb, w, h, chromaBg, thr), `chroma@${thr}`);
+    }
+  }
+
+  // --- edge magnitude fallback ---
+  const edges = sobelMask(gray, w, h);
+  if (edges) consider(edges, 'edge', { edge: 0.5 });
+
+  const ms =
+    (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()) -
+    began;
+
+  const selected = chosen.current;
+  if (!selected) {
+    return {
+      corners: null,
+      debug: { candidates, ms, selectedIndex: -1, workSize: { height: h, width: w } },
+      quad: null,
+      score: 0,
+    };
+  }
+
+  if (candidates[selected.index]) {
+    candidates[selected.index] = {
+      ...candidates[selected.index],
+      rejectedBecause: [],
+    };
+  }
+
+  return {
+    corners: selected.corners,
+    debug: {
+      candidates,
+      ms,
+      selectedIndex: selected.index,
+      workSize: { height: h, width: w },
+    },
+    quad: selected.quad,
+    score: selected.score,
+  };
+};
+
+const scoreParts = (
+  quad: Quad,
+  imageW: number,
+  imageH: number,
+  extras?: Partial<DetectionScoreParts>,
+): DetectionScoreParts => {
+  const [tl, tr, br, bl] = quad;
+  const top = dist(tl, tr);
+  const bottom = dist(bl, br);
+  const left = dist(tl, bl);
+  const right = dist(tr, br);
+  const width = (top + bottom) / 2;
+  const height = (left + right) / 2;
+  const aspect = width / Math.max(height, 1e-6);
+  const CARD = 63 / 88;
+  const aspectScore = 1 - Math.min(1, Math.abs(aspect - CARD) / CARD);
+  const parallel =
+    1 -
+    Math.min(
+      1,
+      (Math.abs(top - bottom) / Math.max(width, 1) +
+        Math.abs(left - right) / Math.max(height, 1)) /
+        2,
+    );
+  const area =
+    Math.abs(
+      tl.x * tr.y +
+        tr.x * br.y +
+        br.x * bl.y +
+        bl.x * tl.y -
+        (tl.y * tr.x + tr.y * br.x + br.y * bl.x + bl.y * tl.x),
+    ) / 2;
+  const areaScore = Math.min(1, area / (imageW * imageH * 0.35));
+  const cx = (tl.x + tr.x + br.x + bl.x) / 4;
+  const cy = (tl.y + tr.y + br.y + bl.y) / 4;
+  const centerDist = Math.hypot(cx - imageW / 2, cy - imageH / 2);
+  const centerScore = 1 - Math.min(1, centerDist / (Math.hypot(imageW, imageH) / 2));
+  return {
+    aspect: aspectScore,
+    area: areaScore,
+    center: centerScore,
+    parallel,
+    ...extras,
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -97,21 +255,41 @@ const downscaleGray = (image: ScanImage, dw: number, dh: number): Float32Array =
   return out;
 };
 
+const downscaleRgb = (
+  image: ScanImage,
+  dw: number,
+  dh: number,
+): { b: Float32Array; g: Float32Array; r: Float32Array } => {
+  const { data, height: sh, width: sw } = image;
+  const r = new Float32Array(dw * dh);
+  const g = new Float32Array(dw * dh);
+  const b = new Float32Array(dw * dh);
+  const xStep = sw / dw;
+  const yStep = sh / dh;
+  for (let y = 0; y < dh; y++) {
+    const sy = Math.min(sh - 1, Math.floor((y + 0.5) * yStep));
+    for (let x = 0; x < dw; x++) {
+      const sx = Math.min(sw - 1, Math.floor((x + 0.5) * xStep));
+      const i = (sy * sw + sx) * 4;
+      const o = y * dw + x;
+      r[o] = data[i];
+      g[o] = data[i + 1];
+      b[o] = data[i + 2];
+    }
+  }
+  return { b, g, r };
+};
+
 const median = (values: number[]): number => {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[sorted.length >> 1] ?? 0;
 };
 
-/**
- * Mark everything that does not look like the background.
- *
- * Background is sampled from a ring around the frame, because that is the one
- * region a user aiming at a card is not pointing at. Deliberately not "the card
- * is the bright part": a black-bordered card on a pale desk is darker than its
- * background, and half the corpus is exactly that. Only the *difference* from
- * background is reliable in both directions.
- */
-const foregroundMask = (gray: Float32Array, w: number, h: number): Uint8Array | null => {
+const sampleRingStats = (
+  gray: Float32Array,
+  w: number,
+  h: number,
+): { background: number; spread: number } | null => {
   const band = Math.max(3, Math.round(Math.min(w, h) * 0.03));
   const ring: number[] = [];
   for (let y = 0; y < h; y++) {
@@ -121,22 +299,118 @@ const foregroundMask = (gray: Float32Array, w: number, h: number): Uint8Array | 
     }
   }
   if (ring.length < 16) return null;
-
   const background = median(ring);
-  // Median absolute deviation: robust to a card corner intruding into the ring.
   const spread = median(ring.map(v => Math.abs(v - background)));
-  const threshold = Math.max(16, spread * 4);
+  return { background, spread };
+};
 
+const sampleRingRgb = (
+  rgb: { b: Float32Array; g: Float32Array; r: Float32Array },
+  w: number,
+  h: number,
+): { b: number; g: number; r: number } | null => {
+  const band = Math.max(3, Math.round(Math.min(w, h) * 0.03));
+  const rs: number[] = [];
+  const gs: number[] = [];
+  const bs: number[] = [];
+  for (let y = 0; y < h; y++) {
+    const edgeRow = y < band || y >= h - band;
+    for (let x = 0; x < w; x++) {
+      if (!(edgeRow || x < band || x >= w - band)) continue;
+      const i = y * w + x;
+      rs.push(rgb.r[i]);
+      gs.push(rgb.g[i]);
+      bs.push(rgb.b[i]);
+    }
+  }
+  if (rs.length < 16) return null;
+  return { b: median(bs), g: median(gs), r: median(rs) };
+};
+
+const diffMask = (
+  gray: Float32Array,
+  w: number,
+  h: number,
+  background: number,
+  threshold: number,
+): Uint8Array => {
   const mask = new Uint8Array(w * h);
   for (let i = 0; i < mask.length; i++) {
     mask[i] = Math.abs(gray[i] - background) > threshold ? 1 : 0;
   }
-
-  // Close small gaps: a pale card on a pale desk separates along a thin seam,
-  // and a one-pixel break is enough to split the blob in two.
   dilate(mask, w, h);
   erode(mask, w, h);
   return mask;
+};
+
+const chromaMask = (
+  rgb: { b: Float32Array; g: Float32Array; r: Float32Array },
+  w: number,
+  h: number,
+  bg: { b: number; g: number; r: number },
+  threshold: number,
+): Uint8Array => {
+  const mask = new Uint8Array(w * h);
+  for (let i = 0; i < mask.length; i++) {
+    const dr = rgb.r[i] - bg.r;
+    const dg = rgb.g[i] - bg.g;
+    const db = rgb.b[i] - bg.b;
+    mask[i] = Math.sqrt(dr * dr + dg * dg + db * db) > threshold ? 1 : 0;
+  }
+  dilate(mask, w, h);
+  dilate(mask, w, h);
+  erode(mask, w, h);
+  return mask;
+};
+
+/** Sobel edge magnitude → closed binary mask of strong edges. */
+const sobelMask = (gray: Float32Array, w: number, h: number): Uint8Array | null => {
+  const mag = new Float32Array(w * h);
+  let sum = 0;
+  let count = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const gx =
+        -gray[i - w - 1] +
+        gray[i - w + 1] -
+        2 * gray[i - 1] +
+        2 * gray[i + 1] -
+        gray[i + w - 1] +
+        gray[i + w + 1];
+      const gy =
+        -gray[i - w - 1] -
+        2 * gray[i - w] -
+        gray[i - w + 1] +
+        gray[i + w - 1] +
+        2 * gray[i + w] +
+        gray[i + w + 1];
+      const m = Math.hypot(gx, gy);
+      mag[i] = m;
+      sum += m;
+      count += 1;
+    }
+  }
+  if (!count) return null;
+  const mean = sum / count;
+  const thr = Math.max(25, mean * 1.8);
+  const mask = new Uint8Array(w * h);
+  for (let i = 0; i < mask.length; i++) mask[i] = mag[i] > thr ? 1 : 0;
+  // Close edge ribbons lightly — heavy close fills a noisy frame into one blob.
+  dilate(mask, w, h);
+  dilate(mask, w, h);
+  erode(mask, w, h);
+  return mask;
+};
+
+/**
+ * Original single-threshold mask (kept for tests / baseline variant).
+ */
+export const foregroundMask = (gray: Float32Array, w: number, h: number): Uint8Array | null => {
+  const stats = sampleRingStats(gray, w, h);
+  if (!stats) return null;
+  const threshold = Math.max(16, stats.spread * 4);
+  return diffMask(gray, w, h, stats.background, threshold);
 };
 
 const dilate = (mask: Uint8Array, w: number, h: number): void => {
@@ -172,7 +446,6 @@ const erode = (mask: Uint8Array, w: number, h: number): void => {
         !copy[i + 1] ||
         !copy[i - w] ||
         !copy[i + w];
-      // Keep frame-edge pixels: a card running off the frame is still a card.
       if (edge && x > 0 && y > 0 && x < w - 1 && y < h - 1) mask[i] = 0;
     }
   }
@@ -180,26 +453,30 @@ const erode = (mask: Uint8Array, w: number, h: number): void => {
 
 interface Component {
   area: number;
-  /** Component membership, same layout as the mask. */
   pixels: Uint8Array;
 }
 
-/**
- * Largest 4-connected blob of set pixels, by flood fill.
- *
- * Labels every component in one pass and only materializes the winner, so a
- * speckled background costs two allocations rather than one per blob.
- */
+/** Largest 4-connected blob — kept for unit tests. */
 export const largestComponent = (
   mask: Uint8Array,
   w: number,
   h: number,
 ): Component | null => {
+  const all = topComponents(mask, w, h, 1);
+  return all[0] ?? null;
+};
+
+/** Top-N components by area. */
+export const topComponents = (
+  mask: Uint8Array,
+  w: number,
+  h: number,
+  n: number,
+): Component[] => {
   const labels = new Int32Array(w * h);
   const queue = new Int32Array(w * h);
+  const areas: number[] = [0];
   let label = 0;
-  let bestLabel = 0;
-  let bestArea = 0;
 
   for (let start = 0; start < mask.length; start++) {
     if (!mask[start] || labels[start]) continue;
@@ -232,29 +509,22 @@ export const largestComponent = (
         queue[tail++] = i + w;
       }
     }
-
-    if (area > bestArea) {
-      bestArea = area;
-      bestLabel = label;
-    }
+    areas[label] = area;
   }
 
-  if (!bestLabel) return null;
-  const pixels = new Uint8Array(w * h);
-  for (let i = 0; i < labels.length; i++) pixels[i] = labels[i] === bestLabel ? 1 : 0;
-  return { area: bestArea, pixels };
+  const ranked = areas
+    .map((area, id) => ({ area, id }))
+    .filter(x => x.id > 0)
+    .sort((a, b) => b.area - a.area)
+    .slice(0, Math.max(1, n));
+
+  return ranked.map(({ area, id }) => {
+    const pixels = new Uint8Array(w * h);
+    for (let i = 0; i < labels.length; i++) pixels[i] = labels[i] === id ? 1 : 0;
+    return { area, pixels };
+  });
 };
 
-/**
- * Extreme set pixels of every row *and* every column.
- *
- * Rows alone would be enough to find the hull vertices, but not to fit the
- * sides: a near-horizontal edge contributes only the two ends of its topmost
- * row, so side-fitting has nothing to work with and silently gives up. Columns
- * sample the horizontal edges, rows the vertical ones.
- *
- * Either way this turns ~100k candidate pixels into a few hundred.
- */
 export const boundaryPoints = (pixels: Uint8Array, w: number, h: number): Pt[] => {
   const out: Pt[] = [];
   for (let y = 0; y < h; y++) {
@@ -284,14 +554,9 @@ export const boundaryPoints = (pixels: Uint8Array, w: number, h: number): Pt[] =
   return out;
 };
 
-// ---------------------------------------------------------------------------
-// Hull and corners
-// ---------------------------------------------------------------------------
-
 const cross = (o: Pt, a: Pt, b: Pt): number =>
   (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
-/** Andrew's monotone chain. Returns hull vertices counter-clockwise. */
 export const convexHull = (points: readonly Pt[]): Pt[] => {
   if (points.length < 3) return [...points];
   const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
@@ -312,10 +577,6 @@ export const convexHull = (points: readonly Pt[]): Pt[] => {
   return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 };
 
-/**
- * Smallest-area enclosing rectangle, by rotating calipers over hull edges.
- * Returns the rotation that makes the card axis-aligned.
- */
 export const minAreaRectAngle = (hull: readonly Pt[]): number => {
   let bestAngle = 0;
   let bestArea = Infinity;
@@ -346,10 +607,6 @@ export const minAreaRectAngle = (hull: readonly Pt[]): number => {
   return bestAngle;
 };
 
-/**
- * Four corner candidates: rotate into the card's own frame, then take the
- * extremes of x+y and x−y. Robust to rotation, unlike raw min/max on x and y.
- */
 export const extremalCorners = (hull: readonly Pt[]): Pt[] | null => {
   if (hull.length < 4) return null;
   const angle = minAreaRectAngle(hull);
@@ -387,7 +644,6 @@ export const extremalCorners = (hull: readonly Pt[]): Pt[] | null => {
   }
 
   const corners = [tl, tr, br, bl];
-  // Degenerate hulls can nominate the same point twice.
   for (let i = 0; i < 4; i++) {
     for (let j = i + 1; j < 4; j++) {
       if (dist(corners[i], corners[j]) < 2) return null;
@@ -397,14 +653,12 @@ export const extremalCorners = (hull: readonly Pt[]): Pt[] | null => {
 };
 
 interface Line {
-  /** Unit direction. */
   dx: number;
   dy: number;
   x: number;
   y: number;
 }
 
-/** Total-least-squares line through points, via the principal axis. */
 const fitLine = (points: readonly Pt[]): Line | null => {
   if (points.length < 2) return null;
   let mx = 0;
@@ -427,7 +681,6 @@ const fitLine = (points: readonly Pt[]): Line | null => {
     sxy += dx * dy;
   }
 
-  // Principal eigenvector of the 2×2 covariance matrix.
   const theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
   const dx = Math.cos(theta);
   const dy = Math.sin(theta);
@@ -453,15 +706,6 @@ const pointLineDist = (p: Pt, a: Pt, b: Pt): number => {
   return Math.abs(dy * (p.x - a.x) - dx * (p.y - a.y)) / len;
 };
 
-/**
- * Fit the four sides and intersect them.
- *
- * Magic cards have rounded corners, so the extreme hull point of a corner sits
- * on the arc — inside the true corner. Every region crop downstream is expressed
- * as a fraction of the card, so a systematically undersized quad shifts the
- * title band on every single scan. Intersecting the straight sides puts the
- * corner back where the cardboard would meet.
- */
 export const refineCorners = (
   boundary: readonly Pt[],
   approx: readonly Pt[],
@@ -474,7 +718,6 @@ export const refineCorners = (
     if (length < 8) return null;
     const tolerance = Math.max(1.5, length * 0.04);
 
-    // Points along this side, skipping the rounded ends.
     const along = boundary.filter(p => {
       if (pointLineDist(p, a, b) > tolerance) return false;
       const t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / (length * length);
@@ -487,16 +730,73 @@ export const refineCorners = (
 
   const out: Pt[] = [];
   for (let i = 0; i < 4; i++) {
-    // Corner i is where the side ending at it meets the side leaving it.
     const previous = sides[(i + 3) % 4];
     const next = sides[i];
     const point = intersect(previous, next);
-    // Reject a refinement that wandered: near-parallel sides send the
-    // intersection off to infinity.
     if (!point || dist(point, approx[i]) > dist(approx[i], approx[(i + 1) % 4]) * 0.25) {
       return null;
     }
     out.push(point);
   }
   return out;
+};
+
+/** Polygon IoU for detection eval (shoelace + Sutherland–Hodgman clip). */
+export const polygonIoU = (a: CardCorners, b: CardCorners): number => {
+  const pa = [a.topLeft, a.topRight, a.bottomRight, a.bottomLeft];
+  const pb = [b.topLeft, b.topRight, b.bottomRight, b.bottomLeft];
+  const areaA = shoelace(pa);
+  const areaB = shoelace(pb);
+  const inter = shoelace(clipPolygon(pa, pb));
+  const union = areaA + areaB - inter;
+  return union > 1e-6 ? inter / union : 0;
+};
+
+const shoelace = (pts: readonly Pt[]): number => {
+  if (pts.length < 3) return 0;
+  let s = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % pts.length];
+    s += p.x * q.y - q.x * p.y;
+  }
+  return Math.abs(s) / 2;
+};
+
+const clipPolygon = (subject: Pt[], clip: Pt[]): Pt[] => {
+  let output = [...subject];
+  for (let i = 0; i < clip.length; i++) {
+    const a = clip[i];
+    const b = clip[(i + 1) % clip.length];
+    const input = output;
+    output = [];
+    if (!input.length) break;
+    for (let j = 0; j < input.length; j++) {
+      const p = input[j];
+      const q = input[(j + 1) % input.length];
+      const pin = cross(a, b, p) >= 0;
+      const qin = cross(a, b, q) >= 0;
+      if (pin && qin) output.push(q);
+      else if (pin && !qin) {
+        const hit = edgeIntersect(p, q, a, b);
+        if (hit) output.push(hit);
+      } else if (!pin && qin) {
+        const hit = edgeIntersect(p, q, a, b);
+        if (hit) output.push(hit);
+        output.push(q);
+      }
+    }
+  }
+  return output;
+};
+
+const edgeIntersect = (p: Pt, q: Pt, a: Pt, b: Pt): Pt | null => {
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  const ex = b.x - a.x;
+  const ey = b.y - a.y;
+  const det = dx * ey - dy * ex;
+  if (Math.abs(det) < 1e-9) return null;
+  const t = ((a.x - p.x) * ey - (a.y - p.y) * ex) / det;
+  return { x: p.x + t * dx, y: p.y + t * dy };
 };

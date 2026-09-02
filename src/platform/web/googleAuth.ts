@@ -7,9 +7,9 @@
 // recognise is the page's *origin* — no redirect URI, and so nothing tied to an
 // extension id.
 //
-// The token is the same kind of token, for the same one scope, reaching the same
-// appDataFolder. Only the way it's obtained differs, which is exactly the seam
-// `TokenProvider` exists to hide: `createDriveRepository` is reused untouched.
+// The token is the same kind of token as the extension's: app-data sync plus
+// `drive.file` for the visible Scanner Corpus folder. Only the way it's obtained
+// differs — the seam `TokenProvider` exists to hide.
 //
 // Deliberately no silent renewal. A token request without a user gesture opens a
 // popup the browser is entitled to block, and a phone that silently "fails to
@@ -17,17 +17,12 @@
 // connect button coming back.
 
 import { AuthError, type TokenProvider, type TokenRequest } from '@/core/sync/auth';
+import { DRIVE_APPDATA_SCOPE, DRIVE_SCOPES } from '@/core/sync/scopes';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 
-/**
- * The narrowest scope that gives us somewhere to keep the user's data.
- *
- * Read *and* write, on both platforms, and always has been — `drive.appdata` is
- * not offered in a read-only flavour. That mattered little while this app only
- * read; now that a phone import pushes, it is the whole permission it needs.
- */
-export const DRIVE_APPDATA_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+/** @deprecated Prefer DRIVE_SCOPES — re-exported for older call sites. */
+export { DRIVE_APPDATA_SCOPE };
 
 /** Set at build time; see .env.example. Shared with the extension build. */
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
@@ -183,7 +178,7 @@ const runFlow = (): Promise<CachedToken> => {
               : new AuthError('cancelled', 'The Google window was closed before finishing'),
           );
         },
-        scope: DRIVE_APPDATA_SCOPE,
+        scope: DRIVE_SCOPES,
       });
       // Empty prompt reuses an existing grant without asking again, so returning
       // users get a window that opens and closes rather than a consent screen.

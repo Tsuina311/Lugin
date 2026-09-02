@@ -1,9 +1,6 @@
-// Turn a raw camera/photo frame into an upright, normalized card image.
-//
-// Pure: no canvas, no DOM. `src/web/scan/canvasBridge.ts` adapts at the edges,
-// and `scripts/scan-eval.mjs` runs the exact same code over PNG fixtures.
-
 import { detectCardQuad } from './detectCard';
+import type { DetectionDebug } from './detection/types';
+import { emptyDetectionDebug } from './detection/types';
 import {
   quadToCorners,
   rectQuad,
@@ -20,25 +17,33 @@ export interface PreparedCard {
   corners: CardCorners | null;
   /** True only when a real perspective quad was found and warped. */
   detected: boolean;
+  detection: DetectionDebug;
   image: ScanImage;
   score: number;
   source: CardSource;
 }
 
 /** Below this, a detected quad is not trusted over the on-screen guide. */
-export const MIN_DETECTION_SCORE = 0.35;
+export const MIN_DETECTION_SCORE = 0.28;
 
 /**
  * Detect the card quad (if possible), perspective-correct it, and emit a
  * standard CARD_WIDTH × CARD_HEIGHT raster for region crops + OCR.
  *
  * Falls back to treating the whole frame as an already-framed card.
+ * Callers that care about acquisition (live scan) must check `detected`.
  */
 export const prepareCard = (source: ScanImage): PreparedCard => {
-  const { quad, score } = detectCardQuad(source);
-  if (quad) return warped(source, quad, score, 'detected');
+  const { debug, quad, score } = detectCardQuad(source);
+  if (quad) return warped(source, quad, score, 'detected', debug);
 
-  return warped(source, rectQuad(0, 0, source.width - 1, source.height - 1), 0, 'whole-frame');
+  return warped(
+    source,
+    rectQuad(0, 0, source.width - 1, source.height - 1),
+    0,
+    'whole-frame',
+    debug,
+  );
 };
 
 /**
@@ -49,8 +54,10 @@ export const prepareCardWithGuideFallback = (
   source: ScanImage,
   guide: RelativeRegion,
 ): PreparedCard => {
-  const { quad, score } = detectCardQuad(source);
-  if (quad && score >= MIN_DETECTION_SCORE) return warped(source, quad, score, 'detected');
+  const { debug, quad, score } = detectCardQuad(source);
+  if (quad && score >= MIN_DETECTION_SCORE) {
+    return warped(source, quad, score, 'detected', debug);
+  }
 
   const fallback: Quad = rectQuad(
     guide.x * source.width,
@@ -58,7 +65,7 @@ export const prepareCardWithGuideFallback = (
     Math.max(1, guide.w * source.width - 1),
     Math.max(1, guide.h * source.height - 1),
   );
-  return warped(source, fallback, 0, 'guide');
+  return warped(source, fallback, 0, 'guide', debug);
 };
 
 const warped = (
@@ -66,9 +73,11 @@ const warped = (
   quad: Quad,
   score: number,
   from: CardSource,
+  detection: DetectionDebug = emptyDetectionDebug(),
 ): PreparedCard => ({
   corners: from === 'detected' ? quadToCorners(quad) : null,
   detected: from === 'detected',
+  detection,
   image: warpQuadToCard(source, quad),
   score,
   source: from,

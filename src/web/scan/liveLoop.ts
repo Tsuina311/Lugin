@@ -5,7 +5,7 @@
 
 import { toScanImage } from './canvasBridge';
 
-import { DETECT_INTERVAL_MS } from '@/lib/scan/params';
+import { DETECT_ANALYSIS_MAX_WIDTH, DETECT_INTERVAL_MS } from '@/lib/scan/params';
 import type { SessionController, SessionSnapshot } from '@/lib/scan/session/controller';
 import type { ScanImage } from '@/lib/scan/types';
 
@@ -30,7 +30,7 @@ export interface LiveLoop {
  */
 const frameToScanImage = (
   video: HTMLVideoElement,
-  maxWidth = 640,
+  maxWidth = DETECT_ANALYSIS_MAX_WIDTH,
 ): ScanImage | null => {
   const vw = video.videoWidth;
   const vh = video.videoHeight;

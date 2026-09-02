@@ -9,68 +9,52 @@ indexes are downloaded once and cached.
 ```text
 LIVE VIDEO
     ↓
-cheap card detection          (limited rate, latest-frame)
+cheap card detection          (DETECT_INTERVAL_MS, latest-frame)
     ↓
-stable-card tracking
+multi-candidate scoring       (luma / chroma / edge masks)
     ↓
-best-frame selection          (sharpness / glare / coverage)
+stable-card tracking + coast
+    ↓
+best-frame quality pool
     ↓
 perspective normalization
     ↓
-ARTWORK + TITLE candidates
-    ↓
-candidate union + fusion
-    ↓
-progressive TEXT / TYPE / FOOTER   (only when ambiguous)
-    ↓
-temporal consensus
-    ↓
-card identity  →  printing identity when evidence allows
+recognition (only when locked)
 ```
 
-UI states (see `src/lib/scan/session/controller.ts`):
+### Live polygon (product UI)
 
-| Phase | Meaning |
-| --- | --- |
-| `searching` | Looking for a card rectangle |
-| `detected` | Card seen; waiting for stability |
-| `locking` | Stable; pooling quality frames |
-| `recognizing` | Running art / title / optional secondary OCR |
-| `found` | Confident card identity (printing may still be soft) |
-| `ambiguous` | Show candidates / keep sampling |
+The scanner draws the **actual detected four corners** over the camera
+(`object-fit: cover` aware). States:
 
-After `found`, the same stationary card is not re-inserted. Removal or a large
-visual change returns to `searching`.
+| Phase | Outline | Label |
+| --- | --- | --- |
+| searching | none | Place a card in view |
+| detected | amber dashed | Hold steady |
+| locking | green solid | Card locked |
+| recognizing | blue solid | Recognizing… |
+| found | green thick | Found / card name |
 
-## Architecture
+No fixed fake guide rectangle substitutes for detection.
 
-Portable core lives under `src/lib/scan/` and must not import React, DOM, or
-Chrome APIs. Browser glue:
+### Detection debug (`flags.scanDebug`)
 
-- `src/web/ScanScreen.tsx` — continuous UX
-- `src/web/scan/liveLoop.ts` — `requestVideoFrameCallback` / rAF, latest-frame
-- `src/web/scan/camera.ts`, `canvasBridge.ts`, `tesseractRecognizer.ts`
-- `src/web/cardIndexStore.ts`, `artworkIndexStore.ts` — Cache API indexes
+Shows detection ms, candidate count, selected method/score, rejection reasons,
+track length, motion, quality.
 
-The offline evaluation harness imports the same `src/lib/scan` modules via
-esbuild, so production and benchmarks cannot drift silently.
+## Real-camera detection corpus
 
-## Recognition signals
+Synthetic fixtures alone are insufficient. See
+[`scripts/fixtures/REAL-DETECTION.md`](../scripts/fixtures/REAL-DETECTION.md).
 
-| Signal | Role |
-| --- | --- |
-| Artwork perceptual match (dHash + block-mean + hue) | Broad candidate generation |
-| Title OCR + `shapeFold` + name index | Independent candidate generation |
-| Rules/printed text tokens (IDF over pool) | Secondary reranker |
-| Type-line OCR | Soft secondary (only when ambiguous) |
-| Footer / collector OCR | Printing narrowing after card identity |
-| Temporal consensus | Multi-frame agreement boost |
-
-**Card identity** is primarily an `oracleId` / English name decision.
-**Printing identity** (`scryfallId`) uses artwork set hints, collector number,
-and language when available. Exact printing is not required to add a card.
+```bash
+yarn scan:detect-annotate path/to/phone-photo.png
+yarn scan:detect-eval --synthetic
+yarn scan:detect-eval --real
+```
 
 ## Indexes
+
 
 ```bash
 yarn scan:index                 # card names (EN + FR/DE/IT titles)

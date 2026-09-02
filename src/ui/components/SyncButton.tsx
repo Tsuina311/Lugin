@@ -98,9 +98,11 @@ export const SyncButton = () => {
             <>
               <div className="font-medium text-ink">Keep your data on your other devices</div>
               <p className="mt-1 text-ink-muted">
-                Your collection, decks, chosen printings and settings are kept in a private folder in
-                your Google Drive that only this extension can open. Nothing else is read, and your
-                Cardmarket sign-in never leaves this browser.
+                Your collection, decks, chosen printings and settings stay in a
+                private app-data folder in your Google Drive. If you enable scanner
+                development capture, selected frames go to a visible
+                "Lugin / Scanner Corpus" folder you control. Nothing else in
+                Drive is read, and your Cardmarket sign-in never leaves this browser.
               </p>
               <Button
                 className="mt-2"

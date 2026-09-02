@@ -183,20 +183,28 @@ URL and hand back the worse picture.
 ### Measuring the card scanner
 
 Full continuous-scanner design: [`docs/SCANNER.md`](docs/SCANNER.md).
+Development capture / Drive corpus: [`docs/SCANNER-CORPUS.md`](docs/SCANNER-CORPUS.md).
 
 ```bash
 yarn scan:fixtures          # resolve the test corpus from Scryfall (writes scripts/fixtures/cards.json)
 yarn scan:index             # build the card-name index the matcher needs
 yarn scan:art-index:fixtures # compact artwork descriptors for the fixture set
 yarn scan:eval              # classic title-only corpus (accuracy + timings)
+yarn scan:detect-eval       # detection-only; synthetic and real reported separately
+yarn scan:detect-annotate   # click 4 corners on a phone photo → .scan-real/
+yarn scan:corpus:import ./path  # Drive download or export JSON → .scan-corpus/
 yarn scan:pipeline          # compare TITLE_ONLY / ART_ONLY / ART_PLUS_TITLE / FULL_PIPELINE
 yarn scan:pipeline:real     # optional gitignored real-photo corpus
 yarn scan:variants          # benchmark preprocessing chains against each other
 yarn scan:calibrate         # measure where the title actually sits on each layout
 yarn scan:folds             # compare name-normalization strategies
 yarn test:scan              # unit tests (portable core, no camera)
+yarn test:corpus            # development-capture policy / Drive transport tests
 ```
 
+Real-camera detection notes: [`scripts/fixtures/REAL-DETECTION.md`](scripts/fixtures/REAL-DETECTION.md).
+Synthetic detection ≠ proven on a desk — populate `.scan-real/` and run
+`yarn scan:detect-eval --real` before trusting acquisition.
 The scanner is the one feature where "that feels better" is worthless: a change
 that rescues the card on your desk routinely breaks five others, and nobody
 notices until a shop trip. So `scripts/scan-eval.mjs` / `scan-pipeline-eval.mjs`

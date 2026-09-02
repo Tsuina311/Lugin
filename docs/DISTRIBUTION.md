@@ -184,14 +184,14 @@ accounts only, not a Google Group address.
 **Add users** → the same emails. Cap is 100, and each one consumes the project's
 quota permanently, so don't add addresses speculatively.
 
-> Worth knowing: Lugin's only scope, `drive.appdata`, is classified
-> **non-sensitive** by Google. You will never need to pass OAuth verification,
-> and the "unverified app" 100-user cap doesn't apply to you. If maintaining the
-> test-user list becomes annoying, you can publish the consent screen to
-> Production and delete the list entirely without triggering a review — the store
-> visibility keeps gating who gets the extension. Testers see a "Google hasn't
-> verified this app" notice either way until you complete optional brand
-> verification.
+> Worth knowing: Lugin's scopes (`drive.appdata` and `drive.file`) are classified
+> **non-sensitive** by Google for these uses. You will never need to pass OAuth
+> verification for them alone, and the "unverified app" 100-user cap doesn't apply
+> to you. If maintaining the test-user list becomes annoying, you can publish the
+> consent screen to Production and delete the list entirely without triggering a
+> review — the store visibility keeps gating who gets the extension. Testers see a
+> "Google hasn't verified this app" notice either way until you complete optional
+> brand verification.
 
 ## 6. Fill in the listing
 
@@ -274,9 +274,11 @@ static site; Pages serves it; your phone opens it and can add it to the home
 screen, where it runs fullscreen with its own icon.
 
 It shows the collection and decks your desktop synced, **and imports ManaBox
-exports into them** — which is why it needs the same `drive.appdata` scope the
-extension uses, and why a tester signing in here is granting write access to that
-one hidden folder, not just reads.
+exports into them** — which is why it needs the same Drive scopes the
+extension uses (`drive.appdata` for the hidden sync folder; `drive.file` when
+scanner development capture writes the visible Scanner Corpus tree). A tester
+signing in here is granting access only to those app-managed locations, not a
+blanket read of their Drive.
 
 It carries the same sync engine as the extension, so an import made here is
 reconciled per domain against whatever the desktop has done meanwhile rather than

@@ -14,6 +14,13 @@ release
 # images are copyrighted and have no business in the repository.
 .scan-fixtures/
 
+# Real phone photos + corner annotations for detection eval.
+# Copyrighted card imagery — never commit.
+.scan-real/
+
+# Downloaded development-capture corpus (private; never commit).
+.scan-corpus/
+
 # The extension's own signing key. Losing it changes the extension id, which
 # turns every existing install into a stranger — keep a backup off the repo.
 .extension-key.pem

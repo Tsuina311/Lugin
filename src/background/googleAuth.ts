@@ -1,10 +1,9 @@
 // Getting a Google access token from inside the extension, and nothing else.
 //
 // This has to live in the service worker: `chrome.identity` doesn't exist in a
-// content script. It asks for exactly one scope — `drive.appdata`, a private
-// folder only this extension can read — so the consent screen the user sees
-// says "see, edit, create and delete its own configuration data", not anything
-// about their files, mail or account.
+// content script. Scopes: `drive.appdata` (hidden collection sync) and
+// `drive.file` (visible Scanner Corpus folder the app creates — not a blanket
+// Drive read).
 //
 // Why the implicit flow rather than code + PKCE, which is otherwise the modern
 // answer: `launchWebAuthFlow` needs a "Web application" client (Google's
@@ -16,12 +15,13 @@
 // Google and the grant stands, which is the ordinary case.
 
 import { AuthError, type TokenProvider, type TokenRequest } from '@/core/sync/auth';
+import { DRIVE_APPDATA_SCOPE, DRIVE_SCOPES } from '@/core/sync/scopes';
 
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke';
 
-/** The narrowest scope that gives us somewhere to put the user's data. */
-export const DRIVE_APPDATA_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+/** @deprecated Prefer DRIVE_SCOPES — re-exported for older call sites. */
+export { DRIVE_APPDATA_SCOPE };
 
 /** Set at build time; see .env.example. */
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
@@ -76,10 +76,10 @@ const authUrl = (interactive: boolean, state: string): string => {
     client_id: CLIENT_ID,
     // Ask for the scope again on every renewal; Google returns the grant it
     // already has rather than prompting.
-    include_granted_scopes: 'false',
+    include_granted_scopes: 'true',
     redirect_uri: redirectUri(),
     response_type: 'token',
-    scope: DRIVE_APPDATA_SCOPE,
+    scope: DRIVE_SCOPES,
     state,
     // Silent renewal must never open a window; the first connection must.
     ...(interactive ? { prompt: 'consent' } : { prompt: 'none' }),

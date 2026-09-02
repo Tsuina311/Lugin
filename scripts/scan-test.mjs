@@ -39,6 +39,8 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/tracking.ts')}';
       export * from '${join(root, 'src/lib/scan/params.ts')}';
       export * from '${join(root, 'src/lib/scan/session/controller.ts')}';
+      export * from '${join(root, 'src/lib/scan/videoMap.ts')}';
+      export { polygonIoU } from '${join(root, 'src/lib/scan/detectCard.ts')}';
     `,
     resolveDir: root,
     sourcefile: 'entry.ts',
@@ -116,6 +118,11 @@ const {
   BATTLE_PROFILE,
   profileForCard,
   createSessionController,
+  mapAnalysisToOverlay,
+  mapCoverSourceToDest,
+  mapAnalysisToSource,
+  coverLayout,
+  polygonIoU,
 } = await import(pathToFileURL(bundle).href);
 
 let failed = 0;
@@ -1224,6 +1231,63 @@ check('track becomes stable only after agreeing frames', () => {
   assert.equal(track.stable, true);
   track = pushTrack(track, null);
   assert.equal(track.stable, false);
+  assert.ok(track.history.length > 0, 'coasts — history kept after one miss');
+});
+
+check('track clears after coast window of misses', () => {
+  let track = emptyTrack();
+  const corners = {
+    bottomLeft: { x: 0, y: 100 },
+    bottomRight: { x: 70, y: 100 },
+    topLeft: { x: 0, y: 0 },
+    topRight: { x: 70, y: 0 },
+  };
+  for (let i = 0; i < 3; i++) track = pushTrack(track, sampleFromQuad(corners, 0.8));
+  track = pushTrack(track, null);
+  track = pushTrack(track, null);
+  track = pushTrack(track, null);
+  track = pushTrack(track, null);
+  assert.equal(track.history.length, 0);
+});
+
+check('object-fit cover maps center to center', () => {
+  const source = { width: 1920, height: 1080 };
+  const dest = { width: 390, height: 844 };
+  const mid = mapCoverSourceToDest(
+    { x: source.width / 2, y: source.height / 2 },
+    source,
+    dest,
+  );
+  assert.ok(Math.abs(mid.x - dest.width / 2) < 1);
+  assert.ok(Math.abs(mid.y - dest.height / 2) < 1);
+});
+
+check('analysis → overlay accounts for downscale and cover crop', () => {
+  const analysis = { width: 640, height: 360 };
+  const source = { width: 1920, height: 1080 };
+  const dest = { width: 400, height: 800 };
+  const srcPt = mapAnalysisToSource({ x: 320, y: 180 }, analysis, source);
+  assert.ok(Math.abs(srcPt.x - 960) < 1);
+  const overlay = mapAnalysisToOverlay({ x: 320, y: 180 }, analysis, source, dest);
+  assert.ok(overlay.x > 0 && overlay.x < dest.width);
+  assert.ok(overlay.y > 0 && overlay.y < dest.height);
+});
+
+check('polygon IoU is 1 for identical quads and ~0 for disjoint', () => {
+  const a = {
+    topLeft: { x: 0, y: 0 },
+    topRight: { x: 10, y: 0 },
+    bottomRight: { x: 10, y: 20 },
+    bottomLeft: { x: 0, y: 20 },
+  };
+  assert.ok(Math.abs(polygonIoU(a, a) - 1) < 1e-6);
+  const b = {
+    topLeft: { x: 100, y: 100 },
+    topRight: { x: 110, y: 100 },
+    bottomRight: { x: 110, y: 120 },
+    bottomLeft: { x: 100, y: 120 },
+  };
+  assert.ok(polygonIoU(a, b) < 0.01);
 });
 
 check('frame quality prefers a sharp frame over a flat one', () => {
