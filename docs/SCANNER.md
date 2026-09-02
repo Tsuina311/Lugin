@@ -4,6 +4,10 @@ Lugin’s phone scanner identifies paper Magic cards from a live camera feed.
 Recognition is **offline-first**: camera frames never leave the device, and
 indexes are downloaded once and cached.
 
+Native Android camera companion (VisionCamera / CameraX): see
+[`docs/MOBILE-NATIVE.md`](MOBILE-NATIVE.md). The web scanner stays; native is a
+third surface gated on Samsung sharpness.
+
 ## Continuous flow
 
 ```text

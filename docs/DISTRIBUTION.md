@@ -6,8 +6,8 @@ Four routes, because they carry different things:
 | --------------------------- | -------------------- | -------------------------------------- | ---- |
 | The extension, as a zip     | **You, by hand**     | Whoever you send the file to           | free |
 | The extension, installable  | **Chrome Web Store** | Visibility `Private` + trusted testers | $5   |
-| The phone app               | **GitHub Pages**     | OAuth test users — no sign-in, no data | free |
-| The phone app (minibrowser) | **Google Play**      | Internal testing track + tester emails | $25  |
+| The phone web companion     | **GitHub Pages**     | OAuth test users — no sign-in, no data | free |
+| The native Android companion| **Google Play**      | Internal testing track + tester emails | $25  |
 
 Google Play does not distribute browser extensions, and the Chrome Web Store does
 not distribute Android apps. There is no single place that does both — and
@@ -297,9 +297,10 @@ Cardmarket *inside* our own interface needs two things a web page may not have:
   inject into a document from another origin. Cloudflare also challenges
   non-browser requests, so fetching and re-rendering it server-side is out too.
 
-Browsing and buying from the phone therefore needs a native WebView the app owns
-— which is Part 4, and the only reason the Android SDK and Play Store come into
-it at all.
+Browsing and buying Cardmarket from the phone is **not** a native-app goal —
+that stays on the Chrome extension. The Play Store path (Part 4) exists for the
+React Native companion: sharper native camera scanning, collection, decks, and
+Drive sync. See `docs/MOBILE-NATIVE.md`.
 
 ## Steps
 
@@ -380,17 +381,19 @@ deployed Pages URL is the one to sign in from.
 
 ---
 
-# Part 4 — Later: the native Android app
+# Part 4 — Native Android companion (React Native / Expo)
 
-> **Status: not built.** Needed only for the minibrowser — browsing Cardmarket
-> inside the app with our overlay injected, using your logged-in session.
-> Planned as Capacitor wrapping the same React bundle, with
-> `@capgo/capacitor-inappbrowser` behind our own `MiniBrowser` interface so the
-> plugin can be swapped for a hand-written one later.
+> **Status: Milestone A/B in progress** (`mobile/` workspace). The app is an
+> Expo **development build** with VisionCamera (CameraX) — not Expo Go, and not
+> a WebView wrapping the PWA. Motivation: Samsung Chrome/PWA camera quality is
+> the scanner ceiling; native must prove sharper frames before the rest of the
+> companion migrates. Product boundary: collection, decks, scanner, import/export,
+> Drive sync — **not** Cardmarket embedding.
 >
-> Prerequisites nobody can skip: a JDK and the Android SDK (neither is currently
-> installed), and the $25 Play registration. This section is the distribution
-> half, valid once there is an `.aab` to upload.
+> Prerequisites: JDK + Android SDK for local `yarn mobile:android`, and the $25
+> Play registration when distributing an `.aab`. Architecture:
+> `docs/MOBILE-NATIVE.md`. CI / OTA / APK install loop:
+> `docs/MOBILE-DEPLOYMENT.md`.
 
 ## Which track
 

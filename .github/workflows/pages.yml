@@ -1,23 +1,22 @@
-# Publish the phone app to GitHub Pages.
+# Deploy Lugin web (GitHub Pages) and native Android development (EAS).
 #
-# The extension is not built here — it goes to the Chrome Web Store as a signed
-# package (see docs/DISTRIBUTION.md). This deploys only the web build.
+# Job graph after the shared gate:
 #
-# The Google client id is read from a repository *variable*, not a secret: it
-# ships inside the bundle either way, and pretending otherwise would just make it
-# awkward to rotate. There is no client secret in this app at all.
+#   gate ──┬── deploy-web → deploy-pages
+#          └── deploy-native-development  (no-ops with warning if EXPO_TOKEN missing)
+#
+# Web never depends on EAS availability. Native uses Expo fingerprint:
+# matching finished development build → EAS Update OTA; otherwise → EAS Build APK.
+#
+# Scheduled runs refresh the web price snapshot only (no native deploy).
 
-name: Deploy phone app to Pages
+name: Deploy Lugin
 
 on:
   push:
     branches: [main]
-  # Daily, for the price snapshot rather than the code: Scryfall refreshes its
-  # bulk dump every morning, and a collection's value is only as current as the
-  # last deploy. 10:30 UTC leaves comfortable room after their ~09:05 rebuild.
   schedule:
     - cron: '30 10 * * *'
-  # So a deploy can be triggered without a commit, e.g. after setting the variable.
   workflow_dispatch:
 
 permissions:
@@ -25,20 +24,48 @@ permissions:
   id-token: write
   pages: write
 
-# A superseded deploy is worth cancelling; a half-finished one is not.
 concurrency:
-  cancel-in-progress: false
-  group: pages
+  # Cancel superseded GH jobs (including queued OTA steps). An EAS Build already
+  # submitted to Expo continues on Expo's side — do not cancel that remotely.
+  group: lugin-main-deploy
+  cancel-in-progress: true
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - run: yarn install --immutable
+
+      # Fast deployment gate — not the heavy scanner corpus / detect-eval suite.
+      - name: Typecheck (web/extension)
+        run: yarn typecheck
+
+      - name: Shared tests (import, prices, scan unit, corpus unit, sync)
+        run: yarn test:import && yarn test:prices && yarn test:scan && yarn test:corpus && yarn test:sync
+
+      - name: Web smoke
+        run: yarn test:web
+
+      - name: Mobile typecheck + smoke
+        run: yarn mobile:typecheck && yarn mobile:test
+
   goldfish-proxy:
     runs-on: ubuntu-latest
     outputs:
       url: ${{ steps.proxy.outputs.url }}
     steps:
       - uses: actions/checkout@v4
-      # Avoid cloudflare/wrangler-action here: it shells out to Yarn 1, which this
-      # repo rejects (packageManager: yarn@3). npx wrangler is enough for one file.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -65,77 +92,38 @@ jobs:
             echo "::warning::Goldfish proxy deploy failed. Check CLOUDFLARE_API_TOKEN and that workers.dev is registered, or set repository variable VITE_LUGIN_GOLDFISH_PROXY_URL manually."
           fi
 
-  build:
-    needs: [goldfish-proxy]
+  deploy-web:
+    needs: [gate, goldfish-proxy]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          # The version's third number is the commit count, and the default
-          # shallow fetch can only count the one commit it took. Without this the
-          # deployed app would call itself 1.0.1 forever while the phone that
-          # pushed it says 1.0.87.
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # `yarn` has to mean 3.8.1, as package.json's packageManager field declares.
-      # The runner ships Yarn 1, which refuses to run in a project pinned to 3, and
-      # Corepack is what resolves that. It has to come *after* setup-node, because
-      # the shims belong to whichever Node is on PATH — which is also why
-      # setup-node can't use `cache: yarn`: that probe runs `yarn cache dir`
-      # while Yarn 1 is still in charge, and fails the job before install.
       - name: Enable Corepack
         run: corepack enable
 
       - run: yarn install --immutable
 
-      # All of them, not just the render checks: import, prices and sync are where
-      # a quiet mistake costs someone their collection or misprices it, and they
-      # take seconds.
-      - name: Tests
-        run: yarn test
-
-      - name: Build
+      - name: Build web
         env:
-          # Pages serves a project site from /<repo>/, so every asset URL needs
-          # that prefix compiled in. Taken from the repo name so a rename can't
-          # quietly break the deploy.
           LUGIN_BASE_PATH: /${{ github.event.repository.name }}/
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-          # CORS proxy for MTGGoldfish (see workers/goldfish-proxy.js).
           VITE_LUGIN_GOLDFISH_PROXY_URL: ${{ needs.goldfish-proxy.outputs.url || vars.VITE_LUGIN_GOLDFISH_PROXY_URL }}
         run: yarn build:web
 
-      # Every paper price in Magic, distilled to ~3.5 MB (about 1.2 MB over the
-      # wire) so a phone can hold the whole table and value a collection without
-      # asking about one card at a time. Deployed beside the app, which is what
-      # makes it readable by the extension too — Pages sends
-      # `access-control-allow-origin: *`.
-      #
-      # Not fatal: a failed dump should not block a code deploy. The app treats a
-      # missing snapshot as "no prices yet" and says so.
       - name: Price snapshot
         continue-on-error: true
         run: node scripts/build-prices.mjs --out dist-web/prices.json
 
-      # Every card name, plus the French, German and Italian titles they are
-      # printed under, so the scanner can identify a card against the real list
-      # instead of asking Scryfall what it just read. ~1.2 MB over the wire,
-      # downloaded on first scan rather than at launch.
-      #
-      # Same bargain as the prices above: not fatal. Without it the scanner falls
-      # back to Scryfall's fuzzy endpoint, which works but needs signal and cannot
-      # offer alternatives.
       - name: Card name index
         continue-on-error: true
         run: node scripts/build-card-index.mjs --out dist-web/card-names.json
 
-      # Compact artwork descriptors (+ text tokens) for continuous scanning.
-      # Fixture-scoped in CI so deploys stay fast; full catalogue:
-      #   yarn scan:art-index --out dist-web/art-index.json
       - name: Artwork index (fixtures)
         continue-on-error: true
         run: node scripts/build-art-index.mjs --from-fixtures --out dist-web/art-index.json
@@ -146,12 +134,148 @@ jobs:
         with:
           path: dist-web
 
-  deploy:
+  deploy-pages:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    needs: build
+    needs: deploy-web
     runs-on: ubuntu-latest
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  deploy-native-development:
+    # Android development only. Skip price-cron schedule. Skip body when no token
+    # so web deploys still succeed before EAS is configured.
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref == 'refs/heads/main'
+    needs: [gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require EXPO_TOKEN
+        id: auth
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::EXPO_TOKEN secret missing — skipping native deploy. Web Pages still deploys."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.auth.outputs.skip != 'true'
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        if: steps.auth.outputs.skip != 'true'
+        run: corepack enable
+
+      - name: Install
+        if: steps.auth.outputs.skip != 'true'
+        run: yarn install --immutable
+
+      - name: Setup EAS
+        if: steps.auth.outputs.skip != 'true'
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Resolve EAS project id
+        if: steps.auth.outputs.skip != 'true'
+        env:
+          EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+        run: |
+          if [ -z "${EAS_PROJECT_ID:-}" ]; then
+            ID=$(node -e "try{const j=require('./mobile/eas-project.json');process.stdout.write(j.projectId||'')}catch{process.stdout.write('')}")
+            if [ -z "$ID" ]; then
+              echo "::error::Set repository variable EAS_PROJECT_ID or mobile/eas-project.json after \`cd mobile && eas init\`."
+              exit 1
+            fi
+            echo "EAS_PROJECT_ID=$ID" >> "$GITHUB_ENV"
+          else
+            echo "EAS_PROJECT_ID=$EAS_PROJECT_ID" >> "$GITHUB_ENV"
+          fi
+
+      - name: Fingerprint decide
+        if: steps.auth.outputs.skip != 'true'
+        id: decide
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ env.EAS_PROJECT_ID }}
+          LUGIN_EAS_PROFILE: development
+          LUGIN_EAS_ENVIRONMENT: development
+          LUGIN_EAS_CHANNEL: development
+        run: node scripts/mobile-eas.mjs decide
+
+      - name: Publish OTA (fingerprint unchanged)
+        if: steps.auth.outputs.skip != 'true' && steps.decide.outputs.mode == 'ota'
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ env.EAS_PROJECT_ID }}
+        run: |
+          eas update \
+            --channel development \
+            --platform android \
+            --environment development \
+            --message "main ${GITHUB_SHA}" \
+            --non-interactive
+
+      - name: Summarize OTA
+        if: steps.auth.outputs.skip != 'true' && steps.decide.outputs.mode == 'ota'
+        env:
+          LUGIN_FINGERPRINT: ${{ steps.decide.outputs.fingerprint }}
+          LUGIN_COMMIT: ${{ steps.decide.outputs.commit }}
+        run: node scripts/mobile-eas.mjs summary-ota
+
+      - name: Build development APK (fingerprint changed)
+        if: steps.auth.outputs.skip != 'true' && steps.decide.outputs.mode == 'build'
+        id: build
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ env.EAS_PROJECT_ID }}
+        run: |
+          # Wait for the build so the install URL is available in the summary.
+          # Do NOT publish an OTA for this fingerprint — the new APK embeds JS.
+          eas build \
+            --platform android \
+            --profile development \
+            --non-interactive \
+            --json > /tmp/eas-build.json
+          node <<'NODE'
+          const fs = require('fs');
+          const text = fs.readFileSync('/tmp/eas-build.json', 'utf8').trim();
+          const startObj = text.lastIndexOf('{');
+          const startArr = text.lastIndexOf('[');
+          const start = Math.max(startObj, startArr);
+          if (start < 0) throw new Error('no JSON from eas build');
+          const parsed = JSON.parse(text.slice(start));
+          const build = Array.isArray(parsed) ? parsed[0] : parsed;
+          const id = build.id || '';
+          const url =
+            build.artifacts?.buildUrl ||
+            build.artifacts?.applicationArchiveUrl ||
+            build.appBuildUrl ||
+            (id ? `https://expo.dev/builds/${id}` : '');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `build_id=${id}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `install_url=${url}\n`);
+          NODE
+
+      - name: Summarize native build
+        if: steps.auth.outputs.skip != 'true' && steps.decide.outputs.mode == 'build'
+        env:
+          LUGIN_FINGERPRINT: ${{ steps.decide.outputs.fingerprint }}
+          LUGIN_COMMIT: ${{ steps.decide.outputs.commit }}
+          LUGIN_BUILD_ID: ${{ steps.build.outputs.build_id }}
+          LUGIN_INSTALL_URL: ${{ steps.build.outputs.install_url }}
+        run: node scripts/mobile-eas.mjs summary-build

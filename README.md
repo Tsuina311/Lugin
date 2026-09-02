@@ -87,16 +87,26 @@ registered through that switch.
 
 ## On a phone
 
+Two phone surfaces share the portable core. The **Vite PWA** stays the
+zero-install companion (GitHub Pages). A **React Native / Expo** app is being
+added for native camera quality on Android — see [`docs/MOBILE-NATIVE.md`](docs/MOBILE-NATIVE.md).
+Neither replaces the Chrome extension.
+
 ```bash
-yarn dev:web      # the phone build, port 5174
+yarn dev:web      # the phone web build, port 5174
 yarn build:web    # static site in dist-web/, deployed to GitHub Pages by CI
 yarn test:web     # server-renders every screen, to catch a blank page early
+
+yarn mobile:android   # Expo development build (VisionCamera; not Expo Go)
+yarn mobile:start     # Metro for the native app
 ```
 
-A second, much smaller build of the same source (`web/index.html` → `src/web/`)
-showing the collection and decks on a phone — and importing into them, which is
-the point: cards get scanned into ManaBox on a phone, so that is where the export
-file already is.
+Native deploys from `main` via EAS (fingerprint → OTA or new APK). Setup:
+[`docs/MOBILE-DEPLOYMENT.md`](docs/MOBILE-DEPLOYMENT.md).
+
+The web build (`web/index.html` → `src/web/`) shows the collection and decks on a
+phone — and imports into them, which is the point: cards get scanned into ManaBox
+on a phone, so that is where the export file already is.
 
 It runs the **same sync engine as the extension**, not a lighter cousin. Two
 devices writing to one document needs reconciliation wherever the writing
@@ -184,6 +194,7 @@ URL and hand back the worse picture.
 
 Full continuous-scanner design: [`docs/SCANNER.md`](docs/SCANNER.md).
 Development capture / Drive corpus: [`docs/SCANNER-CORPUS.md`](docs/SCANNER-CORPUS.md).
+Native Android camera companion: [`docs/MOBILE-NATIVE.md`](docs/MOBILE-NATIVE.md).
 
 ```bash
 yarn scan:fixtures          # resolve the test corpus from Scryfall (writes scripts/fixtures/cards.json)
@@ -332,12 +343,14 @@ a token from Google Identity Services instead of `chrome.identity`, and the loca
 store above.
 
 It cannot show Cardmarket itself: the site sends `x-frame-options: SAMEORIGIN`,
-and no page may script another origin's document. That needs a native WebView —
-see Part 3 of `docs/DISTRIBUTION.md`.
+and no page may script another origin's document. Cardmarket stays extension-only;
+the native app is a companion (collection / decks / scanner / Drive), not a
+Cardmarket shell — see `docs/MOBILE-NATIVE.md` and `docs/DISTRIBUTION.md`.
 
 ```
 src/core/sync  ──┬──►  src/platform/chrome  ──►  extension  (dist/)
-                 └──►  src/platform/web     ──►  phone app  (dist-web/)
+                 ├──►  src/platform/web     ──►  phone web  (dist-web/)
+                 └──►  mobile/ (native adapters, in progress)
 ```
 
 ## Using it
@@ -724,9 +737,10 @@ src/
     App.tsx               #   shell: tabs, docking, theme
     components/           #   WantsPanel, CollectionPanel, DeckPanel, …
     useStickyState.ts     #   filters that survive a navigation
-  web/                    # the phone app, same lib/ and core/
-    ScanScreen.tsx        #   camera + OCR
+  web/                    # the phone web PWA, same lib/ and core/
+    ScanScreen.tsx        #   getUserMedia camera + OCR
     cardIndexStore.ts     #   the cached card-name index
+mobile/                   # Expo RN companion (VisionCamera; see docs/MOBILE-NATIVE.md)
 ```
 
 `src/lib/scan/` is deliberately free of the DOM: the evaluation harness in

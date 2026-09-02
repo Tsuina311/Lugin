@@ -5,6 +5,9 @@
   "description": "Chrome extension that captures a site's HTTP calls and renders a custom React UI overlay.",
   "type": "module",
   "packageManager": "yarn@3.8.1+sha512.8cfec856814c797ccb480703ca5270824327fac5abce240835e2699e01732229fd22bbeb1bb87047a0069f7698be9b2e3d9a926e6046e851faa9908fdacdeacf",
+  "workspaces": [
+    "mobile"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -45,7 +48,19 @@
     "test:sync": "node scripts/sync-test.mjs",
     "test:web": "vite build --config vite.web.config.ts --ssr smoke.tsx --outDir ../dist-smoke --emptyOutDir && node dist-smoke/smoke.js",
     "stylelint": "stylelint \"src/**/*.{css,tsx}\"",
-    "stylelint:fix": "stylelint \"src/**/*.{css,tsx}\" --fix"
+    "stylelint:fix": "stylelint \"src/**/*.{css,tsx}\" --fix",
+    "mobile:start": "yarn workspace lugin-mobile start",
+    "mobile:android": "yarn workspace lugin-mobile android",
+    "mobile:ios": "yarn workspace lugin-mobile ios",
+    "mobile:prebuild": "yarn workspace lugin-mobile prebuild",
+    "mobile:typecheck": "yarn workspace lugin-mobile typecheck",
+    "mobile:test": "yarn workspace lugin-mobile test",
+    "mobile:build:dev": "yarn workspace lugin-mobile build:dev",
+    "mobile:fingerprint": "node scripts/mobile-eas.mjs fingerprint",
+    "mobile:deploy:status": "node scripts/mobile-eas.mjs status",
+    "mobile:update:status": "node scripts/mobile-eas.mjs status",
+    "mobile:update": "yarn workspace lugin-mobile update:development",
+    "mobile:build:eas": "yarn workspace lugin-mobile build:eas"
   },
   "dependencies": {
     "lucide-react": "^1.31.0",

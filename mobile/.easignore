@@ -1,0 +1,22 @@
+# Files EAS Build does not need from the monorepo root.
+# Keep fingerprint/build focused on the mobile workspace + shared source.
+
+.scan-fixtures/
+.scan-real/
+.scan-corpus/
+.lugin-prices/
+dist/
+dist-web/
+dist-smoke/
+release/
+.extension-key.pem
+workers/
+.git/
+.yarn/cache/
+**/node_modules/
+**/.expo/
+mobile/android/
+mobile/ios/
+*.md
+!docs/MOBILE-DEPLOYMENT.md
+!docs/MOBILE-NATIVE.md

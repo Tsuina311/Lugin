@@ -36,3 +36,16 @@ release
 !.yarn/sdks
 !.yarn/versions
 .pnp.*
+
+# Expo / React Native (mobile workspace)
+mobile/.expo/
+mobile/android/
+mobile/ios/
+mobile/dist/
+mobile/web-build/
+mobile/expo-env.d.ts
+mobile/.eas-decide.json
+*.jks
+*.p8
+*.p12
+*.mobileprovision
