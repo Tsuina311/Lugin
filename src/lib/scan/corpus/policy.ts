@@ -6,6 +6,18 @@ import type {
 } from './types';
 
 const POLICY: Record<ScanCorpusEventType, CorpusPolicyDecision> = {
+  CAMERA_BLUR: {
+    imageKind: 'full-frame',
+    maxPerSession: 2,
+    minIntervalMs: 40_000,
+    priority: 'medium',
+  },
+  CAMERA_FOCUS_FAILURE: {
+    imageKind: 'full-frame',
+    maxPerSession: 2,
+    minIntervalMs: 45_000,
+    priority: 'medium',
+  },
   DETECTION_FAILURE_REPORTED: {
     imageKind: 'full-frame',
     maxPerSession: Infinity,

@@ -116,6 +116,37 @@ export const createCorpusCaptureController = (): CorpusCaptureController => {
             videoWidth: video.videoWidth,
           }
         : undefined,
+      camera: (() => {
+        try {
+          const track = video?.srcObject
+            ? (video.srcObject as MediaStream).getVideoTracks()[0]
+            : null;
+          const s = track?.getSettings?.() as
+            | {
+                deviceId?: string;
+                facingMode?: string;
+                focusMode?: string;
+                frameRate?: number;
+                height?: number;
+                width?: number;
+                zoom?: number;
+              }
+            | undefined;
+          if (!s && !snap?.quality) return undefined;
+          return {
+            deviceId: s?.deviceId,
+            facingMode: s?.facingMode,
+            focusMode: s?.focusMode,
+            frameRate: s?.frameRate,
+            height: s?.height ?? video?.videoHeight,
+            sharpness: snap?.quality?.sharpness,
+            width: s?.width ?? video?.videoWidth,
+            zoom: s?.zoom,
+          };
+        } catch {
+          return undefined;
+        }
+      })(),
       eventType: event,
       image: imageMeta,
       labelKind,
@@ -305,6 +336,17 @@ export const createCorpusCaptureController = (): CorpusCaptureController => {
         if (key && key !== lastTrackKey) {
           lastTrackKey = key;
           void enqueue('DETECTION_LOCKED', 'AUTO_LOCKED_POSITIVE');
+        }
+      }
+
+      // Geometry stable but soft — not a detector failure.
+      if (snap.phase === 'focusing') {
+        const soft =
+          (snap.quality?.score ?? 1) < 0.32 || (snap.quality?.sharpness ?? 999) < 55;
+        if (soft && /farther|Tap the card|sharper/i.test(snap.message)) {
+          void enqueue('CAMERA_FOCUS_FAILURE', 'UNLABELED');
+        } else if (soft && lastPhase !== 'focusing') {
+          void enqueue('CAMERA_BLUR', 'UNLABELED');
         }
       }
 

@@ -21,6 +21,8 @@ export const CORPUS_EVENT_TYPES = new Set<ScanCorpusEventType>([
   'RECOGNITION_CORRECTED',
   'PRINTING_CORRECTED',
   'SUCCESS_SAMPLE',
+  'CAMERA_BLUR',
+  'CAMERA_FOCUS_FAILURE',
 ]);
 
 export const FORBIDDEN_META_KEYS = [

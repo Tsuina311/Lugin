@@ -1,14 +1,18 @@
 // Continuous scan session state machine (portable — no React / DOM).
 
 import { describeArtwork, descriptorSimilarity } from '../artwork/descriptors';
+import { focusGateDecision } from '../cameraCapabilities';
 import type { DetectionDebug } from '../detection/types';
 import { emptyDetectionDebug } from '../detection/types';
 import {
   DETECT_MIN_SCORE,
+  FOCUS_TIMEOUT_MS,
+  FOCUS_TOO_CLOSE_AREA_SHARE,
   GONE_FRAMES,
   QUALITY_MIN_SCORE,
   QUALITY_POOL_SIZE,
   REPLACE_VISUAL_DELTA,
+  SHARPNESS_MIN,
 } from '../params';
 import { prepareCard, type PreparedCard } from '../prepareCard';
 import { frameQualityScore, pushQualityPool, type FrameQuality } from '../quality';
@@ -36,6 +40,7 @@ import {
 export type ScannerPhase =
   | 'searching'
   | 'detected'
+  | 'focusing'
   | 'locking'
   | 'recognizing'
   | 'found'
@@ -46,12 +51,18 @@ export interface ScanContext {
   preferSets?: readonly string[];
 }
 
-/** What acquisition hands the recognition layer. */
-export interface CardAcquisition {
-  geometry: CardCorners;
-  normalizedCard: ScanImage;
-  quality: FrameQuality;
-  stability: number;
+/** Optional live-camera helpers (hi-res crop / focus). DOM-free contract. */
+export interface FrameHelpers {
+  /**
+   * Build a recognition crop from the full camera frame using analysis corners.
+   * When absent (fixtures / stills), analysis-frame prepareCard is used.
+   */
+  refineCard?: (
+    corners: CardCorners,
+    analysisSize: { height: number; width: number },
+  ) => PreparedCard | null;
+  /** Request focus/metering at normalized video coords (0–1). */
+  requestFocusNorm?: (x: number, y: number) => void;
 }
 
 export interface SessionSnapshot {
@@ -71,18 +82,35 @@ export interface SessionSnapshot {
 }
 
 export interface SessionController {
-  onFrame(frame: ScanImage): Promise<SessionSnapshot>;
+  /** Last locked/recognized normalized card, if any (for corpus / debug). */
+  lastNormalized(): ScanImage | null;
+  onFrame(frame: ScanImage, helpers?: FrameHelpers): Promise<SessionSnapshot>;
   recognizeStill(frame: ScanImage): Promise<SessionSnapshot>;
   reset(): void;
   snapshot(): SessionSnapshot;
-  /** Last locked/recognized normalized card, if any (for corpus / debug). */
-  lastNormalized(): ScanImage | null;
 }
 
 interface QualFrame {
   card: PreparedCard;
   quality: FrameQuality;
 }
+
+const cornerCenter = (c: CardCorners): { x: number; y: number } => ({
+  x: (c.topLeft.x + c.topRight.x + c.bottomRight.x + c.bottomLeft.x) / 4,
+  y: (c.topLeft.y + c.topRight.y + c.bottomRight.y + c.bottomLeft.y) / 4,
+});
+
+const quadAreaShare = (
+  c: CardCorners,
+  size: { height: number; width: number },
+): number => {
+  const xs = [c.topLeft.x, c.topRight.x, c.bottomRight.x, c.bottomLeft.x];
+  const ys = [c.topLeft.y, c.topRight.y, c.bottomRight.y, c.bottomLeft.y];
+  const w = Math.max(...xs) - Math.min(...xs);
+  const h = Math.max(...ys) - Math.min(...ys);
+  const frame = Math.max(1, size.width * size.height);
+  return (w * h) / frame;
+};
 
 export const createSessionController = (
   deps: RecognizeDeps,
@@ -103,6 +131,9 @@ export const createSessionController = (
   let recognizing = false;
   let message = 'Place a card in view';
   let lastNormalized: ScanImage | null = null;
+  let focusingSince: number | null = null;
+  let lastFocusRequestAt = 0;
+  let lastFocusCenter: { x: number; y: number } | null = null;
 
   const snap = (): SessionSnapshot => ({
     analysisSize,
@@ -125,6 +156,8 @@ export const createSessionController = (
     lastFused = undefined;
     lastRecognition = undefined;
     lastNormalized = null;
+    focusingSince = null;
+    lastFocusCenter = null;
   };
 
   const enterSearching = (why: string) => {
@@ -146,6 +179,7 @@ export const createSessionController = (
     phase = 'recognizing';
     message = 'Recognizing…';
     lastNormalized = card.image;
+    focusingSince = null;
     try {
       const opts: RecognizeOptions = { preferSets: context.preferSets };
       const { result, temporal: nextTemp } = await recognizeCard(
@@ -170,26 +204,50 @@ export const createSessionController = (
         phase = 'ambiguous';
         message = 'Ambiguous — keep steady or pick a candidate';
       } else {
-        phase = 'locking';
+        phase = 'focusing';
         message = 'Need a clearer view…';
+        focusingSince = performance.now();
       }
     } finally {
       recognizing = false;
     }
   };
 
+  const maybeRequestFocus = (
+    corners: CardCorners,
+    size: { height: number; width: number },
+    helpers?: FrameHelpers,
+  ) => {
+    if (!helpers?.requestFocusNorm) return;
+    const now = performance.now();
+    if (now - lastFocusRequestAt < 700) return;
+    const c = cornerCenter(corners);
+    const nx = c.x / Math.max(1, size.width);
+    const ny = c.y / Math.max(1, size.height);
+    if (
+      lastFocusCenter &&
+      Math.hypot(nx - lastFocusCenter.x, ny - lastFocusCenter.y) < 0.04 &&
+      now - lastFocusRequestAt < 1600
+    ) {
+      return;
+    }
+    lastFocusRequestAt = now;
+    lastFocusCenter = { x: nx, y: ny };
+    helpers.requestFocusNorm(nx, ny);
+  };
+
   return {
-    async onFrame(frame) {
+    lastNormalized: () => lastNormalized,
+
+    async onFrame(frame, helpers) {
       analysisSize = { height: frame.height, width: frame.width };
       const prepared = prepareCard(frame);
       lastDetection = prepared.detection;
-      lastQuality = frameQualityScore(
-        prepared.detected ? prepared.image : frame,
-        prepared.score,
-      );
 
       if (!prepared.detected || !prepared.corners || prepared.score < DETECT_MIN_SCORE) {
+        lastQuality = frameQualityScore(frame, prepared.score);
         track = pushTrack(track, null);
+        focusingSince = null;
         if (phase === 'found' || phase === 'ambiguous') {
           gone += 1;
           if (gone >= GONE_FRAMES) enterSearching('Place a card in view');
@@ -205,9 +263,15 @@ export const createSessionController = (
       gone = 0;
       track = pushTrack(track, sampleFromQuad(prepared.corners, prepared.score));
 
+      // Prefer a full-resolution warp for quality + recognition when available.
+      const refined =
+        helpers?.refineCard?.(prepared.corners, analysisSize) ?? null;
+      const forQuality = refined ?? prepared;
+      lastQuality = frameQualityScore(forQuality.image, prepared.score);
+
       if (phase === 'found' && foundCorners && foundDescriptor) {
         if (!geometryChanged(foundCorners, prepared.corners)) return snap();
-        const desc = artDescriptor(prepared);
+        const desc = artDescriptor(forQuality);
         if (descriptorSimilarity(foundDescriptor, desc) > 1 - REPLACE_VISUAL_DELTA) {
           return snap();
         }
@@ -221,15 +285,52 @@ export const createSessionController = (
         phase = 'detected';
         message = 'Hold steady…';
         pool = [];
+        focusingSince = null;
         return snap();
       }
 
+      const now = performance.now();
+      if (focusingSince == null) focusingSince = now;
+      const gate = focusGateDecision({
+        focusingSince,
+        minQuality: QUALITY_MIN_SCORE,
+        minSharpness: SHARPNESS_MIN,
+        now,
+        qualityScore: lastQuality.score,
+        sharpness: lastQuality.sharpness,
+        stable: true,
+        timeoutMs: FOCUS_TIMEOUT_MS,
+      });
+
+      if (gate.kind === 'focusing' || gate.kind === 'timeout') {
+        phase = 'focusing';
+        pool = pushQualityPool(
+          pool,
+          { card: forQuality, quality: lastQuality },
+          QUALITY_POOL_SIZE,
+        );
+        maybeRequestFocus(prepared.corners, analysisSize, helpers);
+        if (gate.kind === 'timeout') {
+          const area = quadAreaShare(prepared.corners, analysisSize);
+          message =
+            area >= FOCUS_TOO_CLOSE_AREA_SHARE
+              ? 'Move slightly farther away'
+              : helpers?.requestFocusNorm
+                ? 'Tap the card to focus'
+                : 'Hold steady — waiting for a sharper frame';
+        } else {
+          message = 'Focusing…';
+        }
+        return snap();
+      }
+
+      // Sharp enough.
       if (phase !== 'found' && phase !== 'ambiguous') {
         phase = 'locking';
         message = 'Card locked';
         pool = pushQualityPool(
           pool,
-          { card: prepared, quality: lastQuality },
+          { card: forQuality, quality: lastQuality },
           QUALITY_POOL_SIZE,
         );
         const best = pool[0];
@@ -265,7 +366,5 @@ export const createSessionController = (
     },
 
     snapshot: snap,
-
-    lastNormalized: () => lastNormalized,
   };
 };

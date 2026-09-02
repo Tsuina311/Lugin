@@ -12,6 +12,7 @@ import type { ScannerPhase } from '@/lib/scan/session/controller';
 export type OutlineVisual =
   | 'searching'
   | 'candidate'
+  | 'focusing'
   | 'locked'
   | 'recognizing'
   | 'found'
@@ -21,6 +22,8 @@ export const outlineVisualForPhase = (phase: ScannerPhase): OutlineVisual => {
   switch (phase) {
     case 'detected':
       return 'candidate';
+    case 'focusing':
+      return 'focusing';
     case 'locking':
       return 'locked';
     case 'recognizing':
@@ -50,6 +53,13 @@ const STYLES: Record<
     label: 'Hold steady',
     stroke: 'rgb(251, 191, 36)',
     width: 2.5,
+  },
+  focusing: {
+    dash: '10 5',
+    fill: 'rgba(250, 204, 21, 0.14)',
+    label: 'Focusing…',
+    stroke: 'rgb(250, 204, 21)',
+    width: 2.75,
   },
   locked: {
     fill: 'rgba(52, 211, 153, 0.14)',

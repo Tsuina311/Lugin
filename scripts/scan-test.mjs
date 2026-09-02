@@ -40,6 +40,7 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/params.ts')}';
       export * from '${join(root, 'src/lib/scan/session/controller.ts')}';
       export * from '${join(root, 'src/lib/scan/videoMap.ts')}';
+      export * from '${join(root, 'src/lib/scan/cameraCapabilities.ts')}';
       export { polygonIoU } from '${join(root, 'src/lib/scan/detectCard.ts')}';
     `,
     resolveDir: root,
@@ -123,6 +124,15 @@ const {
   mapAnalysisToSource,
   coverLayout,
   polygonIoU,
+  buildContinuousFocusConstraints,
+  buildPointFocusConstraints,
+  buildCameraConstraintPlan,
+  cameraConstraintFallbacks,
+  focusGateDecision,
+  normalizeCapabilities,
+  supportsTapFocus,
+  QUALITY_MIN_SCORE,
+  SHARPNESS_MIN,
 } = await import(pathToFileURL(bundle).href);
 
 let failed = 0;
@@ -1335,6 +1345,130 @@ await checkAsync('session controller: no card stays searching', async () => {
   const noise = blankImage(320, 480);
   const s = await ctrl.onFrame(noise);
   assert.equal(s.phase, 'searching');
+});
+
+check('continuous focus constraints only when supported', () => {
+  assert.equal(buildContinuousFocusConstraints({}), null);
+  assert.deepEqual(
+    buildContinuousFocusConstraints({ focusModes: ['continuous'] }),
+    { focusMode: 'continuous' },
+  );
+  assert.equal(
+    buildContinuousFocusConstraints({ focusModes: ['manual'] }),
+    null,
+  );
+});
+
+check('point focus omitted when POI unsupported', () => {
+  assert.equal(buildPointFocusConstraints({ focusModes: ['continuous'] }, { x: 0.5, y: 0.5 }).length, 0);
+  assert.ok(
+    buildPointFocusConstraints(
+      { focusModes: ['single-shot'], pointsOfInterest: true },
+      { x: 0.5, y: 0.5 },
+    ).length >= 1,
+  );
+});
+
+check('preferred camera plan is ideal 1080p environment', () => {
+  const plan = buildCameraConstraintPlan();
+  assert.equal(plan.preferred.width.ideal, 1920);
+  assert.equal(plan.preferred.height.ideal, 1080);
+  assert.ok(cameraConstraintFallbacks().length >= 3);
+});
+
+check('normalizeCapabilities handles missing fields', () => {
+  const caps = normalizeCapabilities({
+    focusMode: ['continuous', 'single-shot'],
+    pointsOfInterest: true,
+    torch: true,
+  });
+  assert.deepEqual(caps.focusModes, ['continuous', 'single-shot']);
+  assert.equal(caps.pointsOfInterest, true);
+  assert.equal(caps.torch, true);
+  assert.equal(supportsTapFocus(caps), true);
+  assert.equal(supportsTapFocus({}), false);
+});
+
+check('focus gate: stable+blurry → focusing; sharp → ready; timeout', () => {
+  assert.equal(
+    focusGateDecision({
+      focusingSince: 0,
+      minQuality: QUALITY_MIN_SCORE,
+      minSharpness: SHARPNESS_MIN,
+      now: 100,
+      qualityScore: 0.1,
+      sharpness: 10,
+      stable: true,
+      timeoutMs: 2800,
+    }).kind,
+    'focusing',
+  );
+  assert.equal(
+    focusGateDecision({
+      focusingSince: 0,
+      minQuality: QUALITY_MIN_SCORE,
+      minSharpness: SHARPNESS_MIN,
+      now: 100,
+      qualityScore: 0.9,
+      sharpness: 200,
+      stable: true,
+      timeoutMs: 2800,
+    }).kind,
+    'ready',
+  );
+  assert.equal(
+    focusGateDecision({
+      focusingSince: 0,
+      minQuality: QUALITY_MIN_SCORE,
+      minSharpness: SHARPNESS_MIN,
+      now: 5000,
+      qualityScore: 0.1,
+      sharpness: 10,
+      stable: true,
+      timeoutMs: 2800,
+    }).kind,
+    'timeout',
+  );
+  assert.equal(
+    focusGateDecision({
+      focusingSince: null,
+      minQuality: QUALITY_MIN_SCORE,
+      minSharpness: SHARPNESS_MIN,
+      now: 100,
+      qualityScore: 0.1,
+      sharpness: 10,
+      stable: false,
+      timeoutMs: 2800,
+    }).kind,
+    'unstable',
+  );
+});
+
+check('quality pool prefers sharper frame', () => {
+  const soft = frameQualityScore(blankImage(64, 64), 1);
+  const detailed = blankImage(64, 64);
+  for (let y = 0; y < 64; y++) {
+    for (let x = 0; x < 64; x++) {
+      const i = (y * 64 + x) * 4;
+      const v = (x + y) % 2 === 0 ? 20 : 220;
+      detailed.data[i] = v;
+      detailed.data[i + 1] = v;
+      detailed.data[i + 2] = v;
+      detailed.data[i + 3] = 255;
+    }
+  }
+  const sharp = frameQualityScore(detailed, 1);
+  assert.ok(sharp.score > soft.score);
+  assert.ok(sharp.sharpness > soft.sharpness);
+});
+
+check('cover tap mapping is invertible at center', () => {
+  const source = { height: 1080, width: 1920 };
+  const dest = { height: 800, width: 400 };
+  const mid = mapCoverSourceToDest({ x: 960, y: 540 }, source, dest);
+  // Center of cover layout should land near dest center.
+  assert.ok(Math.abs(mid.x - 200) < 2);
+  assert.ok(Math.abs(mid.y - 400) < 2);
 });
 
 await checkAsync('session controller: found suppresses duplicate until gone', async () => {

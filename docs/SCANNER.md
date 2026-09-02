@@ -7,19 +7,21 @@ indexes are downloaded once and cached.
 ## Continuous flow
 
 ```text
-LIVE VIDEO
+LIVE VIDEO (preferred 1080p rear + continuous AF when supported)
     ↓
-cheap card detection          (DETECT_INTERVAL_MS, latest-frame)
+cheap card detection          (DETECT_ANALYSIS_MAX_WIDTH, latest-frame)
     ↓
 multi-candidate scoring       (luma / chroma / edge masks)
     ↓
 stable-card tracking + coast
     ↓
-best-frame quality pool
+FOCUSING if geometry stable but soft
+    ↓
+best-frame quality pool       (hi-res warp from video)
     ↓
 perspective normalization
     ↓
-recognition (only when locked)
+recognition (only when sharp enough)
 ```
 
 ### Live polygon (product UI)
@@ -31,16 +33,22 @@ The scanner draws the **actual detected four corners** over the camera
 | --- | --- | --- |
 | searching | none | Place a card in view |
 | detected | amber dashed | Hold steady |
+| focusing | yellow dashed | Focusing… |
 | locking | green solid | Card locked |
 | recognizing | blue solid | Recognizing… |
 | found | green thick | Found / card name |
 
 No fixed fake guide rectangle substitutes for detection.
 
+### Camera acquisition
+
+See **Camera acquisition** below. Requested constraints ≠ actual settings —
+always read `getSettings()` / `getCapabilities()` in `scanDebug` → **Cam**.
+
 ### Detection debug (`flags.scanDebug`)
 
 Shows detection ms, candidate count, selected method/score, rejection reasons,
-track length, motion, quality.
+track length, motion, quality, and live camera resolution/focus mode.
 
 ## Real-camera detection corpus
 
@@ -128,6 +136,50 @@ Copyrighted card photos must not be committed. Locally:
 
 Useful coverage: sleeves, foil glare, dim light, autofocus hunt, old-frame,
 borderless, battles, localized titles. Evaluation skips the corpus when absent.
+
+## Camera acquisition
+
+### Preferred constraints (with fallbacks)
+
+1. `facingMode: environment`, `1920×1080` ideal, `30` fps ideal  
+2. environment `1280×720`  
+3. environment any  
+4. any `videoinput`
+
+Then, if `getCapabilities().focusMode` includes `continuous`, apply it via
+`applyConstraints({ advanced: [{ focusMode: 'continuous' }] })`.
+
+Never treat requested constraints as proof of the stream — use `getSettings()`.
+
+### Resolution pipeline
+
+```text
+camera source (e.g. 1920×1080)
+  → analysis copy ≤640px wide (detection / tracking)
+  → on stable card: warp hi-res crop from full video
+  → quality / sharpness gate
+  → recognition on best sharp normalized card (744×H)
+```
+
+### Real-phone checklist (`flags.scanDebug`)
+
+1. Open scanner; tap **Cam**.
+2. Record: device label, `deviceId`, actual `width×height`, fps, focus mode,
+   focus modes list, pointsOfInterest, zoom, torch.
+3. Place a card at a normal desk distance; watch for **Focusing…** then lock.
+4. Compare visually with the native Camera app at the same distance.
+5. If soft: try another rear videoinput in the Cam panel; try tap-to-focus;
+   try moving slightly farther; optional torch.
+6. Note whether continuous AF is reported and active.
+
+We cannot inspect the native Camera app programmatically — the Cam panel exists
+so limitations are visible rather than guessed.
+
+### Browser limitations
+
+Many iOS Safari / PWA builds omit `focusMode` / `pointsOfInterest` in
+capabilities. The scanner must still work via browser default AF + sharpness
+gate. Unsupported advanced constraints are ignored, not fatal.
 
 ## Known limitations
 

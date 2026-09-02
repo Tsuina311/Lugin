@@ -10,12 +10,14 @@ import { useEffect, useRef, useState } from 'react';
 
 import { loadArtworkIndex } from './artworkIndexStore';
 import { loadCardIndex } from './cardIndexStore';
+import { CameraDebugPanel } from './scan/CameraDebugPanel';
 import { CardOutline } from './scan/CardOutline';
 import { ScanDebugPanel } from './scan/ScanDebugPanel';
 import {
   capturePreparedCard,
   imageFromFile,
   openCamera,
+  type CameraDiagnostics,
   type CameraSession,
 } from './scan/camera';
 import { CaptureConsentDialog } from './scan/corpus/CaptureConsentDialog';
@@ -41,9 +43,9 @@ import {
   pumpCorpusUploads,
   setCorpusUploadPaused,
 } from './scan/corpus/uploader';
-import { syncStore } from './syncStore';
 import { startLiveLoop, type LiveLoop } from './scan/liveLoop';
 import { disposeOcr, tesseractRecognizer } from './scan/tesseractRecognizer';
+import { syncStore } from './syncStore';
 
 import type { CollectionCard } from '@/lib/collection';
 import { flags } from '@/lib/flags';
@@ -71,6 +73,7 @@ const phaseHint = (phase: UiPhase, message: string): string => {
   if (phase === 'pick') return 'Pick a printing';
   if (phase === 'searching') return message || 'Place a card in view';
   if (phase === 'detected') return 'Hold steady';
+  if (phase === 'focusing') return message || 'Focusing…';
   if (phase === 'locking') return 'Card locked';
   if (phase === 'recognizing') return 'Recognizing…';
   if (phase === 'found') return message;
@@ -108,6 +111,9 @@ export const ScanScreen = ({
   const [manualReport, setManualReport] = useState<ManualReport>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadsPaused, setUploadsPaused] = useState(() => isCorpusUploadPaused());
+  const [camDiag, setCamDiag] = useState<CameraDiagnostics | null>(null);
+  const [showCamDebug, setShowCamDebug] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   const setPhase = (p: UiPhase) => {
     uiPhaseRef.current = p;
@@ -181,6 +187,9 @@ export const ScanScreen = ({
           return;
         }
         sessionCam.current = cam;
+        void cam.diagnostics().then(d => {
+          if (alive) setCamDiag(d);
+        });
         const ctrl = createSessionController({
           artwork: art.matcher,
           artworkIndex: art.art,
@@ -190,22 +199,31 @@ export const ScanScreen = ({
         });
         controller.current = ctrl;
         capture.setActive(isCorpusCaptureEnabled());
-        const live = startLiveLoop(video, ctrl, s => {
-          setSnap(s);
-          setMessage(s.message);
-          capture.setNormalizedCard(ctrl.lastNormalized());
-          capture.onSnapshot(s);
-          if (s.phase === 'searching') foundKey.current = null;
-          if (s.phase === 'found' && s.fused?.card) {
-            const key = s.fused.card.oracleId;
-            if (foundKey.current !== key) {
-              foundKey.current = key;
-              void resolveAndAdd(s.fused.card.name, s, true);
-              return;
+        const live = startLiveLoop(
+          video,
+          ctrl,
+          s => {
+            setSnap(s);
+            setMessage(s.message);
+            capture.setNormalizedCard(ctrl.lastNormalized());
+            capture.onSnapshot(s);
+            if (s.phase === 'searching') foundKey.current = null;
+            if (s.phase === 'found' && s.fused?.card) {
+              const key = s.fused.card.oracleId;
+              if (foundKey.current !== key) {
+                foundKey.current = key;
+                void resolveAndAdd(s.fused.card.name, s, true);
+                return;
+              }
             }
-          }
-          if (uiPhaseRef.current !== 'pick') setPhase(s.phase);
-        });
+            if (uiPhaseRef.current !== 'pick') setPhase(s.phase);
+          },
+          {
+            requestFocusNorm: (x, y) => {
+              void sessionCam.current?.focusAtNorm(x, y);
+            },
+          },
+        );
         loop.current = live;
         live.start();
         setMessage('Place a card in view');
@@ -365,8 +383,8 @@ export const ScanScreen = ({
     const predicted = snap.fused?.card?.name;
     if (captureOn && predicted && predicted !== name) {
       await corpus.current?.reportRecognitionCorrected({
-        correctedOracleId: `name:${name}`,
         correctedName: name,
+        correctedOracleId: `name:${name}`,
         normalized: controller.current?.lastNormalized() ?? null,
       });
       void refreshCorpusCounts();
@@ -412,6 +430,15 @@ export const ScanScreen = ({
           autoPlay
           className="h-full w-full object-cover"
           muted
+          onClick={e => {
+            if (!sessionCam.current?.supportsTapFocus()) return;
+            void sessionCam.current.focusAt(e.clientX, e.clientY).then(ok => {
+              if (ok) {
+                setFlash('Focusing…');
+                window.setTimeout(() => setFlash(null), 900);
+              }
+            });
+          }}
           playsInline
         />
         <CardOutline
@@ -457,7 +484,19 @@ export const ScanScreen = ({
               <div>
                 det {snap.detection.ms.toFixed(0)}ms · track {snap.trackFrames} · motion{' '}
                 {snap.motion.toFixed(3)}
+                {snap.quality
+                  ? ` · sharp ${snap.quality.sharpness.toFixed(0)} · q ${snap.quality.score.toFixed(2)}`
+                  : ''}
               </div>
+              {camDiag && (
+                <div>
+                  cam {camDiag.video.width}×{camDiag.video.height}
+                  {camDiag.settings.focusMode ? ` · focus ${camDiag.settings.focusMode}` : ''}
+                  {camDiag.settings.frameRate
+                    ? ` · ${camDiag.settings.frameRate.toFixed(0)}fps`
+                    : ''}
+                </div>
+              )}
               {corpus.current?.getDebug()[0] && (
                 <div>
                   CORPUS {corpus.current.getDebug()[0].event}: {corpus.current.getDebug()[0].note}
@@ -663,16 +702,47 @@ export const ScanScreen = ({
           Scan now
         </button>
         {flags.scanDebug && (
-          <button
-            className="rounded-lg bg-white/10 px-2 py-2 text-[10px]"
-            onClick={() => setShowDebug(v => !v)}
-            type="button"
-          >
-            Debug
-          </button>
+          <>
+            <button
+              className="rounded-lg bg-white/10 px-2 py-2 text-[10px]"
+              onClick={() => {
+                void sessionCam.current?.diagnostics().then(setCamDiag);
+                setShowCamDebug(v => !v);
+              }}
+              type="button"
+            >
+              Cam
+            </button>
+            <button
+              className="rounded-lg bg-white/10 px-2 py-2 text-[10px]"
+              onClick={() => setShowDebug(v => !v)}
+              type="button"
+            >
+              Debug
+            </button>
+          </>
         )}
       </div>
 
+      {flags.scanDebug && showCamDebug && camDiag && (
+        <CameraDebugPanel
+          diagnostics={camDiag}
+          onClose={() => setShowCamDebug(false)}
+          onSelectDevice={id => {
+            void sessionCam.current?.switchDevice(id).then(async () => {
+              const d = await sessionCam.current?.diagnostics();
+              if (d) setCamDiag(d);
+            });
+          }}
+          onToggleTorch={() => {
+            const next = !torchOn;
+            void sessionCam.current?.setTorch(next).then(ok => {
+              if (ok) setTorchOn(next);
+            });
+          }}
+          torchOn={torchOn}
+        />
+      )}
       {needConsent && (
         <CaptureConsentDialog
           onAccept={() => applyConsent('accepted')}

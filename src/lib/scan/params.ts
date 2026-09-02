@@ -35,8 +35,26 @@ export const DETECT_TOP_COMPONENTS = 4;
 /** Rolling pool of candidate frames while locking. */
 export const QUALITY_POOL_SIZE = 4;
 
-/** Minimum quality score before expensive recognition runs. */
-export const QUALITY_MIN_SCORE = 0.12;
+/**
+ * Minimum combined quality score before expensive recognition runs.
+ * Raised so geometry-stable but soft frames stay in FOCUSING.
+ */
+export const QUALITY_MIN_SCORE = 0.32;
+
+/**
+ * Minimum raw sharpness (variance of luminance diffs) on the recognition crop.
+ * Relative across frames of the same scene; absolute floor rejects mush.
+ */
+export const SHARPNESS_MIN = 55;
+
+/** How long to wait in FOCUSING before showing distance/tap guidance (ms). */
+export const FOCUS_TIMEOUT_MS = 2800;
+
+/** Min ms between automatic card-center focus requests. */
+export const FOCUS_POINT_THROTTLE_MS = 700;
+
+/** Card area share above which soft focus often means "too close". */
+export const FOCUS_TOO_CLOSE_AREA_SHARE = 0.52;
 
 /** Title match score treated as strong evidence on its own. */
 export const TITLE_STRONG = 0.82;

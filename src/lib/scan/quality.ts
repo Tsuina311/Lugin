@@ -101,16 +101,19 @@ export const frameQualityScore = (
   const sharp = sharpnessScore(image);
   const glare = glareRatio(image);
   const exp = exposure(image);
-  // Sharpness is unbounded variance — squash with a soft curve so typical phone
-  // mid-band values land in a useful 0–1 range without clipping outliers.
-  const sharpNorm = 1 - Math.exp(-sharp / 180);
+  // Sharpness dominates more aggressively — a crisp earlier frame must beat a
+  // soft latest frame even when detection scores are similar.
+  const sharpNorm = 1 - Math.exp(-sharp / 140);
   const glarePen = Math.min(1, glare / 0.18);
   const expPen =
     exp < 40 ? (40 - exp) / 40 : exp > 210 ? (exp - 210) / 45 : 0;
   const detect = Math.max(0, Math.min(1, detectionScore));
   const score = Math.max(
     0,
-    sharpNorm * (1 - 0.55 * glarePen) * (1 - 0.4 * Math.min(1, expPen)) * (0.35 + 0.65 * detect),
+    sharpNorm *
+      (1 - 0.55 * glarePen) *
+      (1 - 0.4 * Math.min(1, expPen)) *
+      (0.25 + 0.75 * detect),
   );
   return { detectionScore: detect, exposure: exp, glare, score, sharpness: sharp };
 };

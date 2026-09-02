@@ -301,11 +301,12 @@ await checkAsync('consent dialog mentions user Google Drive ownership', async ()
 
 await checkAsync('import command validates and deduplicates', async () => {
   const fixture = join(dir, 'import-src');
-  const sampleDir = join(fixture, 'contributor-x', '2026-09', 'abcdef0123456789');
+  const sampleId = `abcdef${Date.now().toString(16).slice(-10)}`;
+  const sampleDir = join(fixture, 'contributor-x', '2026-09', sampleId);
   await mkdir(sampleDir, { recursive: true });
   const meta = {
     ...validMeta(),
-    sampleId: 'abcdef0123456789',
+    sampleId,
     eventType: 'DETECTION_TIMEOUT',
     image: {
       height: 100,
@@ -326,7 +327,7 @@ await checkAsync('import command validates and deduplicates', async () => {
     { cwd: root, encoding: 'utf8' },
   );
   assert.equal(run.status, 0, run.stderr || run.stdout);
-  assert.ok(run.stdout.includes('imported=1'));
+  assert.ok(run.stdout.includes('imported=1'), run.stdout);
 
   const again = spawnSync(
     process.execPath,

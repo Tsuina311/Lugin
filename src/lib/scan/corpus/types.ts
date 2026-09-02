@@ -23,7 +23,9 @@ export type ScanCorpusEventType =
   | 'RECOGNITION_AMBIGUOUS'
   | 'RECOGNITION_CORRECTED'
   | 'PRINTING_CORRECTED'
-  | 'SUCCESS_SAMPLE';
+  | 'SUCCESS_SAMPLE'
+  | 'CAMERA_BLUR'
+  | 'CAMERA_FOCUS_FAILURE';
 
 export type CorpusPriority = 'high' | 'medium' | 'low';
 
@@ -68,6 +70,17 @@ export interface ScanCorpusSampleMeta {
     orientation?: string;
     videoHeight?: number;
     videoWidth?: number;
+  };
+  /** Actual camera stream diagnostics (no personal identifiers beyond deviceId). */
+  camera?: {
+    deviceId?: string;
+    facingMode?: string;
+    focusMode?: string;
+    frameRate?: number;
+    height?: number;
+    sharpness?: number;
+    width?: number;
+    zoom?: number;
   };
   eventType: ScanCorpusEventType;
   image: CorpusImageMeta | null;

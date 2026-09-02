@@ -1,22 +1,60 @@
 // Camera access for the phone scanner.
 //
-// Acquisition only: getUserMedia, focus, and mapping the on-screen guide onto
-// source pixels. Anything that inspects pixels lives in `src/lib/scan/**`.
+// Acquisition, focus, torch/zoom, and mapping. Pixel inspection stays in
+// `src/lib/scan/**`. Requested constraints ≠ actual settings — always read
+// getSettings() after open.
 
 import { drawToScanImage } from './canvasBridge';
 
+import {
+  buildContinuousFocusConstraints,
+  buildPointFocusConstraints,
+  cameraConstraintFallbacks,
+  normalizeCapabilities,
+  normalizeSettings,
+  supportsTapFocus,
+  type ScannerCameraCapabilities,
+  type ScannerCameraSettings,
+} from '@/lib/scan/cameraCapabilities';
+import { emptyDetectionDebug } from '@/lib/scan/detection/types';
+import { cornersToQuad, warpQuadToCard } from '@/lib/scan/geometry';
 import {
   prepareCard,
   prepareCardWithGuideFallback,
   type PreparedCard,
 } from '@/lib/scan/prepareCard';
 import { sharpnessScore } from '@/lib/scan/quality';
-import type { Rect, ScanImage } from '@/lib/scan/types';
+import type { CardCorners, Rect, ScanImage } from '@/lib/scan/types';
+import { mapAnalysisToSource } from '@/lib/scan/videoMap';
+
+export interface VideoDeviceInfo {
+  deviceId: string;
+  label: string;
+}
+
+export interface CameraDiagnostics {
+  capabilities: ScannerCameraCapabilities;
+  devices: VideoDeviceInfo[];
+  display: { height: number; width: number };
+  requested: string;
+  settings: ScannerCameraSettings;
+  supportsTapFocus: boolean;
+  video: { height: number; width: number };
+}
 
 export interface CameraSession {
+  diagnostics: () => Promise<CameraDiagnostics>;
   focusAt: (clientX: number, clientY: number) => Promise<boolean>;
+  /** Focus/meter at normalized video coordinates (0–1). */
+  focusAtNorm: (x: number, y: number) => Promise<boolean>;
+  listDevices: () => Promise<VideoDeviceInfo[]>;
+  setTorch: (on: boolean) => Promise<boolean>;
+  setZoom: (zoom: number) => Promise<boolean>;
   stop: () => void;
   stream: MediaStream;
+  supportsTapFocus: () => boolean;
+  /** Tear down and reopen with an explicit deviceId (debug). */
+  switchDevice: (deviceId: string) => Promise<void>;
   video: HTMLVideoElement;
 }
 
@@ -30,56 +68,189 @@ export interface GuideRect {
 /** How far past the on-screen guide we capture so card edges are visible. */
 const GUIDE_PAD = 0.22;
 
-/** Open the rear camera into a video element. Caller must stop() when done. */
-export const openCamera = async (video: HTMLVideoElement): Promise<CameraSession> => {
+type TrackCaps = MediaTrackCapabilities & Record<string, unknown>;
+
+const trackOf = (stream: MediaStream): MediaStreamTrack | null =>
+  stream.getVideoTracks()[0] ?? null;
+
+const readCaps = (track: MediaStreamTrack | null): ScannerCameraCapabilities => {
+  if (!track?.getCapabilities) return {};
+  try {
+    return normalizeCapabilities(track.getCapabilities() as TrackCaps);
+  } catch {
+    return {};
+  }
+};
+
+const readSettings = (track: MediaStreamTrack | null): ScannerCameraSettings => {
+  if (!track?.getSettings) return {};
+  try {
+    return normalizeSettings(track.getSettings() as Record<string, unknown>);
+  } catch {
+    return {};
+  }
+};
+
+const applyAdvanced = async (
+  track: MediaStreamTrack,
+  advanced: Record<string, unknown>,
+): Promise<boolean> => {
+  if (!track.applyConstraints) return false;
+  try {
+    await track.applyConstraints({ advanced: [advanced as MediaTrackConstraintSet] });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const applyContinuousFocus = async (track: MediaStreamTrack | null): Promise<boolean> => {
+  if (!track) return false;
+  const advanced = buildContinuousFocusConstraints(readCaps(track));
+  if (!advanced) return false;
+  return applyAdvanced(track, advanced);
+};
+
+const getUserMediaVideo = async (
+  videoConstraints: MediaTrackConstraints | boolean,
+): Promise<MediaStream> =>
+  navigator.mediaDevices.getUserMedia({ audio: false, video: videoConstraints });
+
+/**
+ * Staged rear-camera acquisition: prefer 1080p environment, then simplify.
+ * Always inspect actual settings after grant.
+ */
+const openStream = async (deviceId?: string): Promise<{ requested: string; stream: MediaStream }> => {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error('This browser cannot open the camera.');
   }
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: {
-      facingMode: { ideal: 'environment' },
-      // Prefer a high still; phones often downscale if we only ask for 1080.
-      height: { ideal: 2160 },
-      width: { ideal: 3840 },
-    },
-  });
+  const steps = cameraConstraintFallbacks(deviceId);
+  const labels = deviceId
+    ? [`device ${deviceId.slice(0, 8)}… 1920×1080`, 'device 1280×720', 'device any']
+    : ['environment 1920×1080 @30', 'environment 1280×720', 'environment any', 'any camera'];
 
-  // Best-effort focus / exposure — ignored when the browser doesn't support them.
-  const [track] = stream.getVideoTracks();
-  if (track?.getCapabilities && track.applyConstraints) {
-    const caps = track.getCapabilities() as TrackCaps;
-    const advanced: Record<string, string> = {};
-    if (caps.focusMode?.includes('continuous')) advanced.focusMode = 'continuous';
-    if (caps.exposureMode?.includes('continuous')) advanced.exposureMode = 'continuous';
-    if (Object.keys(advanced).length) {
-      try {
-        await track.applyConstraints({ advanced: [advanced as MediaTrackConstraintSet] });
-      } catch {
-        // Capabilities lie on some Android WebViews — ignore.
-      }
+  let lastErr: unknown;
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    try {
+      const stream = await getUserMediaVideo(step as MediaTrackConstraints | boolean);
+      return { requested: labels[i] ?? `step ${i}`, stream };
+    } catch (err) {
+      lastErr = err;
     }
   }
+  throw lastErr instanceof Error ? lastErr : new Error('Could not open the camera.');
+};
 
+const bindVideo = async (video: HTMLVideoElement, stream: MediaStream): Promise<void> => {
   video.srcObject = stream;
   video.setAttribute('playsinline', 'true');
   video.muted = true;
+  // Prefer the source resolution for layout math; CSS may still scale the preview.
+  video.style.objectFit = 'cover';
   await video.play();
-  return {
-    focusAt: (clientX, clientY) => focusAtPoint(stream, video, clientX, clientY),
-    stop: () => {
-      for (const t of stream.getTracks()) t.stop();
-      video.srcObject = null;
-    },
-    stream,
-    video,
-  };
 };
 
-type TrackCaps = MediaTrackCapabilities & {
-  exposureMode?: string[];
-  focusMode?: string[];
-  pointsOfInterest?: boolean | number;
+/** Open the rear camera into a video element. Caller must stop() when done. */
+export const openCamera = async (video: HTMLVideoElement): Promise<CameraSession> => {
+  const opened = await openStream();
+  let currentStream = opened.stream;
+  let requestedLabel = opened.requested;
+
+  await applyContinuousFocus(trackOf(currentStream));
+  await bindVideo(video, currentStream);
+
+  const refreshTrack = () => trackOf(currentStream);
+
+  const session: CameraSession = {
+    async diagnostics() {
+      const track = refreshTrack();
+      const caps = readCaps(track);
+      const settings = readSettings(track);
+      return {
+        capabilities: caps,
+        devices: await session.listDevices(),
+        display: { height: video.clientHeight, width: video.clientWidth },
+        requested: requestedLabel,
+        settings,
+        supportsTapFocus: supportsTapFocus(caps),
+        video: { height: video.videoHeight, width: video.videoWidth },
+      };
+    },
+
+    focusAt: (clientX, clientY) => focusAtPoint(currentStream, video, clientX, clientY),
+
+    async focusAtNorm(x, y) {
+      const track = refreshTrack();
+      if (!track) return false;
+      const caps = readCaps(track);
+      for (const advanced of buildPointFocusConstraints(caps, { x, y })) {
+        if (await applyAdvanced(track, advanced)) return true;
+      }
+      return false;
+    },
+
+    async listDevices() {
+      if (!navigator.mediaDevices?.enumerateDevices) return [];
+      const all = await navigator.mediaDevices.enumerateDevices();
+      return all
+        .filter(d => d.kind === 'videoinput')
+        .map(d => ({
+          deviceId: d.deviceId,
+          label: d.label || `Camera ${d.deviceId.slice(0, 6)}`,
+        }));
+    },
+
+    async setTorch(on) {
+      const track = refreshTrack();
+      if (!track || !readCaps(track).torch) return false;
+      try {
+        await track.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    async setZoom(zoom) {
+      const track = refreshTrack();
+      const range = readCaps(track).zoom;
+      if (!track || !range) return false;
+      const min = range.min ?? 1;
+      const max = range.max ?? min;
+      const clamped = Math.min(max, Math.max(min, zoom));
+      try {
+        await track.applyConstraints({ advanced: [{ zoom: clamped } as MediaTrackConstraintSet] });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    stop: () => {
+      for (const t of currentStream.getTracks()) t.stop();
+      video.srcObject = null;
+    },
+
+    get stream() {
+      return currentStream;
+    },
+
+    supportsTapFocus: () => supportsTapFocus(readCaps(refreshTrack())),
+
+    async switchDevice(deviceId) {
+      for (const t of currentStream.getTracks()) t.stop();
+      const next = await openStream(deviceId);
+      currentStream = next.stream;
+      requestedLabel = next.requested;
+      await applyContinuousFocus(trackOf(currentStream));
+      await bindVideo(video, currentStream);
+    },
+
+    video,
+  };
+
+  return session;
 };
 
 /**
@@ -136,41 +307,11 @@ export const focusAtPoint = async (
 ): Promise<boolean> => {
   const point = clientToVideoNorm(video, clientX, clientY);
   if (!point) return false;
-  const [track] = stream.getVideoTracks();
+  const track = trackOf(stream);
   if (!track?.applyConstraints) return false;
-
-  const caps = (track.getCapabilities?.() ?? {}) as TrackCaps;
-  const focusModes = caps.focusMode ?? [];
-  const exposureModes = caps.exposureMode ?? [];
-  const focusMode = focusModes.includes('single-shot')
-    ? 'single-shot'
-    : focusModes.includes('manual')
-      ? 'manual'
-      : focusModes.includes('continuous')
-        ? 'continuous'
-        : undefined;
-  const exposureMode = exposureModes.includes('manual')
-    ? 'manual'
-    : exposureModes.includes('continuous')
-      ? 'continuous'
-      : undefined;
-
-  const attempts: Record<string, unknown>[] = [
-    {
-      ...(focusMode ? { focusMode } : {}),
-      ...(exposureMode ? { exposureMode } : {}),
-      pointsOfInterest: [{ x: point.x, y: point.y }],
-    },
-    { pointsOfInterest: [{ x: point.x, y: point.y }] },
-  ];
-
-  for (const advanced of attempts) {
-    try {
-      await track.applyConstraints({ advanced: [advanced as MediaTrackConstraintSet] });
-      return true;
-    } catch {
-      // try next shape
-    }
+  const caps = readCaps(track);
+  for (const advanced of buildPointFocusConstraints(caps, point)) {
+    if (await applyAdvanced(track, advanced)) return true;
   }
   return false;
 };
@@ -193,13 +334,11 @@ export const guideToSource = (video: HTMLVideoElement, guide: GuideRect): Rect =
   let offsetX: number;
   let offsetY: number;
   if (videoAspect > elemAspect) {
-    // Wider than the box → crop left/right.
     renderH = eh;
     renderW = eh * videoAspect;
     offsetX = (ew - renderW) / 2;
     offsetY = 0;
   } else {
-    // Taller than the box → crop top/bottom.
     renderW = ew;
     renderH = ew / videoAspect;
     offsetX = 0;
@@ -221,6 +360,63 @@ export const guideToSource = (video: HTMLVideoElement, guide: GuideRect): Rect =
 /** Snapshot the current frame, cropped to the card guide. */
 export const captureCard = (video: HTMLVideoElement, guide: GuideRect): ScanImage =>
   drawToScanImage(video, guideToSource(video, guide));
+
+/**
+ * Warp a high-resolution card from the live video using analysis-space corners.
+ * Detection stays cheap; recognition gets the sharp source crop.
+ */
+export const captureNormalizedFromVideo = (
+  video: HTMLVideoElement,
+  corners: CardCorners,
+  analysisSize: { height: number; width: number },
+): PreparedCard | null => {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!vw || !vh) return null;
+  const source = { height: vh, width: vw };
+  const mapped: CardCorners = {
+    bottomLeft: mapAnalysisToSource(corners.bottomLeft, analysisSize, source),
+    bottomRight: mapAnalysisToSource(corners.bottomRight, analysisSize, source),
+    topLeft: mapAnalysisToSource(corners.topLeft, analysisSize, source),
+    topRight: mapAnalysisToSource(corners.topRight, analysisSize, source),
+  };
+
+  // Grab a padded axis-aligned crop of the full video, then warp within it.
+  const xs = [
+    mapped.topLeft.x,
+    mapped.topRight.x,
+    mapped.bottomRight.x,
+    mapped.bottomLeft.x,
+  ];
+  const ys = [
+    mapped.topLeft.y,
+    mapped.topRight.y,
+    mapped.bottomRight.y,
+    mapped.bottomLeft.y,
+  ];
+  const minX = Math.max(0, Math.floor(Math.min(...xs) - 8));
+  const minY = Math.max(0, Math.floor(Math.min(...ys) - 8));
+  const maxX = Math.min(vw, Math.ceil(Math.max(...xs) + 8));
+  const maxY = Math.min(vh, Math.ceil(Math.max(...ys) + 8));
+  const w = Math.max(32, maxX - minX);
+  const h = Math.max(32, maxY - minY);
+  const crop = drawToScanImage(video, { h, w, x: minX, y: minY });
+  const local: CardCorners = {
+    bottomLeft: { x: mapped.bottomLeft.x - minX, y: mapped.bottomLeft.y - minY },
+    bottomRight: { x: mapped.bottomRight.x - minX, y: mapped.bottomRight.y - minY },
+    topLeft: { x: mapped.topLeft.x - minX, y: mapped.topLeft.y - minY },
+    topRight: { x: mapped.topRight.x - minX, y: mapped.topRight.y - minY },
+  };
+  const image = warpQuadToCard(crop, cornersToQuad(local));
+  return {
+    corners: mapped,
+    detected: true,
+    detection: emptyDetectionDebug(),
+    image,
+    score: 1,
+    source: 'detected',
+  };
+};
 
 export interface BestFrame {
   frames: number;

@@ -2,11 +2,19 @@
 //
 // Uses requestVideoFrameCallback when available; otherwise rAF. Never queues
 // unbounded work — if analysis is busy, the next run uses the newest frame.
+//
+// Detection runs on a downscaled copy; when the card is stable we refine from
+// the full-resolution video for sharpness gating + recognition.
 
+import { captureNormalizedFromVideo } from './camera';
 import { toScanImage } from './canvasBridge';
 
 import { DETECT_ANALYSIS_MAX_WIDTH, DETECT_INTERVAL_MS } from '@/lib/scan/params';
-import type { SessionController, SessionSnapshot } from '@/lib/scan/session/controller';
+import type {
+  FrameHelpers,
+  SessionController,
+  SessionSnapshot,
+} from '@/lib/scan/session/controller';
 import type { ScanImage } from '@/lib/scan/types';
 
 type VideoFrameCb = (
@@ -24,9 +32,14 @@ export interface LiveLoop {
   stop: () => void;
 }
 
+export interface LiveLoopOptions {
+  /** Request focus at normalized video coords (0–1). */
+  requestFocusNorm?: (x: number, y: number) => void;
+}
+
 /**
  * Downscale the video into a ScanImage for cheap detection.
- * Full-res recognition uses prepareCard on that frame when the session locks.
+ * Full-res recognition crops come from captureNormalizedFromVideo.
  */
 const frameToScanImage = (
   video: HTMLVideoElement,
@@ -43,6 +56,8 @@ const frameToScanImage = (
   canvas.height = h;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'low';
   ctx.drawImage(video, 0, 0, w, h);
   return toScanImage(canvas);
 };
@@ -51,6 +66,7 @@ export const startLiveLoop = (
   video: HTMLVideoElement,
   session: SessionController,
   onUpdate: (snap: SessionSnapshot) => void,
+  options: LiveLoopOptions = {},
 ): LiveLoop => {
   let stopped = false;
   let busy = false;
@@ -58,6 +74,12 @@ export const startLiveLoop = (
   let raf = 0;
   let vfc = 0;
   let lastDetect = 0;
+
+  const helpers: FrameHelpers = {
+    refineCard: (corners, analysisSize) =>
+      captureNormalizedFromVideo(video, corners, analysisSize),
+    requestFocusNorm: options.requestFocusNorm,
+  };
 
   const tick = async () => {
     if (stopped || busy) {
@@ -72,7 +94,7 @@ export const startLiveLoop = (
     busy = true;
     dirty = false;
     try {
-      const snap = await session.onFrame(frame);
+      const snap = await session.onFrame(frame, helpers);
       if (!stopped) onUpdate(snap);
     } finally {
       busy = false;
