@@ -114,6 +114,7 @@ export const ScanScreen = ({
   const [camDiag, setCamDiag] = useState<CameraDiagnostics | null>(null);
   const [showCamDebug, setShowCamDebug] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const [focusRing, setFocusRing] = useState<{ x: number; y: number } | null>(null);
 
   const setPhase = (p: UiPhase) => {
     uiPhaseRef.current = p;
@@ -430,17 +431,34 @@ export const ScanScreen = ({
           autoPlay
           className="h-full w-full object-cover"
           muted
-          onClick={e => {
-            if (!sessionCam.current?.supportsTapFocus()) return;
-            void sessionCam.current.focusAt(e.clientX, e.clientY).then(ok => {
-              if (ok) {
-                setFlash('Focusing…');
-                window.setTimeout(() => setFlash(null), 900);
-              }
-            });
-          }}
           playsInline
         />
+        {/* Dedicated tap layer — always tries focus (Samsung often hides POI caps). */}
+        <button
+          aria-label="Tap to focus"
+          className="absolute inset-0 z-[1] cursor-crosshair bg-transparent"
+          onClick={e => {
+            const cam = sessionCam.current;
+            if (!cam) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            setFocusRing({
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top,
+            });
+            window.setTimeout(() => setFocusRing(null), 900);
+            setFlash('Focusing…');
+            window.setTimeout(() => setFlash(null), 900);
+            void cam.focusAt(e.clientX, e.clientY);
+          }}
+          type="button"
+        />
+        {focusRing && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute z-[2] h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-amber-300/90 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
+            style={{ left: focusRing.x, top: focusRing.y }}
+          />
+        )}
         <CardOutline
           analysisSize={snap?.analysisSize ?? null}
           corners={snap?.corners ?? null}
@@ -452,10 +470,12 @@ export const ScanScreen = ({
           video={videoRef.current}
         />
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent px-3 pb-10 pt-3">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent px-3 pb-10 pt-3">
           <div className="text-sm font-medium">{phaseHint(uiPhase, message)}</div>
           {uiPhase === 'searching' && !snap?.corners && (
-            <div className="mt-0.5 text-xs text-white/55">No card detected yet</div>
+            <div className="mt-0.5 text-xs text-white/55">
+              No card detected yet · tap the card to focus
+            </div>
           )}
           {snap?.fused?.status === 'printing-ambiguous' && (
             <div className="text-xs text-amber-200">Card identified — printing uncertain</div>

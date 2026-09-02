@@ -139,6 +139,13 @@ borderless, battles, localized titles. Evaluation skips the corpus when absent.
 
 ## Camera acquisition
 
+On multi-camera Samsung / Pixel phones, Chrome often opens the **ultrawide**
+(zoom &lt; 1). Ultrawide minimum focus distance is large — desk cards look soft.
+Lugin forces zoom ≈ 1 (main lens) when that range exists.
+
+Tap always attempts single-shot / POI / continuous AF nudge even when
+capabilities omit `pointsOfInterest` (common on Galaxy Chrome).
+
 ### Preferred constraints (with fallbacks)
 
 1. `facingMode: environment`, `1920×1080` ideal, `30` fps ideal  

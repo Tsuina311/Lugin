@@ -130,6 +130,7 @@ const {
   cameraConstraintFallbacks,
   focusGateDecision,
   normalizeCapabilities,
+  preferredMainLensZoom,
   supportsTapFocus,
   QUALITY_MIN_SCORE,
   SHARPNESS_MIN,
@@ -1359,14 +1360,21 @@ check('continuous focus constraints only when supported', () => {
   );
 });
 
-check('point focus omitted when POI unsupported', () => {
-  assert.equal(buildPointFocusConstraints({ focusModes: ['continuous'] }, { x: 0.5, y: 0.5 }).length, 0);
+check('point focus always offers best-effort attempts', () => {
+  const attempts = buildPointFocusConstraints({}, { x: 0.5, y: 0.5 });
+  assert.ok(attempts.length >= 3);
   assert.ok(
     buildPointFocusConstraints(
       { focusModes: ['single-shot'], pointsOfInterest: true },
       { x: 0.5, y: 0.5 },
     ).length >= 1,
   );
+});
+
+check('main-lens zoom prefers 1.0 when ultrawide is available', () => {
+  assert.equal(preferredMainLensZoom({ zoom: { max: 10, min: 0.5 } }), 1);
+  assert.equal(preferredMainLensZoom({ zoom: { max: 8, min: 1 } }), null);
+  assert.equal(preferredMainLensZoom({}), null);
 });
 
 check('preferred camera plan is ideal 1080p environment', () => {

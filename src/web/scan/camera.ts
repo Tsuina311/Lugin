@@ -12,6 +12,7 @@ import {
   cameraConstraintFallbacks,
   normalizeCapabilities,
   normalizeSettings,
+  preferredMainLensZoom,
   supportsTapFocus,
   type ScannerCameraCapabilities,
   type ScannerCameraSettings,
@@ -107,8 +108,39 @@ const applyAdvanced = async (
 const applyContinuousFocus = async (track: MediaStreamTrack | null): Promise<boolean> => {
   if (!track) return false;
   const advanced = buildContinuousFocusConstraints(readCaps(track));
-  if (!advanced) return false;
+  if (!advanced) {
+    // Capabilities sometimes omit focusMode on Samsung — still ask.
+    return applyAdvanced(track, { focusMode: 'continuous' });
+  }
   return applyAdvanced(track, advanced);
+};
+
+/**
+ * Avoid the ultrawide default on multi-lens Android phones (common on Galaxy S).
+ * zoom.min < 1 → ultrawide; zoom = 1 → main camera with usable close focus.
+ */
+const preferMainLens = async (track: MediaStreamTrack | null): Promise<boolean> => {
+  if (!track) return false;
+  const target = preferredMainLensZoom(readCaps(track));
+  if (target == null) return false;
+  const settings = readSettings(track);
+  if (settings.zoom != null && Math.abs(settings.zoom - target) < 0.05) return true;
+  return applyAdvanced(track, { zoom: target });
+};
+
+/** Run every focus attempt until one succeeds; then restore continuous AF. */
+const nudgeFocusAt = async (
+  track: MediaStreamTrack,
+  point: { x: number; y: number },
+): Promise<boolean> => {
+  const caps = readCaps(track);
+  let ok = false;
+  for (const advanced of buildPointFocusConstraints(caps, point)) {
+    if (await applyAdvanced(track, advanced)) ok = true;
+  }
+  // Always try to land back in continuous so the preview keeps hunting.
+  await applyAdvanced(track, { focusMode: 'continuous' });
+  return ok;
 };
 
 const getUserMediaVideo = async (
@@ -157,6 +189,7 @@ export const openCamera = async (video: HTMLVideoElement): Promise<CameraSession
   let currentStream = opened.stream;
   let requestedLabel = opened.requested;
 
+  await preferMainLens(trackOf(currentStream));
   await applyContinuousFocus(trackOf(currentStream));
   await bindVideo(video, currentStream);
 
@@ -183,11 +216,10 @@ export const openCamera = async (video: HTMLVideoElement): Promise<CameraSession
     async focusAtNorm(x, y) {
       const track = refreshTrack();
       if (!track) return false;
-      const caps = readCaps(track);
-      for (const advanced of buildPointFocusConstraints(caps, { x, y })) {
-        if (await applyAdvanced(track, advanced)) return true;
-      }
-      return false;
+      return nudgeFocusAt(track, {
+        x: Math.min(1, Math.max(0, x)),
+        y: Math.min(1, Math.max(0, y)),
+      });
     },
 
     async listDevices() {
@@ -243,6 +275,7 @@ export const openCamera = async (video: HTMLVideoElement): Promise<CameraSession
       const next = await openStream(deviceId);
       currentStream = next.stream;
       requestedLabel = next.requested;
+      await preferMainLens(trackOf(currentStream));
       await applyContinuousFocus(trackOf(currentStream));
       await bindVideo(video, currentStream);
     },
@@ -297,7 +330,7 @@ export const clientToVideoNorm = (
 
 /**
  * Ask the camera to focus (and meter) at a tap point.
- * Best-effort — many desktop cameras ignore pointsOfInterest; phones often honour it.
+ * Best-effort on Samsung/Chrome — POI is often missing; we still nudge AF.
  */
 export const focusAtPoint = async (
   stream: MediaStream,
@@ -309,11 +342,7 @@ export const focusAtPoint = async (
   if (!point) return false;
   const track = trackOf(stream);
   if (!track?.applyConstraints) return false;
-  const caps = readCaps(track);
-  for (const advanced of buildPointFocusConstraints(caps, point)) {
-    if (await applyAdvanced(track, advanced)) return true;
-  }
-  return false;
+  return nudgeFocusAt(track, point);
 };
 
 /**

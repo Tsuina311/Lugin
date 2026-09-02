@@ -167,39 +167,51 @@ export const buildPointFocusConstraints = (
 ): Record<string, unknown>[] => {
   const x = Math.min(1, Math.max(0, point.x));
   const y = Math.min(1, Math.max(0, point.y));
-  const focusMode = caps.focusModes?.includes('single-shot')
-    ? 'single-shot'
-    : caps.focusModes?.includes('manual')
-      ? 'manual'
-      : caps.focusModes?.includes('continuous')
-        ? 'continuous'
-        : undefined;
-  const exposureMode = caps.exposureModes?.includes('manual')
-    ? 'manual'
-    : caps.exposureModes?.includes('continuous')
-      ? 'continuous'
-      : undefined;
-
-  const attempts: Record<string, unknown>[] = [];
-  if (caps.pointsOfInterest) {
-    attempts.push({
-      ...(focusMode ? { focusMode } : {}),
-      ...(exposureMode ? { exposureMode } : {}),
+  const modes = caps.focusModes ?? [];
+  // Try several shapes: Samsung Chrome often omits pointsOfInterest from
+  // capabilities even when a single-shot / continuous toggle still nudges AF.
+  const attempts: Record<string, unknown>[] = [
+    { focusMode: 'single-shot', pointsOfInterest: [{ x, y }] },
+    { pointsOfInterest: [{ x, y }] },
+    { focusMode: 'single-shot' },
+    { focusMode: 'manual' },
+    { focusMode: 'continuous' },
+  ];
+  if (modes.includes('continuous')) {
+    attempts.push({ focusMode: 'continuous', pointsOfInterest: [{ x, y }] });
+  }
+  if (caps.exposureModes?.includes('continuous')) {
+    attempts.unshift({
+      exposureMode: 'continuous',
+      focusMode: 'single-shot',
       pointsOfInterest: [{ x, y }],
     });
-    attempts.push({ pointsOfInterest: [{ x, y }] });
-  }
-  if (focusMode === 'single-shot') {
-    attempts.push({ focusMode: 'single-shot' });
   }
   return attempts;
 };
 
+/**
+ * Whether the UI should advertise tap-to-focus.
+ * Capability lists on Android are incomplete — treat any focus control as yes.
+ */
 export const supportsTapFocus = (caps: ScannerCameraCapabilities): boolean =>
+  Boolean(caps.focusModes?.length) ||
   Boolean(caps.pointsOfInterest) ||
-  Boolean(caps.focusModes?.includes('single-shot')) ||
-  Boolean(caps.focusModes?.includes('manual'));
+  Boolean(caps.focusDistance);
 
+/**
+ * Prefer the main rear lens over ultrawide.
+ * On multi-camera Samsung/Pixel Chrome streams, zoom.min < 1 is usually ultrawide
+ * and zoom ≈ 1 is the primary camera — which focuses much better on a desk card.
+ */
+export const preferredMainLensZoom = (caps: ScannerCameraCapabilities): number | null => {
+  const z = caps.zoom;
+  if (!z) return null;
+  const min = z.min ?? 1;
+  const max = z.max ?? min;
+  if (!(min < 1) || !(max >= 1)) return null;
+  return Math.min(max, Math.max(min, 1));
+};
 /**
  * Focus / sharpness gate decision (portable).
  * Geometry-stable + soft → focusing; sharp enough → locked.
