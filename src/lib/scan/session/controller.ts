@@ -194,10 +194,7 @@ export const createSessionController = (
       const status = result.fused.status;
       if (status === 'identified' || status === 'printing-ambiguous') {
         phase = 'found';
-        message =
-          status === 'printing-ambiguous'
-            ? `${result.fused.card?.name ?? 'Card'} — printing uncertain`
-            : (result.fused.card?.name ?? 'Identified');
+        message = result.fused.card?.name ?? 'Identified';
         foundCorners = card.corners;
         foundDescriptor = artDescriptor(card);
       } else if (status === 'card-ambiguous') {

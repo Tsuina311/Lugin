@@ -136,7 +136,7 @@ export const filterPrintings = (
 
 /**
  * Pick a printing from a name-narrowed list using whatever set/number we have.
- * Returns null when more than one candidate still fits (user must scan more).
+ * Returns null when more than one candidate still fits.
  */
 export const pickPrinting = (
   printings: readonly ScryfallPrinting[],
@@ -151,6 +151,25 @@ export const pickPrinting = (
         ? [...printings]
         : [];
   return filtered.length === 1 ? filtered[0] : null;
+};
+
+/**
+ * Best default when the card identity is known but the exact printing is not.
+ * Prefer a fused/OCR-suggested id, otherwise the newest print (Scryfall list is
+ * released-desc from fetchPrintingsByName). Never blocks the scan on a picker.
+ */
+export const defaultPrinting = (
+  printings: readonly ScryfallPrinting[],
+  preferredIds?: readonly string[],
+): ScryfallPrinting | null => {
+  if (!printings.length) return null;
+  if (preferredIds?.length) {
+    for (const id of preferredIds) {
+      const hit = printings.find(p => p.id === id);
+      if (hit) return hit;
+    }
+  }
+  return printings[0] ?? null;
 };
 
 /** Build the collection row a successful scan should add. */

@@ -53,9 +53,10 @@ import { emptyDiagnostics, type ScanDiagnostics } from '@/lib/scan/diagnostics';
 import { guessFoil } from '@/lib/scan/foil';
 import {
   cardFromScan,
+  defaultPrinting,
   fetchPrintingsByName,
+  filterPrintings,
   pickPrinting,
-  type ScryfallPrinting,
 } from '@/lib/scan/resolve';
 import {
   createSessionController,
@@ -65,12 +66,11 @@ import {
 } from '@/lib/scan/session/controller';
 import { Image, RefreshCw } from '@/ui/components/icons';
 
-type UiPhase = ScannerPhase | 'pick' | 'error';
+type UiPhase = ScannerPhase | 'error';
 type ManualReport = 'detection-failure' | 'false-positive' | null;
 
 const phaseHint = (phase: UiPhase, message: string): string => {
   if (phase === 'error') return message;
-  if (phase === 'pick') return 'Pick a printing';
   if (phase === 'searching') return message || 'Place a card in view';
   if (phase === 'detected') return 'Hold steady';
   if (phase === 'focusing') return message || 'Focusing…';
@@ -100,7 +100,6 @@ export const ScanScreen = ({
   const [message, setMessage] = useState('Starting camera…');
   const [flash, setFlash] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [printings, setPrintings] = useState<ScryfallPrinting[] | null>(null);
   const [diagnostics, setDiagnostics] = useState<ScanDiagnostics | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [needConsent, setNeedConsent] = useState(() => getCorpusConsent() == null);
@@ -131,18 +130,25 @@ export const ScanScreen = ({
     try {
       const list = await fetchPrintingsByName(name);
       const collector = s.recognition?.collector;
+      const preferredIds = s.fused?.candidates[0]?.possiblePrintingIds;
+      // Card identity is enough: pick the best printing we can and move on.
+      // Never trap the user in an endless edition list for reprints.
       const printing =
         (collector && list.length ? pickPrinting(list, collector) : null) ??
-        (list.length === 1 ? list[0] : null);
+        defaultPrinting(
+          collector && list.length
+            ? filterPrintings(list, {
+                collectorNumber: collector.collectorNumber,
+                setCode: collector.setCode,
+              })
+            : list,
+          preferredIds,
+        ) ??
+        defaultPrinting(list, preferredIds);
 
       if (!printing) {
-        setPrintings(list.length ? list : null);
-        setPhase('pick');
-        setMessage(
-          list.length
-            ? `${name} — pick a printing`
-            : `Matched “${name}” but no printings loaded.`,
-        );
+        setMessage(`Matched “${name}” but no printings loaded.`);
+        setPhase('found');
         return;
       }
 
@@ -155,11 +161,15 @@ export const ScanScreen = ({
       await onAdd(card);
       setFlash(`Added ${printing.name}`);
       window.setTimeout(() => setFlash(null), 1600);
+      // Ready for the next card — don't leave a picker on screen.
       if (!auto) {
         foundKey.current = null;
         controller.current?.reset();
         setPhase('searching');
         setMessage('Place a card in view');
+      } else {
+        setPhase('found');
+        setMessage(printing.name);
       }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : String(err));
@@ -217,7 +227,7 @@ export const ScanScreen = ({
                 return;
               }
             }
-            if (uiPhaseRef.current !== 'pick') setPhase(s.phase);
+            if (uiPhaseRef.current !== 'error') setPhase(s.phase);
           },
           {
             requestFocusNorm: (x, y) => {
@@ -252,7 +262,6 @@ export const ScanScreen = ({
 
   const resetScan = () => {
     foundKey.current = null;
-    setPrintings(null);
     setFlash(null);
     controller.current?.reset();
     setPhase('searching');
@@ -393,34 +402,6 @@ export const ScanScreen = ({
     await resolveAndAdd(name, snap, false);
   };
 
-  const onPickPrinting = async (p: ScryfallPrinting) => {
-    const predictedId = snap?.recognition?.collector
-      ? undefined
-      : snap?.fused?.candidates[0]?.possiblePrintingIds[0];
-    if (captureOn && predictedId && predictedId !== p.id) {
-      await corpus.current?.reportPrintingCorrected({
-        correctedPrintingId: p.id,
-        normalized: controller.current?.lastNormalized() ?? null,
-      });
-    } else if (captureOn && snap?.fused?.status === 'printing-ambiguous') {
-      await corpus.current?.reportPrintingCorrected({
-        correctedPrintingId: p.id,
-        normalized: controller.current?.lastNormalized() ?? null,
-      });
-    }
-    await onAdd(
-      cardFromScan(p, {
-        confidence: 0.5,
-        foil: false,
-        reason: 'manual pick',
-      }),
-    );
-    setFlash(`Added ${p.name}`);
-    window.setTimeout(() => setFlash(null), 1600);
-    void refreshCorpusCounts();
-    resetScan();
-  };
-
   const candidates = snap?.fused?.candidates ?? [];
 
   return (
@@ -462,11 +443,7 @@ export const ScanScreen = ({
         <CardOutline
           analysisSize={snap?.analysisSize ?? null}
           corners={snap?.corners ?? null}
-          phase={
-            uiPhase === 'pick' || uiPhase === 'error'
-              ? 'searching'
-              : (uiPhase as ScannerPhase)
-          }
+          phase={uiPhase === 'error' ? 'searching' : (uiPhase as ScannerPhase)}
           video={videoRef.current}
         />
 
@@ -476,9 +453,6 @@ export const ScanScreen = ({
             <div className="mt-0.5 text-xs text-white/55">
               No card detected yet · tap the card to focus
             </div>
-          )}
-          {snap?.fused?.status === 'printing-ambiguous' && (
-            <div className="text-xs text-amber-200">Card identified — printing uncertain</div>
           )}
           {snap?.fused?.status === 'card-ambiguous' && (
             <div className="text-xs text-amber-200">Card identity uncertain</div>
@@ -635,14 +609,22 @@ export const ScanScreen = ({
           </button>
         )}
 
-        {(uiPhase === 'ambiguous' || (uiPhase === 'pick' && !printings?.length)) &&
-          candidates.length > 0 && (
+        {uiPhase === 'ambiguous' && candidates.length > 0 && (
             <div
-              className="absolute inset-x-0 bottom-24 max-h-40 overflow-auto bg-black/80 px-2 py-2"
+              className="absolute inset-x-0 bottom-24 z-10 max-h-40 overflow-auto bg-black/80 px-2 py-2"
               data-scan-controls
             >
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-white/50">
-                Candidates
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="text-[10px] uppercase tracking-wide text-white/50">
+                  Which card?
+                </span>
+                <button
+                  className="rounded px-2 py-0.5 text-[10px] text-white/60"
+                  onClick={resetScan}
+                  type="button"
+                >
+                  Skip
+                </button>
               </div>
               {candidates.slice(0, 6).map(c => (
                 <button
@@ -657,29 +639,6 @@ export const ScanScreen = ({
               ))}
             </div>
           )}
-
-        {uiPhase === 'pick' && printings && printings.length > 0 && (
-          <div
-            className="absolute inset-x-0 bottom-24 max-h-48 overflow-auto bg-black/85 px-2 py-2"
-            data-scan-controls
-          >
-            <div className="mb-1 text-[10px] uppercase tracking-wide text-white/50">
-              Printings
-            </div>
-            {printings.slice(0, 12).map(p => (
-              <button
-                key={p.id}
-                className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-white/10"
-                onClick={() => void onPickPrinting(p)}
-                type="button"
-              >
-                <span className="truncate">
-                  {p.setName} · #{p.collectorNumber}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       <div
