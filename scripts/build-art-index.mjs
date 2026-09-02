@@ -56,8 +56,45 @@ const { describeArtwork, tokenizeScanText, ARTWORK_REGION, cropImage } = await i
   pathToFileURL(bundle).href,
 );
 
-// pngjs for decoding art crops
+// pngjs + jpeg-js: Scryfall art_crop URLs are JPEG; local fixture caches may be PNG.
 const { PNG } = require('pngjs');
+const jpeg = require('jpeg-js');
+
+const toScanImage = ({ width, height, data }) => ({
+  data: new Uint8ClampedArray(data),
+  height,
+  width,
+});
+
+/** Decode PNG or JPEG bytes into an RGBA ScanImage. */
+const decodeImage = buf => {
+  if (!buf?.length) return null;
+  // PNG signature
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    const png = PNG.sync.read(buf);
+    return toScanImage(png);
+  }
+  // JPEG SOI
+  if (buf[0] === 0xff && buf[1] === 0xd8) {
+    const decoded = jpeg.decode(buf, { useTArray: true });
+    return toScanImage(decoded);
+  }
+  throw new Error(
+    `unsupported image signature ${buf.slice(0, 4).toString('hex')}`,
+  );
+};
+
+const loadRemoteImage = async url => {
+  const res = await fetch(url, { headers: { 'User-Agent': AGENT } });
+  if (!res.ok) return null;
+  const buf = Buffer.from(await res.arrayBuffer());
+  try {
+    return decodeImage(buf);
+  } catch (err) {
+    console.warn(`decode ${url}: ${err instanceof Error ? err.message : err}`);
+    return null;
+  }
+};
 
 const fetchJson = async url => {
   const res = await fetch(url, { headers: { 'User-Agent': AGENT } });
@@ -73,69 +110,53 @@ const defaultCardsUri = async () => {
   return dump.download_uri;
 };
 
-const toScanImage = png => {
-  const { width, height, data } = png;
-  // pngjs is RGBA already
-  return { data: new Uint8ClampedArray(data), height, width };
-};
-
-const loadPng = async url => {
-  const res = await fetch(url, { headers: { 'User-Agent': AGENT } });
-  if (!res.ok) return null;
-  const buf = Buffer.from(await res.arrayBuffer());
-  return new Promise((resolve, reject) => {
-    new PNG().parse(buf, (err, png) => (err ? reject(err) : resolve(png)));
-  });
-};
-
 const seenArt = new Set();
 const entries = [];
 const textEntries = [];
 
-/** Fixture-scoped index: prefer local PNGs, else Scryfall art_crop. */
+/** Fixture-scoped index: prefer local PNGs, else Scryfall art_crop (JPEG). */
 const buildFromFixtures = async () => {
   const manifest = JSON.parse(await readFile(MANIFEST, 'utf8'));
   const cache = join(root, '.scan-fixtures');
   for (const row of manifest.cards ?? []) {
-    const localPng = join(cache, `${row.id}.png`);
-    let scanImg = null;
-    if (existsSync(localPng)) {
-      const png = await new Promise((resolve, reject) => {
-        readFile(localPng).then(buf => {
-          new PNG().parse(buf, (err, p) => (err ? reject(err) : resolve(p)));
-        });
-      });
-      // Full card PNG → crop artwork region the same way the scanner does.
-      scanImg = cropImage(toScanImage(png), ARTWORK_REGION);
-    } else {
-      const card = await fetchJson(`https://api.scryfall.com/cards/${row.id}`);
-      const artUrl = card.image_uris?.art_crop ?? card.card_faces?.[0]?.image_uris?.art_crop;
-      if (!artUrl) continue;
-      const png = await loadPng(artUrl);
-      if (!png) continue;
-      scanImg = toScanImage(png);
-      row._oracle = card.oracle_id;
-      row._illustration = card.illustration_id;
-      row._text = card.printed_text || card.oracle_text || '';
-      row._set = card.set;
-    }
-    if (!scanImg) continue;
-    const descriptor = describeArtwork(scanImg);
-    entries.push({
-      descriptor,
-      illustrationId: row._illustration,
-      name: row.expectedName,
-      oracleId: row._oracle ?? `fixture:${row.id}`,
-      scryfallId: row.id,
-      setCode: row._set ?? row.set,
-    });
-    const text = row._text || '';
-    if (text) {
-      textEntries.push({
+    try {
+      const localPng = join(cache, `${row.id}.png`);
+      let scanImg = null;
+      if (existsSync(localPng)) {
+        const buf = await readFile(localPng);
+        scanImg = cropImage(decodeImage(buf), ARTWORK_REGION);
+      } else {
+        const card = await fetchJson(`https://api.scryfall.com/cards/${row.id}`);
+        const artUrl =
+          card.image_uris?.art_crop ?? card.card_faces?.[0]?.image_uris?.art_crop;
+        if (!artUrl) continue;
+        scanImg = await loadRemoteImage(artUrl);
+        if (!scanImg) continue;
+        row._oracle = card.oracle_id;
+        row._illustration = card.illustration_id;
+        row._text = card.printed_text || card.oracle_text || '';
+        row._set = card.set;
+      }
+      if (!scanImg) continue;
+      const descriptor = describeArtwork(scanImg);
+      entries.push({
+        descriptor,
+        illustrationId: row._illustration,
         name: row.expectedName,
         oracleId: row._oracle ?? `fixture:${row.id}`,
-        tokens: [...new Set(tokenizeScanText(text))].slice(0, 40),
+        scryfallId: row.id,
+        setCode: row._set ?? row.set,
       });
+      const text = row._text || '';
+      if (text) {
+        textEntries.push({
+          name: row.expectedName,
+          oracleId: row._oracle ?? `fixture:${row.id}`,
+          tokens: [...new Set(tokenizeScanText(text))].slice(0, 40),
+        });
+      }
+    } catch (err) {
+      console.warn(`skip fixture ${row.id}: ${err instanceof Error ? err.message : err}`);
     }
   }
 };
@@ -173,9 +194,9 @@ for await (const line of lines) {
   if (limit && entries.length >= limit) break;
 
   try {
-    const png = await loadPng(artUrl);
-    if (!png) continue;
-    const descriptor = describeArtwork(toScanImage(png));
+    const scanImg = await loadRemoteImage(artUrl);
+    if (!scanImg) continue;
+    const descriptor = describeArtwork(scanImg);
     entries.push({
       descriptor,
       illustrationId,
