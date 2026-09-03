@@ -156,5 +156,5 @@ export const useHiResFrameLatch = (opts: {
     });
   }, []);
 
-  return { frameOutput, take };
+  return { armed, frameOutput, take };
 };

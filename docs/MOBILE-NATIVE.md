@@ -492,8 +492,10 @@ used only when the preferred hi-res source fails.
 Default analysis long edge is 480 (same FOV as 640/400). Production transfer
 is one `scheduleOnRN`, not the four-rung ladder. Debug PNG/panel publish at
 ~1–2 Hz. Preferred hi-res source defaults to snapshot; cycle **Src** on
-device. Samsung must compare them; see
-`docs/MOBILE-SAMSUNG-CHECKLIST.md`. All PENDING.
+device. The second RGB frame output is attached only while the latch is
+armed — leaving it bound permanently can prevent CameraX from starting on
+Samsung. Compare sources on device; see `docs/MOBILE-SAMSUNG-CHECKLIST.md`.
+All PENDING.
 
 ## Storage / Drive / OCR (later milestones)
 

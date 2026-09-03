@@ -17,6 +17,7 @@ import {
   useOrientation,
   usePhotoOutput,
   type CameraDevice,
+  type CameraOutput,
   type CameraRef,
 } from 'react-native-vision-camera';
 
@@ -138,6 +139,19 @@ export function CameraScanScreen() {
     rung: RUNGS[rungIndex],
   });
 
+  // Never leave a second RGB ImageAnalysis (1440×1920) bound on every
+  // session — that can prevent CameraX from starting on Samsung.
+  // Default detector path is analysis FrameOutput only (proven).
+  // Photo attaches when Src=photo (or while a hi-res latch is armed).
+  // Hi-res frame attaches only while the one-shot latch is armed.
+  const cameraOutputs = useMemo(() => {
+    const outs: CameraOutput[] = [frameOutput];
+    const needPhoto = preferredSource === 'photo' || hiResFrame.armed;
+    if (needPhoto) outs.push(photoOutput);
+    if (hiResFrame.armed) outs.push(hiResFrame.frameOutput);
+    return outs;
+  }, [frameOutput, hiResFrame.armed, hiResFrame.frameOutput, photoOutput, preferredSource]);
+
   const onLayout = (e: LayoutChangeEvent) => {
     const { height, width } = e.nativeEvent.layout;
     setLayout({ height, width });
@@ -246,7 +260,9 @@ export function CameraScanScreen() {
   const badgeText = !detectorOn
     ? 'DETECTOR OFF'
     : !orientation.ready
-      ? 'Initializing orientation'
+      ? counters.cameraFrames === 0
+        ? 'Waiting for camera'
+        : 'Initializing orientation'
       : phase.toUpperCase();
 
   return (
@@ -255,10 +271,10 @@ export function CameraScanScreen() {
         ref={cameraRef}
         device={device}
         enableNativeTapToFocusGesture={false}
-        implementationMode="compatible"
+        implementationMode={preferredSource === 'snapshot' ? 'compatible' : 'performance'}
         isActive
         orientationSource="interface"
-        outputs={[frameOutput, photoOutput, hiResFrame.frameOutput]}
+        outputs={cameraOutputs}
         resizeMode="cover"
         style={StyleSheet.absoluteFill}
         zoom={1}
