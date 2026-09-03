@@ -24,11 +24,19 @@ frames on the same device.
 | Milestone | Status |
 | --- | --- |
 | A — App shell + tabs | Done (`mobile/`) |
-| B — Native camera proof (VisionCamera) | In progress — **requires Samsung device test** |
-| C+ — Detector, recognition, collection, Drive | Blocked on B go/no-go |
+| B — Native camera proof (VisionCamera) | **Passed on Samsung** — native sharper than Chrome |
+| C.1 — Shared scanner core imported by mobile | Done — guarded by `yarn mobile:test` |
+| C.2 — VisionCamera frame → `ScanImage` adapter | Not started |
+| C.3+ — Real detector on device, recognition, collection, Drive | Not started |
 
-**Do not claim blur is solved until Samsung Camera vs Chrome Lugin vs Native
-Lugin are compared at the same distance.**
+Milestone B was compared on the real device: Samsung Camera sharp, Lugin
+web/Chrome materially blurrier, Lugin native materially sharper than Chrome.
+That is what unblocked C.
+
+The full wiring audit — every scanner module classified, every existing seam,
+and the list of things that already exist and must not be rebuilt — is in
+[MOBILE-SCANNER-WIRING.md](./MOBILE-SCANNER-WIRING.md). Read it before writing
+native scanner code.
 
 ## Repository layout
 
@@ -114,7 +122,7 @@ yarn mobile:android        # expo run:android (dev build)
 yarn mobile:ios            # expo run:ios (structural; Android is acceptance)
 yarn mobile:prebuild       # regenerate native projects
 yarn mobile:typecheck
-yarn mobile:test           # workspace smoke
+yarn mobile:test           # workspace smoke + shared-scanner boundary guard
 yarn mobile:build:dev      # prebuild + android run
 yarn mobile:build:eas      # EAS development APK
 yarn mobile:update         # EAS Update → development channel
@@ -173,6 +181,33 @@ VisionCamera (native)
 Web scanner remains for zero-install, desktop, and regression comparison.
 Shared: detector, ranking, indexes, profiles, eval scripts.
 Platform-specific: camera, image adapter, OCR engine if needed, storage/auth.
+
+### The shared-core boundary
+
+Native reaches the shared scanner through exactly one module,
+`mobile/src/scan/sharedCore.ts`. Nothing else in `mobile/` imports `@/lib/**`
+directly. That keeps the boundary reviewable and gives
+`mobile/scripts/shared-core-smoke.mjs` a single graph to police: it bundles the
+boundary for a DOM-free target, rejects the build if browser-only code
+(`getImageData`, `indexedDB`, `tesseract`, `chrome.*`, …) reaches it, then runs
+a real detection and perspective warp on a synthetic card.
+
+`@/…` resolves to `src/` for mobile in two places that must stay in agreement —
+`mobile/tsconfig.json` `paths` and the `resolveRequest` alias in
+`mobile/metro.config.js`. A `paths` entry alone typechecks but fails at runtime.
+
+Baseline detector cost, measured on the dev machine (not the phone), 60
+iterations after warm-up:
+
+| Analysis input | detect p50 | detect p95 | warp → 744×1039 |
+| --- | --- | --- | --- |
+| 480 × 360 | 16.2 ms | 21.8 ms | 18.9 ms |
+| 640 × 480 | 17.5 ms | 32.3 ms | 18.3 ms |
+| 960 × 720 | 16.1 ms | 19.7 ms | 22.1 ms |
+
+Cost is nearly flat across input size because `detectCardQuad` downscales to
+`WORK_WIDTH = 320` internally. These are desktop numbers and say nothing about
+the Samsung; they exist as the control for the on-device benchmark in Phase 5.
 
 ## Storage / Drive / OCR (later milestones)
 

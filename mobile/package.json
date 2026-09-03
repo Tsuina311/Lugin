@@ -10,7 +10,7 @@
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
-    "test": "node ./scripts/smoke.cjs",
+    "test": "node ./scripts/smoke.cjs && node ./scripts/shared-core-smoke.mjs",
     "build:dev": "expo prebuild && expo run:android",
     "eas": "eas",
     "build:eas": "node ../scripts/write-mobile-build-stamp.mjs && eas build --platform android --profile development",

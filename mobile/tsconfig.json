@@ -6,8 +6,12 @@
     "noUnusedParameters": true,
     "baseUrl": ".",
     "paths": {
-      "@mobile/*": ["src/*"]
+      "@mobile/*": ["src/*"],
+      "@/*": ["../src/*"]
     }
   },
+  // Mobile files only. Shared modules under ../src are typechecked transitively
+  // via imports, so a browser-only module (fetchRemote, mtggoldfish, …) only
+  // fails the build if native actually pulls it in — which is the guard we want.
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
 }
