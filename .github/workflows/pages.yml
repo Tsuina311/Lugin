@@ -182,13 +182,13 @@ jobs:
         if: steps.auth.outputs.skip != 'true'
         run: yarn install --immutable
 
-      - name: Setup EAS
+      - name: Setup EAS auth
         if: steps.auth.outputs.skip != 'true'
         uses: expo/expo-github-action@v8
         with:
+          # Auth only — CLI comes from workspace eas-cli via yarn / mobile-eas.mjs.
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-
       - name: Resolve EAS project id
         if: steps.auth.outputs.skip != 'true'
         env:
@@ -197,13 +197,17 @@ jobs:
           if [ -z "${EAS_PROJECT_ID:-}" ]; then
             ID=$(node -e "try{const j=require('./mobile/eas-project.json');process.stdout.write(j.projectId||'')}catch{process.stdout.write('')}")
             if [ -z "$ID" ]; then
-              echo "::error::Set repository variable EAS_PROJECT_ID or mobile/eas-project.json after \`cd mobile && eas init\`."
+              echo "::error::Set repository variable EAS_PROJECT_ID or mobile/eas-project.json after \`yarn mobile:eas init\`."
               exit 1
             fi
             echo "EAS_PROJECT_ID=$ID" >> "$GITHUB_ENV"
           else
             echo "EAS_PROJECT_ID=$EAS_PROJECT_ID" >> "$GITHUB_ENV"
           fi
+
+      - name: Verify workspace eas-cli
+        if: steps.auth.outputs.skip != 'true'
+        run: node scripts/mobile-eas.mjs which
 
       - name: Fingerprint decide
         if: steps.auth.outputs.skip != 'true'
@@ -223,7 +227,8 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_PROJECT_ID: ${{ env.EAS_PROJECT_ID }}
         run: |
-          eas update \
+          node ../scripts/write-mobile-build-stamp.mjs
+          yarn eas update \
             --channel development \
             --platform android \
             --environment development \
@@ -247,7 +252,9 @@ jobs:
         run: |
           # Wait for the build so the install URL is available in the summary.
           # Do NOT publish an OTA for this fingerprint — the new APK embeds JS.
-          eas build \
+          # Use workspace eas-cli via Yarn (no global install).
+          node ../scripts/write-mobile-build-stamp.mjs
+          yarn eas build \
             --platform android \
             --profile development \
             --non-interactive \

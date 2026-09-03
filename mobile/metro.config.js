@@ -13,6 +13,7 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(repoRoot, 'node_modules'),
 ];
-config.resolver.disableHierarchicalLookup = true;
+// Hierarchical lookup stays on: `nmHoistingLimits: workspaces` leaves real
+// nested node_modules (expo/node_modules/…) that Metro must still walk up to.
 
 module.exports = config;

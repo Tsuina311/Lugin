@@ -8,13 +8,16 @@
  *   node scripts/mobile-eas.mjs status
  *   node scripts/mobile-eas.mjs summary-ota
  *   node scripts/mobile-eas.mjs summary-build
+ *   node scripts/mobile-eas.mjs which
  *
- * Requires: eas-cli on PATH, EXPO_TOKEN (CI) or `eas login` (local).
- * Always runs with cwd = mobile/ so fingerprint matches EAS Build.
+ * Invokes the workspace `eas-cli` package (no global install). Auth via
+ * EXPO_TOKEN (CI) or `yarn mobile:eas login` (local). Always runs with
+ * cwd = mobile/ so fingerprint matches EAS Build.
  */
 
 import { execFileSync, execSync } from 'node:child_process';
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,9 +28,34 @@ const ENVIRONMENT = process.env.LUGIN_EAS_ENVIRONMENT || 'development';
 const PLATFORM = process.env.LUGIN_EAS_PLATFORM || 'android';
 const CHANNEL = process.env.LUGIN_EAS_CHANNEL || 'development';
 
+/** Resolve the eas-cli binary from the mobile workspace, never PATH/global. */
+function resolveEasBin() {
+  const requireFromMobile = createRequire(join(mobile, 'package.json'));
+  let pkgJsonPath;
+  try {
+    pkgJsonPath = requireFromMobile.resolve('eas-cli/package.json');
+  } catch {
+    throw new Error(
+      'eas-cli is not installed in the mobile workspace. Run `yarn install` from the repo root.',
+    );
+  }
+  const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
+  const binField = pkg.bin?.eas ?? pkg.bin;
+  if (typeof binField !== 'string') {
+    throw new Error(`eas-cli package.json has unexpected bin field at ${pkgJsonPath}`);
+  }
+  const binPath = join(dirname(pkgJsonPath), binField);
+  if (!existsSync(binPath)) {
+    throw new Error(`eas-cli bin missing: ${binPath}`);
+  }
+  return binPath;
+}
+
 function eas(args, { json = false } = {}) {
-  const full = ['eas', ...args, ...(json ? ['--json', '--non-interactive'] : ['--non-interactive'])];
-  const out = execFileSync(full[0], full.slice(1), {
+  const bin = resolveEasBin();
+  const argv = [...args, ...(json ? ['--json', '--non-interactive'] : ['--non-interactive'])];
+  // eas-cli's bin is a JS entry — run via node for Windows + yarn PnP/node-modules.
+  const out = execFileSync(process.execPath, [bin, ...argv], {
     cwd: mobile,
     encoding: 'utf8',
     env: process.env,
@@ -47,17 +75,22 @@ function parseJson(stdout) {
   return JSON.parse(text.slice(start));
 }
 
+function writeBuildStamp() {
+  execFileSync(process.execPath, [join(root, 'scripts', 'write-mobile-build-stamp.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
 function fingerprintHash() {
+  // Bake stamp before fingerprint so app.config matches what EAS will evaluate
+  // after upload (no .git on the builder).
+  writeBuildStamp();
+  // eas-cli forbids combining --build-profile and --environment.
+  // Use environment so fingerprint matches build/update (all "development").
   const raw = eas(
-    [
-      'fingerprint:generate',
-      '--platform',
-      PLATFORM,
-      '--build-profile',
-      PROFILE,
-      '--environment',
-      ENVIRONMENT,
-    ],
+    ['fingerprint:generate', '--platform', PLATFORM, '--environment', ENVIRONMENT],
     { json: true },
   );
   const parsed = parseJson(raw);
@@ -235,6 +268,17 @@ ${installUrl ? `[Download / install APK](${installUrl})` : '_Install URL will ap
 
 Do **not** expect an OTA for this commit — the native runtime changed. Install the new APK once; later JS-only pushes return to OTA.
 `);
+  process.exit(0);
+}
+
+if (cmd === 'which') {
+  const bin = resolveEasBin();
+  const version = execFileSync(process.execPath, [bin, '--version'], {
+    cwd: mobile,
+    encoding: 'utf8',
+    env: process.env,
+  }).trim();
+  console.log(JSON.stringify({ bin, version }, null, 2));
   process.exit(0);
 }
 

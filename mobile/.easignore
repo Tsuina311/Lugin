@@ -1,5 +1,6 @@
 # Files EAS Build does not need from the monorepo root.
 # Keep fingerprint/build focused on the mobile workspace + shared source.
+# Do NOT ignore yarn.lock, package.json, or .yarnrc.yml — EAS needs Berry.
 
 .scan-fixtures/
 .scan-real/
@@ -13,6 +14,7 @@ release/
 workers/
 .git/
 .yarn/cache/
+# Keep .yarn/releases (committed Berry binary) — required for EAS Build.
 **/node_modules/
 **/.expo/
 mobile/android/

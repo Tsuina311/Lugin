@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Baked before eas build/update (see scripts/write-mobile-build-stamp.mjs)
+/build-stamp.json
+/.eas-decide.json

@@ -13,6 +13,16 @@ const rootDir = join(mobileDir, '..');
 type Stamp = { id: string; label: string; version: string };
 
 function readStamp(): Stamp {
+  // Prefer a baked stamp (scripts/write-mobile-build-stamp.mjs). EAS uploads
+  // omit `.git/`, so live git counting on the builder would always fall to 1.0.0.
+  const baked = join(mobileDir, 'build-stamp.json');
+  if (existsSync(baked)) {
+    try {
+      return JSON.parse(readFileSync(baked, 'utf8')) as Stamp;
+    } catch {
+      /* fall through */
+    }
+  }
   try {
     const raw = execSync(
       `node --experimental-strip-types -e "import { buildVersion } from './build/version.ts'; process.stdout.write(JSON.stringify(buildVersion('./')))"`,

@@ -45,6 +45,7 @@ mobile/dist/
 mobile/web-build/
 mobile/expo-env.d.ts
 mobile/.eas-decide.json
+.eas-yarn-bin/
 *.jks
 *.p8
 *.p12

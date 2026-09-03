@@ -21,16 +21,54 @@ gate (tests)
 Web never waits on EAS. If `EXPO_TOKEN` is missing, Pages still deploys and the
 native job warns and skips.
 
+## Monorepo layout (two package.json files)
+
+Having two `package.json` files is intentional. Do **not** merge them.
+
+| Path | Role | May contain |
+| --- | --- | --- |
+| `/package.json` | Yarn Berry **workspace root** (extension + web) | `workspaces`, `packageManager`, web/extension deps, root scripts |
+| `/mobile/package.json` | Expo **app** package | Expo/RN deps, `eas-build-pre-install`, mobile scripts |
+
+Expo / EAS config does **not** live in either `package.json`:
+
+| File | Purpose |
+| --- | --- |
+| `mobile/app.config.ts` | Expo app config (name, plugins, updates, projectId) |
+| `mobile/eas.json` | EAS Build / Update profiles |
+| `mobile/eas-project.json` | EAS project id fallback |
+
+Root must **not** gain `expo`, `react-native`, or `app.json`/`app.config.*`. Mobile must **not** become the Yarn workspace root (no root `workspaces` move).
+
+EAS runs `yarn install` at the **repo root** because it detects the workspace.
+Both package.json files share the same `packageManager` pin. EAS’s image still
+ships Yarn **1.22** and may invoke it by absolute path, so Corepack alone is not
+enough. We commit Yarn Berry at `.yarn/releases/` (`yarnPath` in `.yarnrc.yml`)
+and run `scripts/eas-build-pre-install.mjs` to replace that Yarn 1 entrypoint
+with a wrapper that execs the committed Berry binary. The builder log line
+“Yarn 1.22.22” under spin-up is only the image default — after the pre-install
+hook, install should show Yarn Berry `YN0000` lines.
+
+Fingerprint OTA uses `runtimeVersion.policy: fingerprint`. Volatile git stamps
+in `app.config.ts` (`version`, `extra.lugin`) and prebuild’s `android/` folder
+must not shift the hash between your machine and EAS. That is handled by
+`mobile/fingerprint.config.js` (source skips + ignore native dirs) and by baking
+`mobile/build-stamp.json` before `eas build` / `eas update` / fingerprint
+(`scripts/write-mobile-build-stamp.mjs`) so the APK still shows the real
+commit-count version even though `.git/` is not uploaded.
+
 ## First setup
 
 ### 1. Expo account + project
 
 ```bash
-npm install -g eas-cli   # or use npx eas-cli@latest
-cd mobile
-eas login
-eas init                 # creates project; copy the projectId
+yarn install                 # installs eas-cli in the mobile workspace
+yarn mobile:eas login
+yarn mobile:eas init         # creates project; copy the projectId
 ```
+
+No global `eas-cli` install. All commands go through Yarn (`yarn mobile:eas …`
+or the higher-level `yarn mobile:build:eas` / `yarn mobile:update` scripts).
 
 Put the project id in **one** of:
 
@@ -61,7 +99,12 @@ Install the APK URL from the EAS build page / CI summary on the Samsung
 
 > The CI **`development`** profile is a **release-style APK** with channel
 > `development` so cold-start OTA works. For Metro debugging, use
-> `development-client` manually (`eas build --profile development-client`).
+> `development-client` manually (`yarn mobile:eas build --profile development-client`).
+>
+> EAS Build uses the committed Yarn Berry binary (`.yarn/releases` + `yarnPath`)
+> and `scripts/eas-build-pre-install.mjs` to replace the image’s Yarn 1 before
+> install. Do **not** set `"corepack": true` or `"yarn": "3.x"` in `eas.json`
+> for this monorepo.
 
 ## Normal development (JS-only)
 
@@ -112,14 +155,18 @@ yarn mobile:update               # publish OTA to development
 yarn mobile:build:eas            # force development APK build
 ```
 
-Inside `mobile/` (same effect):
+Inside `mobile/` via Yarn (same CLI; no global install):
 
 ```bash
-eas fingerprint:generate --platform android --build-profile development --environment development --json --non-interactive
-eas build:list --platform android --build-profile development --fingerprint-hash "$HASH" --status finished --limit 1 --json --non-interactive
-eas update --channel development --platform android --environment development --message "…" --non-interactive
-eas build --platform android --profile development --non-interactive
+yarn eas fingerprint:generate --platform android --environment development --json --non-interactive
+yarn eas build:list --platform android --build-profile development --fingerprint-hash "$HASH" --status finished --limit 1 --json --non-interactive
+yarn eas update --channel development --platform android --environment development --message "…" --non-interactive
+yarn eas build --platform android --profile development --non-interactive
 ```
+
+Or from the repo root: `yarn mobile:eas <args…>`.
+
+Note: `eas fingerprint:generate` accepts **either** `--environment` **or** `--build-profile`, not both. CI uses `--environment development`.
 
 ## Rollback
 
@@ -127,9 +174,9 @@ OTA (JS) problems — republish a known-good update or roll back via EAS:
 
 ```bash
 cd mobile
-eas update:list --channel development --non-interactive
+yarn eas update:list --channel development --non-interactive
 # Republish previous bundle / use Expo dashboard rollback for the branch
-eas update --channel development --platform android --environment development --message "rollback" --non-interactive
+yarn eas update --channel development --platform android --environment development --message "rollback" --non-interactive
 ```
 
 Or use the [EAS dashboard](https://expo.dev) → Updates → roll back / republish.
@@ -182,6 +229,8 @@ Fingerprint, build, and update all use environment **`development`**.
 | Native build failed | No OTA published for that fingerprint; keep old APK |
 | Updates disabled in Settings | Running Metro / Expo Go / `development-client` debug binary |
 | Google auth mismatch | Android OAuth client SHA-1 must match the **installed** signing cert |
+| EAS: Yarn 1.22 vs `packageManager` yarn@3 | Ensure `.yarn/releases/yarn-3.8.1.cjs` is committed and `eas-build-pre-install` runs; check Install logs for “Replaced yarn at …” |
+| EAS: Failed to install yarn | Do not set `"corepack": true` or `"yarn": "3.x"` in eas.json |
 
 ## Acceptance scenario (document when you run it)
 

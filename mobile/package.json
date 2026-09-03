@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "main": "index.ts",
+  "packageManager": "yarn@3.8.1+sha512.8cfec856814c797ccb480703ca5270824327fac5abce240835e2699e01732229fd22bbeb1bb87047a0069f7698be9b2e3d9a926e6046e851faa9908fdacdeacf",
   "scripts": {
     "start": "expo start --dev-client",
     "android": "expo run:android",
@@ -11,12 +12,14 @@
     "typecheck": "tsc --noEmit",
     "test": "node ./scripts/smoke.cjs",
     "build:dev": "expo prebuild && expo run:android",
-    "build:eas": "eas build --platform android --profile development",
-    "update:development": "eas update --channel development --platform android --environment development --non-interactive"
+    "eas": "eas",
+    "build:eas": "node ../scripts/write-mobile-build-stamp.mjs && eas build --platform android --profile development",
+    "update:development": "node ../scripts/write-mobile-build-stamp.mjs && eas update --channel development --platform android --environment development --non-interactive",
+    "eas-build-pre-install": "node ../scripts/eas-build-pre-install.mjs"
   },
   "dependencies": {
     "expo": "~57.0.19",
-    "expo-constants": "~18.0.13",
+    "expo-constants": "~57.0.17",
     "expo-dev-client": "~57.0.18",
     "expo-status-bar": "~57.0.1",
     "expo-updates": "^57.0.21",
@@ -24,11 +27,12 @@
     "react-native": "0.86.3",
     "react-native-nitro-image": "^0.14.0",
     "react-native-nitro-modules": "^0.37.1",
-    "react-native-safe-area-context": "~5.6.0",
+    "react-native-safe-area-context": "~5.7.0",
     "react-native-vision-camera": "^5.2.3"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "eas-cli": "^23.2.0",
     "typescript": "~5.9.2"
   }
 }
