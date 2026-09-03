@@ -14,6 +14,7 @@ import {
   REPLACE_VISUAL_DELTA,
   SHARPNESS_MIN,
 } from '../params';
+import { CARD_HEIGHT, CARD_WIDTH } from '../geometry';
 import { prepareCard, type PreparedCard } from '../prepareCard';
 import { frameQualityScore, pushQualityPool, type FrameQuality } from '../quality';
 import type { FusedResult } from '../ranking/fuse';
@@ -53,6 +54,17 @@ export interface ScanContext {
 
 /** Optional live-camera helpers (hi-res crop / focus). DOM-free contract. */
 export interface FrameHelpers {
+  /**
+   * Supply a detect-only (or already-prepared) analysis result.
+   *
+   * Live camera already ran `detectCardQuad` for the overlay. Calling
+   * `prepareCard` again would detect *and* warp to 744×1039 on every search
+   * frame. When this returns a result, `onFrame` uses it instead.
+   *
+   * Recognition still goes through {@link refineCard} (or `prepareCard` if
+   * that helper is absent) so the 744×1039 crop is not skipped at lock.
+   */
+  prepareAnalysis?: (frame: ScanImage) => PreparedCard | null;
   /**
    * Build a recognition crop from the full camera frame using analysis corners.
    * When absent (fixtures / stills), analysis-frame prepareCard is used.
@@ -238,7 +250,7 @@ export const createSessionController = (
 
     async onFrame(frame, helpers) {
       analysisSize = { height: frame.height, width: frame.width };
-      const prepared = prepareCard(frame);
+      const prepared = helpers?.prepareAnalysis?.(frame) ?? prepareCard(frame);
       lastDetection = prepared.detection;
 
       if (!prepared.detected || !prepared.corners || prepared.score < DETECT_MIN_SCORE) {
@@ -332,8 +344,20 @@ export const createSessionController = (
         );
         const best = pool[0];
         if (best && best.quality.score >= QUALITY_MIN_SCORE && !recognizing) {
-          lastNormalized = best.card.image;
-          await runRecognize(best.card);
+          // prepareAnalysis may have skipped the 744×1039 warp. Recognition
+          // still needs a canonical card — refineCard if we have one, else
+          // warp now from the analysis frame.
+          const canonical =
+            best.card.image.width === CARD_WIDTH &&
+            best.card.image.height === CARD_HEIGHT;
+          const card = canonical
+            ? best.card
+            : (() => {
+                const warped = prepareCard(frame);
+                return warped.detected ? warped : best.card;
+              })();
+          lastNormalized = card.image;
+          await runRecognize(card);
         }
       }
 
