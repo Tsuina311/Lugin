@@ -74,10 +74,23 @@ export function ScanResultCard({ nameIndex, onAction, snapshot }: Props) {
             <Text style={styles.debug}>
               confidence {(card?.confidence ?? fused.candidates[0]?.score ?? 0).toFixed(2)} ·
               margin {fused.margin.toFixed(2)}
+              {rec?.visualTop?.length
+                ? ` · art ${rec.visualTop[0].name} ${rec.visualTop[0].visualScore.toFixed(2)}`
+                : ''}
             </Text>
           ) : null}
+          <Text style={styles.debug}>title/text/footer unavailable (no OCR yet)</Text>
           <View style={styles.row}>
-            <Pressable onPress={() => onAction('add')} style={styles.btn}>
+            <Pressable
+              disabled={fused?.status !== 'identified' && fused?.status !== 'printing-ambiguous'}
+              onPress={() => onAction('add')}
+              style={[
+                styles.btn,
+                fused?.status !== 'identified' && fused?.status !== 'printing-ambiguous'
+                  ? styles.btnOff
+                  : null,
+              ]}
+            >
               <Text style={styles.btnLabel}>Add to collection</Text>
             </Pressable>
             <Pressable
@@ -189,6 +202,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  btnOff: {
+    opacity: 0.4,
   },
   card: {
     backgroundColor: 'rgba(11,18,32,0.92)',

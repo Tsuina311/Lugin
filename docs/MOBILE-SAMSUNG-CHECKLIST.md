@@ -7,6 +7,8 @@ Use the virtual **Back Triple Camera**. Do not switch to ultra-wide.
 Leave the debug panel **off** for the feel test, then **on** for numbers.
 Thumbnails must stay ~1 Hz.
 
+OTA to check: `C.2i` / later `high-res capture` update. Confirm Settings shows the new stamp.
+
 ## A. Detector latency
 
 - Fast path chip is the default (not the 4-rung ladder).
@@ -15,60 +17,71 @@ Thumbnails must stay ~1 Hz.
 - With Scan dbg on, read:
   - sample Hz
   - detect Hz
-  - cam→polygon p50/p95
+  - **cam→polygon p50/p95** (primary)
+  - processed-frame age p50/p95 / last
   - detect p50/p95
   - received / processed / superseded
 - Repeat with debug panel **off** vs **on**, thumbnail visible vs not.
 - Cycle **Long 640 / 480 / 400**. Same FOV. Note hit rate and cam→polygon.
 
-PENDING — not measured in this session.
+PENDING — do not invent numbers.
 
 ## B. SessionController + focus
 
 - Badge uses shared phases: `SEARCHING` `DETECTED` `FOCUSING` `LOCKING`
-  `RECOGNIZING` `FOUND` `AMBIGUOUS`.
+  `RECOGNIZING` `FOUND` `AMBIGUOUS`. `CAPTURING…` while a still is in flight.
 - Hold a card still. Phase should not jump to FOUND on the first plausible frame.
 - Card-center focus should tick without fighting a recent tap.
 - Tap-to-focus still works.
 
 PENDING.
 
-## C. Normalized card
+## C. High-res source vs analysis fallback
 
-- Lock a card until **Recognition input (744×1039)** appears.
-- Upright? Tight crop? Title readable? Not mirrored? Correct aspect?
+Cycle **Src snapshot / photo / high-res-frame**.
+
+For each, lock a card and read debug:
+
+- `source: snapshot|photo|high-res-frame (high-res)` **or** `analysis-fallback`
+- native source dimensions
+- capture / convert / warp ms
+- High-res source thumbnail: does the numbered quad (1 TL … 4 BL) surround the same card?
+- Recognition input — HIGH RES: upright, tight, not mirrored?
+
+Then inspect the **same physical card** under analysis-fallback vs the chosen source:
+
+- title legible?
+- rules text legible?
+- collector number legible?
+- artwork sharpness?
+
+Do not pick a winner without this comparison. Snapshot may fail if preview snapshot is unsupported (we force `implementationMode=compatible` for that). Photo may hitch the preview. High-res-frame may hitch when the latch attaches.
 
 PENDING.
 
-## D. High-res source
+## D. Artwork-only identity
 
-- Current default is **analysis-warp** (same FOV as the detector).
-- Photo / snapshot / higher-res frame are implemented as architecture only.
-- Compare A/B/C only after A feels responsive:
-  - resolution, sharpness, latency, preview freeze, quad mapping.
+OCR is **unavailable** (title/text/footer must say unavailable, not 0).
 
-PENDING — do not pick a mechanism without these numbers.
+- Indexes load (`card-names.json`, `art-index.json`).
+- Scan 10–20 named cards.
+- Artwork candidates 1/2/3 with scores?
+- descriptor ms / matcher ms / art stage ms?
+- Expected name in top-1 / top-3?
+- Ambiguous cards stay ambiguous. Add stays disabled unless identified / printing-ambiguous.
 
-## E. Artwork / identity
+PENDING.
 
-- Indexes load from the Pages deploy (`card-names.json`, `art-index.json`).
-- Scan 10 named cards.
-- Artwork candidates listed? Expected name in top 3?
-- Time to result?
-- Ambiguous cards stay ambiguous (do not auto-pick).
+## E. Result actions
 
-PENDING. OCR is empty, so identity is artwork-only until an engine is added.
-
-## F. Result actions
-
-- Add to collection (command queued; persistence is in-memory).
+- Add to collection (in-memory command).
 - Wrong card / Wrong printing / Scan again.
 
 PENDING.
 
-## G. Thermal
+## F. Thermal
 
 - 5-minute continuous scan.
 - Frame drops, detect Hz, heat.
 
-PENDING — no thermal claim without this test.
+PENDING.

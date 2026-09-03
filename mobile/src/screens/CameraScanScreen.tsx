@@ -11,9 +11,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Camera,
+  CommonResolutions,
   useCameraDevices,
   useCameraPermission,
   useOrientation,
+  usePhotoOutput,
   type CameraDevice,
   type CameraRef,
 } from 'react-native-vision-camera';
@@ -25,6 +27,8 @@ import { tickOverlay } from '../scan/overlayEase';
 import { ScanDebugPanel } from '../scan/ScanDebugPanel';
 import { ScanResultCard } from '../scan/ScanResultCard';
 import { mapCornersToOverlay, type CardCorners, type Point2D } from '../scan/sharedCore';
+import { RECOGNITION_SOURCES, type PreferredSource } from '../scan/hiresCapture';
+import { useHiResFrameLatch } from '../scan/useHiResFrame';
 import { useScanSession } from '../scan/useScanSession';
 import {
   ANALYSIS_LONG_EDGES,
@@ -78,6 +82,20 @@ export function CameraScanScreen() {
   const [diagnosticRungs, setDiagnosticRungs] = useState(false);
   const [showNumbers, setShowNumbers] = useState(true);
   const [pendingAdd, setPendingAdd] = useState<string | null>(null);
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const preferredSource: PreferredSource = RECOGNITION_SOURCES[sourceIndex];
+
+  const photoOutput = usePhotoOutput({
+    containerFormat: 'jpeg',
+    quality: 0.85,
+    qualityPrioritization: device?.supportsSpeedQualityPrioritization ? 'speed' : 'balanced',
+    targetResolution: CommonResolutions.FHD_4_3,
+  });
+
+  const hiResFrame = useHiResFrameLatch({
+    enabled: detectorOn,
+    previewSize: layout,
+  });
   // Interface, not device: the UI is portrait-locked. Device orientation
   // stays undefined until the phone moves — that was the startup bug.
   const interfaceOrientation = useOrientation('interface');
@@ -85,7 +103,10 @@ export function CameraScanScreen() {
   const session = useScanSession({
     cameraRef,
     enabled: detectorOn,
+    photoOutput,
+    preferredSource,
     previewSize: layout,
+    takeHiResFrame: hiResFrame.take,
   });
 
   const {
@@ -234,9 +255,10 @@ export function CameraScanScreen() {
         ref={cameraRef}
         device={device}
         enableNativeTapToFocusGesture={false}
+        implementationMode="compatible"
         isActive
         orientationSource="interface"
-        outputs={[frameOutput]}
+        outputs={[frameOutput, photoOutput, hiResFrame.frameOutput]}
         resizeMode="cover"
         style={StyleSheet.absoluteFill}
         zoom={1}
@@ -367,6 +389,14 @@ export function CameraScanScreen() {
               session={{
                 artCandidates: session.debug.artCandidates,
                 artEntries: session.indexes.art?.entries ?? null,
+                artworkDescriptorMs: session.debug.artworkDescriptorMs,
+                artworkMatcherMs: session.debug.artworkMatcherMs,
+                artworkMs: session.debug.artworkMs,
+                captureMs: session.debug.captureMs,
+                convertMs: session.debug.convertMs,
+                footerEvidence: session.debug.footerEvidence,
+                hiresUri: session.debug.hiresUri,
+                mappedCorners: session.debug.mappedCorners,
                 names: session.indexes.names?.names ?? null,
                 normalizedUri: session.debug.normalizedUri,
                 phase,
@@ -374,8 +404,15 @@ export function CameraScanScreen() {
                 qualityExposure: session.snapshot?.quality?.exposure,
                 qualityGlare: session.snapshot?.quality?.glare,
                 qualitySharpness: session.snapshot?.quality?.sharpness,
+                recognitionSource: session.debug.recognitionSource,
+                sourceHeight: session.debug.sourceHeight,
+                sourceLabel: session.debug.sourceLabel,
+                sourceWidth: session.debug.sourceWidth,
                 stable: (session.snapshot?.motion ?? 1) < 0.04 && (session.snapshot?.trackFrames ?? 0) >= 3,
+                textEvidence: session.debug.textEvidence,
+                titleEvidence: session.debug.titleEvidence,
                 trackFrames: session.snapshot?.trackFrames ?? 0,
+                warpMs: session.debug.warpMs,
               }}
               showNumbers={showNumbers}
               transfer={transfer}
@@ -424,6 +461,12 @@ export function CameraScanScreen() {
             style={styles.chip}
           >
             <Text style={styles.chipLabel}>Long {ANALYSIS_LONG_EDGES[longEdgeIndex]}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setSourceIndex(i => (i + 1) % RECOGNITION_SOURCES.length)}
+            style={styles.chip}
+          >
+            <Text style={styles.chipLabel}>Src {preferredSource}</Text>
           </Pressable>
           <Pressable
             onPress={() => setResolutionIndex(i => (i + 1) % RESOLUTIONS.length)}

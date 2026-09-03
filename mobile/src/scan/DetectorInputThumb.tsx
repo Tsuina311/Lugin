@@ -7,6 +7,7 @@ type Props = {
   height: number;
   label: string;
   showNumbers: boolean;
+  title?: string;
   uri: string | null;
   width: number;
 };
@@ -18,13 +19,21 @@ const THUMB_MAX = 132;
  * "Detector input" — the exact ScanImage handed to detectCardQuad, with that
  * call's raw quad drawn in analysis coordinates before any preview mapping.
  */
-export function DetectorInputThumb({ corners, height, label, showNumbers, uri, width }: Props) {
+export function DetectorInputThumb({
+  corners,
+  height,
+  label,
+  showNumbers,
+  title = 'Detector input',
+  uri,
+  width,
+}: Props) {
   const box = thumbSize(width, height);
   const mapped = corners && width > 0 ? mapCorners(corners, { height, width }, box) : null;
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>Detector input</Text>
+      <Text style={styles.label}>{title}</Text>
       <View style={[styles.frame, box]}>
         {uri ? (
           <Image resizeMode="stretch" source={{ uri }} style={StyleSheet.absoluteFill} />

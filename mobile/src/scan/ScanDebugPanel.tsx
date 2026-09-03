@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { DetectorInputThumb } from './DetectorInputThumb';
 import { formatCorner } from './analysisGeometry';
+import type { CardCorners } from './sharedCore';
 import type { AnalysisMetrics, StageStats } from './analysisStats';
 import type {
   AnalysisResult,
@@ -18,6 +19,14 @@ import type {
 type SessionBits = {
   artCandidates: { name: string; score: number }[];
   artEntries: number | null;
+  artworkDescriptorMs: number | null;
+  artworkMatcherMs: number | null;
+  artworkMs: number | null;
+  captureMs: number | null;
+  convertMs: number | null;
+  footerEvidence: string;
+  hiresUri: string | null;
+  mappedCorners: CardCorners | null;
   names: number | null;
   normalizedUri: string | null;
   phase: string;
@@ -25,8 +34,15 @@ type SessionBits = {
   qualityExposure?: number;
   qualityGlare?: number;
   qualitySharpness?: number;
+  recognitionSource: string | null;
+  sourceHeight: number | null;
+  sourceLabel: string;
+  sourceWidth: number | null;
   stable: boolean;
+  textEvidence: string;
+  titleEvidence: string;
   trackFrames: number;
+  warpMs: number | null;
 };
 
 type Props = {
@@ -179,11 +195,15 @@ export function ScanDebugPanel({
                   {ms(metrics.latency.cameraToDetect)}
                 </Text>
                 <Text style={styles.ok}>
-                  cam→polygon {ms(metrics.latency.cameraToOverlay)}
-                  {metrics.processedFrameAgeMs
-                    ? ` · processed age ${ms(metrics.processedFrameAgeMs)}`
-                    : ''}
+                  cam→polygon {ms(metrics.latency.cameraToOverlay)} last{' '}
+                  {metrics.latency.cameraToOverlay.last.toFixed(0)}
                 </Text>
+                {metrics.processedFrameAgeMs ? (
+                  <Text style={styles.line}>
+                    processed-frame age {ms(metrics.processedFrameAgeMs)} last{' '}
+                    {metrics.processedFrameAgeMs.last.toFixed(0)}
+                  </Text>
+                ) : null}
               </>
             ) : null}
             {metrics.lastDropReason ? (
@@ -351,23 +371,62 @@ export function ScanDebugPanel({
             <Text style={styles.line}>
               names {session.names ?? '—'} · art {session.artEntries ?? '—'}
             </Text>
+            <Text style={styles.line}>
+              title {session.titleEvidence} · text {session.textEvidence} · footer{' '}
+              {session.footerEvidence}
+            </Text>
+            <Text style={styles.title}>Recognition source</Text>
+            <Text style={session.sourceLabel === 'high-res' ? styles.ok : styles.warn}>
+              source: {session.recognitionSource ?? 'none'} ({session.sourceLabel})
+            </Text>
+            <Text style={styles.line}>
+              native {session.sourceWidth ?? '—'}×{session.sourceHeight ?? '—'} · warp 744×1039
+            </Text>
+            <Text style={styles.line}>
+              capture {session.captureMs?.toFixed(0) ?? '—'} ms · convert{' '}
+              {session.convertMs?.toFixed(0) ?? '—'} ms · warp {session.warpMs?.toFixed(0) ?? '—'} ms
+            </Text>
+            <Text style={styles.title}>High-res source</Text>
+            {session.hiresUri && session.sourceWidth && session.sourceHeight ? (
+              <DetectorInputThumb
+                corners={session.mappedCorners}
+                height={session.sourceHeight}
+                label={`${session.sourceWidth}×${session.sourceHeight} · ${session.recognitionSource}`}
+                showNumbers
+                title="High-res source"
+                uri={session.hiresUri}
+                width={session.sourceWidth}
+              />
+            ) : (
+              <Text style={styles.dim}>no high-res source yet — hold a card until locking</Text>
+            )}
             {session.artCandidates.length ? (
               <>
                 <Text style={styles.title}>Artwork candidates</Text>
                 {session.artCandidates.map((c, i) => (
                   <Text key={`${c.name}:${i}`} style={styles.line}>
-                    {i + 1}. {c.name} · {c.score.toFixed(3)}
+                    {i + 1}. {c.name} — {c.score.toFixed(3)}
                   </Text>
                 ))}
+                <Text style={styles.line}>
+                  descriptor {session.artworkDescriptorMs?.toFixed(1) ?? '—'} ms · matcher{' '}
+                  {session.artworkMatcherMs?.toFixed(1) ?? '—'} ms · art stage{' '}
+                  {session.artworkMs?.toFixed(1) ?? '—'} ms
+                </Text>
               </>
-            ) : null}
-            <Text style={styles.title}>Recognition input (744×1039)</Text>
+            ) : (
+              <Text style={styles.dim}>no artwork candidates yet</Text>
+            )}
+            <Text style={styles.title}>
+              Recognition input — {session.sourceLabel === 'high-res' ? 'HIGH RES' : 'analysis fallback'}
+            </Text>
             {session.normalizedUri ? (
               <DetectorInputThumb
                 corners={null}
                 height={1039}
-                label="744×1039 canonical"
+                label={`744×1039 · ${session.recognitionSource ?? 'unknown'}`}
                 showNumbers={false}
+                title="Recognition input"
                 uri={session.normalizedUri}
                 width={744}
               />

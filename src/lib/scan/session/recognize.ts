@@ -86,7 +86,13 @@ export const recognizeCard = async (
   if (!options.skipArtwork) {
     const artCrop = cropImage(card, profile.artwork);
     const descriptor = describeArtwork(artCrop);
+    timings.artworkDescriptorMs = now() - t0;
+    const matchAt = now();
     visualTop = matcher.findCandidates(descriptor, VISUAL_TOP_N);
+    timings.artworkMatcherMs = now() - matchAt;
+  } else {
+    timings.artworkDescriptorMs = 0;
+    timings.artworkMatcherMs = 0;
   }
   timings.artworkMs = now() - t0;
 

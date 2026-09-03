@@ -31,7 +31,8 @@ frames on the same device.
 | C.2e — Worklet → RN transfer ladder | Done — `getPixelBuffer` failed; plane-0 fallback |
 | C.2g — Orient + cover-crop analysis to preview FOV | Passed on Samsung after orientation syncs |
 | C.2h — Initial outputOrientation lifecycle | Shipped; **awaiting still-phone startup test** |
-| C.3+ — Recognition, collection, Drive | Not started |
+| C.3 — High-res Recognition Input + artwork-only | **OTA ready** — Samsung must compare sources |
+| C.4+ — Native OCR, SQLite, Drive | Blocked — OCR after hi-res proven; no Drive yet |
 
 Milestone B was compared on the real device: Samsung Camera sharp, Lugin
 web/Chrome materially blurrier, Lugin native materially sharper than Chrome.
@@ -477,17 +478,22 @@ Live path:
 VisionCamera frame → oriented/cropped ScanImage → detectCardQuad
   → SessionController.onFrame (prepareAnalysis, no search-frame warp)
   → tracking / focus / quality pool
-  → refineCard (744×1039 warp; analysis-warp until photo is measured)
-  → recognizeCard (artwork + empty OCR + fuseEvidence)
+  → lock → async hi-res (snapshot | photo | high-res-frame)
+  → map detector quad through normalized preview FOV (never screen px)
+  → warpQuadToCard → 744×1039
+  → recognizeCard (artwork + ocr:null + fuseEvidence)
   → result card
 ```
 
+`analysis-fallback` warps the ~480px detector image into 744×1039. That
+upsamples; it does not recover title/footer detail. It is labeled and
+used only when the preferred hi-res source fails.
+
 Default analysis long edge is 480 (same FOV as 640/400). Production transfer
 is one `scheduleOnRN`, not the four-rung ladder. Debug PNG/panel publish at
-~1–2 Hz.
-
-Samsung latency, hi-res photo vs snapshot, and artwork-on-device numbers:
-see `docs/MOBILE-SAMSUNG-CHECKLIST.md`. All PENDING.
+~1–2 Hz. Preferred hi-res source defaults to snapshot; cycle **Src** on
+device. Samsung must compare them; see
+`docs/MOBILE-SAMSUNG-CHECKLIST.md`. All PENDING.
 
 ## Storage / Drive / OCR (later milestones)
 
@@ -495,7 +501,8 @@ see `docs/MOBILE-SAMSUNG-CHECKLIST.md`. All PENDING.
   port. Expo SQLite waits for a fingerprint/APK; do not add it through OTA.
 - **Drive:** still out of scope until native recognition *and* local
   persistence work.
-- **OCR:** seam is `emptyTextRecognizer`. Survey: `docs/MOBILE-OCR.md`.
+- **OCR:** live path passes `ocr: null` (title/text/footer = unavailable).
+  `emptyTextRecognizer` is kept for later. Survey: `docs/MOBILE-OCR.md`.
 - **Corpus:** same consent + Drive folder pipeline; label `platform: android`.
 
 ## Versioning
@@ -511,11 +518,11 @@ invent a separate scheme. Desktop overlay continues to use
   not.** Previous device notes (~11 sample Hz → ~2–3 detect Hz) were taken
   with the diagnostic ladder and debug panel on. This session did not
   re-measure on the phone.
-- Hi-res recognition defaults to warping the analysis frame. Photo /
-  snapshot / higher-res frame output need a Samsung comparison before one
-  is chosen.
-- Artwork matching is wired; OCR is an empty recognizer. Identity on device
-  is artwork-only until an engine is added (new APK).
+- Hi-res acquisition is implemented (snapshot / photo / high-res-frame)
+  with labeled `analysis-fallback`. No source is chosen until Samsung
+  compares sharpness, latency, and preview hitch.
+- Artwork matching is wired; OCR is unavailable (not empty-string scores).
+  Identity on device is artwork-only until an engine is added (new APK).
 - Collection add is a command seam over an in-memory `LocalRepository`.
   No SQLite, no Drive.
 - iOS is structurally supported; untested on device.

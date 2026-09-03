@@ -225,6 +225,7 @@ export interface FrameAnalysisOptions {
   onAnalyzed?: (payload: {
     detection: ReturnType<typeof detectCardQuad>;
     image: ScanImage;
+    spaces: CoordinateSpaces;
   }) => void;
   /**
    * Interface (UI) orientation from VisionCamera. Ignored when undefined —
@@ -600,7 +601,11 @@ export const useFrameAnalysis = ({
         score: detection.score,
       });
       stages.cameraToOverlay.push(now() - sampleAt);
-      onAnalyzedRef.current?.({ detection, image });
+      onAnalyzedRef.current?.({
+        detection,
+        image,
+        spaces: { ...spaces, detector: { height: image.height, width: image.width } },
+      });
 
       const candidates = detection.debug.candidates;
       const heavy = debugPreview && finishedAt - lastPreviewAt.current >= PREVIEW_MS;

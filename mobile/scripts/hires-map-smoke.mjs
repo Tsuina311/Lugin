@@ -37,8 +37,12 @@ try {
 
   const {
     fromNorm,
+    mapCornersToHiRes,
+    mapDetectorToHiRes,
     mapDetectorToOrientedSource,
     mapSameFov,
+    mirrorX,
+    scaleVisibleRect,
     toNorm,
   } = await import(pathToFileURL(outfile).href);
 
@@ -79,6 +83,50 @@ try {
     Math.abs(br.x - ((92 + 296) / 480) * 3000) < 0.5 && Math.abs(br.y - 4000) < 0.5,
     `${br.x},${br.y}`,
   );
+
+  const flipped = mirrorX({ x: 10, y: 20 }, { height: 100, width: 80 });
+  check('mirrorX flips about vertical axis', flipped.x === 70 && flipped.y === 20);
+
+  const scaledVis = scaleVisibleRect(visible, oriented, hires);
+  check(
+    'visible scales onto hi-res oriented',
+    Math.abs(scaledVis.x - 575) < 0.5 && Math.abs(scaledVis.width - 1850) < 0.5,
+    JSON.stringify(scaledVis),
+  );
+
+  const via = mapDetectorToHiRes({ x: 0, y: 0 }, {
+    dest: hires,
+    destMirrored: false,
+    detector,
+    kind: 'oriented-full',
+    oriented,
+    visible,
+  });
+  check('mapDetectorToHiRes matches oriented-full TL', Math.abs(via.x - tl.x) < 1e-6);
+
+  const mirrored = mapDetectorToHiRes({ x: 0, y: 0 }, {
+    dest: hires,
+    destMirrored: true,
+    detector,
+    kind: 'oriented-full',
+    oriented,
+    visible,
+  });
+  check(
+    'mirrored dest flips X only',
+    Math.abs(mirrored.x - (hires.width - tl.x)) < 0.5 && Math.abs(mirrored.y - tl.y) < 0.5,
+  );
+
+  const same = mapCornersToHiRes(
+    {
+      bottomLeft: { x: 0, y: 640 },
+      bottomRight: { x: 296, y: 640 },
+      topLeft: { x: 0, y: 0 },
+      topRight: { x: 296, y: 0 },
+    },
+    { dest: { height: 1280, width: 592 }, detector, kind: 'same-fov' },
+  );
+  check('same-fov TR lands at dest TR', same.topRight.x === 592 && same.topRight.y === 0);
 
   if (failures > 0) {
     console.error(`hires-map smoke: ${failures} check(s) failed`);

@@ -14,7 +14,7 @@ import {
   REPLACE_VISUAL_DELTA,
   SHARPNESS_MIN,
 } from '../params';
-import { CARD_HEIGHT, CARD_WIDTH } from '../geometry';
+import { CARD_HEIGHT, CARD_WIDTH, cornersToQuad, warpQuadToCard } from '../geometry';
 import { prepareCard, type PreparedCard } from '../prepareCard';
 import { frameQualityScore, pushQualityPool, type FrameQuality } from '../quality';
 import type { FusedResult } from '../ranking/fuse';
@@ -75,6 +75,11 @@ export interface FrameHelpers {
   ) => PreparedCard | null;
   /** Request focus/metering at normalized video coords (0–1). */
   requestFocusNorm?: (x: number, y: number) => void;
+  /**
+   * When false, stay in locking without starting recognition.
+   * Native uses this while a high-res still is in flight.
+   */
+  allowRecognize?: () => boolean;
 }
 
 export interface SessionSnapshot {
@@ -344,18 +349,25 @@ export const createSessionController = (
         );
         const best = pool[0];
         if (best && best.quality.score >= QUALITY_MIN_SCORE && !recognizing) {
-          // prepareAnalysis may have skipped the 744×1039 warp. Recognition
-          // still needs a canonical card — refineCard if we have one, else
-          // warp now from the analysis frame.
+          if (helpers?.allowRecognize && !helpers.allowRecognize()) {
+            message = 'Capturing…';
+            return snap();
+          }
+          // prepareAnalysis skips the 744×1039 warp on search frames.
+          // Prefer refineCard (hi-res cache); otherwise warp this analysis
+          // frame once. Do not run detectCardQuad again.
           const canonical =
             best.card.image.width === CARD_WIDTH &&
             best.card.image.height === CARD_HEIGHT;
           const card = canonical
             ? best.card
-            : (() => {
-                const warped = prepareCard(frame);
-                return warped.detected ? warped : best.card;
-              })();
+            : helpers?.refineCard?.(prepared.corners, analysisSize) ??
+              {
+                ...best.card,
+                corners: prepared.corners,
+                detected: true,
+                image: warpQuadToCard(frame, cornersToQuad(prepared.corners)),
+              };
           lastNormalized = card.image;
           await runRecognize(card);
         }

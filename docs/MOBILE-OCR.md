@@ -37,4 +37,11 @@ raw character accuracy. Add it only when:
 Either path changes the EAS fingerprint → new development APK. After that,
 TypeScript-only scanner changes go out as OTA again.
 
-The current native implementation is `mobile/src/scan/emptyOcr.ts`.
+The current live path passes `ocr: null` so title/text/footer are
+**unavailable** (not empty-string scores). `mobile/src/scan/emptyOcr.ts`
+exists for later wiring.
+
+Do not add ML Kit (or any OCR native module) until a high-res Recognition
+Input is proven on Samsung. That addition changes the EAS fingerprint and
+needs a new APK. Do not bundle SQLite in the same APK unless persistence
+is actually next.

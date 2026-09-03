@@ -4,12 +4,13 @@
 // must not add a second throttle. It does ignore card-center focus for a short
 // window after a user tap so the two do not fight.
 //
-// refineCard: sync. Returns a cached hi-res warp or warps the last analysis
-// frame. Photo / snapshot stay async and populate the cache from outside.
+// refineCard: cached hi-res only. Analysis-warp is a labeled fallback at lock,
+// not returned here as if it were high-res.
 
 import type { CameraRef } from 'react-native-vision-camera';
 
 import { refineFromStore, type HiResStore } from './hiresCapture';
+import type { HiResSpaces } from './hiresCapture';
 import { preparedFromDetection } from './preparedFromDetection';
 import type {
   CardCorners,
@@ -27,6 +28,7 @@ export interface NativeHelperState {
   detection: DetectResult | null;
   lastTapAt: number;
   preview: { height: number; width: number };
+  spaces: HiResSpaces | null;
   store: HiResStore;
 }
 
@@ -35,6 +37,7 @@ export const createNativeHelperState = (store: HiResStore): NativeHelperState =>
   detection: null,
   lastTapAt: 0,
   preview: { height: 0, width: 0 },
+  spaces: null,
   store,
 });
 
@@ -65,12 +68,12 @@ export const createFrameHelpers = (
   state: NativeHelperState,
   camera: { current: CameraRef | null },
 ): FrameHelpers => ({
+  allowRecognize: () => !state.store.inFlight,
   prepareAnalysis: (frame: ScanImage): PreparedCard | null => {
     if (!state.detection || state.analysis !== frame) return null;
     return preparedFromDetection(frame, state.detection);
   },
-  refineCard: (corners: CardCorners): PreparedCard | null =>
-    refineFromStore(state.store, state.analysis, corners, state.detection?.score ?? 0),
+  refineCard: (_corners: CardCorners): PreparedCard | null => refineFromStore(state.store),
   requestFocusNorm: (x: number, y: number) => {
     if (Date.now() - state.lastTapAt < TAP_FOCUS_GUARD_MS) return;
     requestFocusOnCamera(camera.current, state.preview, x, y);
