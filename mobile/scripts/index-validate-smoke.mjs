@@ -58,17 +58,36 @@ try {
   };
   check(
     'accepts compact art descriptors',
-    !validateArtworkIndexData({
-      entries: [
-        {
-          descriptor,
-          name: 'Sol Ring',
-          oracleId: 'oracle:sol',
-          scryfallId: 'sf',
-        },
-      ],
-      version: 1,
-    }).reason,
+    !validateArtworkIndexData(
+      {
+        entries: [
+          {
+            descriptor,
+            name: 'Sol Ring',
+            oracleId: 'oracle:sol',
+            scryfallId: 'sf',
+          },
+        ],
+        version: 1,
+      },
+      { minEntries: 1 },
+    ).reason,
+  );
+  check(
+    'rejects tiny fixture indexes in production',
+    Boolean(
+      validateArtworkIndexData({
+        entries: [
+          {
+            descriptor,
+            name: 'Sol Ring',
+            oracleId: 'oracle:sol',
+            scryfallId: 'sf',
+          },
+        ],
+        version: 1,
+      }).reason,
+    ),
   );
   check(
     'rejects an image-shaped art payload',

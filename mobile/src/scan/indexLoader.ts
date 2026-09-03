@@ -27,6 +27,7 @@ export interface NameIndexLoad {
   checksum: string;
   coldMs: number;
   data: CardNameIndexData;
+  error?: string;
   index: CardNameIndex;
   names: number;
   source: 'network' | 'memory';
@@ -39,6 +40,8 @@ export interface ArtIndexLoad {
   coldMs: number;
   data: ArtworkIndexData;
   entries: number;
+  error?: string;
+  generated: string | null;
   matcher: ArtworkMatcher;
   source: 'network' | 'memory';
   text: TextIndexData | null;
@@ -128,10 +131,15 @@ export const loadArtworkIndex = async (
     const data = checked.data;
     const builtAt = now();
     const load: ArtIndexLoad = {
-      checksum: checksumJson({ entries: data.entries.length, version: data.version }),
+      checksum: checksumJson({
+        entries: data.entries.length,
+        generated: data.generated ?? null,
+        version: data.version,
+      }),
       coldMs: now() - t0,
       data,
       entries: data.entries.length,
+      generated: data.generated ?? null,
       matcher: createArtworkMatcher(data),
       source: 'network',
       text: textIndexFromArtworkPayload(raw),
@@ -141,7 +149,12 @@ export const loadArtworkIndex = async (
     memory.art = load;
     return load;
   })()
-    .catch(() => null)
+    .catch((err: unknown) => {
+      // Surface the reason in debug — do not silently match against nothing.
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[lugin] art index load failed: ${message}`);
+      return null;
+    })
     .finally(() => {
       memory.artInflight = null;
     });

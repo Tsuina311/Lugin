@@ -136,10 +136,13 @@ export const recognizeCard = async (
     row.titleScore = Math.max(row.titleScore ?? 0, c.score);
   }
 
-  let fused = fuseEvidence([...byOracle.values()].map(r => ({
-    ...r,
-    temporalSupport: temporalSupportFor(temporal, r.oracleId),
-  })));
+  let fused = fuseEvidence(
+    [...byOracle.values()].map(r => ({
+      ...r,
+      temporalSupport: temporalSupportFor(temporal, r.oracleId),
+    })),
+    { artworkOnly: !deps.ocr || options.skipOcr === true },
+  );
 
   const needText =
     options.wantText ||

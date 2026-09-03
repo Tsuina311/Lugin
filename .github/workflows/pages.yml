@@ -124,9 +124,12 @@ jobs:
         continue-on-error: true
         run: node scripts/build-card-index.mjs --out dist-web/card-names.json
 
-      - name: Artwork index (fixtures)
+      # Production art index — unique illustrations from Scryfall (~20–30k).
+      # NEVER ship --from-fixtures here: native/web scanners load this URL and a
+      # 20-entry fixture index produces confident wrong identities.
+      - name: Artwork index (full)
         continue-on-error: true
-        run: node scripts/build-art-index.mjs --from-fixtures --out dist-web/art-index.json
+        run: node scripts/build-art-index.mjs --out dist-web/art-index.json
 
       - uses: actions/configure-pages@v5
 

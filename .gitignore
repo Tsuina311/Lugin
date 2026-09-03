@@ -50,3 +50,4 @@ mobile/.eas-decide.json
 *.p8
 *.p12
 *.mobileprovision
+.scan-cache/

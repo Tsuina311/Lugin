@@ -1216,6 +1216,54 @@ check('fusion accepts a strong title+visual pair and stays ambiguous on a coin t
   assert.ok(toss.status === 'card-ambiguous' || toss.status === 'insufficient-confidence');
 });
 
+check('artwork-only mode rejects a tight weak visual cluster even with temporal boost', () => {
+  const weak = fuseEvidence(
+    [
+      {
+        name: 'Sol Ring',
+        oracleId: 'oracle:sol',
+        possiblePrintingIds: ['p1'],
+        temporalSupport: 1,
+        visualScore: 0.7,
+      },
+      {
+        name: 'Arcane Signet',
+        oracleId: 'oracle:signet',
+        possiblePrintingIds: ['p2'],
+        temporalSupport: 0,
+        visualScore: 0.675,
+      },
+    ],
+    { artworkOnly: true },
+  );
+  assert.equal(weak.status, 'card-ambiguous');
+  assert.equal(weak.card, undefined);
+});
+
+check('artwork-only mode accepts a strong visual leader with clear margin', () => {
+  const strong = fuseEvidence(
+    [
+      {
+        name: 'Chaos Dragon',
+        oracleId: 'oracle:chaos',
+        possiblePrintingIds: ['p1'],
+        temporalSupport: 0.5,
+        visualScore: 0.92,
+      },
+      {
+        name: 'Other',
+        oracleId: 'oracle:other',
+        possiblePrintingIds: [],
+        temporalSupport: 0,
+        visualScore: 0.7,
+      },
+    ],
+    { artworkOnly: true },
+  );
+  assert.equal(strong.status, 'identified');
+  assert.equal(strong.card?.name, 'Chaos Dragon');
+});
+
 check('temporal support rises when the same oracle keeps winning', () => {
   let state = emptyTemporal();
   const obs = id =>

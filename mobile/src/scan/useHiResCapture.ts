@@ -1,6 +1,6 @@
 // On-demand high-res acquisition. Never runs at detector cadence.
 //
-// Order (default): snapshot → photo → analysis-fallback.
+// Order (default): snapshot → photo → high-res-frame → analysis-fallback.
 // Snapshot is preview-FOV (same-fov map). Photo is a still; we treat it as
 // oriented-full and map through the analysis visible rect.
 // A dedicated higher-res frame output is optional and armed only for one copy.
@@ -13,6 +13,10 @@ import {
   HIRES_MAX_LONG_EDGE,
   emptyHiResStore,
   mapAndWarp,
+  markSourceFailure,
+  markSourceRequest,
+  markSourceStarted,
+  markSourceSuccess,
   putFallback,
   type HiResAttempt,
   type HiResCache,
@@ -44,11 +48,15 @@ export const createHiResCapturer = (deps: {
 }) => {
   const captureSnapshot = async (req: CaptureRequest): Promise<HiResCache> => {
     const cam = deps.cameraRef.current;
+    markSourceRequest(deps.store, 'snapshot');
     if (!cam?.takeSnapshot) throw new Error('Preview snapshot is not available');
+    markSourceStarted(deps.store, 'snapshot');
+    deps.store.phase = 'capturing';
     const t0 = now();
     const snap = await cam.takeSnapshot();
     const acquireMs = now() - t0;
     try {
+      deps.store.phase = 'converting';
       const t1 = now();
       const source = await imageToScanImage(snap, HIRES_MAX_LONG_EDGE);
       const convertMs = now() - t1;
@@ -61,12 +69,14 @@ export const createHiResCapturer = (deps: {
         false,
         req.score,
       );
+      const size = { height: source.height, width: source.width };
+      markSourceSuccess(deps.store, 'snapshot', size);
       const attempt: HiResAttempt = {
         acquireMs,
         convertMs,
         mode: 'snapshot',
         previewInterrupted: false,
-        sourceSize: { height: source.height, width: source.width },
+        sourceSize: size,
         warpMs,
       };
       return { attempt, corners: req.corners, mapped, prepared, source };
@@ -77,12 +87,16 @@ export const createHiResCapturer = (deps: {
 
   const capturePhoto = async (req: CaptureRequest): Promise<HiResCache> => {
     const out = deps.photoOutput;
+    markSourceRequest(deps.store, 'photo');
     if (!out) throw new Error('Photo output is not attached');
+    markSourceStarted(deps.store, 'photo');
+    deps.store.phase = 'capturing';
     const t0 = now();
     let photo: Photo | null = null;
     try {
       photo = await out.capturePhoto({ enableShutterSound: false, flashMode: 'off' }, {});
       const acquireMs = now() - t0;
+      deps.store.phase = 'converting';
       const t1 = now();
       const { image: source } = await photoToScanImage(photo, HIRES_MAX_LONG_EDGE);
       const convertMs = now() - t1;
@@ -100,6 +114,7 @@ export const createHiResCapturer = (deps: {
         photo.isMirrored,
         req.score,
       );
+      markSourceSuccess(deps.store, 'photo', dest);
       const attempt: HiResAttempt = {
         acquireMs,
         convertMs,
@@ -148,11 +163,15 @@ export const runPreferredCapture = async (
       if (mode === 'snapshot') return await capturer.captureSnapshot(req);
       if (mode === 'photo') return await capturer.capturePhoto(req);
       if (mode === 'high-res-frame') {
-        if (!takeHiResFrame) throw new Error('high-res frame latch is not armed');
+        markSourceRequest(store, 'high-res-frame');
+        if (!takeHiResFrame) throw new Error('high-res frame latch is not available');
+        markSourceStarted(store, 'high-res-frame');
+        store.phase = 'capturing';
         const t0 = now();
         const source = await takeHiResFrame();
         if (!source) throw new Error('high-res frame produced no pixels');
         const acquireMs = now() - t0;
+        store.phase = 'converting';
         const { mapped, prepared, warpMs } = mapAndWarp(
           source,
           req.corners,
@@ -162,13 +181,15 @@ export const runPreferredCapture = async (
           false,
           req.score,
         );
+        const size = { height: source.height, width: source.width };
+        markSourceSuccess(store, 'high-res-frame', size);
         return {
           attempt: {
             acquireMs,
             convertMs: 0,
             mode: 'high-res-frame',
             previewInterrupted: false,
-            sourceSize: { height: source.height, width: source.width },
+            sourceSize: size,
             warpMs,
           },
           corners: req.corners,
@@ -178,14 +199,14 @@ export const runPreferredCapture = async (
         };
       }
     } catch (err) {
-      errors.push(`${mode}: ${err instanceof Error ? err.message : String(err)}`);
+      const message = err instanceof Error ? err.message : String(err);
+      const timedOut = /timed? ?out/i.test(message);
+      markSourceFailure(store, mode, message, timedOut);
+      errors.push(`${mode}: ${message}`);
     }
   }
-  const fallback = putFallback(store, req.analysis, req.corners, req.score);
-  store.lastAttempt = {
-    ...store.lastAttempt!,
-    reason: errors.join(' · ') || 'all high-res sources failed',
-  };
+  const reason = errors.join(' · ') || 'all high-res sources failed';
+  const fallback = putFallback(store, req.analysis, req.corners, req.score, reason);
   return store.cache ?? {
     attempt: store.lastAttempt!,
     corners: req.corners,

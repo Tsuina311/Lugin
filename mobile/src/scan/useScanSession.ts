@@ -2,17 +2,22 @@
 //
 // Acquisition stays in useFrameAnalysis. This hook owns phases, tracking,
 // focus, quality pool, and recognition — all via the portable controller.
-// High-res capture is async and must finish (or fail) before recognize.
+// High-res capture starts as soon as we enter focusing/locking and recognition
+// waits a bounded interval before labeled analysis-fallback.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Share } from 'react-native';
 
 import type { CameraPhotoOutput, CameraRef } from 'react-native-vision-camera';
 
 import { scanImageToPngDataUri } from './debug/scanImagePng';
 import {
+  HIRES_WAIT_MS,
   RECOGNITION_SOURCES,
   emptyHiResStore,
   isTrueHiRes,
+  type HiResPhase,
+  type HiResSourceStats,
   type HiResSpaces,
   type PreferredSource,
   type RecognitionSource,
@@ -48,13 +53,18 @@ export interface AnalyzedFrame {
 export interface SessionDebug {
   art: ArtIndexLoad | null;
   artCandidates: { name: string; score: number }[];
+  artError: string | null;
+  artGenerated: string | null;
   artworkDescriptorMs: number | null;
   artworkMatcherMs: number | null;
   artworkMs: number | null;
   captureMs: number | null;
   convertMs: number | null;
   footerEvidence: 'unavailable' | 'present';
+  hiresPhase: HiResPhase;
+  hiresStats: Record<string, HiResSourceStats>;
   hiresUri: string | null;
+  hiresWaitMs: number;
   mappedCorners: import('./sharedCore').CardCorners | null;
   names: NameIndexLoad | null;
   normalizedUri: string | null;
@@ -65,6 +75,10 @@ export interface SessionDebug {
   sourceHeight: number | null;
   sourceLabel: string;
   sourceWidth: number | null;
+  temporalLeader: string | null;
+  temporalObservations: number;
+  temporalResetAt: number | null;
+  temporalResetReason: string | null;
   textEvidence: 'unavailable' | 'present';
   titleEvidence: 'unavailable' | 'present';
   warpMs: number | null;
@@ -73,13 +87,18 @@ export interface SessionDebug {
 const emptyDebug = (): SessionDebug => ({
   art: null,
   artCandidates: [],
+  artError: null,
+  artGenerated: null,
   artworkDescriptorMs: null,
   artworkMatcherMs: null,
   artworkMs: null,
   captureMs: null,
   convertMs: null,
   footerEvidence: 'unavailable',
+  hiresPhase: 'idle',
+  hiresStats: emptyHiResStore().stats,
   hiresUri: null,
+  hiresWaitMs: HIRES_WAIT_MS,
   mappedCorners: null,
   names: null,
   normalizedUri: null,
@@ -90,6 +109,10 @@ const emptyDebug = (): SessionDebug => ({
   sourceHeight: null,
   sourceLabel: 'none',
   sourceWidth: null,
+  temporalLeader: null,
+  temporalObservations: 0,
+  temporalResetAt: null,
+  temporalResetReason: null,
   textEvidence: 'unavailable',
   titleEvidence: 'unavailable',
   warpMs: null,
@@ -115,8 +138,9 @@ export const useScanSession = (opts: {
   const [debug, setDebug] = useState<SessionDebug>(emptyDebug);
   const [indexes, setIndexes] = useState<{
     art: ArtIndexLoad | null;
+    artError: string | null;
     names: NameIndexLoad | null;
-  }>({ art: null, names: null });
+  }>({ art: null, artError: null, names: null });
 
   const store = useRef(emptyHiResStore());
   const helperState = useRef(createNativeHelperState(store.current));
@@ -129,6 +153,10 @@ export const useScanSession = (opts: {
   const lastDebugAt = useRef(0);
   const lastPhase = useRef<ScannerPhase>('searching');
   const lastCaptureKey = useRef('');
+  const temporalMeta = useRef<{ resetAt: number | null; resetReason: string | null }>({
+    resetAt: null,
+    resetReason: null,
+  });
 
   const capturer = useMemo(
     () => createHiResCapturer({ cameraRef, photoOutput, store: store.current }),
@@ -138,13 +166,24 @@ export const useScanSession = (opts: {
   useEffect(() => {
     store.current.cache = null;
     store.current.lastAttempt = null;
+    store.current.waitStartedAt = null;
+    store.current.phase = 'idle';
     lastCaptureKey.current = '';
+    temporalMeta.current = {
+      resetAt: Date.now(),
+      resetReason: `source → ${preferredSource}`,
+    };
   }, [preferredSource]);
 
   useEffect(() => {
     let cancelled = false;
     void Promise.all([loadNameIndex(), loadArtworkIndex()]).then(([names, art]) => {
-      if (!cancelled) setIndexes({ art, names });
+      if (cancelled) return;
+      setIndexes({
+        art,
+        artError: art ? null : 'art index missing or rejected (fixture/too small?)',
+        names,
+      });
     });
     return () => {
       cancelled = true;
@@ -188,19 +227,26 @@ export const useScanSession = (opts: {
       const timings = snap.recognition?.timings;
       const ocrOn = Boolean(deps.ocr);
       const mode = cache?.attempt.mode ?? store.current.lastAttempt?.mode ?? null;
+      const temporal = snap.temporal;
+      const leader = temporal?.observations?.[temporal.observations.length - 1]?.topOracleId ?? null;
       setDebug({
         art: indexes.art,
         artCandidates: (snap.recognition?.visualTop ?? []).slice(0, 5).map(c => ({
           name: c.name,
           score: c.visualScore,
         })),
+        artError: indexes.artError,
+        artGenerated: indexes.art?.generated ?? null,
         artworkDescriptorMs: timings?.artworkDescriptorMs ?? null,
         artworkMatcherMs: timings?.artworkMatcherMs ?? null,
         artworkMs: timings?.artworkMs ?? null,
         captureMs: cache?.attempt.acquireMs ?? store.current.lastAttempt?.acquireMs ?? null,
         convertMs: cache?.attempt.convertMs ?? null,
         footerEvidence: ocrOn ? 'present' : 'unavailable',
+        hiresPhase: store.current.phase,
+        hiresStats: { ...store.current.stats },
         hiresUri,
+        hiresWaitMs: HIRES_WAIT_MS,
         mappedCorners: cache?.mapped ?? null,
         names: indexes.names,
         normalizedUri,
@@ -213,25 +259,32 @@ export const useScanSession = (opts: {
           ? isTrueHiRes(mode)
             ? 'high-res'
             : 'analysis-fallback'
-          : 'none',
+          : store.current.inFlight || store.current.phase === 'requested' || store.current.phase === 'capturing'
+            ? 'waiting'
+            : 'none',
         sourceWidth: cache?.attempt.sourceSize?.width ?? null,
+        temporalLeader: leader,
+        temporalObservations: temporal?.observations?.length ?? 0,
+        temporalResetAt: temporalMeta.current.resetAt,
+        temporalResetReason: temporalMeta.current.resetReason,
         textEvidence: ocrOn ? 'present' : 'unavailable',
         titleEvidence: ocrOn ? 'present' : 'unavailable',
         warpMs: cache?.attempt.warpMs ?? store.current.lastAttempt?.warpMs ?? null,
       });
     },
-    [controller, deps.ocr, indexes.art, indexes.names],
+    [controller, deps.ocr, indexes.art, indexes.artError, indexes.names],
   );
 
-  const maybeCapture = useCallback(
-    (frame: AnalyzedFrame, phase: ScannerPhase) => {
-      if (phase !== 'focusing' && phase !== 'locking') return;
+  const startCapture = useCallback(
+    (frame: AnalyzedFrame) => {
       if (!frame.detection.corners) return;
       if (store.current.cache || store.current.inFlight) return;
       const key = `${Math.round(frame.detection.corners.topLeft.x)}:${Math.round(frame.detection.corners.topLeft.y)}`;
       if (key === lastCaptureKey.current) return;
       lastCaptureKey.current = key;
       store.current.inFlight = true;
+      store.current.waitStartedAt = store.current.waitStartedAt ?? Date.now();
+      store.current.phase = 'requested';
       void runPreferredCapture(
         preferredRef.current,
         capturer,
@@ -258,6 +311,7 @@ export const useScanSession = (opts: {
             sourceSize: { height: frame.image.height, width: frame.image.width },
             warpMs: 0,
           };
+          store.current.phase = 'failed';
         })
         .finally(() => {
           store.current.inFlight = false;
@@ -266,18 +320,44 @@ export const useScanSession = (opts: {
     [capturer],
   );
 
+  // Controller may call allowRecognize before our phase-based kick; wire it.
+  helperState.current.requestCapture = () => {
+    const analysis = helperState.current.analysis;
+    const detection = helperState.current.detection;
+    const spaces = helperState.current.spaces;
+    if (!analysis || !detection?.corners || !spaces) return;
+    startCapture({ detection, image: analysis, spaces });
+  };
+
   const onAnalyzed = useCallback(
     async (frame: AnalyzedFrame) => {
       helperState.current.analysis = frame.image;
       helperState.current.detection = frame.detection;
       helperState.current.spaces = frame.spaces;
+
+      // Kick hi-res once we are focusing/locking so capture is not raced
+      // by an immediate analysis-fallback recognize on the first lock frame.
+      if (
+        (lastPhase.current === 'focusing' || lastPhase.current === 'locking') &&
+        frame.detection.corners
+      ) {
+        if (store.current.waitStartedAt == null) store.current.waitStartedAt = Date.now();
+        startCapture(frame);
+      }
+
       const snap = await controller.onFrame(frame.image, helpers);
       if (snap.phase === 'searching') {
         store.current.cache = null;
         store.current.lastAttempt = null;
+        store.current.waitStartedAt = null;
+        store.current.phase = 'idle';
         lastCaptureKey.current = '';
+        temporalMeta.current = { resetAt: Date.now(), resetReason: 'card gone / searching' };
       }
-      maybeCapture(frame, snap.phase);
+      if (snap.phase === 'focusing' || snap.phase === 'locking') {
+        if (store.current.waitStartedAt == null) store.current.waitStartedAt = Date.now();
+        startCapture(frame);
+      }
       const phaseChanged = snap.phase !== lastPhase.current;
       lastPhase.current = snap.phase;
       const t = Date.now();
@@ -290,7 +370,7 @@ export const useScanSession = (opts: {
       lastDebugAt.current = t;
       publishDebug(snap);
     },
-    [controller, helpers, maybeCapture, publishDebug],
+    [controller, helpers, publishDebug, startCapture],
   );
 
   const reset = useCallback(() => {
@@ -298,10 +378,13 @@ export const useScanSession = (opts: {
     store.current.cache = null;
     store.current.inFlight = false;
     store.current.lastAttempt = null;
+    store.current.waitStartedAt = null;
+    store.current.phase = 'idle';
     lastCaptureKey.current = '';
     helperState.current.analysis = null;
     helperState.current.detection = null;
     helperState.current.spaces = null;
+    temporalMeta.current = { resetAt: Date.now(), resetReason: 'scan again' };
     setSnapshot(controller.snapshot());
     setDebug(emptyDebug());
   }, [controller]);
@@ -318,6 +401,35 @@ export const useScanSession = (opts: {
     [cameraRef],
   );
 
+  const exportRecognitionInput = useCallback(async () => {
+    const image = controller.lastNormalized();
+    if (!image || image.width !== CARD_WIDTH || image.height !== CARD_HEIGHT) {
+      return { ok: false as const, reason: 'no 744×1039 recognition input yet' };
+    }
+    const uri = scanImageToPngDataUri(image);
+    const meta = {
+      artEntries: indexes.art?.entries ?? null,
+      artGenerated: indexes.art?.generated ?? null,
+      height: image.height,
+      recognitionSource: store.current.cache?.attempt.mode ?? null,
+      width: image.width,
+    };
+    try {
+      await Share.share({
+        message: `Lugin recognition input ${meta.width}×${meta.height} source=${meta.recognitionSource ?? 'unknown'}\n${JSON.stringify(meta)}\n${uri.slice(0, 80)}…`,
+        title: 'Export recognition input',
+        url: uri,
+      });
+      return { ok: true as const, meta, uri };
+    } catch (err) {
+      return {
+        ok: false as const,
+        reason: err instanceof Error ? err.message : String(err),
+        uri,
+      };
+    }
+  }, [controller, indexes.art]);
+
   return {
     debug,
     describeLastArt: () => {
@@ -325,6 +437,7 @@ export const useScanSession = (opts: {
       if (!image) return null;
       return describeArtwork(image);
     },
+    exportRecognitionInput,
     focusNorm,
     indexes,
     markTap,

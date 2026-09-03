@@ -36,6 +36,8 @@ try {
     isTrueHiRes,
     putFallback,
     refineFromStore,
+    canRecognizeFromStore,
+    HIRES_WAIT_MS,
   } = await import(pathToFileURL(outfile).href);
 
   check('photo is true hi-res', isTrueHiRes('photo') === true);
@@ -44,6 +46,7 @@ try {
 
   const store = emptyHiResStore();
   check('empty refine is null, not a silent warp', refineFromStore(store) === null);
+  check('cannot recognize before wait starts', canRecognizeFromStore(store) === false);
 
   const analysis = {
     data: new Uint8ClampedArray(4 * 4 * 4),
@@ -56,10 +59,13 @@ try {
     topLeft: { x: 0, y: 0 },
     topRight: { x: 3, y: 0 },
   };
-  const prepared = putFallback(store, analysis, corners, 0.9);
+  const prepared = putFallback(store, analysis, corners, 0.9, 'test');
   check('fallback is canonical 744×1039', prepared.image.width === 744 && prepared.image.height === 1039);
   check('fallback mode is labeled', store.lastAttempt.mode === 'analysis-fallback');
-  check('refine then returns the fallback cache', refineFromStore(store) === prepared);
+  check('refine does not treat fallback as hi-res', refineFromStore(store) === null);
+  check('fallback cache still present', store.cache?.prepared === prepared);
+  check('fallback allows recognize', canRecognizeFromStore(store) === true);
+  check('wait constant is bounded', HIRES_WAIT_MS >= 100 && HIRES_WAIT_MS <= 2000);
 
   if (failures > 0) {
     console.error(`hires-fallback smoke: ${failures} check(s) failed`);

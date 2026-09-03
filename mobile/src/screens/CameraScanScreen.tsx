@@ -141,12 +141,14 @@ export function CameraScanScreen() {
 
   // Never leave a second RGB ImageAnalysis (1440×1920) bound on every
   // session — that can prevent CameraX from starting on Samsung.
-  // Default detector path is analysis FrameOutput only (proven).
-  // Photo attaches when Src=photo (or while a hi-res latch is armed).
+  // Photo attaches for snapshot/photo so the capture cascade can succeed.
   // Hi-res frame attaches only while the one-shot latch is armed.
   const cameraOutputs = useMemo(() => {
     const outs: CameraOutput[] = [frameOutput];
-    const needPhoto = preferredSource === 'photo' || hiResFrame.armed;
+    const needPhoto =
+      preferredSource === 'snapshot' ||
+      preferredSource === 'photo' ||
+      hiResFrame.armed;
     if (needPhoto) outs.push(photoOutput);
     if (hiResFrame.armed) outs.push(hiResFrame.frameOutput);
     return outs;
@@ -405,13 +407,18 @@ export function CameraScanScreen() {
               session={{
                 artCandidates: session.debug.artCandidates,
                 artEntries: session.indexes.art?.entries ?? null,
+                artError: session.debug.artError,
+                artGenerated: session.debug.artGenerated,
                 artworkDescriptorMs: session.debug.artworkDescriptorMs,
                 artworkMatcherMs: session.debug.artworkMatcherMs,
                 artworkMs: session.debug.artworkMs,
                 captureMs: session.debug.captureMs,
                 convertMs: session.debug.convertMs,
                 footerEvidence: session.debug.footerEvidence,
+                hiresPhase: session.debug.hiresPhase,
+                hiresStats: session.debug.hiresStats,
                 hiresUri: session.debug.hiresUri,
+                hiresWaitMs: session.debug.hiresWaitMs,
                 mappedCorners: session.debug.mappedCorners,
                 names: session.indexes.names?.names ?? null,
                 normalizedUri: session.debug.normalizedUri,
@@ -425,6 +432,9 @@ export function CameraScanScreen() {
                 sourceLabel: session.debug.sourceLabel,
                 sourceWidth: session.debug.sourceWidth,
                 stable: (session.snapshot?.motion ?? 1) < 0.04 && (session.snapshot?.trackFrames ?? 0) >= 3,
+                temporalLeader: session.debug.temporalLeader,
+                temporalObservations: session.debug.temporalObservations,
+                temporalResetReason: session.debug.temporalResetReason,
                 textEvidence: session.debug.textEvidence,
                 titleEvidence: session.debug.titleEvidence,
                 trackFrames: session.snapshot?.trackFrames ?? 0,
@@ -510,6 +520,16 @@ export function CameraScanScreen() {
             <Text style={styles.chipLabel}>
               {panel === 'scan' ? 'Scan dbg' : panel === 'camera' ? 'Cam dbg' : 'No panel'}
             </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              void session.exportRecognitionInput().then(r => {
+                setPendingAdd(r.ok ? 'exported recognition input' : `export: ${r.reason}`);
+              });
+            }}
+            style={styles.chip}
+          >
+            <Text style={styles.chipLabel}>Export input</Text>
           </Pressable>
           <Pressable
             onPress={() => {

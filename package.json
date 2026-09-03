@@ -39,6 +39,7 @@
     "scan:index": "node scripts/build-card-index.mjs --out .scan-fixtures/card-names.json",
     "scan:art-index": "node scripts/build-art-index.mjs --out .scan-fixtures/art-index.json",
     "scan:art-index:fixtures": "node scripts/build-art-index.mjs --from-fixtures --out .scan-fixtures/art-index.json",
+    "scan:art-replay": "node scripts/scan-art-replay.mjs",
     "scan:pipeline": "node scripts/scan-pipeline-eval.mjs",
     "scan:pipeline:real": "node scripts/scan-pipeline-eval.mjs --real",
     "scan:detect-eval": "node scripts/scan-detect-eval.mjs",

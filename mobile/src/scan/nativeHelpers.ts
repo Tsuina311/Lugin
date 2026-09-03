@@ -4,12 +4,16 @@
 // must not add a second throttle. It does ignore card-center focus for a short
 // window after a user tap so the two do not fight.
 //
-// refineCard: cached hi-res only. Analysis-warp is a labeled fallback at lock,
-// not returned here as if it were high-res.
+// refineCard: cached true hi-res, or labeled analysis-fallback after the wait.
 
 import type { CameraRef } from 'react-native-vision-camera';
 
-import { refineFromStore, type HiResStore } from './hiresCapture';
+import {
+  canRecognizeFromStore,
+  putFallback,
+  refineFromStore,
+  type HiResStore,
+} from './hiresCapture';
 import type { HiResSpaces } from './hiresCapture';
 import { preparedFromDetection } from './preparedFromDetection';
 import type {
@@ -28,6 +32,8 @@ export interface NativeHelperState {
   detection: DetectResult | null;
   lastTapAt: number;
   preview: { height: number; width: number };
+  /** Kick async hi-res capture when the controller first asks to recognize. */
+  requestCapture: (() => void) | null;
   spaces: HiResSpaces | null;
   store: HiResStore;
 }
@@ -37,6 +43,7 @@ export const createNativeHelperState = (store: HiResStore): NativeHelperState =>
   detection: null,
   lastTapAt: 0,
   preview: { height: 0, width: 0 },
+  requestCapture: null,
   spaces: null,
   store,
 });
@@ -68,12 +75,39 @@ export const createFrameHelpers = (
   state: NativeHelperState,
   camera: { current: CameraRef | null },
 ): FrameHelpers => ({
-  allowRecognize: () => !state.store.inFlight,
+  allowRecognize: () => {
+    if (state.store.waitStartedAt == null) state.store.waitStartedAt = Date.now();
+    // Ensure capture is in flight before the controller may fall back.
+    state.requestCapture?.();
+    return canRecognizeFromStore(state.store);
+  },
   prepareAnalysis: (frame: ScanImage): PreparedCard | null => {
     if (!state.detection || state.analysis !== frame) return null;
     return preparedFromDetection(frame, state.detection);
   },
-  refineCard: (_corners: CardCorners): PreparedCard | null => refineFromStore(state.store),
+  refineCard: (corners: CardCorners): PreparedCard | null => {
+    const cached = refineFromStore(state.store);
+    if (cached) return cached;
+    // Wait window elapsed (or capture finished as fallback) — label analysis.
+    if (
+      canRecognizeFromStore(state.store) &&
+      state.analysis &&
+      state.detection?.corners &&
+      !state.store.inFlight
+    ) {
+      if (state.store.cache?.attempt.mode === 'analysis-fallback') {
+        return state.store.cache.prepared;
+      }
+      return putFallback(
+        state.store,
+        state.analysis,
+        corners,
+        state.detection.score,
+        state.store.lastAttempt?.reason ?? 'hi-res wait elapsed — analysis fallback',
+      );
+    }
+    return null;
+  },
   requestFocusNorm: (x: number, y: number) => {
     if (Date.now() - state.lastTapAt < TAP_FOCUS_GUARD_MS) return;
     requestFocusOnCamera(camera.current, state.preview, x, y);

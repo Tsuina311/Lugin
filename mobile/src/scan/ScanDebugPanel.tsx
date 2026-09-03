@@ -19,13 +19,28 @@ import type {
 type SessionBits = {
   artCandidates: { name: string; score: number }[];
   artEntries: number | null;
+  artError: string | null;
+  artGenerated: string | null;
   artworkDescriptorMs: number | null;
   artworkMatcherMs: number | null;
   artworkMs: number | null;
   captureMs: number | null;
   convertMs: number | null;
   footerEvidence: string;
+  hiresPhase: string;
+  hiresStats: Record<
+    string,
+    {
+      failure: number;
+      lastError: string | null;
+      requested: number;
+      started: number;
+      success: number;
+      timeout: number;
+    }
+  > | null;
   hiresUri: string | null;
+  hiresWaitMs: number | null;
   mappedCorners: CardCorners | null;
   names: number | null;
   normalizedUri: string | null;
@@ -39,6 +54,9 @@ type SessionBits = {
   sourceLabel: string;
   sourceWidth: number | null;
   stable: boolean;
+  temporalLeader: string | null;
+  temporalObservations: number;
+  temporalResetReason: string | null;
   textEvidence: string;
   titleEvidence: string;
   trackFrames: number;
@@ -64,7 +82,8 @@ type Props = {
   transfer: TransferCheck | null;
 };
 
-const ms = (s: StageStats) => `${s.p50.toFixed(1)}/${s.p95.toFixed(1)}`;
+const ms = (s: StageStats) =>
+  s.count === 0 ? 'n/a' : `${s.p50.toFixed(1)}/${s.p95.toFixed(1)}`;
 const fps = (n: number) => n.toFixed(1);
 
 /**
@@ -369,23 +388,45 @@ export function ScanDebugPanel({
               </Text>
             ) : null}
             <Text style={styles.line}>
-              names {session.names ?? '—'} · art {session.artEntries ?? '—'}
+              names {session.names ?? '—'} · art index {session.artEntries ?? '—'}
+              {session.artGenerated ? ` · built ${session.artGenerated.slice(0, 10)}` : ''}
             </Text>
+            {session.artError ? <Text style={styles.bad}>{session.artError}</Text> : null}
             <Text style={styles.line}>
               title {session.titleEvidence} · text {session.textEvidence} · footer{' '}
               {session.footerEvidence}
             </Text>
+            <Text style={styles.line}>
+              temporal obs {session.temporalObservations} · leader{' '}
+              {session.temporalLeader ?? '—'}
+              {session.temporalResetReason ? ` · reset: ${session.temporalResetReason}` : ''}
+            </Text>
             <Text style={styles.title}>Recognition source</Text>
             <Text style={session.sourceLabel === 'high-res' ? styles.ok : styles.warn}>
-              source: {session.recognitionSource ?? 'none'} ({session.sourceLabel})
+              source: {session.recognitionSource ?? 'none'} ({session.sourceLabel}) · phase{' '}
+              {session.hiresPhase}
             </Text>
             <Text style={styles.line}>
-              native {session.sourceWidth ?? '—'}×{session.sourceHeight ?? '—'} · warp 744×1039
+              wait {session.hiresWaitMs ?? '—'} ms · native {session.sourceWidth ?? '—'}×
+              {session.sourceHeight ?? '—'} · warp 744×1039
             </Text>
             <Text style={styles.line}>
               capture {session.captureMs?.toFixed(0) ?? '—'} ms · convert{' '}
               {session.convertMs?.toFixed(0) ?? '—'} ms · warp {session.warpMs?.toFixed(0) ?? '—'} ms
             </Text>
+            {session.hiresStats
+              ? (['snapshot', 'photo', 'high-res-frame'] as const).map(key => {
+                  const s = session.hiresStats![key];
+                  if (!s) return null;
+                  return (
+                    <Text key={key} style={styles.line}>
+                      {key} req {s.requested} ok {s.success} fail {s.failure}
+                      {s.timeout ? ` to ${s.timeout}` : ''}
+                      {s.lastError ? ` · ${s.lastError}` : ''}
+                    </Text>
+                  );
+                })
+              : null}
             <Text style={styles.title}>High-res source</Text>
             {session.hiresUri && session.sourceWidth && session.sourceHeight ? (
               <DetectorInputThumb

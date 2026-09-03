@@ -31,8 +31,9 @@ frames on the same device.
 | C.2e — Worklet → RN transfer ladder | Done — `getPixelBuffer` failed; plane-0 fallback |
 | C.2g — Orient + cover-crop analysis to preview FOV | Passed on Samsung after orientation syncs |
 | C.2h — Initial outputOrientation lifecycle | Shipped; **awaiting still-phone startup test** |
-| C.3 — High-res Recognition Input + artwork-only | **OTA ready** — Samsung must compare sources |
-| C.4+ — Native OCR, SQLite, Drive | Blocked — OCR after hi-res proven; no Drive yet |
+| C.3 — High-res Recognition Input + artwork-only | In progress — hi-res wait + index gate; Samsung retest |
+| C.3b — Native YUV geometric detector | **Required** — Shared JS ~1 s/detect on Samsung; see MOBILE-NATIVE-DETECTOR.md |
+| C.4+ — Native OCR, SQLite, Drive | Blocked — OCR after hi-res + full art index proven |
 
 Milestone B was compared on the real device: Samsung Camera sharp, Lugin
 web/Chrome materially blurrier, Lugin native materially sharper than Chrome.

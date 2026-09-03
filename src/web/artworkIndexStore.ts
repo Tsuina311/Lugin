@@ -34,9 +34,9 @@ const held = async (): Promise<Held | null> => {
     const hit = await (await caches.open(ART_INDEX_CACHE)).match(url());
     if (!hit) return null;
     const body = (await hit.json()) as Partial<Held>;
-    return body.art?.entries?.length && body.fetchedAt
-      ? { art: body.art, fetchedAt: body.fetchedAt, text: body.text }
-      : null;
+    if (!body.art?.entries?.length || !body.fetchedAt) return null;
+    if (body.art.entries.length < 500) return null;
+    return { art: body.art, fetchedAt: body.fetchedAt, text: body.text };
   } catch {
     return null;
   }
@@ -72,7 +72,13 @@ const download = async (): Promise<Held | null> => {
     : body.entries
       ? { entries: body.entries, version: body.version ?? 1 }
       : null;
-  if (!art?.entries?.length) return null;
+  // Fixture indexes (~20) must not ship as production — they invent wrong IDs.
+  if (!art?.entries?.length || art.entries.length < 500) {
+    console.warn(
+      `[lugin] refusing art-index.json with ${art?.entries?.length ?? 0} entries (need ≥500)`,
+    );
+    return null;
+  }
   return { art, fetchedAt: Date.now(), text: body.text };
 };
 

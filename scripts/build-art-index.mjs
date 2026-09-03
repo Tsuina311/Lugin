@@ -106,8 +106,11 @@ const defaultCardsUri = async () => {
   const { data } = await fetchJson(BULK_INDEX);
   const dump = data.find(d => d.type === 'default_cards');
   if (!dump) throw new Error('no default_cards dump');
+  // Scryfall renamed download_uri → jsonl_download_uri for the JSONL.gz dump.
+  const uri = dump.jsonl_download_uri ?? dump.download_uri;
+  if (!uri) throw new Error('default_cards dump has no download URI');
   console.log(`default_cards ${(dump.compressed_size / 1e6).toFixed(0)} MB gzipped`);
-  return dump.download_uri;
+  return uri;
 };
 
 const seenArt = new Set();

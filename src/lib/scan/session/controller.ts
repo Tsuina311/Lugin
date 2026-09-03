@@ -94,6 +94,8 @@ export interface SessionSnapshot {
   phase: ScannerPhase;
   quality?: FrameQuality;
   recognition?: RecognizeResult;
+  /** Recent recognition observations for the current track. */
+  temporal?: TemporalState;
   /** Frames currently held in the track. */
   trackFrames: number;
 }
@@ -162,6 +164,7 @@ export const createSessionController = (
     phase,
     quality: lastQuality,
     recognition: lastRecognition,
+    temporal,
     trackFrames: track.history.length,
   });
 

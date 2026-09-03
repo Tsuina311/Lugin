@@ -45,7 +45,7 @@ import { useFrameOutput, type Frame, type FrameDroppedReason } from 'react-nativ
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { parseOrientation, quadDiagnostics, spacesFor, type CoordinateSpaces, type QuadDiagnostics } from './analysisGeometry';
-import { createRate, createStage, type AnalysisMetrics } from './analysisStats';
+import { createRate, createStage, pushFiniteAge, type AnalysisMetrics } from './analysisStats';
 import { scanImageToPngDataUri } from './debug/scanImagePng';
 import {
   frameToScanImage,
@@ -493,9 +493,13 @@ export const useFrameAnalysis = ({
       sampleAcceptedAt: number;
       width: number;
     }) => {
-      const rnAt = now();
-      const sampleAt = payload.sampleAcceptedAt || rnAt;
-      stages.cameraToRn.push(Math.max(0, rnAt - sampleAt));
+      // sampleAcceptedAt is Date.now() from the worklet. Ages that cross the
+      // worklet→RN boundary MUST use Date.now() on both sides — never subtract
+      // Date.now from performance.now (that produced giant negative cam→polygon).
+      const rnMono = now();
+      const rnWall = Date.now();
+      const sampleAt = payload.sampleAcceptedAt || rnWall;
+      pushFiniteAge(stages.cameraToRn, rnWall - sampleAt);
 
       const meta = lastMeta.current;
       const pixelOrder = pixelOrderFor(payload.pixelFormat || meta?.pixelFormat || '');
@@ -560,7 +564,7 @@ export const useFrameAnalysis = ({
         analysisMaxWidth,
       );
 
-      const startedAt = now();
+      const startedAt = rnMono;
       const image = frameToScanImage(
         {
           bytes,
@@ -577,11 +581,12 @@ export const useFrameAnalysis = ({
       tally.current.scanImages++;
       tally.current.processed++;
       lastImage.current = image;
-      stages.rnToScan.push(convertedAt - rnAt);
+      stages.rnToScan.push(convertedAt - rnMono);
 
       tally.current.detectorCalls++;
       const detection = detectCardQuad(image);
       const finishedAt = now();
+      const finishedWall = Date.now();
 
       const detected = Boolean(detection.corners) && detection.score >= DETECT_MIN_SCORE;
       if (detected) tally.current.detectorHits++;
@@ -589,9 +594,9 @@ export const useFrameAnalysis = ({
       stages.convert.push(convertedAt - startedAt);
       stages.detect.push(finishedAt - convertedAt);
       stages.scanToDetect.push(finishedAt - convertedAt);
-      stages.cameraToDetect.push(finishedAt - sampleAt);
+      pushFiniteAge(stages.cameraToDetect, finishedWall - sampleAt);
       stages.total.push(finishedAt - startedAt);
-      stages.processedAge.push(finishedAt - sampleAt);
+      pushFiniteAge(stages.processedAge, finishedWall - sampleAt);
       rates.analysis.mark(finishedAt);
 
       setOverlay({
@@ -600,7 +605,7 @@ export const useFrameAnalysis = ({
         detected,
         score: detection.score,
       });
-      stages.cameraToOverlay.push(now() - sampleAt);
+      pushFiniteAge(stages.cameraToOverlay, Date.now() - sampleAt);
       onAnalyzedRef.current?.({
         detection,
         image,

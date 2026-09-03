@@ -22,6 +22,16 @@ export interface Stage {
   reset(): void;
 }
 
+/**
+ * Record a cross-boundary age only when both ends share a clock.
+ * Rejects negatives and absurd outliers (clock-domain mix → huge |ms|).
+ */
+export const pushFiniteAge = (stage: Stage, ms: number, maxMs = 10_000): boolean => {
+  if (!Number.isFinite(ms) || ms < 0 || ms > maxMs) return false;
+  stage.push(ms);
+  return true;
+};
+
 export const createStage = (): Stage => {
   const samples = new Float64Array(WINDOW);
   const sorted = new Float64Array(WINDOW);

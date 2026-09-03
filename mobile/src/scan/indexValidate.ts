@@ -6,6 +6,13 @@ import type { ArtworkIndexData, CardNameIndexData, TextIndexData } from './share
 export const NAME_INDEX_MIN_VERSION = 1;
 export const ART_INDEX_MIN_VERSION = 1;
 
+/**
+ * Fixture indexes are ~20 entries. Production must be thousands of unique
+ * illustrations. Native loaders reject below this so a Pages deploy that
+ * accidentally ships `--from-fixtures` cannot silently produce wrong IDs.
+ */
+export const ART_INDEX_MIN_PRODUCTION_ENTRIES = 500;
+
 export const validateNameIndexData = (
   raw: unknown,
 ): { data: CardNameIndexData; reason?: undefined } | { data?: undefined; reason: string } => {
@@ -53,22 +60,36 @@ const isDescriptor = (value: unknown): boolean => {
 
 export const validateArtworkIndexData = (
   raw: unknown,
+  opts: { minEntries?: number } = {},
 ): { data: ArtworkIndexData; reason?: undefined } | { data?: undefined; reason: string } => {
   if (!raw || typeof raw !== 'object') return { reason: 'art index is not an object' };
   const body = raw as {
     art?: ArtworkIndexData;
     entries?: ArtworkIndexData['entries'];
+    generated?: string;
     text?: TextIndexData;
     version?: number;
   };
   const art: ArtworkIndexData | null = body.art?.entries
     ? body.art
     : body.entries
-      ? { entries: body.entries, version: body.version ?? 1 }
+      ? {
+          entries: body.entries,
+          generated: body.generated ?? body.art?.generated,
+          version: body.version ?? 1,
+        }
       : null;
   if (!art?.entries?.length) return { reason: 'art index has no entries' };
   if (typeof art.version !== 'number' || art.version < ART_INDEX_MIN_VERSION) {
     return { reason: `art index version ${String(art.version)} is unsupported` };
+  }
+  const minEntries = opts.minEntries ?? ART_INDEX_MIN_PRODUCTION_ENTRIES;
+  if (art.entries.length < minEntries) {
+    return {
+      reason:
+        `art index has only ${art.entries.length} entries (min ${minEntries}) — ` +
+        'refusing fixture/dev index in production',
+    };
   }
   const sample = art.entries[0];
   if (!sample?.name || !sample.oracleId || !isDescriptor(sample.descriptor)) {

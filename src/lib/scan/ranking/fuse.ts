@@ -1,13 +1,8 @@
-// Multi-signal candidate fusion.
-//
-// Generation and ranking are separate: art and title each produce candidates;
-// fusion scores the union. No single weak signal can veto a strong pair of
-// others — missing evidence is zero contribution, not a penalty.
-
 import {
   ACCEPT_CARD_SCORE,
   ACCEPT_MARGIN,
   FUSION_WEIGHTS,
+  VISUAL_STRONG,
 } from '../params';
 
 export interface CandidateEvidence {
@@ -41,6 +36,18 @@ export interface FusedResult {
   status: ScanIdentityStatus;
 }
 
+export interface FuseOptions {
+  /**
+   * When title/text/footer never fired (native art-only / skipOcr), demand a
+   * strong visual leader. Temporal renormalization must not turn a tight
+   * 0.70/0.67 art cluster into Identified.
+   */
+  artworkOnly?: boolean;
+}
+
+/** Visual margin required in artwork-only mode (before temporal boost). */
+export const ARTWORK_ONLY_VISUAL_MARGIN = 0.12;
+
 const weightSum =
   FUSION_WEIGHTS.visual +
   FUSION_WEIGHTS.title +
@@ -49,7 +56,10 @@ const weightSum =
   FUSION_WEIGHTS.footer +
   FUSION_WEIGHTS.temporal;
 
-export const fuseEvidence = (rows: readonly CandidateEvidence[]): FusedResult => {
+export const fuseEvidence = (
+  rows: readonly CandidateEvidence[],
+  options: FuseOptions = {},
+): FusedResult => {
   const ranked: RankedCandidate[] = rows
     .map(r => {
       const parts: Array<[number, number | undefined]> = [
@@ -81,6 +91,26 @@ export const fuseEvidence = (rows: readonly CandidateEvidence[]): FusedResult =>
   if (!top || top.score < ACCEPT_CARD_SCORE * 0.7) {
     return { candidates: ranked, margin, status: 'insufficient-confidence' };
   }
+
+  const artworkOnly =
+    options.artworkOnly === true ||
+    ranked.every(
+      r =>
+        r.titleScore == null &&
+        r.textScore == null &&
+        r.typeLineScore == null &&
+        r.footerScore == null,
+    );
+
+  if (artworkOnly) {
+    const visualMargin = (top.visualScore ?? 0) - (second?.visualScore ?? 0);
+    const strongVisual =
+      (top.visualScore ?? 0) >= VISUAL_STRONG && visualMargin >= ARTWORK_ONLY_VISUAL_MARGIN;
+    if (!strongVisual) {
+      return { candidates: ranked, margin, status: 'card-ambiguous' };
+    }
+  }
+
   if (top.score >= ACCEPT_CARD_SCORE && margin >= ACCEPT_MARGIN) {
     return {
       candidates: ranked,
