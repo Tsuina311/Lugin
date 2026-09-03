@@ -69,6 +69,34 @@ yarn mobile:eas init         # creates project; copy the projectId
 
 No global `eas-cli` install. All commands go through Yarn (`yarn mobile:eas …`
 or the higher-level `yarn mobile:build:eas` / `yarn mobile:update` scripts).
+Yarn exposes the dependency's binary to `yarn eas`, so there is deliberately no
+`"eas"` script in `mobile/package.json` — one would only shadow the binary and
+trip a doctor check.
+
+### `expo doctor` has one expected failure
+
+EAS Build runs `expo doctor` before building. It is **advisory**: the step logs
+`exited with non-zero code: 1` and the build continues. Do not read it as the
+cause of a failed build.
+
+One check fails on purpose and cannot be silenced (only
+`reactNativeDirectoryCheck` and `appConfigFieldsNotSyncedCheck` are
+configurable):
+
+> ✖ Check for legacy global CLI installed locally — Remove eas-cli from your
+> project dependencies.
+
+We keep `eas-cli` as a workspace devDependency on purpose: `scripts/mobile-eas.mjs`
+resolves it explicitly rather than trusting `PATH`, `mobile/scripts/smoke.cjs`
+asserts it as part of `yarn mobile:test`, and CI calls `yarn eas build` so the
+CLI version is pinned by the lockfile instead of being whatever `npx` fetches
+that day. Reproducibility beats a clean doctor run.
+
+`typescript` is in `expo.install.exclude` for a related reason. Expo SDK 57
+wants `~6.0.3`, but root (`^5.7.2`) and mobile (`~5.9.2`) dedupe to a **single**
+TypeScript 5.9.3 for the whole monorepo, so "fixing" it is a major compiler bump
+for the extension, the web PWA and shared `src/` — not a mobile change. Revisit
+it as a deliberate repo-wide upgrade, not as doctor cleanup.
 
 Put the project id in **one** of:
 
@@ -155,6 +183,14 @@ yarn mobile:update               # publish OTA to development
 yarn mobile:build:eas            # force development APK build
 ```
 
+`yarn mobile:update` goes through `scripts/mobile-eas.mjs update` rather than
+calling the CLI directly, because `eas update --non-interactive` refuses to run
+without `--message` — a package.json script cannot supply one and the old
+direct invocation therefore always failed. The helper derives the message from
+the same source stamp the app shows (`v1.0.62 · abc1234`), so an update
+installed on a phone can be traced back to a commit. Pass your own text to
+override: `yarn mobile:update "why this update exists"`.
+
 Inside `mobile/` via Yarn (same CLI; no global install):
 
 ```bash
@@ -231,6 +267,7 @@ Fingerprint, build, and update all use environment **`development`**.
 | Google auth mismatch | Android OAuth client SHA-1 must match the **installed** signing cert |
 | EAS: Yarn 1.22 vs `packageManager` yarn@3 | Ensure `.yarn/releases/yarn-3.8.1.cjs` is committed and `eas-build-pre-install` runs; check Install logs for “Replaced yarn at …” |
 | EAS: Failed to install yarn | Do not set `"corepack": true` or `"yarn": "3.x"` in eas.json |
+| EAS: `expo doctor` exited with non-zero code: 1 | Advisory step, not a build failure. One check (local `eas-cli`) fails by design — see “`expo doctor` has one expected failure” |
 
 ## Acceptance scenario (document when you run it)
 

@@ -1,5 +1,3 @@
-import { AppState, type AppStateStatus } from 'react-native';
-import * as Updates from 'expo-updates';
 import {
   createContext,
   useCallback,
@@ -11,21 +9,24 @@ import {
   type ReactNode,
 } from 'react';
 
+import * as Updates from 'expo-updates';
+import { AppState, type AppStateStatus } from 'react-native';
+
 export type UpdatePhase = 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
 
 type UpdateContextValue = {
-  phase: UpdatePhase;
-  error: string | null;
-  isEnabled: boolean;
-  channel: string | null;
-  updateId: string | null;
-  createdAt: Date | null;
-  runtimeVersion: string | null;
+  applyUpdate: () => Promise<void>;
   /** True when a scanner/import session must not be interrupted. */
   blockReload: boolean;
-  setBlockReload: (blocked: boolean) => void;
+  channel: string | null;
   checkForUpdate: (opts?: { applyIfSafe?: boolean }) => Promise<void>;
-  applyUpdate: () => Promise<void>;
+  createdAt: Date | null;
+  error: string | null;
+  isEnabled: boolean;
+  phase: UpdatePhase;
+  runtimeVersion: string | null;
+  setBlockReload: (blocked: boolean) => void;
+  updateId: string | null;
 };
 
 const UpdateContext = createContext<UpdateContextValue | null>(null);
@@ -104,17 +105,17 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<UpdateContextValue>(
     () => ({
-      phase,
+      applyUpdate,
+      blockReload,
+      channel: Updates.channel,
+      checkForUpdate,
+      createdAt: Updates.createdAt,
       error,
       isEnabled,
-      channel: Updates.channel,
-      updateId: Updates.updateId,
-      createdAt: Updates.createdAt,
+      phase,
       runtimeVersion: Updates.runtimeVersion,
-      blockReload,
       setBlockReload,
-      checkForUpdate,
-      applyUpdate,
+      updateId: Updates.updateId,
     }),
     [phase, error, isEnabled, blockReload, checkForUpdate, applyUpdate],
   );

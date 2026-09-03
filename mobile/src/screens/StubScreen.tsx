@@ -2,8 +2,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = {
-  title: string;
   body: string;
+  title: string;
 };
 
 export function StubScreen({ title, body }: Props) {
@@ -21,26 +21,26 @@ export function StubScreen({ title, body }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#0B1220',
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  title: {
-    color: '#F4F7FB',
-    fontSize: 28,
-    fontWeight: '700',
-  },
   body: {
     color: '#A8B3C7',
     fontSize: 15,
     lineHeight: 22,
   },
   note: {
-    marginTop: 16,
     color: '#6E7B91',
     fontSize: 13,
     lineHeight: 18,
+    marginTop: 16,
+  },
+  root: {
+    backgroundColor: '#0B1220',
+    flex: 1,
+    gap: 10,
+    paddingHorizontal: 20,
+  },
+  title: {
+    color: '#F4F7FB',
+    fontSize: 28,
+    fontWeight: '700',
   },
 });

@@ -173,6 +173,30 @@ if (cmd === 'fingerprint') {
   process.exit(0);
 }
 
+if (cmd === 'update') {
+  // `eas update --non-interactive` refuses to run without a message, so it
+  // cannot live in a package.json script alone. Derive one from the same source
+  // stamp the app displays, so an update on the phone can be traced back here.
+  const stamp = sourceStamp();
+  const extra = process.argv.slice(3);
+  const message = extra.length > 0 ? extra.join(' ') : `v${stamp.version} · ${stamp.id}`;
+  // `eas()` appends --non-interactive itself.
+  const out = eas([
+    'update',
+    '--channel',
+    CHANNEL,
+    '--platform',
+    PLATFORM,
+    '--environment',
+    ENVIRONMENT,
+    '--message',
+    message,
+  ]);
+  process.stdout.write(out);
+  console.log(`\nPublished to channel '${CHANNEL}': ${message}`);
+  process.exit(0);
+}
+
 if (cmd === 'decide') {
   const hash = fingerprintHash();
   const build = findCompatibleBuild(hash);

@@ -1,7 +1,9 @@
 import { useState } from 'react';
+
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CameraProofScreen } from '../screens/CameraProofScreen';
+
+import { CameraScanScreen } from '../screens/CameraScanScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { StubScreen } from '../screens/StubScreen';
 
@@ -23,28 +25,28 @@ export function RootTabs() {
       <View style={styles.body}>
         {tab === 'collection' ? (
           <StubScreen
-            title="Collection"
             body="Owned cards, quantities, foil, cost basis, and valuation will reuse the portable collection domain — after the camera gate."
+            title="Collection"
           />
         ) : null}
         {tab === 'decks' ? (
           <StubScreen
-            title="Decks"
             body="Deck lists and ManaBox export reuse existing portable deck logic. Cardmarket wants/cart stay in the Chrome extension."
+            title="Decks"
           />
         ) : null}
-        {tab === 'scan' ? <CameraProofScreen /> : null}
+        {tab === 'scan' ? <CameraScanScreen /> : null}
         {tab === 'settings' ? <SettingsScreen /> : null}
       </View>
 
       <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-        {TABS.map((t) => {
+        {TABS.map(t => {
           const active = tab === t.id;
           return (
             <Pressable
               key={t.id}
-              style={[styles.tab, active && styles.tabActive]}
               onPress={() => setTab(t.id)}
+              style={[styles.tab, active && styles.tabActive]}
             >
               <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
             </Pressable>
@@ -56,30 +58,30 @@ export function RootTabs() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#0B1220',
-  },
   body: {
     flex: 1,
   },
-  tabBar: {
-    flexDirection: 'row',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: '#101826',
-    paddingTop: 8,
-    paddingHorizontal: 8,
-    gap: 4,
+  root: {
+    backgroundColor: '#0B1220',
+    flex: 1,
   },
   tab: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: 10,
     borderRadius: 8,
+    flex: 1,
+    paddingVertical: 10,
   },
   tabActive: {
     backgroundColor: 'rgba(61,126,255,0.18)',
+  },
+  tabBar: {
+    backgroundColor: '#101826',
+    borderTopColor: 'rgba(255,255,255,0.12)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingTop: 8,
   },
   tabLabel: {
     color: '#8A97AD',

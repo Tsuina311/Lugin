@@ -1,0 +1,453 @@
+import { useCallback, useMemo, useRef, useState } from 'react';
+
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+  type LayoutChangeEvent,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  Camera,
+  useCameraDevices,
+  useCameraPermission,
+  type CameraDevice,
+  type CameraRef,
+} from 'react-native-vision-camera';
+
+import { CameraDebugPanel } from '../camera/CameraDebugPanel';
+import { describeDevice, selectMainRearDevice } from '../camera/selectMainRearDevice';
+import { ScanDebugPanel } from '../scan/ScanDebugPanel';
+import { mapCornersToOverlay, type Point2D } from '../scan/sharedCore';
+import { RESOLUTIONS, RUNGS, useFrameAnalysis } from '../scan/useFrameAnalysis';
+
+type FocusState = 'idle' | 'focusing' | 'done' | 'error';
+type Panel = 'scan' | 'camera' | 'none';
+
+const LINE_THICKNESS = 3;
+
+/**
+ * Milestone C.2 — the shared detector running on native camera frames.
+ *
+ * Supersedes the Milestone B proof screen, keeping its lens cycling,
+ * tap-to-focus and camera debug panel.
+ *
+ * The "Detector" toggle detaches the frame callback, which is the control for
+ * judging whether frame processing costs preview smoothness. Note it isolates
+ * the *processing* cost only — the frame output stays configured on the
+ * session, so it is not the same as a camera with no frame output at all.
+ */
+export function CameraScanScreen() {
+  const insets = useSafeAreaInsets();
+  const cameraRef = useRef<CameraRef>(null);
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const devices = useCameraDevices();
+  const rearDevices = useMemo(() => devices.filter(d => d.position === 'back'), [devices]);
+
+  const preferred = useMemo(() => selectMainRearDevice(rearDevices), [rearDevices]);
+  const [overrideId, setOverrideId] = useState<string | null>(null);
+  const device: CameraDevice | undefined = useMemo(() => {
+    if (overrideId) return rearDevices.find(d => d.id === overrideId) ?? preferred;
+    return preferred;
+  }, [overrideId, preferred, rearDevices]);
+
+  const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
+  const [focusState, setFocusState] = useState<FocusState>('idle');
+  const [lastFocusError, setLastFocusError] = useState<string | null>(null);
+  const [layout, setLayout] = useState({ height: 0, width: 0 });
+  const [detectorOn, setDetectorOn] = useState(true);
+  const [panel, setPanel] = useState<Panel>('scan');
+  // Diagnostic controls: how far the transfer ladder climbs, and how big the
+  // payload is. Lowering either is how a size limit is told from a hard
+  // serialization failure.
+  const [rungIndex, setRungIndex] = useState(RUNGS.length - 1);
+  const [resolutionIndex, setResolutionIndex] = useState(0);
+
+  const {
+    counters,
+    error,
+    failure,
+    frameMeta,
+    frameOutput,
+    metrics,
+    ping,
+    preview,
+    probeResult,
+    resetCounters,
+    resolution,
+    result,
+    testCurrentFrame,
+    transfer,
+  } = useFrameAnalysis({
+    enabled: detectorOn,
+    resolutionIndex,
+    rung: RUNGS[rungIndex],
+  });
+
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { height, width } = e.nativeEvent.layout;
+    setLayout({ height, width });
+  };
+
+  const cycleDevice = useCallback(() => {
+    if (rearDevices.length === 0) return;
+    const currentId = device?.id ?? rearDevices[0].id;
+    const idx = rearDevices.findIndex(d => d.id === currentId);
+    setOverrideId(rearDevices[(idx + 1) % rearDevices.length].id);
+  }, [device?.id, rearDevices]);
+
+  const focusAt = useCallback(async (x: number, y: number) => {
+    const cam = cameraRef.current;
+    if (!cam) return;
+    setFocusPoint({ x, y });
+    setFocusState('focusing');
+    setLastFocusError(null);
+    try {
+      await cam.focusTo(
+        { x, y },
+        { adaptiveness: 'continuous', autoResetAfter: null, responsiveness: 'snappy' },
+      );
+      setFocusState('done');
+    } catch (err) {
+      setFocusState('error');
+      setLastFocusError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const onTap = useCallback(
+    (e: GestureResponderEvent) => {
+      const { locationX, locationY } = e.nativeEvent;
+      void focusAt(locationX, locationY);
+    },
+    [focusAt],
+  );
+
+  // Analysis raster → preview box. The analysis image is upright and shares the
+  // camera's field of view, so cover-fitting it into the preview box is the
+  // whole transform — as long as the preview and the frame output negotiated
+  // the same aspect ratio, which is why `resizeMode` is pinned to 'cover' and
+  // the frame output asks for 4:3.
+  const quad = useMemo(() => {
+    if (!result?.corners || layout.width === 0) return null;
+    const mapped = mapCornersToOverlay(result.corners, result.analysis, result.analysis, layout);
+    return [
+      [mapped.topLeft, mapped.topRight],
+      [mapped.topRight, mapped.bottomRight],
+      [mapped.bottomRight, mapped.bottomLeft],
+      [mapped.bottomLeft, mapped.topLeft],
+    ] as const;
+  }, [layout, result]);
+
+  if (!hasPermission) {
+    return (
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
+        <Text style={styles.title}>Camera permission</Text>
+        <Text style={styles.body}>
+          Lugin needs the camera to scan cards. Microphone is not requested.
+        </Text>
+        <Pressable onPress={() => void requestPermission()} style={styles.button}>
+          <Text style={styles.buttonLabel}>Allow camera</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (!device) {
+    return (
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
+        <Text style={styles.title}>No rear camera</Text>
+        <Text style={styles.body}>
+          Waiting for VisionCamera devices… Use a development build (not Expo Go).
+        </Text>
+      </View>
+    );
+  }
+
+  const detected = result?.detected ?? false;
+
+  return (
+    <View onLayout={onLayout} style={styles.root}>
+      <Camera
+        ref={cameraRef}
+        device={device}
+        enableNativeTapToFocusGesture={false}
+        isActive
+        outputs={[frameOutput]}
+        resizeMode="cover"
+        style={StyleSheet.absoluteFill}
+        zoom={1}
+      />
+
+      <Pressable onPress={onTap} style={StyleSheet.absoluteFill} />
+
+      {quad ? (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          {quad.map(([a, b], i) => (
+            <View
+              key={i}
+              style={[styles.edge, edgeStyle(a, b), detected ? styles.edgeOn : styles.edgeWeak]}
+            />
+          ))}
+        </View>
+      ) : null}
+
+      {focusPoint ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.reticle,
+            {
+              borderColor:
+                focusState === 'error'
+                  ? '#FF8A80'
+                  : focusState === 'focusing'
+                    ? '#F5C542'
+                    : '#7CFFB2',
+              left: focusPoint.x - 28,
+              top: focusPoint.y - 28,
+            },
+          ]}
+        />
+      ) : null}
+
+      {/*
+        A single flex column rather than separately anchored bars: the previous
+        layout floated the metrics panel behind the controls, which made the
+        numbers unscreenshottable. Here the panel gets a bounded share of the
+        height and the controls always sit below it.
+      */}
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.overlay,
+          { paddingBottom: Math.max(insets.bottom, 12), paddingTop: insets.top + 8 },
+        ]}
+      >
+        <View pointerEvents="box-none" style={styles.topBar}>
+          <Text style={[styles.badge, detected && styles.badgeOn]}>
+            {detectorOn ? (detected ? 'CARD' : 'SEARCHING') : 'DETECTOR OFF'}
+          </Text>
+          <Text numberOfLines={2} style={styles.deviceLine}>
+            {describeDevice(device)}
+          </Text>
+        </View>
+
+        <View pointerEvents="none" style={styles.spacer} />
+
+        {panel === 'scan' ? (
+          <View style={styles.panelWrap}>
+            <ScanDebugPanel
+              counters={counters}
+              error={error}
+              failure={failure}
+              frameMeta={frameMeta}
+              metrics={metrics}
+              ping={ping}
+              preview={preview}
+              probeResult={probeResult}
+              result={result}
+              rung={RUNGS[rungIndex]}
+              transfer={transfer}
+            />
+          </View>
+        ) : null}
+
+        {panel === 'camera' ? (
+          <View style={styles.panelWrap}>
+            <CameraDebugPanel
+              device={device}
+              focusPoint={focusPoint}
+              focusState={focusState}
+              lastFocusError={lastFocusError}
+              rearDeviceCount={rearDevices.length}
+            />
+          </View>
+        ) : null}
+
+        <View style={styles.bottomBar}>
+          <Pressable onPress={cycleDevice} style={styles.chip}>
+            <Text style={styles.chipLabel}>Lens ({rearDevices.length})</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setDetectorOn(v => !v)}
+            style={[styles.chip, detectorOn && styles.chipOn]}
+          >
+            <Text style={styles.chipLabel}>Detector {detectorOn ? 'on' : 'off'}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setRungIndex(i => (i + 1) % RUNGS.length)}
+            style={styles.chip}
+          >
+            <Text style={styles.chipLabel}>Rung: {RUNGS[rungIndex]}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setResolutionIndex(i => (i + 1) % RESOLUTIONS.length)}
+            style={styles.chip}
+          >
+            <Text style={styles.chipLabel}>
+              {resolution.width}×{resolution.height}
+            </Text>
+          </Pressable>
+          <Pressable onPress={testCurrentFrame} style={styles.chip}>
+            <Text style={styles.chipLabel}>Test frame</Text>
+          </Pressable>
+          <Pressable onPress={resetCounters} style={styles.chip}>
+            <Text style={styles.chipLabel}>Reset</Text>
+          </Pressable>
+          <Pressable
+            onPress={() =>
+              setPanel(panel === 'scan' ? 'camera' : panel === 'camera' ? 'none' : 'scan')
+            }
+            style={styles.chip}
+          >
+            <Text style={styles.chipLabel}>
+              {panel === 'scan' ? 'Scan dbg' : panel === 'camera' ? 'Cam dbg' : 'No panel'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              if (layout.width > 0) void focusAt(layout.width / 2, layout.height / 2);
+            }}
+            style={styles.chip}
+          >
+            <Text style={styles.chipLabel}>Focus center</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Position a thin view as the segment a→b.
+ *
+ * Placed at the segment's midpoint and rotated about its own centre, which
+ * avoids needing a transform origin (React Native has none).
+ */
+const edgeStyle = (a: Point2D, b: Point2D) => {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  return {
+    left: a.x + dx / 2 - length / 2,
+    top: a.y + dy / 2 - LINE_THICKNESS / 2,
+    transform: [{ rotate: `${Math.atan2(dy, dx)}rad` }],
+    width: length,
+  };
+};
+
+const styles = StyleSheet.create({
+  badge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F5C542',
+    borderRadius: 4,
+    color: '#0B1220',
+    fontSize: 11,
+    fontWeight: '800',
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  badgeOn: {
+    backgroundColor: '#7CFFB2',
+  },
+  body: {
+    color: '#A8B3C7',
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  bottomBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  button: {
+    backgroundColor: '#3D7EFF',
+    borderRadius: 10,
+    marginTop: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  buttonLabel: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  centered: {
+    alignItems: 'center',
+    backgroundColor: '#0B1220',
+    flex: 1,
+    gap: 12,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  chip: {
+    backgroundColor: 'rgba(20,28,44,0.9)',
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  chipLabel: {
+    color: '#E8EEF7',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chipOn: {
+    borderColor: 'rgba(124,255,178,0.6)',
+  },
+  deviceLine: {
+    color: '#F4F7FB',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  edge: {
+    borderRadius: LINE_THICKNESS,
+    height: LINE_THICKNESS,
+    position: 'absolute',
+  },
+  edgeOn: {
+    backgroundColor: '#7CFFB2',
+  },
+  edgeWeak: {
+    backgroundColor: 'rgba(245,197,66,0.75)',
+  },
+  overlay: {
+    bottom: 0,
+    flexDirection: 'column',
+    left: 0,
+    paddingHorizontal: 12,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  panelWrap: {
+    // Bounded so the camera preview and the card stay visible above it.
+    height: '52%',
+  },
+  reticle: {
+    borderRadius: 4,
+    borderWidth: 2,
+    height: 56,
+    position: 'absolute',
+    width: 56,
+  },
+  root: {
+    backgroundColor: '#000',
+    flex: 1,
+  },
+  spacer: {
+    flex: 1,
+  },
+  title: {
+    color: '#F4F7FB',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  topBar: {
+    gap: 4,
+  },
+});

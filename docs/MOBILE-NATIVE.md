@@ -26,8 +26,10 @@ frames on the same device.
 | A — App shell + tabs | Done (`mobile/`) |
 | B — Native camera proof (VisionCamera) | **Passed on Samsung** — native sharper than Chrome |
 | C.1 — Shared scanner core imported by mobile | Done — guarded by `yarn mobile:test` |
-| C.2 — VisionCamera frame → `ScanImage` adapter | Not started |
-| C.3+ — Real detector on device, recognition, collection, Drive | Not started |
+| C.2 — VisionCamera frame → `ScanImage` adapter | Blocked: **nothing crosses worklet → RN** |
+| C.2d — Layered pipeline diagnostics | Done — localised the break to the transfer |
+| C.2e — Worklet → RN transfer ladder | Shipped; **awaiting Samsung read-out** |
+| C.3+ — Recognition, collection, Drive | Not started |
 
 Milestone B was compared on the real device: Samsung Camera sharp, Lugin
 web/Chrome materially blurrier, Lugin native materially sharper than Chrome.
@@ -104,6 +106,7 @@ Expo SDK 57 + development builds (expo-dev-client)
 React Native New Architecture (mandatory on this SDK)
 TypeScript
 react-native-vision-camera (CameraX / AVFoundation)
+react-native-vision-camera-worklets + react-native-worklets (frame output)
 react-native-nitro-modules / nitro-image
 ```
 
@@ -122,7 +125,7 @@ yarn mobile:android        # expo run:android (dev build)
 yarn mobile:ios            # expo run:ios (structural; Android is acceptance)
 yarn mobile:prebuild       # regenerate native projects
 yarn mobile:typecheck
-yarn mobile:test           # workspace smoke + shared-scanner boundary guard
+yarn mobile:test           # workspace smoke + shared-core boundary + frame adapter
 yarn mobile:build:dev      # prebuild + android run
 yarn mobile:build:eas      # EAS development APK
 yarn mobile:update         # EAS Update → development channel
@@ -145,11 +148,23 @@ yarn test:scan / yarn scan:detect-eval / …
 2. From repo root: `yarn install` then `yarn mobile:android`.
 3. First run generates `mobile/android/` via prebuild and installs a
    **development build** (not Expo Go).
-4. Open **Scan** tab → grant camera → verify debug panel:
-   - physical devices (prefer `wide-angle`)
+4. Open **Scan** tab → grant camera. The panel chip cycles between the scan
+   diagnostics, the camera debug panel, and off. Verify in the camera panel:
+   - physical devices and `supportsFocusMetering`
    - zoom range / neutral zoom
    - tap-to-focus reticle
-5. Cycle **Lens** to compare rear devices; prefer main wide-angle for cards.
+5. Cycle **Lens** to compare rear devices. The default is chosen by
+   `selectMainRearDevice`, which ranks **focus metering first**, then
+   wide-angle, and puts an ultra-wide-only device last.
+
+   That order comes from the Samsung, where the naive "prefer a physical
+   wide-angle" rule picked the wrong lens: its *virtual* "Back Triple Camera"
+   supports focus metering and beats Chrome, while the *physical* "Back Camera"
+   is ultra-wide, cannot be focus-metered and is visibly soft. Cards are shot
+   close up, so a lens the focus gate cannot drive is useless however sharp it
+   might be. `mobile/scripts/camera-select-smoke.mjs` pins both real devices so
+   this cannot regress — and keeps the rule capability-based, never matching
+   model or lens names.
 
 ### Go / no-go checklist (Milestone B)
 
@@ -207,7 +222,181 @@ iterations after warm-up:
 
 Cost is nearly flat across input size because `detectCardQuad` downscales to
 `WORK_WIDTH = 320` internally. These are desktop numbers and say nothing about
-the Samsung; they exist as the control for the on-device benchmark in Phase 5.
+the Samsung; they exist as the control for the on-device benchmark below.
+
+### The frame pipeline (C.2)
+
+The RGBA baseline, chosen deliberately over a native/YUV detector so that web,
+native and `yarn scan:detect-eval` all run one detector. The reasoning and the
+escalation criteria are in
+[MOBILE-SCANNER-WIRING.md](./MOBILE-SCANNER-WIRING.md).
+
+```text
+CameraFrameOutput  targetResolution 640×480, pixelFormat 'rgb'
+  → onFrame worklet   cadence gate (10/s), copy bytes, dispose frame
+  → scheduleOnRN      one buffer hop to the JS thread
+  → frameToScanImage  BGRA→RGBA + row stride + rotation + mirror, one pass
+  → detectCardQuad    the shared portable detector, unmodified
+  → overlay quad + ScanMetricsPanel
+```
+
+Full-resolution frames never enter this path: `targetResolution` makes the
+camera pipeline produce a small frame, and the adapter's `maxWidth` is only a
+guard. Backlog is bounded at both ends — `dropFramesWhileBusy` natively, and a
+single-slot pending buffer on the JS thread, so a stalled JS thread discards
+stale frames instead of working through a queue.
+
+`frameToScanImage` is pure and has no React Native imports, so
+`mobile/scripts/frame-adapter-smoke.mjs` asserts it under Node against
+synthetic buffers whose pixels encode their own coordinates. It covers the
+three failures that are silent rather than loud — BGRA read as RGBA, ignored
+`bytesPerRow` padding, and the four rotations plus mirroring — because each one
+merely degrades detection, which is indistinguishable from a detector that
+needs tuning.
+
+Two dependencies were added for this, both native, so this milestone **needs a
+new EAS APK** (JS-only work afterwards can go out as OTA):
+
+```text
+react-native-worklets@0.10.1              # via `npx expo install` (SDK 57 pin)
+react-native-vision-camera-worklets@5.2.3 # matches vision-camera
+```
+
+`mobile/babel.config.js` is new and mandatory: without
+`react-native-worklets/plugin` the `'worklet'` directive is an inert string and
+the frame callback fails on device while the bundle still builds.
+
+### On-device measurement protocol (C.2 acceptance)
+
+Open **Scan**, point at a card, and read the metrics panel. Record p50 / p95:
+
+| Metric | Target | Meaning if it misses |
+| --- | --- | --- |
+| analyses/s | 6–12 | cadence not sustained; find which stage eats the budget |
+| convert | — | BGRA→RGBA + rotate; if this dominates, YUV becomes worth benchmarking |
+| transfer | — | worklet→JS buffer copy; if this dominates, move detection into the worklet before considering YUV |
+| detect | ~16–18 ms desktop | compare against the desktop control above |
+| total | < ~80 ms | end-to-end analysis latency |
+| dropped / superseded | low | sustained drops mean the pipeline is overrunning |
+
+Also judge preview smoothness with **Detector off** versus **on**. That
+detaches the frame callback, isolating the cost of the worklet, the buffer hop
+and the detector. It does not remove the frame output from the session, so it
+measures processing cost rather than the cost of streaming frames at all.
+
+Decision rule, fixed in advance so the measurement decides and not taste: if
+the cadence holds and the preview stays smooth, **keep the shared TypeScript
+detector**. Escalate to a native/YUV path only if conversion or transfer — not
+detection — is shown to be the bottleneck, and then keep the native part to
+geometry/quality returning corners and confidence, parity-tested against
+`yarn scan:detect-eval`.
+
+### Layered diagnostics (C.2d)
+
+The first Samsung run of C.2 sat permanently in SEARCHING: the camera was
+excellent, the detector never produced a quad, and nothing said which of the
+seven stages between the sensor and the overlay was at fault. The panel now
+instruments each boundary, so a device run localises the break instead of
+inviting another guess.
+
+Tap **Scan dbg** (the panel button cycles scan → camera → none). The panel is
+bounded and scrollable, and the controls sit below it — the earlier layout put
+the numbers underneath the buttons, which made them unscreenshottable.
+
+Read it top to bottom; the first stage that stops counting is the broken one:
+
+| Row | Stage it proves |
+| --- | --- |
+| `camera out` | VisionCamera is producing frames at all |
+| `worklet sampled` | the `'worklet'` transform ran and the cadence gate passed |
+| `→ RN` | `scheduleOnRN` crossed the runtime boundary |
+| `ScanImages` | `frameToScanImage` accepted the geometry |
+| `detect calls` / `hits` | the detector ran, and whether it found a card |
+
+`camera out` and `worklet sampled` arrive on a 500 ms **heartbeat** carrying
+primitives only, deliberately independent of pixel delivery. Without it a
+broken transfer and a dead camera look identical: both leave every counter at
+zero.
+
+The other sections, and the specific failure each one is there to catch:
+
+- **Detector input** — a PNG of the *exact* `ScanImage` handed to
+  `detectCardQuad`, not the camera preview. Wrong channel order, a stride
+  shear, a bad rotation, a mirrored frame and an all-black buffer are all
+  obvious by eye and nearly indistinguishable in numbers. Encoded in pure JS
+  (`scan/debug/scanImagePng.ts`) and refreshed roughly 1.4×/s. The `luma` figure
+  next to it separates a black buffer from a dark room.
+- **Frame metadata** — the values VisionCamera actually reported, never
+  inferred. `bytes` versus `need ≥` is the stride arithmetic: a short buffer
+  used to be read out of bounds, which yields `undefined` → 0 and looks exactly
+  like a black camera.
+- **Buffer copy / transfer** — the worklet probes 16 fixed offsets of *its own
+  copy* before `frame.dispose()` and sends the offsets alongside the values, so
+  the JS side compares identical positions with no duplicated sampling logic.
+  Anything below 16/16 means the bytes are not an independent copy, or
+  worklets serialization is not doing what we assume. Sampled, not hashed —
+  the failures it guards against change bytes everywhere.
+- **Detector** — `detectCardQuad`'s own `debug` output: candidate count,
+  selected index, best candidate score and the ranked `rejectedBecause`
+  reasons. The detector was not modified to produce this; it already had it.
+- **Ladder** — see below. The first run localised the failure to the
+  worklet → RN boundary, so the panel now walks that boundary in four rungs.
+- **Test frame** — runs the detector once, synchronously, on the last input.
+  If that finds a card the live path cannot, the fault is cadence or timing. It
+  also runs `SessionController` on the same pixels, which is the only way to
+  say whether the controller *would* suppress a valid detection — it is not in
+  the live path, since the overlay is driven straight from `detectCardQuad`.
+
+### The transfer ladder (C.2e)
+
+The second Samsung run was unambiguous:
+
+```
+camera out 1235 (~40/s) · sampled 350 (~11.5/s) · RN 0 · nobuf 0 · planar 0
+```
+
+The camera and the worklet were both healthy, and the frames were passing the
+`hasPixelBuffer` and `isPlanar` gates — yet nothing arrived on the RN runtime.
+The heartbeat that reported those numbers is itself a `scheduleOnRN` call, so
+scheduling and the RN callback wiring were already proven; only the pixel
+payload path was failing.
+
+It failed *silently*, which was the real defect. That stretch of the worklet had
+a `finally` for `frame.dispose()` but no `catch`, so a throw in
+`getPixelBuffer()`, the copy, or serialization produced exactly what we saw:
+counters climbing, zero deliveries, no error anywhere.
+
+The worklet now attempts four independently guarded rungs per sampled frame,
+each with a counter on both sides:
+
+| Rung | Payload | Isolates |
+| --- | --- | --- |
+| ping | `(seq, width, height)` | scheduling, with no serialization at all |
+| meta | 9 numbers/strings incl. byte lengths | the pixel-buffer read and the copy |
+| tiny | 64-byte `ArrayBuffer` + 4 bytes as numbers | `ArrayBuffer` serialization |
+| full | the whole copied buffer | payload size |
+
+Because a rung failing does not stop the ones already scheduled, a single run
+separates "cannot read pixels" from "cannot serialize an `ArrayBuffer`" from
+"cannot serialize a 1.2 MB one". Any throw is reported over the primitive
+channel — the one channel already known to work — with the stage name and
+message, throttled to 2/s.
+
+Two controls exist for the size question. **Rung** caps how far the ladder
+climbs, and the resolution chip cycles 640×480 → 480×360 → 320×240 to find the
+largest payload that crosses reliably. Both are diagnostics, not settings.
+
+Payloads are positional primitives plus at most one `ArrayBuffer`. No object
+wrapper, no typed-array view, no `Frame` reference. `react-native-worklets` 0.10
+serializes each argument recursively (`makeShareableCloneOnUIRecursive`, since
+Bundle Mode is off), and it does support both `ArrayBuffer` and array views —
+so a flat shape means a serialization failure can only be about the buffer
+itself, not about how it was wrapped.
+
+Buffer lifetime is ordered deliberately: read `getPixelBuffer()`, copy into a
+freshly allocated `Uint8Array`, schedule the copy's `.buffer`, and only then let
+`finally` call `frame.dispose()`. The RN side never sees frame-owned memory,
+which VisionCamera documents as invalid after disposal.
 
 ## Storage / Drive / OCR (later milestones)
 
@@ -230,10 +419,18 @@ invent a separate scheme. Desktop overlay continues to use
 
 ## Limitations (honest)
 
-- Milestone B **not yet validated** on the user’s Samsung (no sharpness claim).
+- C.2 **does not work on device yet**. The first Samsung run stayed in
+  SEARCHING with no quad ever drawn. The C.2d diagnostics were added to find
+  out why; until a device read-out exists, the RGBA baseline is neither
+  accepted nor refuted, and every frame timing in this doc is desktop-only.
+  Performance measurement is deliberately deferred until the pipeline is
+  correct — there is no point profiling a path that produces nothing.
+- Frame `orientation` / `isMirrored` handling is asserted for self-consistency,
+  not against real sensor metadata. The "Detector input" thumbnail exists to
+  settle this visually on the phone.
+- The overlay assumes the preview and the frame output negotiated the same
+  aspect ratio (both 4:3). A mismatch would offset the quad.
 - Collection / decks / Drive / recognition **not** ported yet.
-- Portable `src/lib` is not imported into the app bundle yet (Metro
-  `watchFolders` prepared).
 - iOS is structurally supported; untested on device.
 - CI does not yet build the Android development binary.
 

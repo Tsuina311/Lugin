@@ -10,11 +10,10 @@
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
-    "test": "node ./scripts/smoke.cjs && node ./scripts/shared-core-smoke.mjs",
+    "test": "node ./scripts/smoke.cjs && node ./scripts/shared-core-smoke.mjs && node ./scripts/frame-adapter-smoke.mjs && node ./scripts/png-preview-smoke.mjs && node ./scripts/camera-select-smoke.mjs",
     "build:dev": "expo prebuild && expo run:android",
-    "eas": "eas",
     "build:eas": "node ../scripts/write-mobile-build-stamp.mjs && eas build --platform android --profile development",
-    "update:development": "node ../scripts/write-mobile-build-stamp.mjs && eas update --channel development --platform android --environment development --non-interactive",
+    "update:development": "node ../scripts/write-mobile-build-stamp.mjs && node ../scripts/mobile-eas.mjs update",
     "eas-build-pre-install": "node ../scripts/eas-build-pre-install.mjs"
   },
   "dependencies": {
@@ -28,11 +27,20 @@
     "react-native-nitro-image": "^0.14.0",
     "react-native-nitro-modules": "^0.37.1",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-vision-camera": "^5.2.3"
+    "react-native-vision-camera": "^5.2.3",
+    "react-native-vision-camera-worklets": "^5.2.3",
+    "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
     "eas-cli": "^23.2.0",
     "typescript": "~5.9.2"
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "typescript"
+      ]
+    }
   }
 }

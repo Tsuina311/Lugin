@@ -11,7 +11,7 @@ type Props = {
 
 function typesOf(device: CameraDevice): string {
   if (device.isVirtualDevice && device.physicalDevices.length > 0) {
-    return device.physicalDevices.map((d) => d.type).join(', ');
+    return device.physicalDevices.map(d => d.type).join(', ');
   }
   return device.type;
 }
@@ -25,7 +25,7 @@ export function CameraDebugPanel({
 }: Props) {
   if (!device) {
     return (
-      <View style={styles.panel} pointerEvents="none">
+      <View pointerEvents="none" style={styles.panel}>
         <Text style={styles.line}>No rear camera device</Text>
       </View>
     );
@@ -35,7 +35,7 @@ export function CameraDebugPanel({
   const maxZoom = Number(device.maxZoom).toFixed(2);
 
   return (
-    <View style={styles.panel} pointerEvents="none">
+    <View pointerEvents="none" style={styles.panel}>
       <Text style={styles.title}>Camera debug</Text>
       <Text style={styles.line}>name: {device.localizedName}</Text>
       <Text style={styles.line}>id: {device.id}</Text>
@@ -63,30 +63,35 @@ export function CameraDebugPanel({
 }
 
 const styles = StyleSheet.create({
-  panel: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 96,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+  
+  
+  error: {
+    color: '#FF8A80',
+    fontSize: 11,
+    marginTop: 4,
+  },
+  
+
+line: {
+    color: '#E8EEF7',
+    fontFamily: 'Courier',
+    fontSize: 11,
+  },
+  // Laid out by the parent column (see CameraScanScreen), not self-anchored, so
+// it cannot end up underneath the controls.
+panel: {
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    borderColor: 'rgba(255,255,255,0.14)',
     borderRadius: 10,
-    padding: 10,
+    borderWidth: 1,
+    flex: 1,
     gap: 2,
+    padding: 10,
   },
   title: {
     color: '#F5C542',
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 4,
-  },
-  line: {
-    color: '#E8EEF7',
-    fontSize: 11,
-    fontFamily: 'Courier',
-  },
-  error: {
-    color: '#FF8A80',
-    fontSize: 11,
-    marginTop: 4,
   },
 });
