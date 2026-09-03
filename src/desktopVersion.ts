@@ -6,4 +6,4 @@
  * changes desktop (extension) code: `0.1.0`, `0.1.1`, … `0.1.13`, …
  * Bump it in the same edit as the fix.
  */
-export const DESKTOP_VERSION = '0.1.66';
+export const DESKTOP_VERSION = '0.1.67';

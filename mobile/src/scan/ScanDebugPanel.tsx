@@ -1,10 +1,13 @@
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { DetectorInputThumb } from './DetectorInputThumb';
+import { formatCorner } from './analysisGeometry';
 import type { AnalysisMetrics, StageStats } from './analysisStats';
 import type {
   AnalysisResult,
   FrameMetadata,
   FrameProbeResult,
+  OrientationDebug,
   PingEcho,
   Rung,
   StageCounters,
@@ -18,11 +21,13 @@ type Props = {
   failure: WorkletFailure | null;
   frameMeta: FrameMetadata | null;
   metrics: AnalysisMetrics | null;
+  orientation: OrientationDebug;
   ping: PingEcho | null;
   preview: string | null;
   probeResult: FrameProbeResult | null;
   result: AnalysisResult | null;
   rung: Rung;
+  showNumbers: boolean;
   transfer: TransferCheck | null;
 };
 
@@ -42,11 +47,13 @@ export function ScanDebugPanel({
   failure,
   frameMeta,
   metrics,
+  orientation,
   ping,
   preview,
   probeResult,
   result,
   rung,
+  showNumbers,
   transfer,
 }: Props) {
   const ladder: [string, number][] = [
@@ -91,8 +98,8 @@ export function ScanDebugPanel({
               </Text>
             ))}
             <Text style={styles.line}>
-              skip: cad {counters.skippedForCadence} · nobuf {counters.skippedNoPixelBuffer} ·
-              planar {counters.skippedPlanar}
+              skip: cad {counters.skippedForCadence} · orient {counters.skippedForOrientation} ·
+              nobuf {counters.skippedNoPixelBuffer} · planar {counters.skippedPlanar}
             </Text>
             {counters.pixelBufferFromPlane > 0 ? (
               <Text style={[styles.line, styles.warn]}>
@@ -109,22 +116,18 @@ export function ScanDebugPanel({
             ) : null}
           </View>
 
-          <View style={styles.thumbBox}>
-            <Text style={styles.thumbLabel}>Detector input</Text>
-            {preview ? (
-              <Image resizeMode="contain" source={{ uri: preview }} style={styles.thumb} />
-            ) : (
-              <View style={[styles.thumb, styles.thumbEmpty]}>
-                <Text style={styles.dim}>none</Text>
-              </View>
-            )}
-            {result ? (
-              <Text style={styles.dim}>
-                {result.analysis.width}×{result.analysis.height} · luma{' '}
-                {result.brightness.toFixed(0)}
-              </Text>
-            ) : null}
-          </View>
+          <DetectorInputThumb
+            corners={result?.corners ?? null}
+            height={result?.analysis.height ?? 0}
+            label={
+              result
+                ? `${result.analysis.width}×${result.analysis.height} · luma ${result.brightness.toFixed(0)}`
+                : 'waiting'
+            }
+            showNumbers={showNumbers}
+            uri={preview}
+            width={result?.analysis.width ?? 0}
+          />
         </View>
 
         {metrics ? (
@@ -191,6 +194,46 @@ export function ScanDebugPanel({
           <Text style={styles.dim}>no tiny buffer delivered yet</Text>
         )}
 
+        <Text style={styles.title}>Orientation</Text>
+        <Text style={[styles.line, orientation.ready ? styles.ok : styles.warn]}>
+          ready {orientation.ready ? 'yes' : 'NO'} · desired output {orientation.desired}
+        </Text>
+        <Text style={styles.line}>
+          Frame.orientation {orientation.frameOrientation ?? '—'}
+        </Text>
+        <Text style={styles.line}>{orientation.detectorRotation}</Text>
+        <Text style={styles.line}>
+          last update{' '}
+          {orientation.lastUpdateAt ? new Date(orientation.lastUpdateAt).toISOString().slice(11, 23) : '—'}
+        </Text>
+
+        <Text style={styles.title}>Coordinate spaces</Text>
+        {result ? (
+          <>
+            <Text style={styles.line}>
+              raw: {result.spaces.raw.width}×{result.spaces.raw.height} / orientation=
+              {frameMeta?.orientation ?? '?'}
+              {frameMeta?.isMirrored ? ' · mirrored' : ''}
+            </Text>
+            <Text style={styles.line}>
+              oriented: {result.spaces.oriented.width}×{result.spaces.oriented.height}
+            </Text>
+            <Text style={styles.line}>
+              visible crop: {result.spaces.visible.width.toFixed(0)}×
+              {result.spaces.visible.height.toFixed(0)} @ {result.spaces.visible.x.toFixed(0)},
+              {result.spaces.visible.y.toFixed(0)}
+            </Text>
+            <Text style={styles.ok}>
+              detector: {result.spaces.detector.width}×{result.spaces.detector.height} / upright
+            </Text>
+            <Text style={styles.line}>
+              overlay: {result.spaces.overlay.width.toFixed(0)}×{result.spaces.overlay.height.toFixed(0)}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.dim}>no analysis yet</Text>
+        )}
+
         <Text style={styles.title}>Detector (raw detectCardQuad)</Text>
         {result ? (
           <>
@@ -198,6 +241,24 @@ export function ScanDebugPanel({
               detected {result.detected ? 'YES' : 'no'} · score {result.score.toFixed(3)} ·{' '}
               {result.detector.detectMs.toFixed(1)} ms
             </Text>
+            {result.quad ? (
+              <Text style={styles.line}>
+                area {(result.quad.areaRatio * 100).toFixed(1)}% · aspect {result.quad.aspect.toFixed(3)}{' '}
+                (card 0.716)
+              </Text>
+            ) : null}
+            {result.corners ? (
+              <Text style={styles.line}>
+                1 TL {formatCorner(result.corners.topLeft)} · 2 TR{' '}
+                {formatCorner(result.corners.topRight)}
+              </Text>
+            ) : null}
+            {result.corners ? (
+              <Text style={styles.line}>
+                3 BR {formatCorner(result.corners.bottomRight)} · 4 BL{' '}
+                {formatCorner(result.corners.bottomLeft)}
+              </Text>
+            ) : null}
             <Text style={styles.line}>
               work {result.detector.workSize.width}×{result.detector.workSize.height} · candidates{' '}
               {result.detector.candidates} · selected {result.detector.selectedIndex}
@@ -277,26 +338,6 @@ const styles = StyleSheet.create({
   },
   scroll: {
     padding: 8,
-  },
-  thumb: {
-    backgroundColor: '#000',
-    borderColor: 'rgba(255,255,255,0.25)',
-    borderWidth: 1,
-    height: 132,
-    width: 100,
-  },
-  thumbBox: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  thumbEmpty: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thumbLabel: {
-    color: '#F5C542',
-    fontSize: 10,
-    fontWeight: '700',
   },
   title: {
     color: '#F5C542',

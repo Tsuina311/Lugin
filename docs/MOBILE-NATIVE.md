@@ -26,9 +26,11 @@ frames on the same device.
 | A — App shell + tabs | Done (`mobile/`) |
 | B — Native camera proof (VisionCamera) | **Passed on Samsung** — native sharper than Chrome |
 | C.1 — Shared scanner core imported by mobile | Done — guarded by `yarn mobile:test` |
-| C.2 — VisionCamera frame → `ScanImage` adapter | Blocked: **nothing crosses worklet → RN** |
+| C.2 — VisionCamera frame → `ScanImage` adapter | Transfer works; **FOV/orientation mismatch on Samsung** |
 | C.2d — Layered pipeline diagnostics | Done — localised the break to the transfer |
-| C.2e — Worklet → RN transfer ladder | Shipped; **awaiting Samsung read-out** |
+| C.2e — Worklet → RN transfer ladder | Done — `getPixelBuffer` failed; plane-0 fallback |
+| C.2g — Orient + cover-crop analysis to preview FOV | Passed on Samsung after orientation syncs |
+| C.2h — Initial outputOrientation lifecycle | Shipped; **awaiting still-phone startup test** |
 | C.3+ — Recognition, collection, Drive | Not started |
 
 Milestone B was compared on the real device: Samsung Camera sharp, Lugin
@@ -321,11 +323,11 @@ zero.
 The other sections, and the specific failure each one is there to catch:
 
 - **Detector input** — a PNG of the *exact* `ScanImage` handed to
-  `detectCardQuad`, not the camera preview. Wrong channel order, a stride
-  shear, a bad rotation, a mirrored frame and an all-black buffer are all
-  obvious by eye and nearly indistinguishable in numbers. Encoded in pure JS
-  (`scan/debug/scanImagePng.ts`) and refreshed roughly 1.4×/s. The `luma` figure
-  next to it separates a black buffer from a dark room.
+  `detectCardQuad`, not the camera preview. After C.2g it must also match the
+  preview's orientation and FOV; a blue quad is the detector's raw corners
+  before any screen mapping. Encoded in pure JS (`scan/debug/scanImagePng.ts`)
+  and refreshed roughly 1.4×/s. The `luma` figure next to it separates a black
+  buffer from a dark room.
 - **Frame metadata** — the values VisionCamera actually reported, never
   inferred. `bytes` versus `need ≥` is the stride arithmetic: a short buffer
   used to be read out of bounds, which yields `undefined` → 0 and looks exactly
@@ -397,6 +399,72 @@ Buffer lifetime is ordered deliberately: read `getPixelBuffer()`, copy into a
 freshly allocated `Uint8Array`, schedule the copy's `.buffer`, and only then let
 `finally` call `frame.dispose()`. The RN side never sees frame-owned memory,
 which VisionCamera documents as invalid after disposal.
+
+### Orientation and FOV (C.2g)
+
+Once frames reached the detector, Samsung showed a live pipeline that was
+still wrong: the preview had a large upright card, the Detector input was
+640×480 with the same card small and on its side, and the green overlay
+ignored the physical card even though hits were 53/54.
+
+Two spaces had been conflated.
+
+**Orientation.** `Frame.orientation` is relative to the frame output's
+`outputOrientation`, not to the sensor and not to the phone. Leaving that
+target at the sensor default (`'up'`) makes a landscape buffer report
+`orientation: 'up'`, so `frameToScanImage` does not rotate it. The preview
+still applies a view transform to stand the image up. The adapter now writes
+the same device orientation onto the frame output that VisionCamera writes
+onto the preview, then rotates using the resulting `Frame.orientation`.
+Detection runs on the upright image; we do not rotate the overlay afterwards.
+
+**FOV.** `targetResolution: 640×480` is the full analysis buffer. The preview
+is `resizeMode: 'cover'` of the *upright* frame into a portrait view, so it
+shows a center strip. Feeding the detector the uncropped buffer makes the
+card small and maps its corners onto the wrong place. Analysis is now:
+
+```
+raw frame → orient using Frame.orientation → cover-crop (videoMap.coverSourceRect)
+  → downscale long edge ≤ 640 → detectCardQuad
+```
+
+On a 390×844 preview over a 640×480 / `right` frame that produces a 296×640
+detector image — portrait, same FOV as the preview. Overlay mapping is then
+a uniform scale of that image onto the view.
+
+`enablePreviewSizedOutputBuffers` changes buffer *size*, not the cover-crop,
+so it is not a substitute. `enablePhysicalBufferRotation` would hide the
+orientation metadata we are required to apply; it stays off.
+
+The Detector input thumbnail draws the raw detector quad in blue, before any
+screen mapping. Numbered corners (1 TL … 4 BL) sit on both the thumbnail and
+the preview. If the blue quad hugs the card and the green overlay does not,
+the remaining bug is mapping; if the blue quad misses, the crop/orientation
+is still wrong.
+
+### Initial orientation (C.2h)
+
+Samsung after C.2g: once the phone moved, Detector Input was upright and both
+quads hugged the card. Immediately after opening Scan, without moving, the
+thumbnail was still rotated 90°.
+
+`useOrientation('device')` returns `undefined` until a physical orientation
+*change*. A still phone never fires, so this assignment never ran:
+
+```
+if (outputOrientation) frameOutput.outputOrientation = …
+```
+
+`useFrameOutput` creates the output without an orientation. The native default
+is a landscape buffer whose `Frame.orientation` is `'up'` — “already matches
+the output” — while the output target was never set to preview-upright.
+
+The app is Expo-locked to portrait. Desired output orientation is therefore
+`'up'` from the first render, assigned in `useLayoutEffect` (not after an
+event). Camera uses `orientationSource="interface"`. Frames whose metadata is
+incoherent with that target (landscape + `'up'`) are dropped; the badge reads
+`Initializing orientation`. Stored quads are cleared if the desired target
+later changes.
 
 ## Storage / Drive / OCR (later milestones)
 

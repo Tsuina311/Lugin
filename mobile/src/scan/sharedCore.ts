@@ -34,6 +34,7 @@ export { prepareCard } from '@/lib/scan/prepareCard';
 export type { Point2D, Size2D } from '@/lib/scan/videoMap';
 export {
   coverLayout,
+  coverSourceRect,
   mapAnalysisToOverlay,
   mapAnalysisToSource,
   mapCornersToOverlay,

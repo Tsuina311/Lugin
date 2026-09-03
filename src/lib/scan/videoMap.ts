@@ -49,6 +49,31 @@ export const coverLayout = (
   };
 };
 
+/**
+ * The rectangle of `source` that `object-fit: cover` actually shows in `dest`.
+ *
+ * This is the inverse of {@link coverLayout}: the preview paints a center-crop
+ * of the source, so analysis that should match the preview must sample this
+ * rectangle — not the full sensor buffer.
+ */
+export const coverSourceRect = (
+  source: Size2D,
+  dest: Size2D,
+): { height: number; width: number; x: number; y: number } => {
+  const { offsetX, offsetY, scale } = coverLayout(source, dest);
+  if (scale === 0) {
+    return { height: source.height, width: source.width, x: 0, y: 0 };
+  }
+  const x = Math.max(0, -offsetX / scale);
+  const y = Math.max(0, -offsetY / scale);
+  return {
+    height: Math.min(source.height - y, dest.height / scale),
+    width: Math.min(source.width - x, dest.width / scale),
+    x,
+    y,
+  };
+};
+
 /** Video-source pixel → CSS pixel inside the covered element. */
 export const mapCoverSourceToDest = (
   p: Point2D,

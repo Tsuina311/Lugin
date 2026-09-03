@@ -55,13 +55,31 @@ export interface RawFrameView {
   width: number;
 }
 
+export interface OrientedRect {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+}
+
 export interface FrameConvertOptions {
   /**
-   * Longest edge of the analysis image, applied *after* rotation.
+   * Rectangle in *oriented* space to copy. Defaults to the full upright
+   * frame. The native pipeline passes the preview's cover-crop here so the
+   * detector sees the same FOV as the user, not the full sensor.
+   */
+  crop?: OrientedRect;
+  /**
+   * Longest edge of the analysis image, applied after rotation and crop.
    *
    * A guard, not the primary downscale: the camera should already be
    * delivering a small frame via `FrameOutputOptions.targetResolution`. Full
    * resolution frames must never reach this function.
+   */
+  maxLongEdge?: number;
+  /**
+   * @deprecated Prefer {@link maxLongEdge}. Kept so existing tests that
+   * constrain width still compile; treated as a long-edge cap.
    */
   maxWidth?: number;
 }
@@ -106,19 +124,42 @@ export const validateFrameView = (
   return { bytesPerPixel, reason, requiredBytes, stride, strideCorrected };
 };
 
+/** Upright size of a frame after applying {@link RawFrameView.orientation}. */
+export const orientedSize = (
+  frame: Pick<RawFrameView, 'height' | 'orientation' | 'width'>,
+): { height: number; width: number } => {
+  const turned = frame.orientation === 'left' || frame.orientation === 'right';
+  return {
+    height: turned ? frame.width : frame.height,
+    width: turned ? frame.height : frame.width,
+  };
+};
+
+/** Clamp `crop` onto `bounds` so a cover-rect cannot read off the image. */
+export const clampRect = (crop: OrientedRect, bounds: OrientedRect): OrientedRect => {
+  const x = Math.min(Math.max(0, crop.x), Math.max(0, bounds.width - 1));
+  const y = Math.min(Math.max(0, crop.y), Math.max(0, bounds.height - 1));
+  return {
+    height: Math.max(1, Math.min(crop.height, bounds.height - y)),
+    width: Math.max(1, Math.min(crop.width, bounds.width - x)),
+    x,
+    y,
+  };
+};
+
 /** Size of the analysis image `frameToScanImage` would produce. */
 export const analysisSize = (
   frame: Pick<RawFrameView, 'height' | 'orientation' | 'width'>,
   options: FrameConvertOptions = {},
 ): { height: number; width: number } => {
-  const turned = frame.orientation === 'left' || frame.orientation === 'right';
-  const rotW = turned ? frame.height : frame.width;
-  const rotH = turned ? frame.width : frame.height;
-  const max = options.maxWidth ?? 0;
-  const scale = max > 0 && rotW > max ? max / rotW : 1;
+  const oriented = orientedSize(frame);
+  const crop = clampRect(options.crop ?? { ...oriented, x: 0, y: 0 }, { ...oriented, x: 0, y: 0 });
+  const max = options.maxLongEdge ?? options.maxWidth ?? 0;
+  const long = Math.max(crop.width, crop.height);
+  const scale = max > 0 && long > max ? max / long : 1;
   return {
-    height: Math.max(1, Math.round(rotH * scale)),
-    width: Math.max(1, Math.round(rotW * scale)),
+    height: Math.max(1, Math.round(crop.height * scale)),
+    width: Math.max(1, Math.round(crop.width * scale)),
   };
 };
 
@@ -146,13 +187,11 @@ export const frameToScanImage = (
     width: srcW,
   });
 
-  const target = analysisSize(frame, options);
+  const oriented = orientedSize(frame);
+  const crop = clampRect(options.crop ?? { ...oriented, x: 0, y: 0 }, { ...oriented, x: 0, y: 0 });
+  const target = analysisSize(frame, { ...options, crop });
   const out = blankImage(target.width, target.height);
   const { data, height: outH, width: outW } = out;
-
-  const turned = orientation === 'left' || orientation === 'right';
-  const rotW = turned ? srcH : srcW;
-  const rotH = turned ? srcW : srcH;
 
   // Rotation is affine in the corrected-space coordinates (rx, ry):
   //   sx = ax*rx + bx*ry + cx
@@ -209,15 +248,18 @@ export const frameToScanImage = (
   const lastPixel = bytes.length - bpp;
 
   // Hoist the horizontal nearest-neighbour map out of the row loop.
+  // Coordinates are in oriented space, offset by the preview cover-crop.
   const xMap = new Int32Array(outW);
   for (let ox = 0; ox < outW; ox++) {
-    xMap[ox] = outW === rotW ? ox : Math.min(rotW - 1, Math.floor((ox * rotW) / outW));
+    const rx = crop.x + (outW === crop.width ? ox : (ox * crop.width) / outW);
+    xMap[ox] = Math.min(oriented.width - 1, Math.max(0, Math.floor(rx)));
   }
 
   let di = 0;
   for (let oy = 0; oy < outH; oy++) {
-    const ry = outH === rotH ? oy : Math.min(rotH - 1, Math.floor((oy * rotH) / outH));
-    const rowBase = (by * ry + cy) * stride + (bx * ry + cx) * bpp;
+    const ry = crop.y + (outH === crop.height ? oy : (oy * crop.height) / outH);
+    const rowY = Math.min(oriented.height - 1, Math.max(0, Math.floor(ry)));
+    const rowBase = (by * rowY + cy) * stride + (bx * rowY + cx) * bpp;
     for (let ox = 0; ox < outW; ox++) {
       const si = rowBase + xMap[ox] * colStep;
       if (si < 0 || si > lastPixel) {

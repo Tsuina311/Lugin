@@ -162,6 +162,29 @@ try {
     check('analysisSize measures after rotation', turned.width === 480 && turned.height === 640, `${turned.width}×${turned.height}`);
   }
 
+  // 6b. Preview cover-crop in oriented space. A portrait strip of a rotated
+  //     landscape frame must come out portrait, and only contain those columns.
+  {
+    const frame = { ...makeFrame(8, 4), orientation: 'right' };
+    // Oriented size is 4×8. Crop the right-hand 2 columns of that upright image.
+    const img = frameToScanImage(frame, { crop: { height: 8, width: 2, x: 2, y: 0 } });
+    check('crop output is 2×8', img.width === 2 && img.height === 8, `${img.width}×${img.height}`);
+    // Oriented (rx,ry)=(2,0) is the source pixel that 'right' maps from
+    // source (sx,sy). The existing right-rotation sends oriented (0,7) ← source (0,0).
+    // We only assert the crop does not include oriented x=0 (source top-left).
+    let sawSourceOrigin = false;
+    let finite = true;
+    for (let y = 0; y < img.height; y++) {
+      for (let x = 0; x < img.width; x++) {
+        const [r, g] = pixel(img, x, y);
+        if (!Number.isFinite(r) || !Number.isFinite(g)) finite = false;
+        if (r === 0 && g === 0) sawSourceOrigin = true;
+      }
+    }
+    check('cropped region has no NaN', finite);
+    check('crop excluded oriented x=0 (source origin)', !sawSourceOrigin);
+  }
+
   // 7. Format gate. Planar and private formats must be rejected by name, not
   //    read as if they were RGBA.
   {

@@ -39,11 +39,12 @@
 // prevent. So the worklet copies bytes and the tested pure converter
 // (`frameToScanImage`) runs on the JS thread, where the detector is anyway.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useFrameOutput, type Frame, type FrameDroppedReason } from 'react-native-vision-camera';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { parseOrientation, quadDiagnostics, spacesFor, type CoordinateSpaces, type QuadDiagnostics } from './analysisGeometry';
 import { createRate, createStage, type AnalysisMetrics } from './analysisStats';
 import { scanImageToPngDataUri } from './debug/scanImagePng';
 import {
@@ -51,8 +52,13 @@ import {
   imageBrightness,
   pixelOrderFor,
   validateFrameView,
-  type FrameOrientation,
 } from './frameToScanImage';
+import {
+  detectorRotationLabel,
+  isFrameCoherentWithOutput,
+  PORTRAIT_OUTPUT_ORIENTATION,
+  resolveDesiredOutputOrientation,
+} from './orientationLifecycle';
 import {
   createSessionController,
   detectCardQuad,
@@ -94,6 +100,7 @@ export interface StageCounters {
   scanImages: number;
   scheduleAttempted: number;
   skippedForCadence: number;
+  skippedForOrientation: number;
   skippedNoPixelBuffer: number;
   skippedPlanar: number;
   supersededOnJs: number;
@@ -164,7 +171,9 @@ export interface AnalysisResult {
   corners: CardCorners | null;
   detected: boolean;
   detector: DetectorDiagnostics;
+  quad: QuadDiagnostics | null;
   score: number;
+  spaces: CoordinateSpaces;
 }
 
 export interface FrameProbeResult {
@@ -177,10 +186,26 @@ export interface FrameProbeResult {
   size: string;
 }
 
+/** Startup / change timeline for outputOrientation vs Frame.orientation. */
+export interface OrientationDebug {
+  desired: string;
+  detectorRotation: string;
+  frameOrientation: string | null;
+  lastUpdateAt: number | null;
+  ready: boolean;
+}
+
 export interface FrameAnalysisOptions {
   analysisMaxWidth?: number;
   debugPreview?: boolean;
   enabled?: boolean;
+  /**
+   * Interface (UI) orientation from VisionCamera. Ignored when undefined —
+   * a portrait-locked app must not wait for it. Defaults to `'up'`.
+   */
+  interfaceOrientation?: string;
+  /** Preview view size in screen pixels — the cover-crop destination. */
+  previewSize?: { height: number; width: number };
   /** Index into `RESOLUTIONS`. */
   resolutionIndex?: number;
   /** Highest ladder rung to attempt. Lower it to isolate a failure. */
@@ -192,8 +217,6 @@ const now = () =>
   typeof performance !== 'undefined' && typeof performance.now === 'function'
     ? performance.now()
     : Date.now();
-
-const ORIENTATIONS: readonly string[] = ['up', 'right', 'down', 'left'];
 
 const emptyCounters = (): StageCounters => ({
   bufferCopied: 0,
@@ -211,6 +234,7 @@ const emptyCounters = (): StageCounters => ({
   scanImages: 0,
   scheduleAttempted: 0,
   skippedForCadence: 0,
+  skippedForOrientation: 0,
   skippedNoPixelBuffer: 0,
   skippedPlanar: 0,
   supersededOnJs: 0,
@@ -241,6 +265,8 @@ export const useFrameAnalysis = ({
   analysisMaxWidth = 640,
   debugPreview = true,
   enabled = true,
+  interfaceOrientation,
+  previewSize = { height: 0, width: 0 },
   resolutionIndex = 0,
   rung = 'full',
   targetAnalysisFps = 10,
@@ -255,6 +281,15 @@ export const useFrameAnalysis = ({
   const [preview, setPreview] = useState<string | null>(null);
   const [probeResult, setProbeResult] = useState<FrameProbeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [orientationDebug, setOrientationDebug] = useState<OrientationDebug>({
+    desired: PORTRAIT_OUTPUT_ORIENTATION,
+    detectorRotation: detectorRotationLabel(PORTRAIT_OUTPUT_ORIENTATION),
+    frameOrientation: null,
+    lastUpdateAt: null,
+    ready: false,
+  });
+
+  const desiredOutput = resolveDesiredOutputOrientation(interfaceOrientation);
 
   const stages = useMemo(
     () => ({
@@ -280,6 +315,8 @@ export const useFrameAnalysis = ({
   const lastImage = useRef<ScanImage | null>(null);
   const lastPreviewAt = useRef(0);
   const lastMeta = useRef<FrameMetadata | null>(null);
+  const previewSizeRef = useRef(previewSize);
+  previewSizeRef.current = previewSize;
   const pending = useRef<{
     bytes: ArrayBuffer;
     bytesPerRow: number;
@@ -411,9 +448,30 @@ export const useFrameAnalysis = ({
         publish();
         return;
       }
-      const orientation = (
-        ORIENTATIONS.includes(payload.orientation) ? payload.orientation : 'up'
-      ) as FrameOrientation;
+      const orientation = parseOrientation(payload.orientation);
+      const desired = desiredOutput;
+      const coherent = isFrameCoherentWithOutput(
+        desired,
+        payload.width,
+        payload.height,
+        orientation,
+      );
+      setOrientationDebug({
+        desired,
+        detectorRotation: detectorRotationLabel(orientation),
+        frameOrientation: payload.orientation,
+        lastUpdateAt: Date.now(),
+        ready: coherent,
+      });
+      if (!coherent) {
+        tally.current.skippedForOrientation++;
+        pending.current = null;
+        lastImage.current = null;
+        setResult(null);
+        setPreview(null);
+        publish();
+        return;
+      }
 
       const bytes = new Uint8Array(payload.bytes);
       const validation = validateFrameView({
@@ -431,6 +489,13 @@ export const useFrameAnalysis = ({
         return;
       }
 
+      const spaces = spacesFor(
+        { height: payload.height, width: payload.width },
+        orientation,
+        previewSizeRef.current,
+        analysisMaxWidth,
+      );
+
       const startedAt = now();
       const image = frameToScanImage(
         {
@@ -442,7 +507,7 @@ export const useFrameAnalysis = ({
           pixelOrder,
           width: payload.width,
         },
-        { maxWidth: analysisMaxWidth },
+        { crop: spaces.visible, maxLongEdge: analysisMaxWidth },
       );
       const convertedAt = now();
       tally.current.scanImages++;
@@ -476,7 +541,9 @@ export const useFrameAnalysis = ({
           selectedIndex: detection.debug.selectedIndex,
           workSize: detection.debug.workSize,
         },
+        quad: detection.corners ? quadDiagnostics(detection.corners, image) : null,
         score: detection.score,
+        spaces: { ...spaces, detector: { height: image.height, width: image.width } },
       });
       setError(null);
 
@@ -492,7 +559,7 @@ export const useFrameAnalysis = ({
 
       publish();
     },
-    [analysisMaxWidth, debugPreview, publish, rates, stages],
+    [analysisMaxWidth, debugPreview, desiredOutput, publish, rates, stages],
   );
 
   const drain = useCallback(() => {
@@ -935,6 +1002,32 @@ export const useFrameAnalysis = ({
     targetResolution,
   });
 
+  // Assign before paint. useEffect ran too late: the first frames already
+  // used the native default. Do not wait for an orientation event.
+  useLayoutEffect(() => {
+    frameOutput.outputOrientation = desiredOutput;
+  }, [desiredOutput, frameOutput]);
+
+  // A new output target invalidates every stored raster and quad.
+  const previousDesired = useRef(desiredOutput);
+  useLayoutEffect(() => {
+    if (previousDesired.current === desiredOutput) return;
+    previousDesired.current = desiredOutput;
+    pending.current = null;
+    lastImage.current = null;
+    lastPreviewAt.current = 0;
+    setResult(null);
+    setPreview(null);
+    setProbeResult(null);
+    setOrientationDebug({
+      desired: desiredOutput,
+      detectorRotation: detectorRotationLabel(PORTRAIT_OUTPUT_ORIENTATION),
+      frameOrientation: null,
+      lastUpdateAt: Date.now(),
+      ready: false,
+    });
+  }, [desiredOutput]);
+
   useEffect(() => {
     if (enabled) return;
     pending.current = null;
@@ -948,6 +1041,7 @@ export const useFrameAnalysis = ({
     frameMeta,
     frameOutput,
     metrics,
+    orientation: orientationDebug,
     ping,
     preview,
     probeResult,

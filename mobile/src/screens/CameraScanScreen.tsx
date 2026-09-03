@@ -13,6 +13,7 @@ import {
   Camera,
   useCameraDevices,
   useCameraPermission,
+  useOrientation,
   type CameraDevice,
   type CameraRef,
 } from 'react-native-vision-camera';
@@ -64,6 +65,10 @@ export function CameraScanScreen() {
   // serialization failure.
   const [rungIndex, setRungIndex] = useState(RUNGS.length - 1);
   const [resolutionIndex, setResolutionIndex] = useState(0);
+  const [showNumbers, setShowNumbers] = useState(true);
+  // Interface, not device: the UI is portrait-locked. Device orientation
+  // stays undefined until the phone moves — that was the startup bug.
+  const interfaceOrientation = useOrientation('interface');
 
   const {
     counters,
@@ -72,6 +77,7 @@ export function CameraScanScreen() {
     frameMeta,
     frameOutput,
     metrics,
+    orientation,
     ping,
     preview,
     probeResult,
@@ -82,6 +88,8 @@ export function CameraScanScreen() {
     transfer,
   } = useFrameAnalysis({
     enabled: detectorOn,
+    interfaceOrientation,
+    previewSize: layout,
     resolutionIndex,
     rung: RUNGS[rungIndex],
   });
@@ -124,21 +132,23 @@ export function CameraScanScreen() {
     [focusAt],
   );
 
-  // Analysis raster → preview box. The analysis image is upright and shares the
-  // camera's field of view, so cover-fitting it into the preview box is the
-  // whole transform — as long as the preview and the frame output negotiated
-  // the same aspect ratio, which is why `resizeMode` is pinned to 'cover' and
-  // the frame output asks for 4:3.
-  const quad = useMemo(() => {
+  // Detector image is already the preview-visible cover-crop, upright, so
+  // overlay is a uniform scale of analysis → dest. Using the same cover mapper
+  // as web keeps the math in one place if rounding leaves a sliver of mismatch.
+  const mappedCorners = useMemo(() => {
     if (!result?.corners || layout.width === 0) return null;
-    const mapped = mapCornersToOverlay(result.corners, result.analysis, result.analysis, layout);
-    return [
-      [mapped.topLeft, mapped.topRight],
-      [mapped.topRight, mapped.bottomRight],
-      [mapped.bottomRight, mapped.bottomLeft],
-      [mapped.bottomLeft, mapped.topLeft],
-    ] as const;
+    return mapCornersToOverlay(result.corners, result.analysis, result.analysis, layout);
   }, [layout, result]);
+
+  const quad = useMemo(() => {
+    if (!mappedCorners) return null;
+    return [
+      [mappedCorners.topLeft, mappedCorners.topRight],
+      [mappedCorners.topRight, mappedCorners.bottomRight],
+      [mappedCorners.bottomRight, mappedCorners.bottomLeft],
+      [mappedCorners.bottomLeft, mappedCorners.topLeft],
+    ] as const;
+  }, [mappedCorners]);
 
   if (!hasPermission) {
     return (
@@ -174,6 +184,7 @@ export function CameraScanScreen() {
         device={device}
         enableNativeTapToFocusGesture={false}
         isActive
+        orientationSource="interface"
         outputs={[frameOutput]}
         resizeMode="cover"
         style={StyleSheet.absoluteFill}
@@ -190,6 +201,20 @@ export function CameraScanScreen() {
               style={[styles.edge, edgeStyle(a, b), detected ? styles.edgeOn : styles.edgeWeak]}
             />
           ))}
+          {showNumbers && mappedCorners
+            ? (
+                [
+                  ['1', mappedCorners.topLeft],
+                  ['2', mappedCorners.topRight],
+                  ['3', mappedCorners.bottomRight],
+                  ['4', mappedCorners.bottomLeft],
+                ] as const
+              ).map(([n, p]) => (
+                <Text key={n} style={[styles.cornerNum, { left: p.x - 6, top: p.y - 8 }]}>
+                  {n}
+                </Text>
+              ))
+            : null}
         </View>
       ) : null}
 
@@ -226,8 +251,20 @@ export function CameraScanScreen() {
         ]}
       >
         <View pointerEvents="box-none" style={styles.topBar}>
-          <Text style={[styles.badge, detected && styles.badgeOn]}>
-            {detectorOn ? (detected ? 'CARD' : 'SEARCHING') : 'DETECTOR OFF'}
+          <Text
+            style={[
+              styles.badge,
+              detected && styles.badgeOn,
+              detectorOn && !orientation.ready && styles.badgeWait,
+            ]}
+          >
+            {!detectorOn
+              ? 'DETECTOR OFF'
+              : !orientation.ready
+                ? 'Initializing orientation'
+                : detected
+                  ? 'CARD'
+                  : 'SEARCHING'}
           </Text>
           <Text numberOfLines={2} style={styles.deviceLine}>
             {describeDevice(device)}
@@ -244,11 +281,13 @@ export function CameraScanScreen() {
               failure={failure}
               frameMeta={frameMeta}
               metrics={metrics}
+              orientation={orientation}
               ping={ping}
               preview={preview}
               probeResult={probeResult}
               result={result}
               rung={RUNGS[rungIndex]}
+              showNumbers={showNumbers}
               transfer={transfer}
             />
           </View>
@@ -292,6 +331,9 @@ export function CameraScanScreen() {
           </Pressable>
           <Pressable onPress={testCurrentFrame} style={styles.chip}>
             <Text style={styles.chipLabel}>Test frame</Text>
+          </Pressable>
+          <Pressable onPress={() => setShowNumbers(v => !v)} style={styles.chip}>
+            <Text style={styles.chipLabel}>Corners {showNumbers ? 'on' : 'off'}</Text>
           </Pressable>
           <Pressable onPress={resetCounters} style={styles.chip}>
             <Text style={styles.chipLabel}>Reset</Text>
@@ -353,6 +395,10 @@ const styles = StyleSheet.create({
   badgeOn: {
     backgroundColor: '#7CFFB2',
   },
+  badgeWait: {
+    backgroundColor: '#8A97AD',
+    color: '#0B1220',
+  },
   body: {
     color: '#A8B3C7',
     lineHeight: 20,
@@ -398,6 +444,14 @@ const styles = StyleSheet.create({
   },
   chipOn: {
     borderColor: 'rgba(124,255,178,0.6)',
+  },
+  cornerNum: {
+    color: '#7CFFB2',
+    fontSize: 12,
+    fontWeight: '800',
+    position: 'absolute',
+    textShadowColor: '#000',
+    textShadowRadius: 3,
   },
   deviceLine: {
     color: '#F4F7FB',
