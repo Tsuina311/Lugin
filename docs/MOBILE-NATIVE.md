@@ -466,16 +466,36 @@ incoherent with that target (landscape + `'up'`) are dropped; the badge reads
 `Initializing orientation`. Stored quads are cleared if the desired target
 later changes.
 
+## C.2i — live session + recognition path
+
+Correctness (Triple Camera, FOV crop, blue/green quads) was proven on Samsung
+before this work. This slice does **not** invent new device timings.
+
+Live path:
+
+```
+VisionCamera frame → oriented/cropped ScanImage → detectCardQuad
+  → SessionController.onFrame (prepareAnalysis, no search-frame warp)
+  → tracking / focus / quality pool
+  → refineCard (744×1039 warp; analysis-warp until photo is measured)
+  → recognizeCard (artwork + empty OCR + fuseEvidence)
+  → result card
+```
+
+Default analysis long edge is 480 (same FOV as 640/400). Production transfer
+is one `scheduleOnRN`, not the four-rung ladder. Debug PNG/panel publish at
+~1–2 Hz.
+
+Samsung latency, hi-res photo vs snapshot, and artwork-on-device numbers:
+see `docs/MOBILE-SAMSUNG-CHECKLIST.md`. All PENDING.
+
 ## Storage / Drive / OCR (later milestones)
 
-- **Storage:** implement `LocalRepository` with Expo SQLite; keep
-  `src/core/sync` engine unchanged.
-- **Drive:** new native `TokenProvider`; scopes stay
-  `drive.appdata` + `drive.file` (`src/core/sync/scopes.ts`). No client secret
-  in the app; secure token storage (not plain AsyncStorage).
-- **OCR:** keep `TextRecognizer` portable; web stays `tesseract.js`; native
-  must be benchmarked (e.g. ML Kit) against fixtures — do not switch on
-  convenience alone.
+- **Storage:** `LocalRepository` contract is wired to the existing in-memory
+  port. Expo SQLite waits for a fingerprint/APK; do not add it through OTA.
+- **Drive:** still out of scope until native recognition *and* local
+  persistence work.
+- **OCR:** seam is `emptyTextRecognizer`. Survey: `docs/MOBILE-OCR.md`.
 - **Corpus:** same consent + Drive folder pipeline; label `platform: android`.
 
 ## Versioning
@@ -487,18 +507,17 @@ invent a separate scheme. Desktop overlay continues to use
 
 ## Limitations (honest)
 
-- C.2 **does not work on device yet**. The first Samsung run stayed in
-  SEARCHING with no quad ever drawn. The C.2d diagnostics were added to find
-  out why; until a device read-out exists, the RGBA baseline is neither
-  accepted nor refuted, and every frame timing in this doc is desktop-only.
-  Performance measurement is deliberately deferred until the pipeline is
-  correct — there is no point profiling a path that produces nothing.
-- Frame `orientation` / `isMirrored` handling is asserted for self-consistency,
-  not against real sensor metadata. The "Detector input" thumbnail exists to
-  settle this visually on the phone.
-- The overlay assumes the preview and the frame output negotiated the same
-  aspect ratio (both 4:3). A mismatch would offset the quad.
-- Collection / decks / Drive / recognition **not** ported yet.
+- Detector correctness on Samsung is proven (C.2g/h). **Responsiveness is
+  not.** Previous device notes (~11 sample Hz → ~2–3 detect Hz) were taken
+  with the diagnostic ladder and debug panel on. This session did not
+  re-measure on the phone.
+- Hi-res recognition defaults to warping the analysis frame. Photo /
+  snapshot / higher-res frame output need a Samsung comparison before one
+  is chosen.
+- Artwork matching is wired; OCR is an empty recognizer. Identity on device
+  is artwork-only until an engine is added (new APK).
+- Collection add is a command seam over an in-memory `LocalRepository`.
+  No SQLite, no Drive.
 - iOS is structurally supported; untested on device.
 - CI does not yet build the Android development binary.
 

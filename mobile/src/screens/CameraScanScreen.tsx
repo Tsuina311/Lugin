@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   Pressable,
@@ -20,9 +20,18 @@ import {
 
 import { CameraDebugPanel } from '../camera/CameraDebugPanel';
 import { describeDevice, selectMainRearDevice } from '../camera/selectMainRearDevice';
+import { collectionAddFromPrinting } from '../scan/collectionCommand';
+import { tickOverlay } from '../scan/overlayEase';
 import { ScanDebugPanel } from '../scan/ScanDebugPanel';
-import { mapCornersToOverlay, type Point2D } from '../scan/sharedCore';
-import { RESOLUTIONS, RUNGS, useFrameAnalysis } from '../scan/useFrameAnalysis';
+import { ScanResultCard } from '../scan/ScanResultCard';
+import { mapCornersToOverlay, type CardCorners, type Point2D } from '../scan/sharedCore';
+import { useScanSession } from '../scan/useScanSession';
+import {
+  ANALYSIS_LONG_EDGES,
+  RESOLUTIONS,
+  RUNGS,
+  useFrameAnalysis,
+} from '../scan/useFrameAnalysis';
 
 type FocusState = 'idle' | 'focusing' | 'done' | 'error';
 type Panel = 'scan' | 'camera' | 'none';
@@ -65,10 +74,19 @@ export function CameraScanScreen() {
   // serialization failure.
   const [rungIndex, setRungIndex] = useState(RUNGS.length - 1);
   const [resolutionIndex, setResolutionIndex] = useState(0);
+  const [longEdgeIndex, setLongEdgeIndex] = useState(1);
+  const [diagnosticRungs, setDiagnosticRungs] = useState(false);
   const [showNumbers, setShowNumbers] = useState(true);
+  const [pendingAdd, setPendingAdd] = useState<string | null>(null);
   // Interface, not device: the UI is portrait-locked. Device orientation
   // stays undefined until the phone moves — that was the startup bug.
   const interfaceOrientation = useOrientation('interface');
+
+  const session = useScanSession({
+    cameraRef,
+    enabled: detectorOn,
+    previewSize: layout,
+  });
 
   const {
     counters,
@@ -78,6 +96,7 @@ export function CameraScanScreen() {
     frameOutput,
     metrics,
     orientation,
+    overlay,
     ping,
     preview,
     probeResult,
@@ -87,8 +106,12 @@ export function CameraScanScreen() {
     testCurrentFrame,
     transfer,
   } = useFrameAnalysis({
+    analysisMaxWidth: ANALYSIS_LONG_EDGES[longEdgeIndex],
+    debugPreview: panel === 'scan',
+    diagnosticRungs,
     enabled: detectorOn,
     interfaceOrientation,
+    onAnalyzed: session.onAnalyzed,
     previewSize: layout,
     resolutionIndex,
     rung: RUNGS[rungIndex],
@@ -127,18 +150,40 @@ export function CameraScanScreen() {
   const onTap = useCallback(
     (e: GestureResponderEvent) => {
       const { locationX, locationY } = e.nativeEvent;
+      session.markTap();
       void focusAt(locationX, locationY);
     },
-    [focusAt],
+    [focusAt, session],
   );
+
+  const easeClock = useRef({ display: null as CardCorners | null, targetAt: 0 });
+  const [displayCorners, setDisplayCorners] = useState<CardCorners | null>(null);
+  useEffect(() => {
+    let raf = 0;
+    const close = (a: CardCorners | null, b: CardCorners | null) => {
+      if (a === b) return true;
+      if (!a || !b) return false;
+      return Math.hypot(a.topLeft.x - b.topLeft.x, a.topLeft.y - b.topLeft.y) < 0.5;
+    };
+    const loop = () => {
+      const next = tickOverlay(easeClock.current, overlay?.corners ?? null, Date.now());
+      const changed = !close(easeClock.current.display, next.display);
+      easeClock.current = next;
+      if (changed) setDisplayCorners(next.display);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [overlay?.corners]);
 
   // Detector image is already the preview-visible cover-crop, upright, so
   // overlay is a uniform scale of analysis → dest. Using the same cover mapper
   // as web keeps the math in one place if rounding leaves a sliver of mismatch.
+  const analysisSize = overlay?.analysis ?? result?.analysis;
   const mappedCorners = useMemo(() => {
-    if (!result?.corners || layout.width === 0) return null;
-    return mapCornersToOverlay(result.corners, result.analysis, result.analysis, layout);
-  }, [layout, result]);
+    if (!displayCorners || !analysisSize || layout.width === 0) return null;
+    return mapCornersToOverlay(displayCorners, analysisSize, analysisSize, layout);
+  }, [analysisSize, displayCorners, layout]);
 
   const quad = useMemo(() => {
     if (!mappedCorners) return null;
@@ -175,7 +220,13 @@ export function CameraScanScreen() {
     );
   }
 
-  const detected = result?.detected ?? false;
+  const detected = overlay?.detected ?? result?.detected ?? false;
+  const phase = session.snapshot?.phase ?? (detected ? 'detected' : 'searching');
+  const badgeText = !detectorOn
+    ? 'DETECTOR OFF'
+    : !orientation.ready
+      ? 'Initializing orientation'
+      : phase.toUpperCase();
 
   return (
     <View onLayout={onLayout} style={styles.root}>
@@ -254,17 +305,11 @@ export function CameraScanScreen() {
           <Text
             style={[
               styles.badge,
-              detected && styles.badgeOn,
+              (detected || phase === 'found' || phase === 'locking') && styles.badgeOn,
               detectorOn && !orientation.ready && styles.badgeWait,
             ]}
           >
-            {!detectorOn
-              ? 'DETECTOR OFF'
-              : !orientation.ready
-                ? 'Initializing orientation'
-                : detected
-                  ? 'CARD'
-                  : 'SEARCHING'}
+            {badgeText}
           </Text>
           <Text numberOfLines={2} style={styles.deviceLine}>
             {describeDevice(device)}
@@ -273,10 +318,42 @@ export function CameraScanScreen() {
 
         <View pointerEvents="none" style={styles.spacer} />
 
+        {session.snapshot &&
+        (session.snapshot.phase === 'found' || session.snapshot.phase === 'ambiguous') ? (
+          <View style={styles.resultWrap}>
+            <ScanResultCard
+              nameIndex={session.indexes.names?.index ?? null}
+              onAction={(action, extra) => {
+                if (action === 'scan-again') {
+                  session.reset();
+                  return;
+                }
+                if (action === 'add') {
+                  const name = session.snapshot?.fused?.card?.name;
+                  setPendingAdd(name ? `queued add: ${name}` : 'queued add (unnamed)');
+                  const printing = extra?.printing;
+                  if (printing) collectionAddFromPrinting(printing);
+                }
+                if (action === 'wrong-card' && extra?.name) {
+                  setPendingAdd(`correction: ${extra.name}`);
+                }
+                if (action === 'wrong-printing' && extra?.printing) {
+                  collectionAddFromPrinting(extra.printing);
+                  setPendingAdd(`printing: ${extra.printing.setCode} ${extra.printing.collectorNumber}`);
+                }
+              }}
+              snapshot={session.snapshot}
+            />
+            {pendingAdd ? <Text style={styles.pendingAdd}>{pendingAdd}</Text> : null}
+          </View>
+        ) : null}
+
         {panel === 'scan' ? (
           <View style={styles.panelWrap}>
             <ScanDebugPanel
+              analysisLongEdge={ANALYSIS_LONG_EDGES[longEdgeIndex]}
               counters={counters}
+              diagnosticRungs={diagnosticRungs}
               error={error}
               failure={failure}
               frameMeta={frameMeta}
@@ -287,6 +364,19 @@ export function CameraScanScreen() {
               probeResult={probeResult}
               result={result}
               rung={RUNGS[rungIndex]}
+              session={{
+                artCandidates: session.debug.artCandidates,
+                artEntries: session.indexes.art?.entries ?? null,
+                names: session.indexes.names?.names ?? null,
+                normalizedUri: session.debug.normalizedUri,
+                phase,
+                qualityBest: session.snapshot?.quality?.score ?? session.debug.qualityBest,
+                qualityExposure: session.snapshot?.quality?.exposure,
+                qualityGlare: session.snapshot?.quality?.glare,
+                qualitySharpness: session.snapshot?.quality?.sharpness,
+                stable: (session.snapshot?.motion ?? 1) < 0.04 && (session.snapshot?.trackFrames ?? 0) >= 3,
+                trackFrames: session.snapshot?.trackFrames ?? 0,
+              }}
               showNumbers={showNumbers}
               transfer={transfer}
             />
@@ -316,10 +406,24 @@ export function CameraScanScreen() {
             <Text style={styles.chipLabel}>Detector {detectorOn ? 'on' : 'off'}</Text>
           </Pressable>
           <Pressable
-            onPress={() => setRungIndex(i => (i + 1) % RUNGS.length)}
+            onPress={() => setDiagnosticRungs(v => !v)}
+            style={[styles.chip, diagnosticRungs && styles.chipOn]}
+          >
+            <Text style={styles.chipLabel}>{diagnosticRungs ? 'Ladder on' : 'Fast path'}</Text>
+          </Pressable>
+          {diagnosticRungs ? (
+            <Pressable
+              onPress={() => setRungIndex(i => (i + 1) % RUNGS.length)}
+              style={styles.chip}
+            >
+              <Text style={styles.chipLabel}>Rung: {RUNGS[rungIndex]}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            onPress={() => setLongEdgeIndex(i => (i + 1) % ANALYSIS_LONG_EDGES.length)}
             style={styles.chip}
           >
-            <Text style={styles.chipLabel}>Rung: {RUNGS[rungIndex]}</Text>
+            <Text style={styles.chipLabel}>Long {ANALYSIS_LONG_EDGES[longEdgeIndex]}</Text>
           </Pressable>
           <Pressable
             onPress={() => setResolutionIndex(i => (i + 1) % RESOLUTIONS.length)}
@@ -468,6 +572,14 @@ const styles = StyleSheet.create({
   },
   edgeWeak: {
     backgroundColor: 'rgba(245,197,66,0.75)',
+  },
+  pendingAdd: {
+    color: '#7CFFB2',
+    fontSize: 11,
+    marginTop: 4,
+  },
+  resultWrap: {
+    marginBottom: 8,
   },
   overlay: {
     bottom: 0,

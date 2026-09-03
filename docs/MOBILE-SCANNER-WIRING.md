@@ -453,6 +453,16 @@ also proves unreliable — VisionCamera's own guidance is that `'yuv'` is the
 format to use when you need CPU access — but that costs a hand-written
 YUV→RGBA conversion, so it waits until the cheaper source is disproven.
 
+## Native live path (post C.2h)
+
+`SessionController.onFrame` is on the live native path. Native supplies
+`FrameHelpers.prepareAnalysis` (reuse the overlay `detectCardQuad`, skip the
+search-frame 744×1039 warp), `refineCard` (canonical warp / future hi-res),
+and `requestFocusNorm` (VisionCamera `focusTo`, no second 700 ms throttle).
+
+Indexes load from the Pages deploy into process memory (`buildNameIndex`,
+`createArtworkMatcher`). Not AsyncStorage.
+
 ## What is deliberately not decided here
 
 Multi-card/binder scanning stays out (Phase 39), but note `detectCardQuad`

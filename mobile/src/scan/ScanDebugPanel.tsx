@@ -15,8 +15,24 @@ import type {
   WorkletFailure,
 } from './useFrameAnalysis';
 
+type SessionBits = {
+  artCandidates: { name: string; score: number }[];
+  artEntries: number | null;
+  names: number | null;
+  normalizedUri: string | null;
+  phase: string;
+  qualityBest: number | null;
+  qualityExposure?: number;
+  qualityGlare?: number;
+  qualitySharpness?: number;
+  stable: boolean;
+  trackFrames: number;
+};
+
 type Props = {
+  analysisLongEdge: number;
   counters: StageCounters;
+  diagnosticRungs: boolean;
   error: string | null;
   failure: WorkletFailure | null;
   frameMeta: FrameMetadata | null;
@@ -27,6 +43,7 @@ type Props = {
   probeResult: FrameProbeResult | null;
   result: AnalysisResult | null;
   rung: Rung;
+  session?: SessionBits | null;
   showNumbers: boolean;
   transfer: TransferCheck | null;
 };
@@ -42,7 +59,9 @@ const fps = (n: number) => n.toFixed(1);
  * inside the worklet, so a failure at one does not suppress the rows above it.
  */
 export function ScanDebugPanel({
+  analysisLongEdge,
   counters,
+  diagnosticRungs,
   error,
   failure,
   frameMeta,
@@ -53,6 +72,7 @@ export function ScanDebugPanel({
   probeResult,
   result,
   rung,
+  session,
   showNumbers,
   transfer,
 }: Props) {
@@ -66,6 +86,8 @@ export function ScanDebugPanel({
     ['RN meta', counters.rnMeta],
     ['RN tiny buffer', counters.rnTiny],
     ['RN full frame', counters.rnFull],
+    ['received', counters.received],
+    ['processed', counters.processed],
     ['ScanImages', counters.scanImages],
     ['detector calls', counters.detectorCalls],
     ['detector hits', counters.detectorHits],
@@ -90,7 +112,9 @@ export function ScanDebugPanel({
 
         <View style={styles.row}>
           <View style={styles.column}>
-            <Text style={styles.title}>Ladder (rung: {rung})</Text>
+            <Text style={styles.title}>
+              Ladder ({diagnosticRungs ? `rung: ${rung}` : 'fast path'}) · long {analysisLongEdge}
+            </Text>
             {ladder.map(([label, value], i) => (
               <Text key={label} style={[styles.line, i === breakAt && styles.bad]}>
                 {label}: {value}
@@ -144,6 +168,24 @@ export function ScanDebugPanel({
             <Text style={styles.line}>
               detect {ms(metrics.detectMs)} · total {ms(metrics.totalMs)}
             </Text>
+            {metrics.latency ? (
+              <>
+                <Text style={styles.title}>Frame age p50/p95 ms</Text>
+                <Text style={styles.line}>
+                  cam→RN {ms(metrics.latency.cameraToRn)} · RN→Scan {ms(metrics.latency.rnToScan)}
+                </Text>
+                <Text style={styles.line}>
+                  Scan→detect {ms(metrics.latency.scanToDetect)} · cam→detect{' '}
+                  {ms(metrics.latency.cameraToDetect)}
+                </Text>
+                <Text style={styles.ok}>
+                  cam→polygon {ms(metrics.latency.cameraToOverlay)}
+                  {metrics.processedFrameAgeMs
+                    ? ` · processed age ${ms(metrics.processedFrameAgeMs)}`
+                    : ''}
+                </Text>
+              </>
+            ) : null}
             {metrics.lastDropReason ? (
               <Text style={styles.line}>last drop: {metrics.lastDropReason}</Text>
             ) : null}
@@ -291,9 +333,51 @@ export function ScanDebugPanel({
           </>
         ) : null}
 
-        <Text style={styles.dim}>
-          Overlay is driven directly by detectCardQuad; SessionController is not in the live path.
-        </Text>
+        {session ? (
+          <>
+            <Text style={styles.title}>SessionController</Text>
+            <Text style={styles.ok}>phase {session.phase}</Text>
+            <Text style={styles.line}>
+              stable {session.stable ? 'yes' : 'no'} · track {session.trackFrames}
+              {session.qualityBest != null ? ` · quality ${session.qualityBest.toFixed(2)}` : ''}
+            </Text>
+            {session.qualitySharpness != null ? (
+              <Text style={styles.line}>
+                sharp {session.qualitySharpness.toFixed(0)} · glare{' '}
+                {(session.qualityGlare ?? 0).toFixed(3)} · exp{' '}
+                {(session.qualityExposure ?? 0).toFixed(0)}
+              </Text>
+            ) : null}
+            <Text style={styles.line}>
+              names {session.names ?? '—'} · art {session.artEntries ?? '—'}
+            </Text>
+            {session.artCandidates.length ? (
+              <>
+                <Text style={styles.title}>Artwork candidates</Text>
+                {session.artCandidates.map((c, i) => (
+                  <Text key={`${c.name}:${i}`} style={styles.line}>
+                    {i + 1}. {c.name} · {c.score.toFixed(3)}
+                  </Text>
+                ))}
+              </>
+            ) : null}
+            <Text style={styles.title}>Recognition input (744×1039)</Text>
+            {session.normalizedUri ? (
+              <DetectorInputThumb
+                corners={null}
+                height={1039}
+                label="744×1039 canonical"
+                showNumbers={false}
+                uri={session.normalizedUri}
+                width={744}
+              />
+            ) : (
+              <Text style={styles.dim}>no normalized card yet — lock a stable card</Text>
+            )}
+          </>
+        ) : (
+          <Text style={styles.dim}>SessionController not attached</Text>
+        )}
       </ScrollView>
     </View>
   );
