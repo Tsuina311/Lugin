@@ -78,10 +78,17 @@ export const RESOLUTIONS = [
   { height: 240, width: 320 },
 ] as const;
 
+/**
+ * Long-edge matrix for the *same* preview FOV crop.
+ * Camera target stays 640×480; only the post-crop downscale changes.
+ */
+export const ANALYSIS_LONG_EDGES = [640, 480, 400] as const;
+
 /** Bytes in the tiny-ArrayBuffer rung. Small enough that size cannot be the issue. */
 const TINY_BYTES = 64;
-/** Thumbnail refresh. Roughly 1–2 per second. */
+/** Thumbnail / debug-panel refresh. Must not run at detector cadence. */
 const PREVIEW_MS = 700;
+const DEBUG_PUBLISH_MS = 400;
 
 /** Per-stage tallies. The first one that stops moving is the broken boundary. */
 export interface StageCounters {
@@ -92,6 +99,8 @@ export interface StageCounters {
   droppedByCamera: number;
   pixelBufferFromPlane: number;
   pixelBufferRead: number;
+  processed: number;
+  received: number;
   rnFull: number;
   rnMeta: number;
   rnPing: number;
@@ -195,10 +204,28 @@ export interface OrientationDebug {
   ready: boolean;
 }
 
+export interface OverlayState {
+  analysis: { height: number; width: number };
+  corners: CardCorners | null;
+  detected: boolean;
+  score: number;
+}
+
 export interface FrameAnalysisOptions {
   analysisMaxWidth?: number;
+  /**
+   * Climb the diagnostic transfer ladder (ping/meta/tiny/full). Default is
+   * the production path: one `scheduleOnRN` with the copied buffer.
+   */
+  diagnosticRungs?: boolean;
+  /** PNG thumbnail + full debug state. Off = overlay-only updates. */
   debugPreview?: boolean;
   enabled?: boolean;
+  /** Called after each processed ScanImage + detectCardQuad. */
+  onAnalyzed?: (payload: {
+    detection: ReturnType<typeof detectCardQuad>;
+    image: ScanImage;
+  }) => void;
   /**
    * Interface (UI) orientation from VisionCamera. Ignored when undefined —
    * a portrait-locked app must not wait for it. Defaults to `'up'`.
@@ -226,6 +253,8 @@ const emptyCounters = (): StageCounters => ({
   droppedByCamera: 0,
   pixelBufferFromPlane: 0,
   pixelBufferRead: 0,
+  processed: 0,
+  received: 0,
   rnFull: 0,
   rnMeta: 0,
   rnPing: 0,
@@ -262,15 +291,18 @@ const describeBytes = (value: unknown): string => {
 };
 
 export const useFrameAnalysis = ({
-  analysisMaxWidth = 640,
+  analysisMaxWidth = 480,
   debugPreview = true,
+  diagnosticRungs = false,
   enabled = true,
   interfaceOrientation,
+  onAnalyzed,
   previewSize = { height: 0, width: 0 },
   resolutionIndex = 0,
   rung = 'full',
   targetAnalysisFps = 10,
 }: FrameAnalysisOptions = {}) => {
+  const [overlay, setOverlay] = useState<OverlayState | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [metrics, setMetrics] = useState<AnalysisMetrics | null>(null);
   const [counters, setCounters] = useState<StageCounters>(emptyCounters);
@@ -291,10 +323,19 @@ export const useFrameAnalysis = ({
 
   const desiredOutput = resolveDesiredOutputOrientation(interfaceOrientation);
 
+  const onAnalyzedRef = useRef(onAnalyzed);
+  onAnalyzedRef.current = onAnalyzed;
+
   const stages = useMemo(
     () => ({
+      cameraToDetect: createStage(),
+      cameraToOverlay: createStage(),
+      cameraToRn: createStage(),
       convert: createStage(),
       detect: createStage(),
+      processedAge: createStage(),
+      rnToScan: createStage(),
+      scanToDetect: createStage(),
       total: createStage(),
       transfer: createStage(),
     }),
@@ -314,6 +355,7 @@ export const useFrameAnalysis = ({
   const dropReason = useRef<FrameDroppedReason | null>(null);
   const lastImage = useRef<ScanImage | null>(null);
   const lastPreviewAt = useRef(0);
+  const lastDebugAt = useRef(0);
   const lastMeta = useRef<FrameMetadata | null>(null);
   const previewSizeRef = useRef(previewSize);
   previewSizeRef.current = previewSize;
@@ -323,12 +365,16 @@ export const useFrameAnalysis = ({
     height: number;
     isMirrored: boolean;
     orientation: string;
+    pixelFormat: string;
+    sampleAcceptedAt: number;
     width: number;
   } | null>(null);
   const draining = useRef(false);
 
-  const publish = useCallback(() => {
+  const publish = useCallback((force = false) => {
     const t = now();
+    if (!force && t - lastDebugAt.current < DEBUG_PUBLISH_MS) return;
+    lastDebugAt.current = t;
     setCounters({ ...tally.current });
     setMetrics({
       analysisRate: rates.analysis.read(t),
@@ -338,6 +384,14 @@ export const useFrameAnalysis = ({
       droppedByCamera: tally.current.droppedByCamera,
       frameRate: rates.camera.read(t),
       lastDropReason: dropReason.current,
+      latency: {
+        cameraToDetect: stages.cameraToDetect.read(),
+        cameraToOverlay: stages.cameraToOverlay.read(),
+        cameraToRn: stages.cameraToRn.read(),
+        rnToScan: stages.rnToScan.read(),
+        scanToDetect: stages.scanToDetect.read(),
+      },
+      processedFrameAgeMs: stages.processedAge.read(),
       sampleRate: rates.sample.read(t),
       skippedForCadence: tally.current.skippedForCadence,
       supersededOnJs: tally.current.supersededOnJs,
@@ -434,10 +488,16 @@ export const useFrameAnalysis = ({
       height: number;
       isMirrored: boolean;
       orientation: string;
+      pixelFormat: string;
+      sampleAcceptedAt: number;
       width: number;
     }) => {
+      const rnAt = now();
+      const sampleAt = payload.sampleAcceptedAt || rnAt;
+      stages.cameraToRn.push(Math.max(0, rnAt - sampleAt));
+
       const meta = lastMeta.current;
-      const pixelOrder = pixelOrderFor(meta?.pixelFormat ?? '');
+      const pixelOrder = pixelOrderFor(payload.pixelFormat || meta?.pixelFormat || '');
       if (!pixelOrder) {
         // Planar/private formats have no contiguous RGBA buffer to read. Fail
         // loudly rather than draw a plausible-looking wrong overlay.
@@ -456,17 +516,20 @@ export const useFrameAnalysis = ({
         payload.height,
         orientation,
       );
-      setOrientationDebug({
-        desired,
-        detectorRotation: detectorRotationLabel(orientation),
-        frameOrientation: payload.orientation,
-        lastUpdateAt: Date.now(),
-        ready: coherent,
-      });
+      if (!coherent || debugPreview) {
+        setOrientationDebug({
+          desired,
+          detectorRotation: detectorRotationLabel(orientation),
+          frameOrientation: payload.orientation,
+          lastUpdateAt: Date.now(),
+          ready: coherent,
+        });
+      }
       if (!coherent) {
         tally.current.skippedForOrientation++;
         pending.current = null;
         lastImage.current = null;
+        setOverlay(null);
         setResult(null);
         setPreview(null);
         publish();
@@ -511,7 +574,9 @@ export const useFrameAnalysis = ({
       );
       const convertedAt = now();
       tally.current.scanImages++;
+      tally.current.processed++;
       lastImage.current = image;
+      stages.rnToScan.push(convertedAt - rnAt);
 
       tally.current.detectorCalls++;
       const detection = detectCardQuad(image);
@@ -522,32 +587,47 @@ export const useFrameAnalysis = ({
 
       stages.convert.push(convertedAt - startedAt);
       stages.detect.push(finishedAt - convertedAt);
+      stages.scanToDetect.push(finishedAt - convertedAt);
+      stages.cameraToDetect.push(finishedAt - sampleAt);
       stages.total.push(finishedAt - startedAt);
+      stages.processedAge.push(finishedAt - sampleAt);
       rates.analysis.mark(finishedAt);
 
-      const candidates = detection.debug.candidates;
-      setResult({
+      setOverlay({
         analysis: { height: image.height, width: image.width },
-        brightness: imageBrightness(image),
         corners: detection.corners,
         detected,
-        detector: {
-          bestCandidateScore: candidates.reduce((best, c) => Math.max(best, c.score), 0),
-          candidates: candidates.length,
-          detectMs: detection.debug.ms,
-          detected,
-          rejectReasons: topRejectReasons(candidates.map(c => c.rejectedBecause)),
-          score: detection.score,
-          selectedIndex: detection.debug.selectedIndex,
-          workSize: detection.debug.workSize,
-        },
-        quad: detection.corners ? quadDiagnostics(detection.corners, image) : null,
         score: detection.score,
-        spaces: { ...spaces, detector: { height: image.height, width: image.width } },
       });
-      setError(null);
+      stages.cameraToOverlay.push(now() - sampleAt);
+      onAnalyzedRef.current?.({ detection, image });
 
-      if (debugPreview && finishedAt - lastPreviewAt.current >= PREVIEW_MS) {
+      const candidates = detection.debug.candidates;
+      const heavy = debugPreview && finishedAt - lastPreviewAt.current >= PREVIEW_MS;
+      if (heavy) {
+        setResult({
+          analysis: { height: image.height, width: image.width },
+          brightness: imageBrightness(image),
+          corners: detection.corners,
+          detected,
+          detector: {
+            bestCandidateScore: candidates.reduce((best, c) => Math.max(best, c.score), 0),
+            candidates: candidates.length,
+            detectMs: detection.debug.ms,
+            detected,
+            rejectReasons: topRejectReasons(candidates.map(c => c.rejectedBecause)),
+            score: detection.score,
+            selectedIndex: detection.debug.selectedIndex,
+            workSize: detection.debug.workSize,
+          },
+          quad: detection.corners ? quadDiagnostics(detection.corners, image) : null,
+          score: detection.score,
+          spaces: { ...spaces, detector: { height: image.height, width: image.width } },
+        });
+        setError(null);
+      }
+
+      if (heavy) {
         lastPreviewAt.current = finishedAt;
         try {
           setPreview(scanImageToPngDataUri(image));
@@ -584,23 +664,46 @@ export const useFrameAnalysis = ({
       orientation: string,
       isMirrored: boolean,
       postedAt: number,
+      sampleAcceptedAt: number,
+      pixelFormat: string,
     ) => {
       const transferMs = Date.now() - postedAt;
       if (transferMs >= 0 && transferMs < 1000) stages.transfer.push(transferMs);
 
       tally.current.rnFull++;
-      if (lastMeta.current) {
-        setFrameMeta({ ...lastMeta.current, bytesKind: describeBytes(bytes) });
-      }
+      tally.current.received++;
+      lastMeta.current = {
+        bufferSource: lastMeta.current?.bufferSource ?? 'frame buffer',
+        bytesKind: describeBytes(bytes),
+        bytesPerRow,
+        copiedByteLength: bytes instanceof ArrayBuffer ? bytes.byteLength : 0,
+        expectedPacked: width * height * 4,
+        height,
+        isMirrored,
+        orientation,
+        pixelFormat,
+        sourceByteLength: lastMeta.current?.sourceByteLength ?? 0,
+        timestamp: sampleAcceptedAt,
+        width,
+      };
 
       if (!(bytes instanceof ArrayBuffer)) {
         setError(`Full rung delivered ${describeBytes(bytes)}, expected an ArrayBuffer.`);
-        publish();
+        publish(true);
         return;
       }
 
       if (pending.current) tally.current.supersededOnJs++;
-      pending.current = { bytes, bytesPerRow, height, isMirrored, orientation, width };
+      pending.current = {
+        bytes,
+        bytesPerRow,
+        height,
+        isMirrored,
+        orientation,
+        pixelFormat,
+        sampleAcceptedAt,
+        width,
+      };
 
       // A macrotask, not a microtask: any further deliveries already queued
       // collapse into this one drain, so we detect on the newest frame.
@@ -768,13 +871,18 @@ export const useFrameAnalysis = ({
         state.sampled++;
         state.seq++;
 
+        // Production path: one scheduleOnRN. The four-rung ladder is opt-in.
+        const climb = diagnosticRungs;
+
         // Rung 1: primitives only.
-        try {
-          scheduleOnRN(onPing, state.seq, frame.width, frame.height);
-        } catch (err) {
-          report('ping', err);
+        if (climb) {
+          try {
+            scheduleOnRN(onPing, state.seq, frame.width, frame.height);
+          } catch (err) {
+            report('ping', err);
+          }
+          if (maxRung < 2) return;
         }
-        if (maxRung < 2) return;
 
         // Rung 2: read the pixel buffer and take an independent copy, both
         // while the frame is still valid, then describe it with primitives.
@@ -845,46 +953,48 @@ export const useFrameAnalysis = ({
           }
         }
 
-        try {
-          scheduleOnRN(
-            onMeta,
-            frame.width,
-            frame.height,
-            stride,
-            sourceLength,
-            copy.length,
-            frame.pixelFormat,
-            frame.orientation,
-            frame.isMirrored,
-            frame.timestamp,
-            bufferSource,
-          );
-        } catch (err) {
-          report('metaTransfer', err);
-        }
-        if (maxRung < 3) return;
+        if (climb) {
+          try {
+            scheduleOnRN(
+              onMeta,
+              frame.width,
+              frame.height,
+              stride,
+              sourceLength,
+              copy.length,
+              frame.pixelFormat,
+              frame.orientation,
+              frame.isMirrored,
+              frame.timestamp,
+              bufferSource,
+            );
+          } catch (err) {
+            report('metaTransfer', err);
+          }
+          if (maxRung < 3) return;
 
-        // Rung 3: a small ArrayBuffer, to separate "ArrayBuffer serialization
-        // does not work" from "this ArrayBuffer is too big".
-        try {
-          const size = Math.min(64, copy.length);
-          const tiny = new Uint8Array(size);
-          for (let i = 0; i < size; i++) tiny[i] = copy[i];
-          scheduleOnRN(
-            onTiny,
-            // Freshly allocated above, so this is a plain ArrayBuffer.
-            tiny.buffer as ArrayBuffer,
-            tiny[0],
-            tiny[1],
-            tiny[size >> 1],
-            tiny[size - 1],
-          );
-        } catch (err) {
-          report('tinyArrayBuffer', err);
+          // Rung 3: a small ArrayBuffer, to separate "ArrayBuffer serialization
+          // does not work" from "this ArrayBuffer is too big".
+          try {
+            const size = Math.min(64, copy.length);
+            const tiny = new Uint8Array(size);
+            for (let i = 0; i < size; i++) tiny[i] = copy[i];
+            scheduleOnRN(
+              onTiny,
+              // Freshly allocated above, so this is a plain ArrayBuffer.
+              tiny.buffer as ArrayBuffer,
+              tiny[0],
+              tiny[1],
+              tiny[size >> 1],
+              tiny[size - 1],
+            );
+          } catch (err) {
+            report('tinyArrayBuffer', err);
+          }
+          if (maxRung < 4) return;
         }
-        if (maxRung < 4) return;
 
-        // Rung 4: the whole copy.
+        // Rung 4 / production: the whole copy, plus clocks for frame age.
         try {
           state.scheduled++;
           scheduleOnRN(
@@ -896,6 +1006,8 @@ export const useFrameAnalysis = ({
             frame.orientation,
             frame.isMirrored,
             Date.now(),
+            stamp,
+            frame.pixelFormat,
           );
         } catch (err) {
           report('fullArrayBuffer', err);
@@ -910,7 +1022,7 @@ export const useFrameAnalysis = ({
         frame.dispose();
       }
     },
-    [heartbeat, maxRung, minIntervalMs, onFull, onMeta, onPing, onTiny, onWorkletError],
+    [diagnosticRungs, heartbeat, maxRung, minIntervalMs, onFull, onMeta, onPing, onTiny, onWorkletError],
   );
 
   /**
@@ -941,9 +1053,8 @@ export const useFrameAnalysis = ({
     });
     setPreview(scanImageToPngDataUri(image));
 
-    // The controller is not in the live path — the overlay is driven straight
-    // from `detectCardQuad`. Running it here on the same pixels is what lets us
-    // say whether it *would* suppress a valid detection.
+    // Same pixels, a throwaway controller — isolates "would this frame lock?"
+    // from the live session that already consumed it.
     const controller = createSessionController({ nameIndex: null });
     void controller
       .onFrame(image)
@@ -967,8 +1078,14 @@ export const useFrameAnalysis = ({
   const resetCounters = useCallback(() => {
     tally.current = emptyCounters();
     dropReason.current = null;
+    stages.cameraToDetect.reset();
+    stages.cameraToOverlay.reset();
+    stages.cameraToRn.reset();
     stages.convert.reset();
     stages.detect.reset();
+    stages.processedAge.reset();
+    stages.rnToScan.reset();
+    stages.scanToDetect.reset();
     stages.total.reset();
     stages.transfer.reset();
     rates.analysis.reset();
@@ -980,7 +1097,7 @@ export const useFrameAnalysis = ({
     setTransfer(null);
     setPing(null);
     setError(null);
-    publish();
+    publish(true);
   }, [publish, rates, stages]);
 
   // Memoized: a fresh object each render would reconfigure the camera session.
@@ -1016,6 +1133,7 @@ export const useFrameAnalysis = ({
     pending.current = null;
     lastImage.current = null;
     lastPreviewAt.current = 0;
+    setOverlay(null);
     setResult(null);
     setPreview(null);
     setProbeResult(null);
@@ -1031,6 +1149,7 @@ export const useFrameAnalysis = ({
   useEffect(() => {
     if (enabled) return;
     pending.current = null;
+    setOverlay(null);
     setResult(null);
   }, [enabled]);
 
@@ -1042,6 +1161,7 @@ export const useFrameAnalysis = ({
     frameOutput,
     metrics,
     orientation: orientationDebug,
+    overlay,
     ping,
     preview,
     probeResult,

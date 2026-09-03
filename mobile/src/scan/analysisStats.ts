@@ -90,6 +90,19 @@ export const createRate = (windowMs = 2000): Rate => {
  * where frames were lost. Fields are alphabetical to satisfy the repo lint
  * rule; `ScanMetricsPanel` renders them in pipeline order.
  */
+export interface LatencyAges {
+  /** Sample accepted → detectCardQuad returned. */
+  cameraToDetect: StageStats;
+  /** Sample accepted → overlay state committed. */
+  cameraToOverlay: StageStats;
+  /** Sample accepted → RN callback. */
+  cameraToRn: StageStats;
+  /** RN callback → ScanImage ready. */
+  rnToScan: StageStats;
+  /** ScanImage ready → detectCardQuad returned. */
+  scanToDetect: StageStats;
+}
+
 export interface AnalysisMetrics {
   /** Analyses completed per second — the 6–12/s target. */
   analysisRate: number;
@@ -110,6 +123,10 @@ export interface AnalysisMetrics {
    */
   frameRate: number;
   lastDropReason: string | null;
+  /** End-to-end ages. The visible one is cameraToOverlay. */
+  latency?: LatencyAges;
+  /** Age of frames that were actually processed (not superseded). */
+  processedFrameAgeMs?: StageStats;
   /** Frames the worklet chose to sample, per second. */
   sampleRate: number;
   /** Frames the worklet skipped to hold the target cadence. */
