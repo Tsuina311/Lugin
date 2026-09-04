@@ -16,33 +16,69 @@ export interface ArtworkMatcher {
     descriptor: ArtworkDescriptor,
     limit?: number,
   ): VisualCandidate[];
+  /**
+   * Restricted search — only score entries matching oracle / scryfall / illustration
+   * ids (footer/title already proposed a small set).
+   */
+  findCandidatesRestricted?(
+    descriptor: ArtworkDescriptor,
+    restrict: {
+      illustrationIds?: readonly string[];
+      oracleIds?: readonly string[];
+      scryfallIds?: readonly string[];
+    },
+    limit?: number,
+  ): VisualCandidate[];
 }
 
 /** In-memory matcher over a loaded index. */
 export const createArtworkMatcher = (index: ArtworkIndexData | null): ArtworkMatcher => {
   const entries = index?.entries ?? [];
+
+  const scorePool = (
+    descriptor: ArtworkDescriptor,
+    pool: ArtworkIndexEntry[],
+    limit: number,
+  ): VisualCandidate[] => {
+    if (!pool.length) return [];
+    const best = new Map<string, VisualCandidate>();
+    for (const e of pool) {
+      const visualScore = descriptorSimilarity(descriptor, e.descriptor);
+      if (visualScore < 0.45) continue;
+      const prev = best.get(e.oracleId);
+      if (prev && prev.visualScore >= visualScore) continue;
+      best.set(e.oracleId, {
+        ...(e.illustrationId ? { illustrationId: e.illustrationId } : {}),
+        name: e.name,
+        oracleId: e.oracleId,
+        scryfallId: e.scryfallId,
+        ...(e.setCode ? { setCode: e.setCode } : {}),
+        visualScore,
+      });
+    }
+    return [...best.values()]
+      .sort((a, b) => b.visualScore - a.visualScore || a.name.localeCompare(b.name))
+      .slice(0, limit);
+  };
+
   return {
     findCandidates(descriptor, limit = VISUAL_TOP_N) {
-      if (!entries.length) return [];
-      // Keep best score per oracleId so reprints of the same art don't flood.
-      const best = new Map<string, VisualCandidate>();
-      for (const e of entries) {
-        const visualScore = descriptorSimilarity(descriptor, e.descriptor);
-        if (visualScore < 0.45) continue;
-        const prev = best.get(e.oracleId);
-        if (prev && prev.visualScore >= visualScore) continue;
-        best.set(e.oracleId, {
-          ...(e.illustrationId ? { illustrationId: e.illustrationId } : {}),
-          name: e.name,
-          oracleId: e.oracleId,
-          scryfallId: e.scryfallId,
-          ...(e.setCode ? { setCode: e.setCode } : {}),
-          visualScore,
-        });
+      return scorePool(descriptor, entries, limit);
+    },
+    findCandidatesRestricted(descriptor, restrict, limit = VISUAL_TOP_N) {
+      const oracle = new Set(restrict.oracleIds ?? []);
+      const scry = new Set(restrict.scryfallIds ?? []);
+      const ill = new Set(restrict.illustrationIds ?? []);
+      if (!oracle.size && !scry.size && !ill.size) {
+        return scorePool(descriptor, entries, limit);
       }
-      return [...best.values()]
-        .sort((a, b) => b.visualScore - a.visualScore || a.name.localeCompare(b.name))
-        .slice(0, limit);
+      const pool = entries.filter(
+        e =>
+          (oracle.size && oracle.has(e.oracleId)) ||
+          (scry.size && scry.has(e.scryfallId)) ||
+          (ill.size && e.illustrationId && ill.has(e.illustrationId)),
+      );
+      return scorePool(descriptor, pool, limit);
     },
   };
 };

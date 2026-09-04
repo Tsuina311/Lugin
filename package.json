@@ -6,7 +6,8 @@
   "type": "module",
   "packageManager": "yarn@3.8.1",
   "workspaces": [
-    "mobile"
+    "mobile",
+    "mobile/modules/*"
   ],
   "scripts": {
     "dev": "vite",
@@ -40,9 +41,15 @@
     "scan:art-index": "node scripts/build-art-index.mjs --out .scan-fixtures/art-index.json",
     "scan:art-index:fixtures": "node scripts/build-art-index.mjs --from-fixtures --out .scan-fixtures/art-index.json",
     "scan:art-replay": "node scripts/scan-art-replay.mjs",
+    "scan:art-coverage": "node scripts/scan-art-coverage.mjs",
+    "scan:printing-index": "node scripts/build-printing-index.mjs --out .scan-fixtures/printing-index.json",
+    "scan:scanner-manifest": "node scripts/build-scanner-manifest.mjs",
+    "scan:footer-replay": "node scripts/scan-footer-replay.mjs",
+    "scan:channel-bench": "node scripts/scan-channel-bench.mjs",
     "scan:pipeline": "node scripts/scan-pipeline-eval.mjs",
     "scan:pipeline:real": "node scripts/scan-pipeline-eval.mjs --real",
     "scan:detect-eval": "node scripts/scan-detect-eval.mjs",
+    "scan:detect-native-parity": "node scripts/scan-detect-native-parity.mjs",
     "scan:detect-annotate": "node scripts/scan-detect-annotate.mjs",
     "scan:corpus:import": "node scripts/scan-corpus-import.mjs",
     "scan:variants": "node scripts/scan-eval.mjs --variants",

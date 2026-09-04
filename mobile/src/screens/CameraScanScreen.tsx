@@ -26,13 +26,29 @@ import {
 
 import { CameraDebugPanel } from '../camera/CameraDebugPanel';
 import { describeDevice, selectMainRearDevice } from '../camera/selectMainRearDevice';
+import { useAppActive } from '../lifecycle/useAppActive';
+import {
+  BenchmarkHud,
+  endBenchmarkSession,
+  isBenchmarkToolsEnabled,
+  peekBenchmarkHud,
+  recordBenchmarkScan,
+  restoreBenchmarkSession,
+  subscribeBenchmark,
+} from '../scan/benchmark';
 import { collectionAddFromPrinting } from '../scan/collectionCommand';
 import { tickOverlay } from '../scan/overlayEase';
 import { ScanDebugPanel } from '../scan/ScanDebugPanel';
 import { ScanResultCard } from '../scan/ScanResultCard';
 import { mapCornersToOverlay, type CardCorners, type Point2D } from '../scan/sharedCore';
 import { RECOGNITION_SOURCES, type PreferredSource } from '../scan/hiresCapture';
-import { shareDebugBundle } from '../scan/saveDebugBundle';
+import {
+  downloadPreparedBundle,
+  prepareDebugBundle,
+  sharePreparedBundle,
+  type PreparedDebugBundle,
+  type DebugSharePayload,
+} from '../scan/saveDebugBundle';
 import { useHiResFrameLatch } from '../scan/useHiResFrame';
 import { useScanSession } from '../scan/useScanSession';
 import {
@@ -41,6 +57,17 @@ import {
   RUNGS,
   useFrameAnalysis,
 } from '../scan/useFrameAnalysis';
+import {
+  createNativeDetectorEngine,
+  createSharedJsDetectorEngine,
+  isNativeDetectorLinked,
+  type DetectorEngineId,
+} from '../scan/detectorEngine';
+import {
+  getNativeOcrImplementationStatus,
+  isNativeOcrLinked,
+} from '../scan/mlkitTextRecognizer';
+import Constants from 'expo-constants';
 
 type FocusState = 'idle' | 'focusing' | 'done' | 'error';
 type Panel = 'scan' | 'camera' | 'none';
@@ -88,16 +115,31 @@ export function CameraScanScreen() {
   const [showNumbers, setShowNumbers] = useState(true);
   const [pendingAdd, setPendingAdd] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
-  const [debugViewer, setDebugViewer] = useState<{
-    imageUri: string | null;
-    reportText: string;
-  } | null>(null);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [debugViewer, setDebugViewer] = useState<PreparedDebugBundle | null>(null);
   const [detectorColorOk, setDetectorColorOk] = useState<'yes' | 'no' | 'unverified'>('unverified');
   const [recognitionColorOk, setRecognitionColorOk] = useState<'yes' | 'no' | 'unverified'>(
     'unverified',
   );
   const [sourceIndex, setSourceIndex] = useState(0);
+  const [detectorEngineId, setDetectorEngineId] = useState<DetectorEngineId>('shared-js');
+  const [benchHud, setBenchHud] = useState(() => peekBenchmarkHud());
   const preferredSource: PreferredSource = RECOGNITION_SOURCES[sourceIndex];
+  const detectorEngine = useMemo(() => {
+    if (detectorEngineId === 'native') {
+      try {
+        return createNativeDetectorEngine();
+      } catch {
+        return createSharedJsDetectorEngine();
+      }
+    }
+    return createSharedJsDetectorEngine();
+  }, [detectorEngineId]);
+  // CameraX / frame outputs stall after backgrounding if isActive stays true.
+  // Tab switch remounts the screen (works); AppState pause/resume does the same
+  // without leaving Scan.
+  const appActive = useAppActive();
+  const scanning = detectorOn && appActive;
 
   const photoOutput = usePhotoOutput({
     containerFormat: 'jpeg',
@@ -107,7 +149,7 @@ export function CameraScanScreen() {
   });
 
   const hiResFrame = useHiResFrameLatch({
-    enabled: detectorOn,
+    enabled: scanning,
     previewSize: layout,
   });
   // Interface, not device: the UI is portrait-locked. Device orientation
@@ -116,7 +158,7 @@ export function CameraScanScreen() {
 
   const session = useScanSession({
     cameraRef,
-    enabled: detectorOn,
+    enabled: scanning,
     photoOutput,
     preferredSource,
     previewSize: layout,
@@ -129,6 +171,7 @@ export function CameraScanScreen() {
     failure,
     frameMeta,
     frameOutput,
+    lastDetectorInput,
     metrics,
     orientation,
     overlay,
@@ -143,14 +186,83 @@ export function CameraScanScreen() {
   } = useFrameAnalysis({
     analysisMaxWidth: ANALYSIS_LONG_EDGES[longEdgeIndex],
     debugPreview: panel === 'scan',
+    detectorEngine,
     diagnosticRungs,
-    enabled: detectorOn,
+    enabled: scanning,
     interfaceOrientation,
     onAnalyzed: session.onAnalyzed,
     previewSize: layout,
     resolutionIndex,
     rung: RUNGS[rungIndex],
   });
+
+  useEffect(() => {
+    if (!isBenchmarkToolsEnabled()) return;
+    void restoreBenchmarkSession().then(() => setBenchHud(peekBenchmarkHud()));
+    return subscribeBenchmark(() => setBenchHud(peekBenchmarkHud()));
+  }, []);
+
+  // Auto-persist every completed recognition during an active benchmark session.
+  // Payload is built here (not via buildReportPayload) so this hook can stay
+  // above permission early-returns.
+  useEffect(() => {
+    if (!isBenchmarkToolsEnabled() || !benchHud.active) return;
+    const snap = session.snapshot;
+    if (!snap || (snap.phase !== 'found' && snap.phase !== 'ambiguous')) return;
+    if (!snap.fused) return;
+    const lugin = (Constants.expoConfig?.extra as { lugin?: { buildLabel?: string } } | undefined)
+      ?.lugin;
+    const payload: DebugSharePayload = {
+      analysisLongEdge: ANALYSIS_LONG_EDGES[longEdgeIndex],
+      appStamp: lugin?.buildLabel ?? Constants.expoConfig?.version ?? null,
+      detectorEngine: detectorEngineId,
+      deviceLine: device ? describeDevice(device) : undefined,
+      images: {
+        detector: lastDetectorInput(),
+        detectorUri: preview,
+        hiresUri: session.debug.hiresUri,
+        recognition: session.lastNormalized(),
+        recognitionUri: session.debug.normalizedUri,
+      },
+      ocrEngine: isNativeOcrLinked()
+        ? `mlkit:${getNativeOcrImplementationStatus() ?? 'linked'}`
+        : 'none',
+      pixelFormat: frameMeta?.pixelFormat ?? null,
+      preferredSource,
+      recognitionSource: session.debug.recognitionSource,
+      stamp: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      panel: {
+        frameMeta,
+        session: {
+          ...session.debug,
+          artEntries: session.indexes.art?.entries ?? null,
+          printingEntries: session.indexes.printing?.entries ?? null,
+        },
+        snapshot: {
+          fused: snap.fused,
+          phase: snap.phase,
+          recognition: snap.recognition,
+          earlyShownAt: snap.earlyShownAt ?? null,
+          lockedAt: snap.lockedAt ?? null,
+          finalIdentityAt: snap.finalIdentityAt ?? null,
+          printingShownAt: snap.printingShownAt ?? null,
+          userLatency: snap.userLatency ?? null,
+        },
+      },
+    };
+    void recordBenchmarkScan({
+      payload,
+      recognition: session.lastNormalized(),
+      snapshot: snap,
+    }).then(() => setBenchHud(peekBenchmarkHud()));
+  }, [
+    benchHud.active,
+    session.snapshot?.phase,
+    session.snapshot?.lockedAt,
+    session.snapshot?.earlyShownAt,
+    session.snapshot?.finalIdentityAt,
+    session.snapshot?.printingShownAt,
+  ]);
 
   // Never leave a second RGB ImageAnalysis (1440×1920) bound on every
   // session — that can prevent CameraX from starting on Samsung.
@@ -272,6 +384,8 @@ export function CameraScanScreen() {
 
   const detected = overlay?.detected ?? result?.detected ?? false;
   const phase = session.snapshot?.phase ?? (detected ? 'detected' : 'searching');
+  const cardRecognized =
+    session.snapshot?.phase === 'found' || session.snapshot?.phase === 'ambiguous';
   const badgeText = !detectorOn
     ? 'DETECTOR OFF'
     : !orientation.ready
@@ -280,6 +394,162 @@ export function CameraScanScreen() {
         : 'Initializing orientation'
       : phase.toUpperCase();
 
+  const buildReportPayload = (): DebugSharePayload => {
+    const analysisResult = result;
+    const lugin = (Constants.expoConfig?.extra as { lugin?: { buildLabel?: string } } | undefined)
+      ?.lugin;
+    return {
+      analysisLongEdge: ANALYSIS_LONG_EDGES[longEdgeIndex],
+      appStamp: lugin?.buildLabel ?? Constants.expoConfig?.version ?? null,
+      detectorEngine: detectorEngineId,
+      deviceLine: describeDevice(device),
+      images: {
+        detector: lastDetectorInput(),
+        detectorUri: preview,
+        hiresUri: session.debug.hiresUri,
+        recognition: session.lastNormalized(),
+        recognitionUri: session.debug.normalizedUri,
+      },
+      ocrEngine: isNativeOcrLinked()
+        ? `mlkit:${getNativeOcrImplementationStatus() ?? 'linked'}`
+        : 'none',
+      pixelFormat: frameMeta?.pixelFormat ?? null,
+      preferredSource,
+      detectorInputColorCorrect: detectorColorOk,
+      recognitionInputColorCorrect: recognitionColorOk,
+      recognitionSource: session.debug.recognitionSource,
+      stamp: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      panel: {
+        counters,
+        error,
+        failure,
+        frameMeta,
+        metrics,
+        orientation,
+        probeResult,
+        preferredSource,
+        result: analysisResult
+          ? {
+              analysis: analysisResult.analysis,
+              brightness: analysisResult.brightness,
+              detected: analysisResult.detected,
+              detector: analysisResult.detector,
+              score: analysisResult.score,
+            }
+          : null,
+        session: {
+          ...session.debug,
+          artEntries: session.indexes.art?.entries ?? null,
+          artChecksum: session.indexes.art?.checksum ?? null,
+          artUniqueOracles: session.indexes.art?.uniqueOracles ?? null,
+          printingEntries: session.indexes.printing?.entries ?? null,
+          printingChecksum: session.indexes.printing?.checksum ?? null,
+          namesCount: session.indexes.names?.names ?? null,
+          namesChecksum: session.indexes.names?.checksum ?? null,
+        },
+        snapshot: session.snapshot
+          ? {
+              fused: session.snapshot.fused,
+              message: session.snapshot.message,
+              motion: session.snapshot.motion,
+              phase: session.snapshot.phase,
+              quality: session.snapshot.quality,
+              recognition: session.snapshot.recognition
+                ? {
+                    timings: session.snapshot.recognition.timings,
+                    titleCandidates: session.snapshot.recognition.titleCandidates,
+                    readings: session.snapshot.recognition.readings,
+                    visualTop: session.snapshot.recognition.visualTop,
+                    earlyIdentity: session.snapshot.recognition.earlyIdentity,
+                    earlyReason: session.snapshot.recognition.earlyReason,
+                    collector: session.snapshot.recognition.collector,
+                    printingLookup: session.snapshot.recognition.printingLookup,
+                    titleFooterConflict: session.snapshot.recognition.titleFooterConflict,
+                    artMode: session.snapshot.recognition.artMode,
+                  }
+                : null,
+              earlyShownAt: session.snapshot.earlyShownAt ?? null,
+              recognizingStartedAt: session.snapshot.recognizingStartedAt ?? null,
+              lockedAt: session.snapshot.lockedAt ?? null,
+              finalIdentityAt: session.snapshot.finalIdentityAt ?? null,
+              printingShownAt: session.snapshot.printingShownAt ?? null,
+              userLatency: session.snapshot.userLatency ?? null,
+              trackFrames: session.snapshot.trackFrames,
+            }
+          : null,
+        transfer,
+      },
+    };
+  };
+
+  const openReport = () => {
+    void (async () => {
+      setReportBusy(true);
+      setDebugViewer(null);
+      setSaveStatus('Preparing report…');
+      try {
+        const prepared = await prepareDebugBundle(buildReportPayload());
+        if (!prepared.ok) {
+          setSaveStatus(`Report failed: ${prepared.reason}`);
+          return;
+        }
+        setDebugViewer(prepared.bundle);
+        const parts = [
+          prepared.bundle.reportUri || prepared.bundle.jsonUri ? 'text' : null,
+          prepared.bundle.pngUri ? 'recognition' : null,
+          prepared.bundle.detectorPngUri ? 'detector' : null,
+        ].filter(Boolean);
+        setSaveStatus(
+          parts.length > 0
+            ? `Report ready (${parts.join(' + ')}) — Share or Download`
+            : 'Report on screen (file write failed — text only)',
+        );
+      } catch (err) {
+        setSaveStatus(`Report crashed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setReportBusy(false);
+      }
+    })();
+  };
+
+  const shareReport = () => {
+    if (!debugViewer) return;
+    void (async () => {
+      setSaveStatus('Opening share sheet…');
+      const shared = await sharePreparedBundle(debugViewer);
+      if (!shared.ok) {
+        setSaveStatus(`Share failed: ${shared.reason}`);
+        return;
+      }
+      setSaveStatus(
+        shared.method === 'sharing'
+          ? 'Shared text → recognition → detector (pick same app each time)'
+          : 'Text share opened',
+      );
+    })();
+  };
+
+  const downloadReport = () => {
+    if (!debugViewer) return;
+    void (async () => {
+      setSaveStatus('Choose a folder to save…');
+      const saved = await downloadPreparedBundle(debugViewer);
+      if (!saved.ok) {
+        if (saved.cancelled) {
+          setSaveStatus('Download cancelled');
+          return;
+        }
+        setSaveStatus(`Download failed: ${saved.reason}`);
+        return;
+      }
+      setSaveStatus(
+        saved.method === 'saf'
+          ? `Saved ${saved.saved.join(', ')}`
+          : `Saved to ${saved.directoryHint}: ${saved.saved.join(', ')}`,
+      );
+    })();
+  };
+
   return (
     <View onLayout={onLayout} style={styles.root}>
       <Camera
@@ -287,7 +557,7 @@ export function CameraScanScreen() {
         device={device}
         enableNativeTapToFocusGesture={false}
         implementationMode={preferredSource === 'snapshot' ? 'compatible' : 'performance'}
-        isActive
+        isActive={appActive}
         orientationSource="interface"
         outputs={cameraOutputs}
         resizeMode="cover"
@@ -296,6 +566,23 @@ export function CameraScanScreen() {
       />
 
       <Pressable onPress={onTap} style={StyleSheet.absoluteFill} />
+
+      {benchHud.active ? (
+        <View style={{ paddingTop: insets.top }}>
+          <BenchmarkHud
+            count={benchHud.count}
+            lastCorrect={benchHud.lastCorrect}
+            lastLatencyOracleMs={benchHud.lastLatencyOracleMs}
+            lastLatencyPrintingMs={benchHud.lastLatencyPrintingMs}
+            lastName={benchHud.lastName}
+            onEnd={() => {
+              void endBenchmarkSession().then(() => setBenchHud(peekBenchmarkHud()));
+            }}
+            summaryText={benchHud.summaryText}
+            target={benchHud.target}
+          />
+        </View>
+      ) : null}
 
       {quad ? (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -381,9 +668,14 @@ export function CameraScanScreen() {
           <View style={styles.resultWrap}>
             <ScanResultCard
               nameIndex={session.indexes.names?.index ?? null}
+              printingIndex={session.indexes.printing?.index ?? null}
               onAction={(action, extra) => {
                 if (action === 'scan-again') {
                   session.reset();
+                  return;
+                }
+                if (action === 'set-finish' && extra?.finish) {
+                  setPendingAdd(`finish: ${extra.finish}`);
                   return;
                 }
                 if (action === 'add') {
@@ -403,6 +695,15 @@ export function CameraScanScreen() {
               snapshot={session.snapshot}
             />
             {pendingAdd ? <Text style={styles.pendingAdd}>{pendingAdd}</Text> : null}
+            <Pressable
+              disabled={reportBusy}
+              onPress={openReport}
+              style={[styles.reportButton, reportBusy && styles.reportButtonBusy]}
+            >
+              <Text style={styles.reportButtonLabel}>
+                {reportBusy ? 'Preparing…' : 'Report'}
+              </Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -427,6 +728,8 @@ export function CameraScanScreen() {
                 artEntries: session.indexes.art?.entries ?? null,
                 artError: session.debug.artError,
                 artGenerated: session.debug.artGenerated,
+                artChecksum: session.indexes.art?.checksum ?? null,
+                artUniqueOracles: session.indexes.art?.uniqueOracles ?? null,
                 artworkDescriptorMs: session.debug.artworkDescriptorMs,
                 artworkMatcherMs: session.debug.artworkMatcherMs,
                 artworkMs: session.debug.artworkMs,
@@ -439,6 +742,7 @@ export function CameraScanScreen() {
                 hiresWaitMs: session.debug.hiresWaitMs,
                 mappedCorners: session.debug.mappedCorners,
                 names: session.indexes.names?.names ?? null,
+                printingEntries: session.indexes.printing?.entries ?? null,
                 normalizedUri: session.debug.normalizedUri,
                 phase,
                 qualityBest: session.snapshot?.quality?.score ?? session.debug.qualityBest,
@@ -457,6 +761,12 @@ export function CameraScanScreen() {
                 titleEvidence: session.debug.titleEvidence,
                 trackFrames: session.snapshot?.trackFrames ?? 0,
                 warpMs: session.debug.warpMs,
+                userLatency: session.debug.userLatency,
+                earlyReason: session.debug.earlyReason,
+                titleMs: session.debug.titleMs,
+                titleDoneAt: session.debug.titleDoneAt,
+                artDoneAt: session.debug.artDoneAt,
+                earlyIdentityAt: session.debug.earlyIdentityAt,
               }}
               showNumbers={showNumbers}
               transfer={transfer}
@@ -485,6 +795,19 @@ export function CameraScanScreen() {
             style={[styles.chip, detectorOn && styles.chipOn]}
           >
             <Text style={styles.chipLabel}>Detector {detectorOn ? 'on' : 'off'}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() =>
+              setDetectorEngineId(id => {
+                if (id === 'shared-js' && isNativeDetectorLinked()) return 'native';
+                return 'shared-js';
+              })
+            }
+            style={[styles.chip, detectorEngineId === 'native' && styles.chipOn]}
+          >
+            <Text style={styles.chipLabel}>
+              Eng {detectorEngineId === 'native' ? 'Native' : 'Shared JS'}
+            </Text>
           </Pressable>
           <Pressable
             onPress={() => setDiagnosticRungs(v => !v)}
@@ -557,94 +880,15 @@ export function CameraScanScreen() {
           >
             <Text style={styles.chipLabel}>Rec color {recognitionColorOk}</Text>
           </Pressable>
-          <Pressable
-            onPress={() => {
-              void (async () => {
-                setSaveStatus('Preparing export…');
-                try {
-                  const analysisResult = result;
-                  const shareResult = await shareDebugBundle({
-                    analysisLongEdge: ANALYSIS_LONG_EDGES[longEdgeIndex],
-                    deviceLine: describeDevice(device),
-                    images: {
-                      detectorUri: preview,
-                      hiresUri: session.debug.hiresUri,
-                      recognition: session.lastNormalized(),
-                      recognitionUri: session.debug.normalizedUri,
-                    },
-                    pixelFormat: frameMeta?.pixelFormat ?? null,
-                    preferredSource,
-                    detectorInputColorCorrect: detectorColorOk,
-                    recognitionInputColorCorrect: recognitionColorOk,
-                    recognitionSource: session.debug.recognitionSource,
-                    panel: {
-                      counters,
-                      error,
-                      failure,
-                      frameMeta,
-                      metrics,
-                      orientation,
-                      probeResult,
-                      preferredSource,
-                      result: analysisResult
-                        ? {
-                            analysis: analysisResult.analysis,
-                            brightness: analysisResult.brightness,
-                            detected: analysisResult.detected,
-                            detector: analysisResult.detector,
-                            score: analysisResult.score,
-                          }
-                        : null,
-                      session: session.debug,
-                      snapshot: session.snapshot
-                        ? {
-                            fused: session.snapshot.fused,
-                            message: session.snapshot.message,
-                            motion: session.snapshot.motion,
-                            phase: session.snapshot.phase,
-                            quality: session.snapshot.quality,
-                            recognition: session.snapshot.recognition
-                              ? {
-                                  timings: session.snapshot.recognition.timings,
-                                  visualTop: session.snapshot.recognition.visualTop,
-                                }
-                              : null,
-                            trackFrames: session.snapshot.trackFrames,
-                          }
-                        : null,
-                      transfer,
-                    },
-                  });
-                  if (!shareResult.ok) {
-                    setSaveStatus(`Export failed: ${shareResult.reason}`);
-                    return;
-                  }
-                  setDebugViewer({
-                    imageUri: shareResult.imageUri,
-                    reportText: shareResult.reportText,
-                  });
-                  const method =
-                    shareResult.method === 'sharing'
-                      ? 'Share sheet opened — pick an app'
-                      : shareResult.method === 'saf'
-                        ? 'Saved via folder picker (Drive / Downloads)'
-                        : 'Text share only — rebuild APK for file export';
-                  setSaveStatus(
-                    shareResult.imageUri || shareResult.pngUri
-                      ? method
-                      : `${method} (no recognition PNG yet — lock a card first)`,
-                  );
-                } catch (err) {
-                  setSaveStatus(
-                    `Export crashed: ${err instanceof Error ? err.message : String(err)}`,
-                  );
-                }
-              })();
-            }}
-            style={[styles.chip, styles.chipOn]}
-          >
-            <Text style={styles.chipLabel}>Export</Text>
-          </Pressable>
+          {!cardRecognized ? (
+            <Pressable
+              disabled={reportBusy}
+              onPress={openReport}
+              style={[styles.chip, styles.chipOn]}
+            >
+              <Text style={styles.chipLabel}>{reportBusy ? 'Report…' : 'Report'}</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             onPress={() => {
               if (layout.width > 0) void focusAt(layout.width / 2, layout.height / 2);
@@ -663,37 +907,75 @@ export function CameraScanScreen() {
         visible={Boolean(debugViewer)}
       >
         <View style={styles.debugModalBackdrop}>
-          <View style={[styles.debugModal, { paddingTop: insets.top + 8 }]}>
-            <Text style={styles.debugModalTitle}>Recognition export</Text>
+          <View
+            style={[
+              styles.debugModal,
+              { paddingBottom: Math.max(insets.bottom, 12), paddingTop: insets.top + 8 },
+            ]}
+          >
+            <View style={styles.debugModalHeader}>
+              <Text style={styles.debugModalTitle}>Scan report</Text>
+              <Pressable
+                onPress={() => setDebugViewer(null)}
+                style={[styles.chip, styles.chipOn, styles.debugModalClose]}
+              >
+                <Text style={styles.chipLabel}>Close</Text>
+              </Pressable>
+            </View>
             <Text style={styles.debugModalHint}>
-              Checklist (Det/Rec color chips + source / format / channel order) is at the top of
-              the shared text and JSON.
+              Share sends text, then recognition PNG, then detector-input PNG (three sheets).
+              Download saves .txt + .json + both PNGs. Use detector PNG to judge detector color.
             </Text>
-            <ScrollView contentContainerStyle={styles.debugModalScroll}>
+            <View style={styles.debugModalActions}>
+              <Pressable onPress={shareReport} style={[styles.reportButton, styles.reportAction]}>
+                <Text style={styles.reportButtonLabel}>Share</Text>
+              </Pressable>
+              <Pressable
+                onPress={downloadReport}
+                style={[styles.reportButton, styles.reportAction, styles.reportSecondary]}
+              >
+                <Text style={styles.reportButtonLabel}>Download</Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              contentContainerStyle={styles.debugModalScroll}
+              style={styles.debugModalScrollView}
+            >
               {debugViewer?.imageUri ? (
-                <Image
-                  resizeMode="contain"
-                  source={{ uri: debugViewer.imageUri }}
-                  style={styles.debugModalImage}
-                />
+                <>
+                  <Text style={styles.debugModalCaption}>Recognition (744×1039)</Text>
+                  <Image
+                    resizeMode="contain"
+                    source={{ uri: debugViewer.imageUri }}
+                    style={styles.debugModalImage}
+                  />
+                </>
               ) : (
                 <Text style={styles.debugModalHint}>
-                  No recognition image yet — lock a card first, then Export again.
+                  No recognition image yet — lock a card first, then Report again.
+                </Text>
+              )}
+              {debugViewer?.detectorImageUri ? (
+                <>
+                  <Text style={styles.debugModalCaption}>Detector input (analysis FOV)</Text>
+                  <Image
+                    resizeMode="contain"
+                    source={{ uri: debugViewer.detectorImageUri }}
+                    style={styles.debugModalImage}
+                  />
+                </>
+              ) : (
+                <Text style={styles.debugModalHint}>
+                  No detector input latched — keep scanning a moment, then Report again.
                 </Text>
               )}
               <Text selectable style={styles.debugModalText}>
                 {(debugViewer?.reportText ?? '').slice(0, 4000)}
                 {(debugViewer?.reportText?.length ?? 0) > 4000
-                  ? '\n…(truncated on screen; full JSON was written to the export file)'
+                  ? '\n…(truncated on screen)'
                   : ''}
               </Text>
             </ScrollView>
-            <Pressable
-              onPress={() => setDebugViewer(null)}
-              style={[styles.chip, styles.chipOn, styles.debugModalClose]}
-            >
-              <Text style={styles.chipLabel}>Close</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -828,13 +1110,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#0B1220',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    maxHeight: '92%',
-    paddingBottom: 16,
+    flexGrow: 0,
+    maxHeight: '88%',
     paddingHorizontal: 12,
   },
   debugModalClose: {
-    alignSelf: 'center',
-    marginTop: 8,
+    marginLeft: 8,
+  },
+  debugModalHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  debugModalCaption: {
+    color: '#F5C542',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 4,
+    marginTop: 4,
   },
   debugModalHint: {
     color: '#A8B3C7',
@@ -844,12 +1138,16 @@ const styles = StyleSheet.create({
   debugModalImage: {
     alignSelf: 'center',
     backgroundColor: '#000',
-    height: 420,
+    height: 280,
     marginBottom: 10,
-    width: 300,
+    width: 200,
   },
   debugModalScroll: {
-    paddingBottom: 8,
+    paddingBottom: 16,
+  },
+  debugModalScrollView: {
+    flexGrow: 0,
+    maxHeight: 480,
   },
   debugModalText: {
     color: '#C5D0E0',
@@ -859,12 +1157,42 @@ const styles = StyleSheet.create({
   },
   debugModalTitle: {
     color: '#F5C542',
+    flex: 1,
     fontSize: 16,
     fontWeight: '700',
-    marginBottom: 4,
   },
   resultWrap: {
     marginBottom: 8,
+  },
+  reportAction: {
+    flex: 1,
+    marginTop: 0,
+  },
+  reportButton: {
+    alignItems: 'center',
+    backgroundColor: '#3D7EFF',
+    borderRadius: 10,
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  reportButtonBusy: {
+    opacity: 0.6,
+  },
+  reportButtonLabel: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  reportSecondary: {
+    backgroundColor: '#1E2A3D',
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+  },
+  debugModalActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
   },
   overlay: {
     bottom: 0,

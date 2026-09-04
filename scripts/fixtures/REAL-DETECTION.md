@@ -68,6 +68,30 @@ yarn scan:detect-eval --synthetic
 Reports detection rate, false positives, IoU, corner error — **separately** for
 synthetic and real.
 
+## Native parity (shared JS ↔ Kotlin)
+
+Native `DetectCard` is Kotlin-only — it **cannot** run inside Node. Use:
+
+```bash
+yarn scan:detect-native-parity            # shared-js metrics + RGBA export
+yarn scan:detect-native-parity --no-export
+```
+
+This runs the same shared `detectCardQuad` path as `scan:detect-eval`, writes
+`.scan-fixtures/detect-parity-report.json` (IoU / detection rate), and encodes
+each frame as packed RGBA + JSON sidecar under `.scan-fixtures/detect-parity/`
+for `DetectCard.detectFromRgba`.
+
+Gradle unit test (after `yarn mobile:prebuild`):
+
+```bash
+DETECT_PARITY_DIR="$(pwd)/.scan-fixtures/detect-parity" \
+  ./gradlew :lugin-card-detector:testDebugUnitTest -p mobile/android
+```
+
+See `.scan-fixtures/detect-parity/NATIVE.md` after export, and
+`mobile/modules/lugin-card-detector/README.md`.
+
 ## Suggested tags
 
 `wood-table`, `white-table`, `dark-table`, `playmat`, `clear-sleeve`,

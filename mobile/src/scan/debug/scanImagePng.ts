@@ -127,12 +127,12 @@ const storedZlib = (raw: Uint8Array): Uint8Array => {
 };
 
 /**
- * `data:image/png;base64,…` for `image`, downscaled to `maxWidth` when larger.
+ * Encode `image` as an uncompressed PNG byte buffer (optionally downscaled).
  *
  * Pass the image width (or larger) to keep full resolution — recognition export
  * must not shrink 744×1039 or title/rules become unreadable.
  */
-export const scanImageToPngDataUri = (image: ScanImage, maxWidth = 120): string => {
+export const scanImageToPngBytes = (image: ScanImage, maxWidth = 120): Uint8Array => {
   const small = shrink(image, maxWidth);
 
   // PNG scanlines: one filter byte (0 = none) per row, then RGBA.
@@ -167,6 +167,14 @@ export const scanImageToPngDataUri = (image: ScanImage, maxWidth = 120): string 
     png.set(part, at);
     at += part.length;
   }
-
-  return `data:image/png;base64,${base64(png)}`;
+  return png;
 };
+
+/**
+ * `data:image/png;base64,…` for `image`, downscaled to `maxWidth` when larger.
+ *
+ * Pass the image width (or larger) to keep full resolution — recognition export
+ * must not shrink 744×1039 or title/rules become unreadable.
+ */
+export const scanImageToPngDataUri = (image: ScanImage, maxWidth = 120): string =>
+  `data:image/png;base64,${base64(scanImageToPngBytes(image, maxWidth))}`;

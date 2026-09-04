@@ -2,6 +2,7 @@ import {
   ACCEPT_CARD_SCORE,
   ACCEPT_MARGIN,
   FUSION_WEIGHTS,
+  TITLE_STRONG,
   VISUAL_STRONG,
 } from '../params';
 
@@ -33,6 +34,17 @@ export interface FusedResult {
   /** Best card-level identity when confident enough. */
   card?: { confidence: number; name: string; oracleId: string };
   margin: number;
+  /** Exact printing when local footer lookup uniquely resolved it. */
+  printing?: {
+    collectorNumber: string;
+    confidence: number;
+    finishes: string[];
+    lang?: string;
+    name: string;
+    oracleId: string;
+    scryfallId: string;
+    setCode: string;
+  };
   status: ScanIdentityStatus;
 }
 
@@ -43,10 +55,21 @@ export interface FuseOptions {
    * 0.70/0.67 art cluster into Identified.
    */
   artworkOnly?: boolean;
+  /**
+   * Allow a near-exact title match (huge margin) to identify the oracle even
+   * when artwork is weak or still processing. Printing stays unresolved.
+   */
+  allowTitleOnly?: boolean;
+  /** Prefer accepting when title and art both strongly agree on one name. */
+  allowStrongDual?: boolean;
 }
 
 /** Visual margin required in artwork-only mode (before temporal boost). */
 export const ARTWORK_ONLY_VISUAL_MARGIN = 0.12;
+
+/** Title-only: absolute score + margin over #2 title. */
+export const TITLE_ONLY_MIN = 0.94;
+export const TITLE_ONLY_MARGIN = 0.2;
 
 const weightSum =
   FUSION_WEIGHTS.visual +
@@ -108,6 +131,37 @@ export const fuseEvidence = (
       (top.visualScore ?? 0) >= VISUAL_STRONG && visualMargin >= ARTWORK_ONLY_VISUAL_MARGIN;
     if (!strongVisual) {
       return { candidates: ranked, margin, status: 'card-ambiguous' };
+    }
+  }
+
+  // Strong dual: title + art agree — accept even with modest fused margin.
+  if (options.allowStrongDual) {
+    const title = top.titleScore ?? 0;
+    const visual = top.visualScore ?? 0;
+    const sameNameArt = ranked.find(
+      r => r.name === top.name && (r.visualScore ?? 0) >= VISUAL_STRONG * 0.9,
+    );
+    if (title >= TITLE_STRONG && visual >= VISUAL_STRONG * 0.9 && sameNameArt) {
+      return {
+        candidates: ranked,
+        card: { confidence: top.score, name: top.name, oracleId: top.oracleId },
+        margin,
+        status:
+          top.possiblePrintingIds.length === 1 ? 'identified' : 'printing-ambiguous',
+      };
+    }
+  }
+
+  // Title-only fast path — oracle identity only; printing stays pending.
+  if (options.allowTitleOnly && !artworkOnly) {
+    const titleMargin = (top.titleScore ?? 0) - (second?.titleScore ?? 0);
+    if ((top.titleScore ?? 0) >= TITLE_ONLY_MIN && titleMargin >= TITLE_ONLY_MARGIN) {
+      return {
+        candidates: ranked,
+        card: { confidence: top.titleScore ?? top.score, name: top.name, oracleId: top.oracleId },
+        margin: titleMargin,
+        status: 'printing-ambiguous',
+      };
     }
   }
 

@@ -9026,6 +9026,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lugin-card-detector@workspace:*, lugin-card-detector@workspace:mobile/modules/lugin-card-detector":
+  version: 0.0.0-use.local
+  resolution: "lugin-card-detector@workspace:mobile/modules/lugin-card-detector"
+  peerDependencies:
+    expo: "*"
+    react: "*"
+    react-native: "*"
+  languageName: unknown
+  linkType: soft
+
 "lugin-mobile@workspace:mobile":
   version: 0.0.0-use.local
   resolution: "lugin-mobile@workspace:mobile"
@@ -9039,6 +9049,8 @@ __metadata:
     expo-sharing: ~57.0.17
     expo-status-bar: ~57.0.1
     expo-updates: ^57.0.21
+    lugin-card-detector: "workspace:*"
+    lugin-ocr: "workspace:*"
     react: 19.2.3
     react-native: 0.86.3
     react-native-nitro-image: ^0.14.0
@@ -9048,6 +9060,16 @@ __metadata:
     react-native-vision-camera-worklets: ^5.2.3
     react-native-worklets: 0.10.1
     typescript: ~5.9.2
+  languageName: unknown
+  linkType: soft
+
+"lugin-ocr@workspace:*, lugin-ocr@workspace:mobile/modules/lugin-ocr":
+  version: 0.0.0-use.local
+  resolution: "lugin-ocr@workspace:mobile/modules/lugin-ocr"
+  peerDependencies:
+    expo: "*"
+    react: "*"
+    react-native: "*"
   languageName: unknown
   linkType: soft
 

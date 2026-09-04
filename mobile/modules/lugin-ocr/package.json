@@ -1,0 +1,21 @@
+{
+  "name": "lugin-ocr",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native offline OCR for Lugin via Google ML Kit Text Recognition (Expo Modules API). Returns raw text + word boxes — no Magic interpretation.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "keywords": [
+    "expo",
+    "react-native",
+    "lugin",
+    "ocr",
+    "mlkit"
+  ],
+  "license": "UNLICENSED",
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

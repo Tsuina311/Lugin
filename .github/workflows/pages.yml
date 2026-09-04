@@ -131,6 +131,20 @@ jobs:
         continue-on-error: true
         run: node scripts/build-art-index.mjs --out dist-web/art-index.json
 
+      - name: Printing index (full)
+        continue-on-error: true
+        run: node scripts/build-printing-index.mjs --out dist-web/printing-index.json
+
+      - name: Scanner manifest
+        continue-on-error: true
+        run: >
+          node scripts/build-scanner-manifest.mjs
+          --names dist-web/card-names.json
+          --art dist-web/art-index.json
+          --printing dist-web/printing-index.json
+          --out dist-web/scanner-manifest.json
+          --base-url https://tsuina311.github.io/${{ github.event.repository.name }}/
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

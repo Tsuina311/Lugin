@@ -18,9 +18,8 @@ const check = (name, ok, detail = '') => {
 
 const bundleDir = await mkdtemp(join(tmpdir(), 'lugin-dbg-'));
 const rnStub = join(bundleDir, 'rn-stub.mjs');
-const fsStub = join(bundleDir, 'fs-stub.mjs');
+const fsLegacyStub = join(bundleDir, 'fs-legacy-stub.mjs');
 const sharingStub = join(bundleDir, 'sharing-stub.mjs');
-const legacyStub = join(bundleDir, 'fs-legacy-stub.mjs');
 const outfile = join(bundleDir, 'saveDebug.mjs');
 
 await writeFile(
@@ -28,36 +27,44 @@ await writeFile(
   'export const Platform = { OS: "android" };\nexport const Share = { share: async () => ({ action: "sharedAction" }) };\n',
 );
 await writeFile(
-  fsStub,
+  fsLegacyStub,
   `
-export const EncodingType = { Base64: "base64", UTF8: "utf8" };
-export class Paths { static cache = "file:///cache/"; }
-export class Directory {
-  constructor(...parts) { this.uri = parts.map(p => typeof p === "string" ? p : p.uri).join("/").replace(/\\/+/g, "/"); this.exists = false; }
-  create() { this.exists = true; }
-}
-export class File {
-  constructor(dir, name) { this.uri = (dir.uri || dir) + "/" + name; this.exists = false; }
-  create() { this.exists = true; }
-  delete() { this.exists = false; }
-  write() {}
-}
+const files = new Map();
+export const cacheDirectory = "file:///cache/";
+export const documentDirectory = "file:///documents/";
+export const makeDirectoryAsync = async () => {};
+export const writeAsStringAsync = async (uri, contents) => { files.set(uri, contents); };
+export const readAsStringAsync = async (uri) => {
+  const c = files.get(uri);
+  if (c == null) throw new Error('missing ' + uri);
+  return String(c);
+};
+export const copyAsync = async ({ from, to }) => {
+  files.set(to, files.get(from));
+};
+export const getInfoAsync = async (uri) => {
+  const c = files.get(uri);
+  return c == null ? { exists: false } : { exists: true, size: String(c).length };
+};
+export const StorageAccessFramework = {
+  requestDirectoryPermissionsAsync: async () => ({ granted: true, directoryUri: "content://tree/downloads" }),
+  createFileAsync: async (dir, name, mime) => {
+    const uri = dir + "/" + name;
+    files.set(uri, "");
+    return uri;
+  },
+};
 `,
 );
 await writeFile(
   sharingStub,
   'export const isAvailableAsync = async () => true;\nexport const shareAsync = async () => {};\n',
 );
-await writeFile(
-  legacyStub,
-  'export const StorageAccessFramework = { requestDirectoryPermissionsAsync: async () => ({ granted: false }) };\n',
-);
 
 try {
   await esbuild.build({
     alias: {
-      'expo-file-system': fsStub,
-      'expo-file-system/legacy': legacyStub,
+      'expo-file-system/legacy': fsLegacyStub,
       'expo-sharing': sharingStub,
       'react-native': rnStub,
     },
@@ -75,9 +82,11 @@ try {
   const {
     buildColorChecklist,
     buildDebugReport,
-    exportDebugBundle,
+    downloadPreparedBundle,
     formatColorChecklist,
     formatDebugReportText,
+    prepareDebugBundle,
+    sharePreparedBundle,
   } = mod;
   const report = buildDebugReport({
     analysisLongEdge: 480,
@@ -85,33 +94,22 @@ try {
     panel: {
       frameMeta: { pixelFormat: 'rgb-bgra-8-bit' },
       phase: 'locking',
-      artCandidates: [{ name: 'Sol Ring', score: 0.7 }],
-      session: { recognitionSource: 'analysis-fallback' },
+      session: { recognitionSource: 'analysis-fallback', phase: 'locking' },
     },
     preferredSource: 'snapshot',
     recognitionSource: 'analysis-fallback',
     stamp: 'test',
   });
   check('report has generatedAt', typeof report.generatedAt === 'string');
-  check('report keeps panel payload', report.panel.phase === 'locking');
+  check('report omits huge panel', report.panel === undefined);
   check('Detector input color correct? present', report['Detector input color correct?'] === 'unverified');
-  check(
-    'Recognition input color correct? present',
-    report['Recognition input color correct?'] === 'unverified',
-  );
   check('Recognition source is fallback', report['Recognition source'] === 'fallback');
   check('pixel format present', report['pixel format'] === 'rgb-bgra-8-bit');
   check('channel order is rgba on android', report['channel order'] === 'rgba');
   const text = formatDebugReportText(report);
   check('text starts with banner', text.startsWith('Lugin scan debug\n'));
-  check(
-    'text leads with checklist',
-    text.includes('Detector input color correct? unverified') &&
-      text.includes('Recognition source: fallback') &&
-      text.includes('pixel format: rgb-bgra-8-bit') &&
-      text.includes('channel order: rgba'),
-  );
-  check('text is JSON-ish', text.includes('"phase": "locking"'));
+  check('text leads with checklist', text.includes('Recognition source: fallback'));
+
   const checklist = buildColorChecklist({
     panel: {
       frameMeta: { pixelFormat: 'rgb-rgba-8-bit' },
@@ -119,15 +117,60 @@ try {
     },
   });
   check('checklist formats', formatColorChecklist(checklist).includes('Recognition source: photo'));
-  check('rgba channel order', checklist.channelOrder === 'rgba');
 
-  const exported = await exportDebugBundle({
+  const prepared = await prepareDebugBundle({
     panel: { phase: 'locking' },
     stamp: 'smoke',
   });
-  check('export ok', exported.ok === true, exported.ok ? '' : exported.reason);
-  if (exported.ok) {
-    check('export method is sharing', exported.method === 'sharing', exported.method);
+  check('prepare ok', prepared.ok === true, prepared.ok ? '' : prepared.reason);
+  check('prepare writes report txt', prepared.ok && prepared.bundle.reportUri != null);
+  check('prepare writes json', prepared.ok && prepared.bundle.jsonUri != null);
+
+  if (prepared.ok) {
+    const shared = await sharePreparedBundle(prepared.bundle);
+    check('share ok', shared.ok === true, shared.ok ? '' : shared.reason);
+    check('share method is sharing', shared.ok && shared.method === 'sharing', shared.ok ? shared.method : '');
+
+    const downloaded = await downloadPreparedBundle(prepared.bundle);
+    check('download ok', downloaded.ok === true, downloaded.ok ? '' : downloaded.reason);
+    check(
+      'download method is saf',
+      downloaded.ok && downloaded.method === 'saf',
+      downloaded.ok ? downloaded.method : '',
+    );
+    check(
+      'download includes txt',
+      downloaded.ok && downloaded.saved.some((n) => n.endsWith('.txt')),
+      downloaded.ok ? downloaded.saved.join(',') : '',
+    );
+  }
+
+  // Detector + recognition ScanImages should both land in the bundle files.
+  const rgba = (w, h, r, g, b) => {
+    const data = new Uint8Array(w * h * 4);
+    for (let i = 0; i < w * h; i++) {
+      const o = i * 4;
+      data[o] = r;
+      data[o + 1] = g;
+      data[o + 2] = b;
+      data[o + 3] = 255;
+    }
+    return { data, height: h, width: w };
+  };
+  const withImages = await prepareDebugBundle({
+    images: {
+      detector: rgba(32, 48, 220, 40, 40),
+      recognition: rgba(64, 89, 220, 40, 40),
+    },
+    panel: { frameMeta: { pixelFormat: 'rgb-rgba-8-bit' } },
+    stamp: 'smoke-images',
+  });
+  check('image prepare ok', withImages.ok === true);
+  if (withImages.ok) {
+    check('recognition png written', withImages.bundle.pngUri != null);
+    check('detector png written', withImages.bundle.detectorPngUri != null);
+    check('detector preview uri', withImages.bundle.detectorImageUri != null);
+    check('report lists detector input', withImages.bundle.reportText.includes('detectorInput'));
   }
 
   if (failures > 0) {

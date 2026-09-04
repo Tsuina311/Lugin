@@ -21,6 +21,8 @@ type SessionBits = {
   artEntries: number | null;
   artError: string | null;
   artGenerated: string | null;
+  artChecksum: string | null;
+  artUniqueOracles: number | null;
   artworkDescriptorMs: number | null;
   artworkMatcherMs: number | null;
   artworkMs: number | null;
@@ -43,6 +45,7 @@ type SessionBits = {
   hiresWaitMs: number | null;
   mappedCorners: CardCorners | null;
   names: number | null;
+  printingEntries: number | null;
   normalizedUri: string | null;
   phase: string;
   qualityBest: number | null;
@@ -61,6 +64,17 @@ type SessionBits = {
   titleEvidence: string;
   trackFrames: number;
   warpMs: number | null;
+  userLatency: {
+    lockToFirstOracleMs: number | null;
+    lockToFinalOracleMs: number | null;
+    lockToPrintingMs: number | null;
+    recognizeToFirstOracleMs: number | null;
+  } | null;
+  earlyReason: string | null;
+  titleMs: number | null;
+  titleDoneAt: number | null;
+  artDoneAt: number | null;
+  earlyIdentityAt: number | null;
 };
 
 type Props = {
@@ -84,6 +98,8 @@ type Props = {
 
 const ms = (s: StageStats) =>
   s.count === 0 ? 'n/a' : `${s.p50.toFixed(1)}/${s.p95.toFixed(1)}`;
+const latMs = (n: number | null | undefined) =>
+  n == null || !Number.isFinite(n) ? '—' : `${n.toFixed(0)} ms`;
 const fps = (n: number) => n.toFixed(1);
 
 /**
@@ -388,10 +404,20 @@ export function ScanDebugPanel({
               </Text>
             ) : null}
             <Text style={styles.line}>
-              names {session.names ?? '—'} · art index {session.artEntries ?? '—'}
+              names {session.names ?? '—'} · printing {session.printingEntries ?? '—'} · art{' '}
+              {session.artEntries ?? '—'}
+              {session.artUniqueOracles != null ? ` · oracles ${session.artUniqueOracles}` : ''}
               {session.artGenerated ? ` · built ${session.artGenerated.slice(0, 10)}` : ''}
             </Text>
+            {session.artChecksum ? (
+              <Text style={styles.line}>art checksum {session.artChecksum}</Text>
+            ) : null}
             {session.artError ? <Text style={styles.bad}>{session.artError}</Text> : null}
+            {session.artCandidates.length ? (
+              <Text style={styles.line}>
+                art candidate pool {session.artCandidates.length} (matcher top-N, not index size)
+              </Text>
+            ) : null}
             <Text style={styles.line}>
               title {session.titleEvidence} · text {session.textEvidence} · footer{' '}
               {session.footerEvidence}
@@ -458,6 +484,26 @@ export function ScanDebugPanel({
               </>
             ) : (
               <Text style={styles.dim}>no artwork candidates yet</Text>
+            )}
+            <Text style={styles.title}>User latency (lock → result)</Text>
+            {session.userLatency ? (
+              <>
+                <Text style={styles.line}>
+                  lock→first oracle {latMs(session.userLatency.lockToFirstOracleMs)} · lock→final{' '}
+                  {latMs(session.userLatency.lockToFinalOracleMs)}
+                </Text>
+                <Text style={styles.line}>
+                  lock→printing {latMs(session.userLatency.lockToPrintingMs)} · recognize→name{' '}
+                  {latMs(session.userLatency.recognizeToFirstOracleMs)}
+                </Text>
+                <Text style={styles.line}>
+                  early {session.earlyReason ?? '—'} · titleDone{' '}
+                  {latMs(session.titleDoneAt)} · artDone {latMs(session.artDoneAt)} · earlyAt{' '}
+                  {latMs(session.earlyIdentityAt)}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.dim}>no lock→oracle timing yet</Text>
             )}
             <Text style={styles.title}>
               Recognition input — {session.sourceLabel === 'high-res' ? 'HIGH RES' : 'analysis fallback'}

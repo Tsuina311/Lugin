@@ -1,12 +1,18 @@
-# Native OCR engine survey
+# Native OCR engine
 
-Status: **interface wired, engine not chosen.** Artwork matching and fusion
-run without OCR. Title / rules / footer evidence stay empty until a
-maintained recognizer lands.
+Status: **engine chosen — ML Kit Latin via thin Expo module.** High-res
+Recognition Input gate **PASSED**. Batch `lugin-ocr` with
+`lugin-card-detector` in the **next development APK** (fingerprint change).
+Do not ship tesseract.js in RN.
+
+Artwork matching and fusion already run without OCR. Title / rules / footer
+evidence stay **unavailable** (`ocr: null`) until the new APK links
+`lugin-ocr`; after that, `useScanSession` feature-detects the module and
+passes `createMlkitTextRecognizer()`.
 
 The portable seam is `TextRecognizer` in `src/lib/scan/textRecognizer.ts`.
-Native must return `OcrReading[]`-shaped `TextRecognitionResult`s. It must
-**not** decide Magic identity.
+Native returns `TextRecognitionResult` (raw text + word boxes + confidence).
+It must **not** decide Magic identity — ranking stays in shared TypeScript.
 
 OCR runs on **normalized 744×1039 region crops** (title, text box, footer,
 collector) — never on full camera frames, and never at detector cadence.
@@ -17,31 +23,60 @@ collector) — never on full camera frames, and never at detector cadence.
 - React Native 0.86 / New Architecture
 - Android first (Samsung). iOS later.
 
-## Candidates (2026)
+## Decision (2026)
 
-| Option | Maintained? | New Arch | Notes |
-| --- | --- | --- | --- |
-| ML Kit via a thin Android module | Yes (Google) | Yes, if we write the module | Likely best Android quality. **Not auto-chosen.** Needs a new APK. |
-| `react-native-mlkit-ocr` and forks | Mixed / stale | Often old-arch only | Reject abandoned wrappers. |
-| Tesseract native wrappers | Mixed | Unreliable | Web already uses `tesseract.js`. Do not copy that into native as the long-term engine. |
-| VisionCamera frame processors + custom OCR | Extra surface | Possible | Would put recognition closer to native pixels. Rejected: shared code owns identity. |
+| Option | Verdict | Notes |
+| --- | --- | --- |
+| **ML Kit via thin Expo module (`lugin-ocr`)** | **Chosen** | Google-maintained, New Arch–friendly, bundled Latin model, offline. Same structure as `lugin-card-detector`. |
+| `react-native-mlkit-ocr` and forks | Rejected | Mixed / stale; often old-arch only. |
+| Tesseract native wrappers | Rejected | Unreliable New Arch story. Web keeps `tesseract.js`; do **not** copy it into RN. |
+| VisionCamera frame processors + OCR | Rejected | Would put recognition closer to native pixels; shared code owns identity. OCR stays on warped region crops. |
 
-## Decision rule
+### Why ML Kit (rationale)
 
-Pick the engine that wins **oracle top-1 / top-5** on existing fixtures, not
-raw character accuracy. Add it only when:
+1. Thin local Expo module is smaller and safer than adopting an abandoned RN
+   wrapper on RN 0.86 / New Architecture.
+2. Bundled `com.google.mlkit:text-recognition` (Latin) is offline and does not
+   depend on a Play Services model download for the common EN card path.
+3. Output maps cleanly onto `TextRecognitionResult` (`text`, `words[]` with
+   boxes + confidence). Magic matching stays in `readCard` / fuse.
+4. Fingerprint already changes for `lugin-card-detector` — batch OCR in the
+   same next APK rather than a second native rebuild.
 
-1. the wrapper is maintained for RN 0.86 + New Arch, **or**
-2. a thin Android module is smaller than adopting a stale wrapper.
+Oracle top-1 / top-5 on fixtures remains the quality bar after the APK lands;
+character accuracy alone is not the ship gate.
 
-Either path changes the EAS fingerprint → new development APK. After that,
-TypeScript-only scanner changes go out as OTA again.
+## Wire-up
 
-The current live path passes `ocr: null` so title/text/footer are
-**unavailable** (not empty-string scores). `mobile/src/scan/emptyOcr.ts`
-exists for later wiring.
+| Piece | Location |
+| --- | --- |
+| Expo module (Android + ML Kit) | `mobile/modules/lugin-ocr/` |
+| JS adapter (`TextRecognizer`) | `mobile/src/scan/mlkitTextRecognizer.ts` |
+| Session | `useScanSession` → `ocr: isNativeOcrLinked() ? createMlkitTextRecognizer() : null` |
+| Empty helper (tests / explicit) | `mobile/src/scan/emptyOcr.ts` |
 
-Do not add ML Kit (or any OCR native module) until a high-res Recognition
-Input is proven on Samsung. That addition changes the EAS fingerprint and
-needs a new APK. Do not bundle SQLite in the same APK unless persistence
-is actually next.
+Native API:
+
+- `recognizeFromRgba(base64, width, height)` → `{ text, confidence, words, timingMs }`
+- `recognizeFromFile(path)` → same (JPEG/PNG temp files)
+- `implementationStatus`: `"ready"`
+
+`RecognizeOptions` (mode / whitelist) are accepted for seam parity but not
+forwarded to ML Kit; shared preprocess + post-normalization own character
+constraints.
+
+## Remaining work (title-region path)
+
+After the APK links the module:
+
+1. Confirm `isNativeOcrLinked()` on Samsung and that title/text/footer debug
+   chips flip from `unavailable` → `present`.
+2. End-to-end: warped 744×1039 → `readTitle` / rules / footer crops → ML Kit
+   → name index / text evidence / fuse.
+3. Benchmark oracle top-1 / top-5 vs web tesseract on the same fixtures.
+4. Tune shared OCR preprocess only if ML Kit underperforms on foil / glare
+   crops (do not add Magic logic in Kotlin).
+5. iOS Vision adapter later behind the same `TextRecognizer` seam.
+
+Do not bundle SQLite / Drive in the OCR+detector APK unless persistence is
+actually next.

@@ -61,12 +61,18 @@ import {
   resolveDesiredOutputOrientation,
 } from './orientationLifecycle';
 import {
+  cornersToQuad,
   createSessionController,
-  detectCardQuad,
   DETECT_MIN_SCORE,
   type CardCorners,
+  type DetectResult,
   type ScanImage,
 } from './sharedCore';
+import {
+  createSharedJsDetectorEngine,
+  type DetectorEngine,
+} from './detectorEngine';
+import { yPlaneToGrayScanImage } from './yPlaneToGrayScanImage';
 
 /** How far up the transfer ladder the worklet is allowed to climb. */
 export const RUNGS = ['ping', 'meta', 'tiny', 'full'] as const;
@@ -214,6 +220,8 @@ export interface OverlayState {
 
 export interface FrameAnalysisOptions {
   analysisMaxWidth?: number;
+  /** Geometric detector engine. Default: shared JS `detectCardQuad`. */
+  detectorEngine?: DetectorEngine;
   /**
    * Climb the diagnostic transfer ladder (ping/meta/tiny/full). Default is
    * the production path: one `scheduleOnRN` with the copied buffer.
@@ -222,9 +230,9 @@ export interface FrameAnalysisOptions {
   /** PNG thumbnail + full debug state. Off = overlay-only updates. */
   debugPreview?: boolean;
   enabled?: boolean;
-  /** Called after each processed ScanImage + detectCardQuad. */
+  /** Called after each processed ScanImage + detector engine. */
   onAnalyzed?: (payload: {
-    detection: ReturnType<typeof detectCardQuad>;
+    detection: DetectResult;
     image: ScanImage;
     spaces: CoordinateSpaces;
   }) => void;
@@ -295,6 +303,7 @@ const describeBytes = (value: unknown): string => {
 export const useFrameAnalysis = ({
   analysisMaxWidth = 480,
   debugPreview = true,
+  detectorEngine: detectorEngineOption,
   diagnosticRungs = false,
   enabled = true,
   interfaceOrientation,
@@ -304,6 +313,15 @@ export const useFrameAnalysis = ({
   rung = 'full',
   targetAnalysisFps = 10,
 }: FrameAnalysisOptions = {}) => {
+  const detectorEngine = useMemo(
+    () => detectorEngineOption ?? createSharedJsDetectorEngine(),
+    [detectorEngineOption],
+  );
+  const detectorEngineRef = useRef(detectorEngine);
+  detectorEngineRef.current = detectorEngine;
+  const preferNativeYuv = detectorEngine.id === 'native' && Boolean(detectorEngine.detectYPlane);
+  const preferNativeYuvRef = useRef(preferNativeYuv);
+  preferNativeYuvRef.current = preferNativeYuv;
   const [overlay, setOverlay] = useState<OverlayState | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [metrics, setMetrics] = useState<AnalysisMetrics | null>(null);
@@ -588,7 +606,13 @@ export const useFrameAnalysis = ({
       stages.rnToScan.push(convertedAt - rnMono);
 
       tally.current.detectorCalls++;
-      const detection = detectCardQuad(image);
+      const rawDetection = detectorEngineRef.current.detect(image);
+      const detection: DetectResult = {
+        corners: rawDetection.corners,
+        debug: rawDetection.debug,
+        quad: rawDetection.corners ? cornersToQuad(rawDetection.corners) : null,
+        score: rawDetection.score,
+      };
       const finishedAt = now();
       const finishedWall = Date.now();
 
@@ -667,6 +691,153 @@ export const useFrameAnalysis = ({
       setError(err instanceof Error ? err.message : String(err));
     }
   }, [analyse]);
+
+  /**
+   * Native live path: Y/luma plane only → native detectFromYPlane.
+   * Builds a grayscale ScanImage solely for session quality / prepareAnalysis.
+   */
+  const onYLuma = useCallback(
+    (
+      bytes: ArrayBuffer,
+      width: number,
+      height: number,
+      rowStride: number,
+      orientation: string,
+      isMirrored: boolean,
+      sampleAcceptedAt: number,
+      seq: number,
+    ) => {
+      void seq;
+      void isMirrored;
+      const engine = detectorEngineRef.current;
+      if (!engine.detectYPlane) {
+        setError('Native detector has no detectYPlane — rebuild APK with lugin-card-detector');
+        return;
+      }
+
+      const y = new Uint8Array(bytes);
+      const orientationParsed = parseOrientation(orientation);
+      const desired = desiredOutput;
+      const coherent = isFrameCoherentWithOutput(desired, width, height, orientationParsed);
+      if (!coherent || debugPreview) {
+        setOrientationDebug({
+          desired,
+          detectorRotation: detectorRotationLabel(orientationParsed),
+          frameOrientation: orientation,
+          lastUpdateAt: Date.now(),
+          ready: coherent,
+        });
+      }
+      if (!coherent) {
+        tally.current.skippedForOrientation++;
+        setOverlay(null);
+        publish();
+        return;
+      }
+
+      const spaces = spacesFor(
+        { height, width },
+        orientationParsed,
+        previewSizeRef.current,
+        analysisMaxWidth,
+      );
+
+      const startedAt = now();
+      const rawDetection = engine.detectYPlane(y, width, height, rowStride);
+      const detection: DetectResult = {
+        corners: rawDetection.corners,
+        debug: rawDetection.debug,
+        quad: rawDetection.corners ? cornersToQuad(rawDetection.corners) : null,
+        score: rawDetection.score,
+      };
+      const finishedAt = now();
+      const detected = Boolean(detection.corners) && detection.score >= DETECT_MIN_SCORE;
+
+      tally.current.detectorCalls++;
+      if (detected) tally.current.detectorHits++;
+      tally.current.processed++;
+      stages.detect.push(rawDetection.debug.ms || finishedAt - startedAt);
+      pushFiniteAge(stages.cameraToDetect, Date.now() - sampleAcceptedAt);
+      rates.analysis.mark(finishedAt);
+
+      // Gray proxy for session — not used for geometry (already done natively).
+      const image = yPlaneToGrayScanImage(y, width, height, rowStride);
+      lastImage.current = image;
+
+      setOverlay({
+        analysis: { height, width },
+        corners: detection.corners,
+        detected,
+        score: detection.score,
+      });
+      pushFiniteAge(stages.cameraToOverlay, Date.now() - sampleAcceptedAt);
+
+      setFrameMeta({
+        bufferSource: 'yuv plane 0 (native live)',
+        bytesKind: 'ArrayBuffer',
+        bytesPerRow: rowStride,
+        copiedByteLength: y.byteLength,
+        expectedPacked: width * height,
+        height,
+        isMirrored: false,
+        orientation,
+        pixelFormat: 'yuv-y-plane',
+        sourceByteLength: y.byteLength,
+        timestamp: sampleAcceptedAt,
+        width,
+      });
+
+      onAnalyzedRef.current?.({
+        detection,
+        image,
+        spaces: { ...spaces, detector: { height, width } },
+      });
+
+      const heavy = debugPreview && finishedAt - lastPreviewAt.current >= PREVIEW_MS;
+      if (heavy) {
+        lastPreviewAt.current = finishedAt;
+        try {
+          setPreview(scanImageToPngDataUri(image));
+        } catch {
+          setPreview(null);
+        }
+        setResult({
+          analysis: { height, width },
+          brightness: imageBrightness(image),
+          corners: detection.corners,
+          detected,
+          detector: {
+            bestCandidateScore: detection.debug.candidates.reduce(
+              (best, c) => Math.max(best, c.score),
+              0,
+            ),
+            candidates: detection.debug.candidates.length,
+            detectMs: detection.debug.ms,
+            detected,
+            rejectReasons: topRejectReasons(
+              detection.debug.candidates.map(c => c.rejectedBecause),
+            ),
+            score: detection.score,
+            selectedIndex: detection.debug.selectedIndex,
+            workSize: detection.debug.workSize,
+          },
+          quad: detection.corners ? quadDiagnostics(detection.corners, image) : null,
+          score: detection.score,
+          spaces: { ...spaces, detector: { height, width } },
+        });
+      }
+
+      publish();
+    },
+    [
+      analysisMaxWidth,
+      debugPreview,
+      desiredOutput,
+      publish,
+      rates,
+      stages,
+    ],
+  );
 
   /** Rung 4. The full copied analysis buffer, positional args only. */
   const onFull = useCallback(
@@ -877,13 +1048,62 @@ export const useFrameAnalysis = ({
           state.skipNoBuffer++;
           return;
         }
-        if (frame.isPlanar) {
+        if (frame.isPlanar && !preferNativeYuv) {
           state.skipPlanar++;
           return;
         }
         state.at = stamp;
         state.sampled++;
         state.seq++;
+
+        // Native live geometry: copy Y plane only (tight pack), no RGBA.
+        if (preferNativeYuv) {
+          try {
+            const planes = frame.getPlanes();
+            if (planes.length === 0) {
+              state.skipNoBuffer++;
+              return;
+            }
+            const plane = planes[0];
+            const source = new Uint8Array(plane.getPixelBuffer());
+            state.read++;
+            const stride = plane.bytesPerRow;
+            const fw = frame.width;
+            const fh = frame.height;
+            // Downscale long edge to analysisMaxWidth before crossing RN.
+            const long = Math.max(fw, fh);
+            const scale = long > analysisMaxWidth ? analysisMaxWidth / long : 1;
+            const dw = Math.max(32, Math.round(fw * scale));
+            const dh = Math.max(32, Math.round(fh * scale));
+            const packed = new Uint8Array(dw * dh);
+            for (let y = 0; y < dh; y++) {
+              const sy = Math.min(fh - 1, Math.floor((y + 0.5) * (fh / dh)));
+              const srcRow = sy * stride;
+              const dstRow = y * dw;
+              for (let x = 0; x < dw; x++) {
+                const sx = Math.min(fw - 1, Math.floor((x + 0.5) * (fw / dw)));
+                packed[dstRow + x] = source[srcRow + sx] ?? 0;
+              }
+            }
+            state.copied++;
+            state.fromPlane++;
+            state.scheduled++;
+            scheduleOnRN(
+              onYLuma,
+              packed.buffer,
+              dw,
+              dh,
+              dw,
+              frame.orientation,
+              frame.isMirrored,
+              stamp,
+              state.seq,
+            );
+          } catch (err) {
+            report('yPlane', err);
+          }
+          return;
+        }
 
         // Production path: one scheduleOnRN. The four-rung ladder is opt-in.
         const climb = diagnosticRungs;
@@ -1067,7 +1287,20 @@ export const useFrameAnalysis = ({
         frame.dispose();
       }
     },
-    [diagnosticRungs, heartbeat, maxRung, minIntervalMs, onFull, onMeta, onPing, onTiny, onWorkletError],
+    [
+      analysisMaxWidth,
+      diagnosticRungs,
+      heartbeat,
+      maxRung,
+      minIntervalMs,
+      onFull,
+      onMeta,
+      onPing,
+      onTiny,
+      onWorkletError,
+      onYLuma,
+      preferNativeYuv,
+    ],
   );
 
   /**
@@ -1084,8 +1317,14 @@ export const useFrameAnalysis = ({
     }
 
     const startedAt = now();
-    const detection = detectCardQuad(image);
-    const rawMs = now() - startedAt;
+    const rawDetection = detectorEngineRef.current.detect(image);
+    const detection: DetectResult = {
+      corners: rawDetection.corners,
+      debug: rawDetection.debug,
+      quad: rawDetection.corners ? cornersToQuad(rawDetection.corners) : null,
+      score: rawDetection.score,
+    };
+    const rawMs = detection.debug.ms || now() - startedAt;
 
     setProbeResult({
       brightness: imageBrightness(image),
@@ -1157,9 +1396,9 @@ export const useFrameAnalysis = ({
     dropFramesWhileBusy: true,
     onFrame: enabled ? onFrame : undefined,
     onFrameDropped,
-    // RGBA in the camera pipeline. Costs bandwidth versus YUV, which is the
-    // trade being measured; converting YUV by hand in JS would cost more.
-    pixelFormat: 'rgb',
+    // Native live geometry uses YUV plane-0 only (no full RGBA through RN).
+    // Shared JS still needs RGB for detectCardQuad + debug thumbs.
+    pixelFormat: detectorEngine.id === 'native' ? 'yuv' : 'rgb',
     // The one thing that keeps full-resolution frames out of this pipeline.
     targetResolution,
   });
@@ -1194,6 +1433,8 @@ export const useFrameAnalysis = ({
   useEffect(() => {
     if (enabled) return;
     pending.current = null;
+    draining.current = false;
+    lastImage.current = null;
     setOverlay(null);
     setResult(null);
   }, [enabled]);
@@ -1204,6 +1445,7 @@ export const useFrameAnalysis = ({
     failure,
     frameMeta,
     frameOutput,
+    lastDetectorInput: (): ScanImage | null => lastImage.current,
     metrics,
     orientation: orientationDebug,
     overlay,

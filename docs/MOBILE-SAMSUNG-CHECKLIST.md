@@ -20,13 +20,20 @@ Confirm Settings stamp after OTA. Do not invent numbers.
 
 ## A. Color channels (gate before identity)
 
-Export a red card and a blue card. Recognition PNG + detector thumb:
+Export **Chaos Dragon** (red) via **Report** after OTA. The sheet shows / downloads:
 
-- Red stays red (not blue)
-- Blue stays blue (not yellow/orange)
+- `lugin-recognition-*.png` — 744×1039 recognition input
+- `lugin-detector-*.png` — analysis FOV fed to `detectCardQuad`
+- report `.txt` / `.json` — includes `pixel format` + `channel order`
+
+Gates:
+
+- Recognition: red stays red (not blue); blue stays blue (not yellow)
+- Detector: same check on `lugin-detector-*.png`
 - Report: `pixel format`, `channel order`, buffer source (`plane 0` preferred on Android RGB)
 
-PENDING until retested after R/B fix.
+Recognition color: PASS (Chaos Dragon / Pixie Guide, Sep 2026).
+Detector color: PENDING — need one Chaos Dragon export with detector PNG.
 
 ## B. Detector latency (Shared JS — known slow)
 
@@ -60,26 +67,29 @@ PENDING.
 
 ## D. Artwork index
 
-Debug must show something like:
+Debug must show:
 
 ```text
-names 36776 · art index ≥5000 · built YYYY-MM-DD
+names 36776 · art index ≥5000 · oracles ≥5000 · built YYYY-MM-DD
+art candidate pool N (matcher top-N, not index size)
 ```
 
+Production Pages index (2026-09-04): **49968 entries · 34082 oracles**.
+Chaos Dragon / Pixie Guide: **present**.
+
 If you see `art index 20` or an art-index error about fixture size, the
-deployed index is wrong — do not trust identity results.
+deployed index is wrong — do not trust identity results. Matcher top-N is
+**not** index size.
 
-Verify **Chaos Dragon** (and 10–20 other named cards) appear in candidates
-only after a full art index is deployed.
+Wrong Chaos Dragon art candidates (Sol Ring / Midgar / …) with a correct
+normalized image ⇒ matcher/runtime issue, not missing coverage. Replay:
 
-Export recognition via the camera **Export** chip (share sheet → Messages /
-Drive / Files). Replay offline with
-`node scripts/scan-art-replay.mjs --image … --expect "Chaos Dragon"`.
+```bash
+node scripts/scan-art-coverage.mjs
+node scripts/scan-art-replay.mjs --image … --expect "Chaos Dragon"
+```
 
-File share needs an APK that includes `expo-sharing`. Older builds fall back
-to the Android folder picker or text-only share.
-
-PENDING until full art-index is on Pages.
+PENDING same-image replay with Samsung export + on-device OCR.
 
 ## E. Artwork-only confidence
 

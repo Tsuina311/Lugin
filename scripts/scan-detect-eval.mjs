@@ -7,6 +7,9 @@
 // Synthetic: Scryfall fixtures under .scan-fixtures/ (ids in scripts/fixtures).
 // Real: gitignored .scan-real/ frames + corner annotations — see
 // scripts/fixtures/REAL-DETECTION.md.
+//
+// Native Kotlin parity (shared-js metrics + RGBA export for DetectCard):
+//   yarn scan:detect-native-parity
 
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';

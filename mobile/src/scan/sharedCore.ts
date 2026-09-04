@@ -29,6 +29,16 @@ export type { DetectResult } from '@/lib/scan/detectCard';
 export { detectCardQuad } from '@/lib/scan/detectCard';
 export type { DetectionDebug } from '@/lib/scan/detection/types';
 export { emptyDetectionDebug } from '@/lib/scan/detection/types';
+export type {
+  CardDetection,
+  CardDetectionFrame,
+  CardDetectionRole,
+} from '@/lib/scan/detection/multi';
+export {
+  choosePrimaryDetection,
+  detectionsFromDebug,
+  primaryCornersFromFrame,
+} from '@/lib/scan/detection/multi';
 export type { CardSource, PreparedCard } from '@/lib/scan/prepareCard';
 export { prepareCard } from '@/lib/scan/prepareCard';
 
@@ -65,21 +75,46 @@ export type {
   ScannerPhase,
   SessionController,
   SessionSnapshot,
+  SessionUserLatency,
 } from '@/lib/scan/session/controller';
 export { createSessionController } from '@/lib/scan/session/controller';
 
 // --- Recognition -------------------------------------------------------------
-export type { RecognizeDeps, RecognizeResult } from '@/lib/scan/session/recognize';
-export { recognizeCard } from '@/lib/scan/session/recognize';
+export type { RecognizeDeps, RecognizeResult, EarlyIdentityReason } from '@/lib/scan/session/recognize';
+export {
+  isStrongArtOnly,
+  isStrongDualEvidence,
+  isStrongTitleOnly,
+  recognizeCard,
+} from '@/lib/scan/session/recognize';
 export type {
   RecognitionMode,
   RecognizeOptions,
+  RecognizedWord,
   TextRecognitionResult,
   TextRecognizer,
 } from '@/lib/scan/textRecognizer';
-export { EMPTY_RECOGNITION } from '@/lib/scan/textRecognizer';
-export type { CardNameIndex, CardNameIndexData, NameCandidate } from '@/lib/scan/matchName';
-export { buildNameIndex, matchReadings, shapeFold } from '@/lib/scan/matchName';
+export { EMPTY_RECOGNITION, meanConfidence } from '@/lib/scan/textRecognizer';
+export type { CardNameIndex, CardNameIndexData, MatchTiming, NameCandidate } from '@/lib/scan/matchName';
+export { buildNameIndex, matchName, matchReadings, shapeFold } from '@/lib/scan/matchName';
+export type {
+  PrintingIndex,
+  PrintingIndexData,
+  PrintingIndexEntry,
+  PrintingLookupHit,
+} from '@/lib/scan/printing/index';
+export {
+  buildPrintingIndex,
+  entryToScryfallPrinting,
+  listPrintingsByName,
+  lookupPrinting,
+  validatePrintingIndexData,
+} from '@/lib/scan/printing/index';
+export type { CardFinish, FinishRecognizer, FinishResult } from '@/lib/scan/finish/types';
+export {
+  createUnknownFinishRecognizer,
+  finishFromMetadata,
+} from '@/lib/scan/finish/types';
 export type { ArtworkIndexData, ArtworkMatcher, VisualCandidate } from '@/lib/scan/artwork/match';
 export { createArtworkMatcher, NO_ARTWORK_MATCHER } from '@/lib/scan/artwork/match';
 export { describeArtwork } from '@/lib/scan/artwork/descriptors';

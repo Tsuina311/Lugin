@@ -6,12 +6,16 @@
 
 import {
   buildNameIndex,
+  buildPrintingIndex,
   createArtworkMatcher,
   NO_ARTWORK_MATCHER,
+  validatePrintingIndexData,
   type ArtworkIndexData,
   type ArtworkMatcher,
   type CardNameIndex,
   type CardNameIndexData,
+  type PrintingIndex,
+  type PrintingIndexData,
   type TextIndexData,
 } from './sharedCore';
 import {
@@ -35,6 +39,17 @@ export interface NameIndexLoad {
   warmMs: number;
 }
 
+export interface PrintingIndexLoad {
+  checksum: string;
+  coldMs: number;
+  data: PrintingIndexData;
+  entries: number;
+  index: PrintingIndex;
+  source: 'network' | 'memory';
+  version: number;
+  warmMs: number;
+}
+
 export interface ArtIndexLoad {
   checksum: string;
   coldMs: number;
@@ -45,6 +60,7 @@ export interface ArtIndexLoad {
   matcher: ArtworkMatcher;
   source: 'network' | 'memory';
   text: TextIndexData | null;
+  uniqueOracles: number;
   version: number;
   warmMs: number;
 }
@@ -54,6 +70,8 @@ const memory = {
   artInflight: null as Promise<ArtIndexLoad | null> | null,
   names: null as NameIndexLoad | null,
   namesInflight: null as Promise<NameIndexLoad | null> | null,
+  printing: null as PrintingIndexLoad | null,
+  printingInflight: null as Promise<PrintingIndexLoad | null> | null,
 };
 
 const now = () =>
@@ -130,6 +148,7 @@ export const loadArtworkIndex = async (
     if (checked.reason || !checked.data) throw new Error(checked.reason ?? 'invalid art index');
     const data = checked.data;
     const builtAt = now();
+    const uniqueOracles = new Set(data.entries.map(e => e.oracleId)).size;
     const load: ArtIndexLoad = {
       checksum: checksumJson({
         entries: data.entries.length,
@@ -143,6 +162,7 @@ export const loadArtworkIndex = async (
       matcher: createArtworkMatcher(data),
       source: 'network',
       text: textIndexFromArtworkPayload(raw),
+      uniqueOracles,
       version: data.version,
       warmMs: now() - builtAt,
     };
@@ -150,7 +170,6 @@ export const loadArtworkIndex = async (
     return load;
   })()
     .catch((err: unknown) => {
-      // Surface the reason in debug — do not silently match against nothing.
       const message = err instanceof Error ? err.message : String(err);
       console.warn(`[lugin] art index load failed: ${message}`);
       return null;
@@ -161,8 +180,47 @@ export const loadArtworkIndex = async (
   return memory.artInflight;
 };
 
+export const loadPrintingIndex = async (
+  base = DEFAULT_INDEX_BASE,
+): Promise<PrintingIndexLoad | null> => {
+  if (memory.printing) {
+    return { ...memory.printing, source: 'memory', warmMs: 0 };
+  }
+  if (memory.printingInflight) return memory.printingInflight;
+  memory.printingInflight = (async () => {
+    const t0 = now();
+    const raw = await fetchJson(joinUrl(base, 'printing-index.json'));
+    const checked = validatePrintingIndexData(raw, { minEntries: 500 });
+    if (checked.reason || !checked.data) throw new Error(checked.reason ?? 'invalid printing index');
+    const data = checked.data;
+    const builtAt = now();
+    const load: PrintingIndexLoad = {
+      checksum: checksumJson({ entries: data.entries.length, version: data.version }),
+      coldMs: now() - t0,
+      data,
+      entries: data.entries.length,
+      index: buildPrintingIndex(data),
+      source: 'network',
+      version: data.version,
+      warmMs: now() - builtAt,
+    };
+    memory.printing = load;
+    return load;
+  })()
+    .catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[lugin] printing index load failed: ${message}`);
+      return null;
+    })
+    .finally(() => {
+      memory.printingInflight = null;
+    });
+  return memory.printingInflight;
+};
+
 export const peekNameIndex = (): NameIndexLoad | null => memory.names;
 export const peekArtworkIndex = (): ArtIndexLoad | null => memory.art;
+export const peekPrintingIndex = (): PrintingIndexLoad | null => memory.printing;
 
 export const emptyArtMatcher = (): ArtworkMatcher => NO_ARTWORK_MATCHER;
 
@@ -172,4 +230,6 @@ export const resetIndexCache = (): void => {
   memory.artInflight = null;
   memory.names = null;
   memory.namesInflight = null;
+  memory.printing = null;
+  memory.printingInflight = null;
 };

@@ -32,6 +32,9 @@ import {
 import { cropImage, type CardCorners, type ScanImage } from '../types';
 
 import {
+  isStrongArtOnly,
+  isStrongDualEvidence,
+  isStrongTitleOnly,
   recognizeCard,
   type RecognizeDeps,
   type RecognizeOptions,
@@ -82,22 +85,46 @@ export interface FrameHelpers {
   allowRecognize?: () => boolean;
 }
 
+/** User-facing latency anchors (performance.now ms). */
+export interface SessionUserLatency {
+  /** Stable lock → first provisional/final oracle name on screen. */
+  lockToFirstOracleMs: number | null;
+  /** Stable lock → final fused identity (after channels settle). */
+  lockToFinalOracleMs: number | null;
+  /** Stable lock → exact printing (identified, not printing-ambiguous). */
+  lockToPrintingMs: number | null;
+  /** Recognize start → first oracle name (early or final). */
+  recognizeToFirstOracleMs: number | null;
+}
+
 export interface SessionSnapshot {
   /** Analysis frame size corners are expressed in. */
   analysisSize: { height: number; width: number } | null;
   corners: CardCorners | null;
   detection: DetectionDebug;
+  /** Wall time when provisional identity first reached the UI (if any). */
+  earlyShownAt?: number | null;
+  /** Wall time when final identity was applied after recognize settled. */
+  finalIdentityAt?: number | null;
   fused?: FusedResult;
+  /** Wall time when track first became lock-ready (phase → locking). */
+  lockedAt?: number | null;
   message: string;
   /** Mean corner motion (fraction of diagonal); lower = more stable. */
   motion: number;
   phase: ScannerPhase;
+  /** Wall time when exact printing first applied (fused.status === identified). */
+  printingShownAt?: number | null;
   quality?: FrameQuality;
   recognition?: RecognizeResult;
+  /** Wall time when the current recognize pass started. */
+  recognizingStartedAt?: number | null;
   /** Recent recognition observations for the current track. */
   temporal?: TemporalState;
   /** Frames currently held in the track. */
   trackFrames: number;
+  /** Derived lock→oracle / printing deltas for debug + export. */
+  userLatency?: SessionUserLatency;
 }
 
 export interface SessionController {
@@ -153,19 +180,43 @@ export const createSessionController = (
   let focusingSince: number | null = null;
   let lastFocusRequestAt = 0;
   let lastFocusCenter: { x: number; y: number } | null = null;
+  let recognizingStartedAt: number | null = null;
+  let earlyShownAt: number | null = null;
+  let lockedAt: number | null = null;
+  let finalIdentityAt: number | null = null;
+  let printingShownAt: number | null = null;
+  let earlyApplied = false;
+
+  const userLatency = (): SessionUserLatency => {
+    const firstOracleAt = earlyShownAt ?? finalIdentityAt;
+    const delta = (from: number | null, to: number | null): number | null =>
+      from != null && to != null && to >= from ? to - from : null;
+    return {
+      lockToFirstOracleMs: delta(lockedAt, firstOracleAt),
+      lockToFinalOracleMs: delta(lockedAt, finalIdentityAt),
+      lockToPrintingMs: delta(lockedAt, printingShownAt),
+      recognizeToFirstOracleMs: delta(recognizingStartedAt, firstOracleAt),
+    };
+  };
 
   const snap = (): SessionSnapshot => ({
     analysisSize,
     corners: latestCorners(track) ?? foundCorners,
     detection: lastDetection,
+    earlyShownAt,
+    finalIdentityAt,
     fused: lastFused,
+    lockedAt,
     message,
     motion: trackMotion(track),
     phase,
+    printingShownAt,
     quality: lastQuality,
     recognition: lastRecognition,
+    recognizingStartedAt,
     temporal,
     trackFrames: track.history.length,
+    userLatency: userLatency(),
   });
 
   const clearLock = () => {
@@ -178,6 +229,51 @@ export const createSessionController = (
     lastNormalized = null;
     focusingSince = null;
     lastFocusCenter = null;
+    recognizingStartedAt = null;
+    earlyShownAt = null;
+    lockedAt = null;
+    finalIdentityAt = null;
+    printingShownAt = null;
+    earlyApplied = false;
+  };
+
+  const applyIdentity = (
+    result: RecognizeResult,
+    card: PreparedCard,
+    opts: { provisional?: boolean } = {},
+  ) => {
+    lastRecognition = result;
+    lastFused = result.fused;
+    const status = result.fused.status;
+    const nowMs = performance.now();
+    if (status === 'identified' || status === 'printing-ambiguous') {
+      phase = 'found';
+      message = result.fused.card?.name ?? 'Identified';
+      foundCorners = card.corners;
+      foundDescriptor = artDescriptor(card);
+      if (!opts.provisional) {
+        if (finalIdentityAt == null) finalIdentityAt = nowMs;
+        if (status === 'identified' && printingShownAt == null) printingShownAt = nowMs;
+      }
+    } else if (status === 'card-ambiguous') {
+      phase = 'ambiguous';
+      message = 'Ambiguous — keep steady or pick a candidate';
+    } else {
+      phase = 'focusing';
+      message = 'Need a clearer view…';
+      focusingSince = nowMs;
+    }
+  };
+
+  /** Final wins only when it strongly contradicts the provisional early identity. */
+  const stronglyContradictsEarly = (early: FusedResult, final: FusedResult): boolean => {
+    const earlyKey = early.card?.oracleId ?? early.card?.name;
+    const finalKey = final.card?.oracleId ?? final.card?.name;
+    if (!earlyKey || !finalKey || earlyKey === finalKey) return false;
+    if (final.status !== 'identified' && final.status !== 'printing-ambiguous') return false;
+    return (
+      isStrongDualEvidence(final) || isStrongTitleOnly(final) || isStrongArtOnly(final)
+    );
   };
 
   const enterSearching = (why: string) => {
@@ -196,6 +292,9 @@ export const createSessionController = (
   const runRecognize = async (card: PreparedCard): Promise<void> => {
     if (recognizing) return;
     recognizing = true;
+    earlyApplied = false;
+    earlyShownAt = null;
+    recognizingStartedAt = performance.now();
     phase = 'recognizing';
     message = 'Recognizing…';
     lastNormalized = card.image;
@@ -204,26 +303,41 @@ export const createSessionController = (
       const opts: RecognizeOptions = { preferSets: context.preferSets };
       const { result, temporal: nextTemp } = await recognizeCard(
         card.image,
-        deps,
+        {
+          ...deps,
+          onEarlyIdentity: provisional => {
+            earlyApplied = true;
+            earlyShownAt = performance.now();
+            applyIdentity(provisional, card, { provisional: true });
+            deps.onEarlyIdentity?.(provisional);
+          },
+        },
         opts,
         temporal,
       );
       temporal = nextTemp;
-      lastRecognition = result;
-      lastFused = result.fused;
-      const status = result.fused.status;
-      if (status === 'identified' || status === 'printing-ambiguous') {
-        phase = 'found';
-        message = result.fused.card?.name ?? 'Identified';
-        foundCorners = card.corners;
-        foundDescriptor = artDescriptor(card);
-      } else if (status === 'card-ambiguous') {
-        phase = 'ambiguous';
-        message = 'Ambiguous — keep steady or pick a candidate';
+
+      if (earlyApplied && lastFused) {
+        const same =
+          (lastFused.card?.oracleId &&
+            lastFused.card.oracleId === result.fused.card?.oracleId) ||
+          (lastFused.card?.name && lastFused.card.name === result.fused.card?.name);
+        if (!same && stronglyContradictsEarly(lastFused, result.fused)) {
+          applyIdentity(result, card);
+        } else if (!same) {
+          // Weak contradict — keep provisional name; attach final timings/evidence.
+          lastRecognition = {
+            ...result,
+            earlyIdentity: true,
+            earlyReason: lastRecognition?.earlyReason ?? result.earlyReason ?? null,
+            fused: lastFused,
+          };
+          if (finalIdentityAt == null) finalIdentityAt = performance.now();
+        } else {
+          applyIdentity(result, card);
+        }
       } else {
-        phase = 'focusing';
-        message = 'Need a clearer view…';
-        focusingSince = performance.now();
+        applyIdentity(result, card);
       }
     } finally {
       recognizing = false;
@@ -344,6 +458,7 @@ export const createSessionController = (
       // Sharp enough.
       if (phase !== 'found' && phase !== 'ambiguous') {
         phase = 'locking';
+        if (lockedAt == null) lockedAt = now;
         message = 'Card locked';
         pool = pushQualityPool(
           pool,

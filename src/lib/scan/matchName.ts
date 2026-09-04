@@ -63,9 +63,25 @@ interface Entry {
 
 export interface CardNameIndex {
   entries: Entry[];
+  /**
+   * Folded key → first entry id. Exact OCR hits skip trigram + edit distance.
+   * Multiple languages that fold identically share one slot (first wins); fuzzy
+   * ranking still de-dupes by English name.
+   */
+  exactByKey: Map<string, number>;
   names: string[];
   /** Trigram → entry ids. Built once; this is what keeps a search off the full list. */
   postings: Map<string, number[]>;
+}
+
+/** Timing breakdown for local title match (ms). Tiny vs OCR when warm. */
+export interface MatchTiming {
+  candidateGenMs: number;
+  exactMs: number;
+  fuzzyRankMs: number;
+  /** `exact` short-circuit or full `fuzzy` path. */
+  path: 'exact' | 'fuzzy';
+  totalMs: number;
 }
 
 /**
@@ -147,7 +163,9 @@ export const buildNameIndex = (
   }
 
   const postings = new Map<string, number[]>();
+  const exactByKey = new Map<string, number>();
   entries.forEach((entry, id) => {
+    if (!exactByKey.has(entry.key)) exactByKey.set(entry.key, id);
     // Distinct grams only: a repeated gram should not count twice toward overlap.
     for (const gram of new Set(trigrams(entry.key))) {
       const bucket = postings.get(gram);
@@ -156,7 +174,7 @@ export const buildNameIndex = (
     }
   });
 
-  return { entries, names: data.names, postings };
+  return { entries, exactByKey, names: data.names, postings };
 };
 
 /** Levenshtein distance, two rows at a time. */
@@ -218,24 +236,64 @@ export interface MatchOptions {
   limit?: number;
   /** Discard anything below this similarity. */
   minScore?: number;
+  /** Optional timing sink for benchmarks / debug. */
+  timing?: MatchTiming;
 }
+
+const nowMs = (): number =>
+  typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+
+const candidateFromEntry = (index: CardNameIndex, entry: Entry, score: number): NameCandidate => ({
+  ...(entry.lang ? { lang: entry.lang } : {}),
+  name: index.names[entry.name],
+  ...(entry.printed ? { printedName: entry.printed } : {}),
+  score,
+});
 
 /**
  * Rank index entries against one OCR reading.
  *
- * Two stages, because scoring 90k names properly per reading is too slow on a
- * phone: shared trigrams cheaply narrow the field, then edit distance ranks what
- * is left.
+ * Exact folded Map lookup first (typical clean OCR). Otherwise shared trigrams
+ * narrow the field, then edit distance ranks what is left — scoring ~90k names
+ * with Levenshtein every frame is too slow on a phone.
  */
 export const matchName = (
   text: string,
   index: CardNameIndex,
   options: MatchOptions = {},
 ): NameCandidate[] => {
-  const { fold = shapeFold, limit = 8, minScore = 0.45 } = options;
+  const { fold = shapeFold, limit = 8, minScore = 0.45, timing } = options;
+  const t0 = nowMs();
   const query = fold(text);
-  if (query.length < 2) return [];
+  if (query.length < 2) {
+    if (timing) {
+      timing.exactMs = 0;
+      timing.candidateGenMs = 0;
+      timing.fuzzyRankMs = 0;
+      timing.totalMs = nowMs() - t0;
+      timing.path = 'fuzzy';
+    }
+    return [];
+  }
 
+  const exactId = index.exactByKey.get(query);
+  const exactMs = nowMs() - t0;
+  if (exactId != null) {
+    const entry = index.entries[exactId];
+    const hit = candidateFromEntry(index, entry, 1);
+    if (timing) {
+      timing.exactMs = exactMs;
+      timing.candidateGenMs = 0;
+      timing.fuzzyRankMs = 0;
+      timing.totalMs = nowMs() - t0;
+      timing.path = 'exact';
+    }
+    return [hit];
+  }
+
+  const tGen = nowMs();
   const grams = new Set(trigrams(query));
   const overlap = new Map<number, number>();
   for (const gram of grams) {
@@ -257,7 +315,9 @@ export const matchName = (
       if (Math.abs(index.entries[id].key.length - query.length) <= 2) pool.push(id);
     }
   }
+  const candidateGenMs = nowMs() - tGen;
 
+  const tRank = nowMs();
   // Keep the best score per English name: three languages and several printings
   // of one card must not fill the list with itself.
   const best = new Map<number, NameCandidate>();
@@ -267,17 +327,20 @@ export const matchName = (
     if (score < minScore) continue;
     const previous = best.get(entry.name);
     if (previous && previous.score >= score) continue;
-    best.set(entry.name, {
-      ...(entry.lang ? { lang: entry.lang } : {}),
-      name: index.names[entry.name],
-      ...(entry.printed ? { printedName: entry.printed } : {}),
-      score,
-    });
+    best.set(entry.name, candidateFromEntry(index, entry, score));
   }
 
-  return [...best.values()]
+  const ranked = [...best.values()]
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
     .slice(0, limit);
+  if (timing) {
+    timing.exactMs = exactMs;
+    timing.candidateGenMs = candidateGenMs;
+    timing.fuzzyRankMs = nowMs() - tRank;
+    timing.totalMs = nowMs() - t0;
+    timing.path = 'fuzzy';
+  }
+  return ranked;
 };
 
 export interface Reading {

@@ -1,10 +1,11 @@
-// Native TextRecognizer until a maintained OCR engine is adopted.
+// Fallback TextRecognizer that returns EMPTY_RECOGNITION.
 //
-// Artwork matching and fusion run without OCR. Title / rules / footer
-// evidence stay empty so we never invent readings.
+// Prefer `createMlkitTextRecognizer()` when `lugin-ocr` is linked
+// (see `mlkitTextRecognizer.ts`). Keep this helper for tests / explicit
+// empty-engine wiring — do not use it on the live path in place of `ocr: null`
+// when the module is absent (unavailable ≠ empty-string scores).
 //
-// See docs/MOBILE-OCR.md for the engine survey. Adding ML Kit (or any
-// native module) changes the EAS fingerprint and needs a new APK.
+// See docs/MOBILE-OCR.md.
 
 import { EMPTY_RECOGNITION, type TextRecognizer } from './sharedCore';
 

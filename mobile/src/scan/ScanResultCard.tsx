@@ -5,19 +5,32 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { useMemo, useState } from 'react';
 
 import type {
+  CardFinish,
   FusedResult,
   NameCandidate,
+  PrintingIndex,
   ScanIdentityStatus,
   ScryfallPrinting,
   SessionSnapshot,
 } from './sharedCore';
-import { fetchPrintingsByName, matchReadings, type CardNameIndex } from './sharedCore';
+import {
+  entryToScryfallPrinting,
+  fetchPrintingsByName,
+  finishFromMetadata,
+  listPrintingsByName,
+  matchReadings,
+  type CardNameIndex,
+} from './sharedCore';
 
-type Action = 'add' | 'wrong-card' | 'wrong-printing' | 'scan-again';
+type Action = 'add' | 'wrong-card' | 'wrong-printing' | 'scan-again' | 'set-finish';
 
 type Props = {
   nameIndex: CardNameIndex | null;
-  onAction: (action: Action, extra?: { name?: string; printing?: ScryfallPrinting }) => void;
+  onAction: (
+    action: Action,
+    extra?: { name?: string; printing?: ScryfallPrinting; finish?: CardFinish },
+  ) => void;
+  printingIndex?: PrintingIndex | null;
   snapshot: SessionSnapshot;
 };
 
@@ -36,12 +49,37 @@ const statusLabel = (status: ScanIdentityStatus | undefined): string => {
   }
 };
 
-export function ScanResultCard({ nameIndex, onAction, snapshot }: Props) {
+const finishLabel = (finish: CardFinish | null | undefined, supported?: string[]): string => {
+  if (finish && finish !== 'unknown') {
+    return finish === 'nonfoil' ? 'Nonfoil' : finish === 'foil' ? 'Foil' : 'Etched';
+  }
+  if (supported && supported.length > 1) return 'Finish: ?';
+  return '';
+};
+
+export function ScanResultCard({
+  nameIndex,
+  onAction,
+  printingIndex = null,
+  snapshot,
+}: Props) {
   const fused: FusedResult | undefined = snapshot.fused;
   const card = fused?.card;
+  const printing = fused?.printing;
   const [query, setQuery] = useState('');
   const [printings, setPrintings] = useState<ScryfallPrinting[] | null>(null);
   const [mode, setMode] = useState<'result' | 'wrong-card' | 'wrong-printing'>('result');
+  const [finishOverride, setFinishOverride] = useState<CardFinish | null>(null);
+
+  const metaFinish = useMemo(() => {
+    const finishes = printing?.finishes;
+    return finishFromMetadata(finishes);
+  }, [printing?.finishes]);
+
+  const finish: CardFinish =
+    finishOverride ?? metaFinish?.finish ?? 'unknown';
+  const supported = printing?.finishes ?? metaFinish?.supported ?? [];
+  const needsFinishPick = Boolean(printing && supported.length > 1 && finish === 'unknown');
 
   const suggestions: NameCandidate[] = useMemo(() => {
     if (!nameIndex || query.trim().length < 2) return [];
@@ -51,35 +89,56 @@ export function ScanResultCard({ nameIndex, onAction, snapshot }: Props) {
   const show = snapshot.phase === 'found' || snapshot.phase === 'ambiguous';
   if (!show && mode === 'result') return null;
 
-  const rec = snapshot.recognition;
+  const setLine = printing
+    ? `${printing.setCode.toUpperCase()} #${printing.collectorNumber}`
+    : null;
 
   return (
     <View style={styles.card}>
       {mode === 'result' ? (
         <>
-          <Text style={styles.name}>{card?.name ?? snapshot.message}</Text>
-          <Text style={styles.status}>{statusLabel(fused?.status)}</Text>
-          {rec?.collector?.setCode ? (
+          <Text style={styles.name}>{card?.name ?? printing?.name ?? snapshot.message}</Text>
+          {setLine ? <Text style={styles.printing}>{setLine}</Text> : null}
+          {printing ? (
             <Text style={styles.meta}>
-              set {rec.collector.setCode}
-              {rec.collector.collectorNumber ? ` · ${rec.collector.collectorNumber}` : ''}
-              {rec.collector.foilMarker == null
-                ? ''
-                : rec.collector.foilMarker
-                  ? ' · foil'
-                  : ' · nonfoil'}
+              {finishLabel(finish, [...supported]) ||
+                (supported.length === 1
+                  ? finishLabel(finishFromMetadata(supported)?.finish ?? 'unknown')
+                  : '')}
+              {printing.lang && printing.lang !== 'en' ? ` · ${printing.lang}` : ''}
+              {!printing.lang ? ' · language ?' : ''}
             </Text>
+          ) : null}
+          <Text style={styles.status}>{statusLabel(fused?.status)}</Text>
+          {needsFinishPick ? (
+            <View style={styles.row}>
+              {(['nonfoil', 'foil', 'etched'] as const)
+                .filter(f => supported.map(s => s.toLowerCase()).includes(f))
+                .map(f => (
+                  <Pressable
+                    key={f}
+                    onPress={() => {
+                      setFinishOverride(f);
+                      onAction('set-finish', { finish: f });
+                    }}
+                    style={styles.btnGhost}
+                  >
+                    <Text style={styles.btnGhostLabel}>
+                      {f === 'nonfoil' ? 'Nonfoil' : f === 'foil' ? 'Foil' : 'Etched'}
+                    </Text>
+                  </Pressable>
+                ))}
+            </View>
           ) : null}
           {fused ? (
             <Text style={styles.debug}>
               confidence {(card?.confidence ?? fused.candidates[0]?.score ?? 0).toFixed(2)} ·
               margin {fused.margin.toFixed(2)}
-              {rec?.visualTop?.length
-                ? ` · art ${rec.visualTop[0].name} ${rec.visualTop[0].visualScore.toFixed(2)}`
+              {snapshot.recognition?.earlyReason
+                ? ` · early ${snapshot.recognition.earlyReason}`
                 : ''}
             </Text>
           ) : null}
-          <Text style={styles.debug}>title/text/footer unavailable (no OCR yet)</Text>
           <View style={styles.row}>
             <Pressable
               disabled={fused?.status !== 'identified' && fused?.status !== 'printing-ambiguous'}
@@ -102,9 +161,14 @@ export function ScanResultCard({ nameIndex, onAction, snapshot }: Props) {
             <Pressable
               onPress={() => {
                 setMode('wrong-printing');
-                if (card?.name) {
-                  void fetchPrintingsByName(card.name).then(setPrintings);
+                const name = card?.name ?? printing?.name;
+                if (!name) return;
+                const local = listPrintingsByName(printingIndex, name).map(entryToScryfallPrinting);
+                if (local.length) {
+                  setPrintings(local);
+                  return;
                 }
+                void fetchPrintingsByName(name).then(setPrintings);
               }}
               style={styles.btnGhost}
             >
@@ -219,17 +283,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   hit: {
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   hitLabel: {
     color: '#E8EEF7',
     fontSize: 13,
   },
   input: {
-    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 8,
-    borderWidth: 1,
-    color: '#F4F7FB',
+    color: '#E8EEF7',
     marginVertical: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -238,14 +301,20 @@ const styles = StyleSheet.create({
     maxHeight: 160,
   },
   meta: {
-    color: '#A8B3C7',
-    fontSize: 12,
+    color: '#B8C4D8',
+    fontSize: 13,
     marginTop: 2,
   },
   name: {
-    color: '#F4F7FB',
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 18,
     fontWeight: '700',
+  },
+  printing: {
+    color: '#9EC1FF',
+    fontSize: 15,
+    fontWeight: '600',
+    marginTop: 2,
   },
   row: {
     flexDirection: 'row',
@@ -254,9 +323,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   status: {
-    color: '#F5C542',
+    color: '#8A97AD',
     fontSize: 12,
-    fontWeight: '700',
-    marginTop: 2,
+    marginTop: 4,
   },
 });

@@ -29,8 +29,11 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/diagnostics.ts')}';
       export * from '${join(root, 'src/lib/scan/readCard.ts')}';
       export * from '${join(root, 'src/lib/scan/detectCard.ts')}';
+      export * from '${join(root, 'src/lib/scan/detection/multi.ts')}';
       export * from '${join(root, 'src/lib/scan/regions.ts')}';
       export * from '${join(root, 'src/lib/scan/matchName.ts')}';
+      export * from '${join(root, 'src/lib/scan/printing/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/finish/types.ts')}';
       export * from '${join(root, 'src/lib/scan/artwork/descriptors.ts')}';
       export * from '${join(root, 'src/lib/scan/artwork/match.ts')}';
       export * from '${join(root, 'src/lib/scan/text/evidence.ts')}';
@@ -39,6 +42,7 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/tracking.ts')}';
       export * from '${join(root, 'src/lib/scan/params.ts')}';
       export * from '${join(root, 'src/lib/scan/session/controller.ts')}';
+      export * from '${join(root, 'src/lib/scan/session/recognize.ts')}';
       export * from '${join(root, 'src/lib/scan/videoMap.ts')}';
       export * from '${join(root, 'src/lib/scan/cameraCapabilities.ts')}';
       export { polygonIoU } from '${join(root, 'src/lib/scan/detectCard.ts')}';
@@ -59,8 +63,12 @@ const {
   binarize,
   blankImage,
   buildNameIndex,
+  buildPrintingIndex,
   candidateMargin,
+  choosePrimaryDetection,
   contrastStretch,
+  finishFromMetadata,
+  lookupPrinting,
   convexHull,
   cornersToQuad,
   cropImage,
@@ -100,6 +108,8 @@ const {
   tidyName,
   trimToTextBand,
   upscaleFactorFor,
+  uniquePrinting,
+  uniqueOracle,
   warpQuadToCard,
   describeArtwork,
   descriptorSimilarity,
@@ -119,6 +129,9 @@ const {
   BATTLE_PROFILE,
   profileForCard,
   createSessionController,
+  recognizeCard,
+  isStrongTitleOnly,
+  isStrongArtOnly,
   mapAnalysisToOverlay,
   mapCoverSourceToDest,
   mapAnalysisToSource,
@@ -528,6 +541,186 @@ check('matchName finds the card behind a misread title', () => {
   const [top] = matchName('Sol Rinq', index);
   assert.equal(top.name, 'Sol Ring');
   assert.ok(top.score > 0.8, `score ${top.score}`);
+});
+
+check('matchName exact folded Map short-circuits fuzzy ranking', () => {
+  const index = testIndex();
+  const timing = {
+    exactMs: -1,
+    candidateGenMs: -1,
+    fuzzyRankMs: -1,
+    path: /** @type {'exact'|'fuzzy'} */ ('fuzzy'),
+    totalMs: -1,
+  };
+  const [top] = matchName('Sol Ring', index, { timing });
+  assert.equal(top.name, 'Sol Ring');
+  assert.equal(top.score, 1);
+  assert.equal(timing.path, 'exact');
+  assert.equal(timing.candidateGenMs, 0);
+  assert.equal(timing.fuzzyRankMs, 0);
+  assert.ok(timing.totalMs >= 0);
+});
+
+check('PrintingIndex resolves AFC 030 → Chaos Dragon locally', () => {
+  const data = {
+    version: 1,
+    entries: [
+      {
+        setCode: 'afc',
+        collectorNumber: '30',
+        scryfallId: 'afc-30-id',
+        oracleId: 'chaos-ora',
+        name: 'Chaos Dragon',
+        lang: 'en',
+        finishes: ['nonfoil'],
+      },
+    ],
+  };
+  const index = buildPrintingIndex(data);
+  const hit = lookupPrinting(index, {
+    foilMarker: null,
+    raw: 'AFC 030',
+    setCode: 'AFC',
+    collectorNumber: '030',
+  });
+  assert.ok(hit);
+  assert.equal(hit.candidates[0].name, 'Chaos Dragon');
+  assert.equal(uniquePrinting(hit)?.scryfallId, 'afc-30-id');
+});
+
+check('full PrintingIndex (if present) resolves Chaos Dragon + Pixie Guide fast', async () => {
+  const { existsSync } = await import('node:fs');
+  const { readFile } = await import('node:fs/promises');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const path = join(root, '.scan-fixtures/printing-index.json');
+  if (!existsSync(path)) {
+    console.log('  (skip — no .scan-fixtures/printing-index.json)');
+    return;
+  }
+  const data = JSON.parse(await readFile(path, 'utf8'));
+  assert.ok(data.entries.length >= 10_000, `expected production-sized index, got ${data.entries.length}`);
+  const index = buildPrintingIndex(data);
+  const t0 = performance.now();
+  const chaos = lookupPrinting(index, {
+    foilMarker: null,
+    raw: 'AFC 030',
+    setCode: 'AFC',
+    collectorNumber: '030',
+  });
+  const pixie = lookupPrinting(index, {
+    foilMarker: null,
+    raw: 'AFR 066',
+    setCode: 'AFR',
+    collectorNumber: '066',
+  });
+  const ms = performance.now() - t0;
+  assert.equal(uniqueOracle(chaos)?.name, 'Chaos Dragon');
+  assert.equal(uniqueOracle(pixie)?.name, 'Pixie Guide');
+  assert.ok(ms < 5, `two lookups should be sub-ms; took ${ms.toFixed(2)} ms`);
+});
+
+check('finishFromMetadata short-circuits single-finish printings', () => {
+  assert.equal(finishFromMetadata(['nonfoil'])?.finish, 'nonfoil');
+  assert.equal(finishFromMetadata(['foil', 'nonfoil']), null);
+});
+
+check('footer-printing early identity fires before slow title', async () => {
+  const printing = buildPrintingIndex({
+    version: 1,
+    entries: [
+      {
+        setCode: 'afc',
+        collectorNumber: '30',
+        scryfallId: 'afc-30',
+        oracleId: 'chaos-ora',
+        name: 'Chaos Dragon',
+        lang: 'en',
+        finishes: ['nonfoil'],
+      },
+    ],
+  });
+  const names = buildNameIndex({ names: ['Chaos Dragon', 'Other'], version: 1 });
+  const early = [];
+  const ocr = {
+    recognize: async (img, opts) => {
+      // Footer regions return set/number; title delayed via titleDelayMs.
+      const text =
+        opts?.mode === 'block'
+          ? ''
+          : 'AFC\n030';
+      return { text, confidence: 0.9, words: [] };
+    },
+  };
+  // Simpler: stub read via custom ocr that always returns footer-like text;
+  // titleDelay ensures footer wins the race.
+  const titleDelayMs = 80;
+  const { result } = await recognizeCard(
+    blankImage(CARD_WIDTH, CARD_HEIGHT, 40),
+    {
+      nameIndex: names,
+      printingIndex: printing,
+      ocr: {
+        async recognize() {
+          return { text: 'AFC 030', confidence: 0.9, words: [] };
+        },
+      },
+      onEarlyIdentity: r => early.push(r),
+    },
+    { skipArtwork: true, titleDelayMs, footerDelayMs: 0 },
+  );
+  assert.ok(early.length >= 1, 'footer should early-publish');
+  assert.ok(
+    early[0].earlyReason === 'footer-printing' || early[0].fused.printing,
+    `reason ${early[0].earlyReason}`,
+  );
+  assert.equal(result.fused.printing?.setCode, 'afc');
+  assert.equal(result.fused.card?.name, 'Chaos Dragon');
+});
+
+check('nested sleeve prefers inner card over stronger outer', () => {
+  const outer = {
+    topLeft: { x: 40, y: 40 },
+    topRight: { x: 360, y: 40 },
+    bottomRight: { x: 360, y: 480 },
+    bottomLeft: { x: 40, y: 480 },
+  };
+  const inner = {
+    topLeft: { x: 70, y: 70 },
+    topRight: { x: 330, y: 70 },
+    bottomRight: { x: 330, y: 450 },
+    bottomLeft: { x: 70, y: 450 },
+  };
+  const frame = {
+    detections: [
+      { corners: outer, score: 0.92, areaRatio: 0.55, aspectRatio: 63 / 88, role: 'unknown' },
+      { corners: inner, score: 0.71, areaRatio: 0.42, aspectRatio: 63 / 88, role: 'unknown' },
+    ],
+  };
+  const { primary, provisionalOuter, nested } = choosePrimaryDetection(frame);
+  assert.ok(nested.length >= 1, 'expected nested relation');
+  assert.equal(primary?.role, 'card');
+  assert.ok(provisionalOuter, 'outer retained as provisional');
+  // Inner center should match primary
+  assert.equal(primary?.corners.topLeft.x, inner.topLeft.x);
+});
+
+check('choosePrimaryDetection keeps bare card when alone', () => {
+  const card = {
+    topLeft: { x: 100, y: 100 },
+    topRight: { x: 300, y: 100 },
+    bottomRight: { x: 300, y: 380 },
+    bottomLeft: { x: 100, y: 380 },
+  };
+  const { primary, nested } = choosePrimaryDetection({
+    detections: [
+      { corners: card, score: 0.8, areaRatio: 0.3, aspectRatio: 63 / 88, role: 'unknown' },
+    ],
+  });
+  assert.equal(nested.length, 0);
+  assert.equal(primary?.corners.topLeft.x, 100);
+  assert.equal(primary?.role, 'card');
 });
 
 check('matchName recovers a title clipped by the crop', () => {
@@ -1569,6 +1762,172 @@ await checkAsync('session controller: found suppresses duplicate until gone', as
       'must not thrash recognition on a stationary card',
     );
   }
+});
+
+await checkAsync('title-only early identity fires before slow artwork', async () => {
+  const names = buildNameIndex({ names: ['Sol Ring', 'Soul Warden'], version: 1 });
+  const early = [];
+  const artDelayMs = 120;
+  const ocr = {
+    recognize: async () => ({ confidence: 0.95, text: 'Sol Ring' }),
+  };
+  // Empty matcher — art contributes nothing; delay proves we do not wait for it.
+  const artwork = { findCandidates: () => [] };
+  const card = solid(CARD_WIDTH, CARD_HEIGHT, [200, 200, 200]);
+  const { result } = await recognizeCard(
+    card,
+    {
+      artwork,
+      nameIndex: names,
+      ocr,
+      onEarlyIdentity: r => {
+        early.push({
+          at: Date.now(),
+          name: r.fused.card?.name,
+          reason: r.earlyReason,
+          status: r.fused.status,
+        });
+      },
+    },
+    { artworkDelayMs: artDelayMs },
+  );
+
+  assert.ok(early.length >= 1, 'onEarlyIdentity must fire');
+  assert.equal(early[0].reason, 'title-only');
+  assert.equal(early[0].name, 'Sol Ring');
+  assert.equal(early[0].status, 'printing-ambiguous');
+  assert.equal(result.earlyReason, 'title-only');
+  assert.ok(typeof result.timings.titleDoneAt === 'number');
+  assert.ok(typeof result.timings.artDoneAt === 'number');
+  assert.ok(typeof result.timings.earlyIdentityAt === 'number');
+  assert.ok(
+    result.timings.titleDoneAt < result.timings.artDoneAt,
+    `title (${result.timings.titleDoneAt}) should finish before art (${result.timings.artDoneAt})`,
+  );
+  assert.ok(
+    result.timings.earlyIdentityAt < result.timings.artDoneAt,
+    'early identity must not wait for artwork',
+  );
+  assert.ok(
+    result.timings.earlyIdentityAt <= result.timings.titleDoneAt + 30,
+    'early should fire promptly after title',
+  );
+  assert.equal(result.fused.card?.name, 'Sol Ring');
+});
+
+await checkAsync('art-only early identity fires when OCR is slow', async () => {
+  const names = buildNameIndex({ names: ['Chaos Dragon', 'Other'], version: 1 });
+  const early = [];
+  const ocr = {
+    recognize: async () => {
+      await new Promise(r => setTimeout(r, 120));
+      return { confidence: 0.5, text: 'zzzz' };
+    },
+  };
+  const artwork = {
+    findCandidates: () => [
+      {
+        name: 'Chaos Dragon',
+        oracleId: 'oracle:chaos',
+        scryfallId: 'p1',
+        visualScore: 0.92,
+      },
+      {
+        name: 'Other',
+        oracleId: 'oracle:other',
+        visualScore: 0.7,
+      },
+    ],
+  };
+  const card = solid(CARD_WIDTH, CARD_HEIGHT, [40, 40, 40]);
+  const { result } = await recognizeCard(
+    card,
+    {
+      artwork,
+      nameIndex: names,
+      ocr,
+      onEarlyIdentity: r => {
+        early.push({ name: r.fused.card?.name, reason: r.earlyReason });
+      },
+    },
+    {},
+  );
+
+  assert.ok(early.length >= 1, 'art-only early should fire');
+  assert.equal(early[0].reason, 'art-only');
+  assert.equal(early[0].name, 'Chaos Dragon');
+  assert.equal(result.earlyReason, 'art-only');
+  assert.ok(result.timings.artDoneAt < result.timings.titleDoneAt);
+  assert.ok(result.timings.earlyIdentityAt < result.timings.titleDoneAt);
+});
+
+await checkAsync('controller publishes provisional found via onEarlyIdentity', async () => {
+  const names = buildNameIndex({ names: ['Sol Ring'], version: 1 });
+  const published = [];
+  const ocr = {
+    recognize: async () => ({ confidence: 0.95, text: 'Sol Ring' }),
+  };
+  const artwork = { findCandidates: () => [] };
+  const ctrl = createSessionController({
+    artwork,
+    nameIndex: names,
+    ocr,
+    onEarlyIdentity: () => {
+      const snap = ctrl.snapshot();
+      published.push({ message: snap.message, phase: snap.phase });
+    },
+  });
+  const card = solid(CARD_WIDTH, CARD_HEIGHT, [200, 200, 200]);
+  const snap = await ctrl.recognizeStill(card);
+  assert.ok(published.length >= 1, 'controller must surface early identity');
+  assert.equal(published[0].phase, 'found');
+  assert.equal(published[0].message, 'Sol Ring');
+  assert.equal(snap.phase, 'found');
+  assert.ok(snap.earlyShownAt != null);
+  assert.ok(snap.recognizingStartedAt != null);
+  assert.ok(snap.earlyShownAt >= snap.recognizingStartedAt);
+});
+
+check('isStrongArtOnly keeps the artwork-only weak-cluster bar', () => {
+  const weak = fuseEvidence(
+    [
+      {
+        name: 'Sol Ring',
+        oracleId: 'oracle:sol',
+        possiblePrintingIds: ['p1'],
+        visualScore: 0.7,
+      },
+      {
+        name: 'Arcane Signet',
+        oracleId: 'oracle:signet',
+        possiblePrintingIds: ['p2'],
+        visualScore: 0.675,
+      },
+    ],
+    { artworkOnly: true },
+  );
+  assert.equal(weak.status, 'card-ambiguous');
+  assert.equal(isStrongArtOnly(weak), false);
+
+  const strong = fuseEvidence(
+    [
+      {
+        name: 'Chaos Dragon',
+        oracleId: 'oracle:chaos',
+        possiblePrintingIds: ['p1'],
+        visualScore: 0.92,
+      },
+      {
+        name: 'Other',
+        oracleId: 'oracle:other',
+        possiblePrintingIds: [],
+        visualScore: 0.7,
+      },
+    ],
+    { artworkOnly: true },
+  );
+  assert.equal(strong.status, 'identified');
+  assert.equal(isStrongArtOnly(strong), true);
 });
 
 await rm(dir, { force: true, recursive: true });

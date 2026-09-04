@@ -21,7 +21,12 @@ import {
   type PreferredSource,
   type RecognitionSource,
 } from './hiresCapture';
-import { loadArtworkIndex, loadNameIndex, type ArtIndexLoad, type NameIndexLoad } from './indexLoader';
+import { loadArtworkIndex, loadNameIndex, loadPrintingIndex, type ArtIndexLoad, type NameIndexLoad, type PrintingIndexLoad } from './indexLoader';
+import {
+  checkScannerDataUpdates,
+  loadScannerIndexesLocal,
+  peekActiveScannerIndexes,
+} from './scannerDataStore';
 import {
   createFrameHelpers,
   createNativeHelperState,
@@ -39,6 +44,7 @@ import {
   type ScannerPhase,
   type SessionSnapshot,
 } from './sharedCore';
+import { createMlkitTextRecognizer, isNativeOcrLinked } from './mlkitTextRecognizer';
 import { createHiResCapturer, runPreferredCapture } from './useHiResCapture';
 
 const DEBUG_MS = 700;
@@ -66,6 +72,7 @@ export interface SessionDebug {
   hiresWaitMs: number;
   mappedCorners: import('./sharedCore').CardCorners | null;
   names: NameIndexLoad | null;
+  printing: PrintingIndexLoad | null;
   normalizedUri: string | null;
   phase: ScannerPhase;
   qualityBest: number | null;
@@ -81,6 +88,18 @@ export interface SessionDebug {
   textEvidence: 'unavailable' | 'present';
   titleEvidence: 'unavailable' | 'present';
   warpMs: number | null;
+  /** User-facing lock→oracle / printing latency (ms). */
+  userLatency: {
+    lockToFirstOracleMs: number | null;
+    lockToFinalOracleMs: number | null;
+    lockToPrintingMs: number | null;
+    recognizeToFirstOracleMs: number | null;
+  } | null;
+  earlyReason: string | null;
+  titleMs: number | null;
+  titleDoneAt: number | null;
+  artDoneAt: number | null;
+  earlyIdentityAt: number | null;
 }
 
 const emptyDebug = (): SessionDebug => ({
@@ -100,6 +119,7 @@ const emptyDebug = (): SessionDebug => ({
   hiresWaitMs: HIRES_WAIT_MS,
   mappedCorners: null,
   names: null,
+  printing: null,
   normalizedUri: null,
   phase: 'searching',
   qualityBest: null,
@@ -115,6 +135,12 @@ const emptyDebug = (): SessionDebug => ({
   textEvidence: 'unavailable',
   titleEvidence: 'unavailable',
   warpMs: null,
+  userLatency: null,
+  earlyReason: null,
+  titleMs: null,
+  titleDoneAt: null,
+  artDoneAt: null,
+  earlyIdentityAt: null,
 });
 
 export const useScanSession = (opts: {
@@ -139,7 +165,8 @@ export const useScanSession = (opts: {
     art: ArtIndexLoad | null;
     artError: string | null;
     names: NameIndexLoad | null;
-  }>({ art: null, artError: null, names: null });
+    printing: PrintingIndexLoad | null;
+  }>({ art: null, artError: null, names: null, printing: null });
 
   const store = useRef(emptyHiResStore());
   const helperState = useRef(createNativeHelperState(store.current));
@@ -176,31 +203,140 @@ export const useScanSession = (opts: {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([loadNameIndex(), loadArtworkIndex()]).then(([names, art]) => {
+    const printingFromActive = (
+      next: NonNullable<ReturnType<typeof peekActiveScannerIndexes>>,
+    ): PrintingIndexLoad | null =>
+      next.printing && next.printingIndex
+        ? {
+            checksum: next.printingChecksum,
+            coldMs: 0,
+            data: next.printing,
+            entries: next.printing.entries.length,
+            index: next.printingIndex,
+            source: 'memory',
+            version: next.printing.version,
+            warmMs: 0,
+          }
+        : null;
+
+    void (async () => {
+      // Local disk / bundled seed first — scanner usable offline immediately.
+      const local = await loadScannerIndexesLocal();
       if (cancelled) return;
-      setIndexes({
-        art,
-        artError: art ? null : 'art index missing or rejected (fixture/too small?)',
-        names,
+      if (local?.nameIndex) {
+        setIndexes({
+          art: local.art
+            ? {
+                checksum: local.artChecksum,
+                coldMs: 0,
+                data: local.art,
+                entries: local.art.entries.length,
+                generated: local.artGenerated,
+                matcher: local.artMatcher!,
+                source: local.artOrigin === 'disk' ? 'memory' : 'memory',
+                text: local.text,
+                uniqueOracles: local.artUniqueOracles,
+                version: local.art.version,
+                warmMs: 0,
+              }
+            : null,
+          artError: local.art
+            ? null
+            : 'art index not on disk yet — title-only until background update',
+          names: {
+            checksum: local.nameChecksum,
+            coldMs: 0,
+            data: local.nameData!,
+            index: local.nameIndex,
+            names: local.names,
+            source: 'memory',
+            version: local.nameData!.version,
+            warmMs: 0,
+          },
+          printing: printingFromActive(local),
+        });
+      } else {
+        // First install: fetch Pages indexes (same as before), then persist via updater.
+        const [names, art, printing] = await Promise.all([
+          loadNameIndex(),
+          loadArtworkIndex(),
+          loadPrintingIndex(),
+        ]);
+        if (cancelled) return;
+        setIndexes({
+          art,
+          artError: art ? null : 'art index missing or rejected (fixture/too small?)',
+          names,
+          printing,
+        });
+      }
+      // Background manifest check — never blocks first scan.
+      void checkScannerDataUpdates({ force: false }).then(() => {
+        if (cancelled) return;
+        const next = peekActiveScannerIndexes();
+        if (!next?.nameIndex) return;
+        setIndexes({
+          art: next.art
+            ? {
+                checksum: next.artChecksum,
+                coldMs: 0,
+                data: next.art,
+                entries: next.art.entries.length,
+                generated: next.artGenerated,
+                matcher: next.artMatcher!,
+                source: 'memory',
+                text: next.text,
+                uniqueOracles: next.artUniqueOracles,
+                version: next.art.version,
+                warmMs: 0,
+              }
+            : null,
+          artError: next.art ? null : 'art index not on disk yet',
+          names: {
+            checksum: next.nameChecksum,
+            coldMs: 0,
+            data: next.nameData!,
+            index: next.nameIndex,
+            names: next.names,
+            source: 'memory',
+            version: next.nameData!.version,
+            warmMs: 0,
+          },
+          printing: printingFromActive(next),
+        });
       });
-    });
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const earlyIdentityRef = useRef<((snap: SessionSnapshot) => void) | null>(null);
+  const controllerRef = useRef<ReturnType<typeof createSessionController> | null>(null);
 
   const deps: RecognizeDeps = useMemo(
     () => ({
       artwork: indexes.art?.matcher ?? null,
       artworkIndex: indexes.art?.data ?? null,
       nameIndex: indexes.names?.index ?? null,
-      ocr: null,
+      printingIndex: indexes.printing?.index ?? null,
+      // Feature-detect: old APKs without lugin-ocr stay ocr:null (unavailable).
+      // Linked binaries get ML Kit Latin via createMlkitTextRecognizer.
+      ocr: isNativeOcrLinked() ? createMlkitTextRecognizer() : null,
       textIndex: indexes.art?.text ?? null,
+      onEarlyIdentity: () => {
+        // Controller already updated lastRecognition/phase; publish snapshot now
+        // so title-only / footer-printing identity is not gated on slow channels.
+        const snap = controllerRef.current?.snapshot();
+        if (!snap) return;
+        earlyIdentityRef.current?.(snap);
+      },
     }),
     [indexes],
   );
 
   const controller = useMemo(() => createSessionController(deps), [deps]);
+  controllerRef.current = controller;
   const helpers = useMemo(() => createFrameHelpers(helperState.current, cameraRef), [cameraRef]);
 
   const publishDebug = useCallback(
@@ -249,6 +385,7 @@ export const useScanSession = (opts: {
         hiresWaitMs: HIRES_WAIT_MS,
         mappedCorners: cache?.mapped ?? null,
         names: indexes.names,
+        printing: indexes.printing,
         normalizedUri,
         phase: snap.phase,
         qualityBest: snap.quality?.score ?? null,
@@ -270,10 +407,24 @@ export const useScanSession = (opts: {
         textEvidence: ocrOn ? 'present' : 'unavailable',
         titleEvidence: ocrOn ? 'present' : 'unavailable',
         warpMs: cache?.attempt.warpMs ?? store.current.lastAttempt?.warpMs ?? null,
+        userLatency: snap.userLatency ?? null,
+        earlyReason: snap.recognition?.earlyReason ?? null,
+        titleMs: timings?.titleMs ?? null,
+        titleDoneAt: timings?.titleDoneAt ?? null,
+        artDoneAt: timings?.artDoneAt ?? null,
+        earlyIdentityAt: timings?.earlyIdentityAt ?? null,
       });
     },
-    [controller, deps.ocr, indexes.art, indexes.artError, indexes.names],
+    [controller, deps.ocr, indexes.art, indexes.artError, indexes.names, indexes.printing],
   );
+
+  // Publish provisional found/ambiguous as soon as title (or strong art) wins the race.
+  earlyIdentityRef.current = snap => {
+    lastPhase.current = snap.phase;
+    setSnapshot(snap);
+    lastDebugAt.current = Date.now();
+    publishDebug(snap);
+  };
 
   const startCapture = useCallback(
     (frame: AnalyzedFrame) => {
@@ -364,6 +515,14 @@ export const useScanSession = (opts: {
       const terminal = snap.phase === 'found' || snap.phase === 'ambiguous';
       if (phaseChanged || terminal || t - lastDebugAt.current >= DEBUG_MS) {
         setSnapshot(snap);
+      }
+
+      // Always refresh debug thumbs/URIs on terminal lock so Report does not
+      // reuse a previous card's normalized preview.
+      if (terminal && phaseChanged) {
+        lastDebugAt.current = t;
+        publishDebug(snap);
+        return;
       }
 
       if (t - lastDebugAt.current < DEBUG_MS) return;

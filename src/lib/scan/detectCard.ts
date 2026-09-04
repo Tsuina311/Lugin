@@ -19,7 +19,9 @@ import type {
   DetectionDebug,
   DetectionScoreParts,
 } from './detection/types';
+import { selectPrimaryAmongDebugCandidates } from './detection/multi';
 import {
+  cornersToQuad,
   dist,
   orderCorners,
   quadToCorners,
@@ -159,7 +161,22 @@ export const detectCardQuad = (image: ScanImage): DetectResult => {
     (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()) -
     began;
 
-  const selected = chosen.current;
+  // Nested sleeve preference: may override pure max-score when an inner card
+  // sits inside a stronger outer rectangle.
+  const nestedPick = selectPrimaryAmongDebugCandidates(candidates, fullW, fullH);
+  let selected = chosen.current;
+  if (nestedPick.selectedIndex >= 0 && candidates[nestedPick.selectedIndex]?.corners) {
+    const c = candidates[nestedPick.selectedIndex];
+    if (c.corners) {
+      selected = {
+        corners: c.corners,
+        index: nestedPick.selectedIndex,
+        quad: cornersToQuad(c.corners),
+        score: c.score,
+      };
+    }
+  }
+
   if (!selected) {
     return {
       corners: null,
