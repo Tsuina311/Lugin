@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
+  Image,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -84,6 +87,11 @@ export function CameraScanScreen() {
   const [diagnosticRungs, setDiagnosticRungs] = useState(false);
   const [showNumbers, setShowNumbers] = useState(true);
   const [pendingAdd, setPendingAdd] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [debugViewer, setDebugViewer] = useState<{
+    imageUri: string | null;
+    reportText: string;
+  } | null>(null);
   const [sourceIndex, setSourceIndex] = useState(0);
   const preferredSource: PreferredSource = RECOGNITION_SOURCES[sourceIndex];
 
@@ -355,6 +363,11 @@ export function CameraScanScreen() {
           <Text numberOfLines={2} style={styles.deviceLine}>
             {describeDevice(device)}
           </Text>
+          {saveStatus ? (
+            <Text style={styles.saveStatus} numberOfLines={2}>
+              {saveStatus}
+            </Text>
+          ) : null}
         </View>
 
         <View pointerEvents="none" style={styles.spacer} />
@@ -525,65 +538,80 @@ export function CameraScanScreen() {
           <Pressable
             onPress={() => {
               void (async () => {
-                const analysisResult = result;
-                const shareResult = await shareDebugBundle({
-                  analysisLongEdge: ANALYSIS_LONG_EDGES[longEdgeIndex],
-                  deviceLine: describeDevice(device),
-                  images: {
-                    detectorUri: preview,
-                    hiresUri: session.debug.hiresUri,
-                    recognition: session.lastNormalized(),
-                    recognitionUri: session.debug.normalizedUri,
-                  },
-                  panel: {
-                    counters,
-                    error,
-                    failure,
-                    frameMeta,
-                    metrics,
-                    orientation,
-                    probeResult,
+                setSaveStatus('Preparing debug…');
+                try {
+                  const analysisResult = result;
+                  const shareResult = await shareDebugBundle({
+                    analysisLongEdge: ANALYSIS_LONG_EDGES[longEdgeIndex],
+                    deviceLine: describeDevice(device),
+                    images: {
+                      detectorUri: preview,
+                      hiresUri: session.debug.hiresUri,
+                      recognition: session.lastNormalized(),
+                      recognitionUri: session.debug.normalizedUri,
+                    },
+                    panel: {
+                      counters,
+                      error,
+                      failure,
+                      frameMeta,
+                      metrics,
+                      orientation,
+                      probeResult,
+                      preferredSource,
+                      result: analysisResult
+                        ? {
+                            analysis: analysisResult.analysis,
+                            brightness: analysisResult.brightness,
+                            detected: analysisResult.detected,
+                            detector: analysisResult.detector,
+                            score: analysisResult.score,
+                          }
+                        : null,
+                      session: session.debug,
+                      snapshot: session.snapshot
+                        ? {
+                            fused: session.snapshot.fused,
+                            message: session.snapshot.message,
+                            motion: session.snapshot.motion,
+                            phase: session.snapshot.phase,
+                            quality: session.snapshot.quality,
+                            recognition: session.snapshot.recognition
+                              ? {
+                                  timings: session.snapshot.recognition.timings,
+                                  visualTop: session.snapshot.recognition.visualTop,
+                                }
+                              : null,
+                            trackFrames: session.snapshot.trackFrames,
+                          }
+                        : null,
+                      transfer,
+                    },
                     preferredSource,
-                    result: analysisResult
-                      ? {
-                          analysis: analysisResult.analysis,
-                          brightness: analysisResult.brightness,
-                          detected: analysisResult.detected,
-                          detector: analysisResult.detector,
-                          score: analysisResult.score,
-                        }
-                      : null,
-                    session: session.debug,
-                    snapshot: session.snapshot
-                      ? {
-                          fused: session.snapshot.fused,
-                          message: session.snapshot.message,
-                          motion: session.snapshot.motion,
-                          phase: session.snapshot.phase,
-                          quality: session.snapshot.quality,
-                          recognition: session.snapshot.recognition
-                            ? {
-                                timings: session.snapshot.recognition.timings,
-                                visualTop: session.snapshot.recognition.visualTop,
-                              }
-                            : null,
-                          trackFrames: session.snapshot.trackFrames,
-                        }
-                      : null,
-                    transfer,
-                  },
-                  preferredSource,
-                });
-                setPendingAdd(
-                  shareResult.ok
-                    ? shareResult.hadImage
-                      ? 'debug shared (report + recognition PNG)'
-                      : 'debug shared (report only — no recognition image)'
-                    : `save debug: ${shareResult.reason}`,
-                );
+                  });
+                  if (!shareResult.ok) {
+                    setSaveStatus(`Save debug failed: ${shareResult.reason}`);
+                    return;
+                  }
+                  setDebugViewer({
+                    imageUri: shareResult.imageUri,
+                    reportText: shareResult.reportText,
+                  });
+                  setSaveStatus(
+                    shareResult.sharedText
+                      ? shareResult.imageUri
+                        ? 'Share sheet opened — recognition image is on screen too'
+                        : 'Share sheet opened (text only — no recognition image yet)'
+                      : 'Share dismissed — recognition image is on screen',
+                  );
+                } catch (err) {
+                  setSaveStatus(
+                    `Save debug crashed: ${err instanceof Error ? err.message : String(err)}`,
+                  );
+                }
               })();
             }}
-            style={styles.chip}
+            style={[styles.chip, styles.chipOn]}
           >
             <Text style={styles.chipLabel}>Save debug</Text>
           </Pressable>
@@ -597,6 +625,45 @@ export function CameraScanScreen() {
           </Pressable>
         </View>
       </View>
+
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setDebugViewer(null)}
+        transparent
+        visible={Boolean(debugViewer)}
+      >
+        <View style={styles.debugModalBackdrop}>
+          <View style={[styles.debugModal, { paddingTop: insets.top + 8 }]}>
+            <Text style={styles.debugModalTitle}>Recognition input</Text>
+            <Text style={styles.debugModalHint}>
+              Screenshot this card image, then share/save the text report from the share sheet.
+            </Text>
+            <ScrollView contentContainerStyle={styles.debugModalScroll}>
+              {debugViewer?.imageUri ? (
+                <Image
+                  resizeMode="contain"
+                  source={{ uri: debugViewer.imageUri }}
+                  style={styles.debugModalImage}
+                />
+              ) : (
+                <Text style={styles.debugModalHint}>
+                  No recognition image yet — lock a card first, then Save debug again.
+                </Text>
+              )}
+              <Text selectable style={styles.debugModalText}>
+                {(debugViewer?.reportText ?? '').slice(0, 4000)}
+                {(debugViewer?.reportText?.length ?? 0) > 4000 ? '\n…(truncated on screen; full text was shared)' : ''}
+              </Text>
+            </ScrollView>
+            <Pressable
+              onPress={() => setDebugViewer(null)}
+              style={[styles.chip, styles.chipOn, styles.debugModalClose]}
+            >
+              <Text style={styles.chipLabel}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -712,6 +779,56 @@ const styles = StyleSheet.create({
     color: '#7CFFB2',
     fontSize: 11,
     marginTop: 4,
+  },
+  saveStatus: {
+    color: '#7CFFB2',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  debugModalBackdrop: {
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  debugModal: {
+    backgroundColor: '#0B1220',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '92%',
+    paddingBottom: 16,
+    paddingHorizontal: 12,
+  },
+  debugModalClose: {
+    alignSelf: 'center',
+    marginTop: 8,
+  },
+  debugModalHint: {
+    color: '#A8B3C7',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  debugModalImage: {
+    alignSelf: 'center',
+    backgroundColor: '#000',
+    height: 420,
+    marginBottom: 10,
+    width: 300,
+  },
+  debugModalScroll: {
+    paddingBottom: 8,
+  },
+  debugModalText: {
+    color: '#C5D0E0',
+    fontFamily: 'Courier',
+    fontSize: 9,
+    lineHeight: 12,
+  },
+  debugModalTitle: {
+    color: '#F5C542',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
   },
   resultWrap: {
     marginBottom: 8,

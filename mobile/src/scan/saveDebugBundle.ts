@@ -1,21 +1,18 @@
 // Build + share a debug dump of the live scanner panel.
 //
-// No expo-file-system in this APK — Share is the OTA-safe path:
-// text report (all on-screen numbers) + recognition-input PNG as the share URL.
+// Android Share only accepts `message` (url is ignored). A full 744×1039 PNG
+// data-URI is multi‑MB and freezes/fails the share Intent — so we share the
+// text report, and show the recognition image in an on-screen viewer instead.
 
-import { Share } from 'react-native';
+import { Platform, Share } from 'react-native';
 
 import { CARD_HEIGHT, CARD_WIDTH, type ScanImage } from './sharedCore';
 import { scanImageToPngDataUri } from './debug/scanImagePng';
 
 export interface DebugShareImages {
-  /** Detector analysis thumbnail (already a data URI is fine). */
   detectorUri?: string | null;
-  /** Mapped hi-res source thumbnail. */
   hiresUri?: string | null;
-  /** Full-quality 744×1039 recognition input (preferred). */
   recognition?: ScanImage | null;
-  /** Already-encoded recognition preview if the ScanImage is gone. */
   recognitionUri?: string | null;
 }
 
@@ -23,11 +20,13 @@ export interface DebugSharePayload {
   analysisLongEdge?: number;
   deviceLine?: string;
   images?: DebugShareImages;
-  /** Anything already shown on the scan debug panel. */
   panel: Record<string, unknown>;
   preferredSource?: string;
   stamp?: string;
 }
+
+/** Android Binder limit is ~1 MB; keep headroom for Intent extras. */
+const ANDROID_MESSAGE_MAX = 700_000;
 
 export const buildDebugReport = (payload: DebugSharePayload): Record<string, unknown> => {
   const recognition = payload.images?.recognition;
@@ -54,62 +53,63 @@ export const buildDebugReport = (payload: DebugSharePayload): Record<string, unk
 export const formatDebugReportText = (report: Record<string, unknown>): string =>
   `Lugin scan debug\n${JSON.stringify(report, null, 2)}`;
 
+export const encodeRecognitionPreview = (
+  image: ScanImage | null | undefined,
+  maxWidth = 480,
+): string | null => {
+  if (!image || image.width <= 0 || image.height <= 0) return null;
+  try {
+    return scanImageToPngDataUri(image, maxWidth);
+  } catch {
+    return null;
+  }
+};
+
+export type ShareDebugResult =
+  | {
+      ok: true;
+      /** Data URI for the on-screen image viewer (not put in the Android Intent). */
+      imageUri: string | null;
+      reportText: string;
+      sharedText: boolean;
+    }
+  | { ok: false; reason: string };
+
 /**
- * Share a text report of every debug field, plus the recognition PNG when present.
- * The PNG is encoded at full 744×1039 so title/rules/collector stay readable.
+ * Share the text report (works on Android). Returns an image URI for a modal
+ * viewer so the user can screenshot / inspect recognition input.
  */
 export const shareDebugBundle = async (
   payload: DebugSharePayload,
-): Promise<{ ok: true; hadImage: boolean } | { ok: false; reason: string }> => {
+): Promise<ShareDebugResult> => {
   const report = buildDebugReport(payload);
-  const text = formatDebugReportText(report);
-
-  let imageUri: string | null = null;
-  const card = payload.images?.recognition;
-  if (card && card.width === CARD_WIDTH && card.height === CARD_HEIGHT) {
-    try {
-      // Full width — do not shrink; this is what offline replay needs.
-      imageUri = scanImageToPngDataUri(card, CARD_WIDTH);
-    } catch (err) {
-      return {
-        ok: false,
-        reason: `recognition PNG encode failed: ${err instanceof Error ? err.message : String(err)}`,
-      };
-    }
-  } else if (payload.images?.recognitionUri) {
-    imageUri = payload.images.recognitionUri;
+  let text = formatDebugReportText(report);
+  if (Platform.OS === 'android' && text.length > ANDROID_MESSAGE_MAX) {
+    text = `${text.slice(0, ANDROID_MESSAGE_MAX)}\n\n…truncated for Android share size limit`;
   }
 
+  const card = payload.images?.recognition;
+  const imageUri =
+    encodeRecognitionPreview(card ?? null, 520) ?? payload.images?.recognitionUri ?? null;
+
   try {
+    // Android: message only. Do NOT pass a data: URL — it is ignored and can
+    // make the Intent explode if someone concatenates it into message.
     await Share.share(
-      imageUri
-        ? {
-            message: text,
-            title: 'Lugin scan debug',
-            url: imageUri,
-          }
-        : {
-            message: text,
-            title: 'Lugin scan debug',
-          },
+      {
+        message: text,
+        title: 'Lugin scan debug',
+      },
+      { dialogTitle: 'Share Lugin scan debug' },
     );
-    return { ok: true, hadImage: Boolean(imageUri) };
+    return { ok: true, imageUri, reportText: text, sharedText: true };
   } catch (err) {
-    // Some Android targets reject huge data-URI urls — retry text-only.
+    const reason = err instanceof Error ? err.message : String(err);
+    // Still return the image so the viewer can open even if Share was dismissed
+    // with an error on some OEMs.
     if (imageUri) {
-      try {
-        await Share.share({
-          message: `${text}\n\n(recognition PNG omitted — share target rejected the image)`,
-          title: 'Lugin scan debug',
-        });
-        return { ok: true, hadImage: false };
-      } catch (err2) {
-        return {
-          ok: false,
-          reason: err2 instanceof Error ? err2.message : String(err2),
-        };
-      }
+      return { ok: true, imageUri, reportText: text, sharedText: false };
     }
-    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    return { ok: false, reason };
   }
 };

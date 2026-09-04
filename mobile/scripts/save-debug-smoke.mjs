@@ -19,7 +19,10 @@ const check = (name, ok, detail = '') => {
 const bundleDir = await mkdtemp(join(tmpdir(), 'lugin-dbg-'));
 const stub = join(bundleDir, 'rn-stub.mjs');
 const outfile = join(bundleDir, 'saveDebug.mjs');
-await writeFile(stub, 'export const Share = { share: async () => ({}) };\n');
+await writeFile(
+  stub,
+  'export const Platform = { OS: "android" };\nexport const Share = { share: async () => ({ action: "sharedAction" }) };\n',
+);
 
 try {
   await esbuild.build({
