@@ -5,6 +5,7 @@
 // the session — it is one of the things Samsung must measure.
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { useFrameOutput, type Frame } from 'react-native-vision-camera';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -54,7 +55,7 @@ export const useHiResFrameLatch = (opts: {
         return;
       }
       try {
-        const pixelOrder = pixelOrderFor(pixelFormat);
+        const pixelOrder = pixelOrderFor(pixelFormat, Platform.OS);
         if (!pixelOrder) throw new Error(`hi-res frame format '${pixelFormat}'`);
         const orient = parseOrientation(orientation);
         const spaces = spacesFor(
@@ -93,16 +94,21 @@ export const useHiResFrameLatch = (opts: {
         }
         let copy: Uint8Array;
         let stride = frame.bytesPerRow;
+        // Prefer plane 0 for RGB (CameraX documents R,G,B,A there).
         try {
+          const planes = frame.getPlanes();
+          if (planes.length > 0) {
+            const source = new Uint8Array(planes[0].getPixelBuffer());
+            copy = new Uint8Array(source.length);
+            copy.set(source);
+            stride = planes[0].bytesPerRow;
+          } else {
+            throw new Error('no planes');
+          }
+        } catch {
           const source = new Uint8Array(frame.getPixelBuffer());
           copy = new Uint8Array(source.length);
           copy.set(source);
-        } catch {
-          const plane = frame.getPlanes()[0];
-          const source = new Uint8Array(plane.getPixelBuffer());
-          copy = new Uint8Array(source.length);
-          copy.set(source);
-          stride = plane.bytesPerRow;
         }
         scheduleOnRN(
           onPixels,

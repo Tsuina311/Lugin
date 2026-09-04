@@ -189,6 +189,7 @@ try {
   //    read as if they were RGBA.
   {
     check('bgra format recognised', pixelOrderFor('rgb-bgra-8-bit') === 'bgra');
+    check('bgra on android → rgba', pixelOrderFor('rgb-bgra-8-bit', 'android') === 'rgba');
     check('rgba format recognised', pixelOrderFor('rgb-rgba-8-bit') === 'rgba');
     check('3-byte rgb recognised', pixelOrderFor('rgb-rgb-8-bit') === 'rgb');
     check('yuv rejected', pixelOrderFor('yuv-420-8-bit-video') === null);

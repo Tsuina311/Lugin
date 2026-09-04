@@ -99,7 +99,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       },
       predictiveBackGestureEnabled: false,
     },
-    plugins: ['expo-dev-client', 'expo-updates'],
+    plugins: ['expo-dev-client', 'expo-updates', 'expo-sharing'],
     web: {
       favicon: './assets/favicon.png',
     },

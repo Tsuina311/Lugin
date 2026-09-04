@@ -7,10 +7,11 @@
 // Four corrections happen in the single copy below, because we are touching
 // every pixel anyway and doing them separately would cost extra passes:
 //
-//   1. Channel order. `pixelFormat: 'rgb'` gives BGRA on Android
-//      (`rgb-bgra-8-bit`), while `ScanImage` is RGBA. This is not cosmetic —
-//      luma weights R at 0.299 and B at 0.114, so a swapped frame changes
-//      detection scores, sharpness, artwork hue histograms and OCR contrast.
+//   1. Channel order. VisionCamera's RGB target is documented as "often BGRA",
+//      but Android CameraX `OUTPUT_IMAGE_FORMAT_RGBA_8888` writes true R,G,B,A
+//      bytes. Mapping that buffer as BGRA swaps red↔blue (red cards look blue;
+//      blueish cards go yellow). `pixelOrderFor(..., 'android')` keeps Android
+//      on RGBA; iOS keeps BGRA when the frame says so.
 //   2. Pixel size. The pipeline may also hand back 3-byte `rgb-rgb-8-bit`.
 //   3. Row stride. `bytesPerRow` is frequently larger than `width * bpp`
 //      because the camera pads rows for alignment. Ignoring it shears the
@@ -284,12 +285,34 @@ export const frameToScanImage = (
   return out;
 };
 
-/** Map a VisionCamera `pixelFormat` string onto a byte order, if we can use it. */
-export const pixelOrderFor = (pixelFormat: string): FramePixelOrder | null => {
-  if (pixelFormat === 'rgb-bgra-8-bit') return 'bgra';
-  if (pixelFormat === 'rgb-rgba-8-bit') return 'rgba';
+/**
+ * Map a VisionCamera `pixelFormat` string onto the **byte** order to read.
+ *
+ * @param platform Pass `Platform.OS`. On Android, CameraX RGB analysis is
+ *   R,G,B,A even when the label is `rgb-bgra-8-bit`.
+ */
+export const pixelOrderFor = (
+  pixelFormat: string,
+  platform?: string | null,
+): FramePixelOrder | null => {
   if (pixelFormat === 'rgb-rgb-8-bit') return 'rgb';
+  if (pixelFormat === 'rgb-rgba-8-bit') return 'rgba';
+  if (pixelFormat === 'rgb-bgra-8-bit') {
+    if (platform === 'android') return 'rgba';
+    return 'bgra';
+  }
   return null;
+};
+
+/** Swap R and B in place. Used only for proven wrong-order buffers. */
+export const swapScanImageRedBlue = (image: ScanImage): ScanImage => {
+  const { data } = image;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    data[i] = data[i + 2];
+    data[i + 2] = r;
+  }
+  return image;
 };
 
 /**

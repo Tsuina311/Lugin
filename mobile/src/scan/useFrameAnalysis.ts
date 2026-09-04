@@ -40,6 +40,7 @@
 // (`frameToScanImage`) runs on the JS thread, where the detector is anyway.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { useFrameOutput, type Frame, type FrameDroppedReason } from 'react-native-vision-camera';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -502,7 +503,10 @@ export const useFrameAnalysis = ({
       pushFiniteAge(stages.cameraToRn, rnWall - sampleAt);
 
       const meta = lastMeta.current;
-      const pixelOrder = pixelOrderFor(payload.pixelFormat || meta?.pixelFormat || '');
+      const pixelOrder = pixelOrderFor(
+        payload.pixelFormat || meta?.pixelFormat || '',
+        Platform.OS,
+      );
       if (!pixelOrder) {
         // Planar/private formats have no contiguous RGBA buffer to read. Fail
         // loudly rather than draw a plausible-looking wrong overlay.
@@ -897,70 +901,101 @@ export const useFrameAnalysis = ({
         // Rung 2: read the pixel buffer and take an independent copy, both
         // while the frame is still valid, then describe it with primitives.
         //
-        // Two sources, tried in order, because `hasPixelBuffer` being true does
-        // not mean the *contiguous whole-frame* buffer is readable:
-        //
-        //   1. `frame.getPixelBuffer()`. On Android this prefers the frame's
-        //      GPU `HardwareBuffer` and has to `AHardwareBuffer_lock` it for CPU
-        //      reads. The lock is a device-dependent operation and throws
-        //      outright when it fails, even though the usage flags that
-        //      `hasPixelBuffer` inspects said CPU reads were allowed.
-        //   2. Plane 0 of `frame.getPlanes()`. A non-planar RGB frame has
-        //      exactly one plane holding the same pixels behind a plain CPU
-        //      `ByteBuffer`, with no lock and no GPU download — so it works
-        //      wherever the frame buffer does not. Its `bytesPerRow` is the
-        //      authoritative row pitch, which is why the stride travels with
-        //      the payload from here rather than being read off the frame.
-        //
-        // iOS only ever needs the first: `getPlanes()` returns `[]` for
-        // non-planar frames there, so the fallback is a no-op.
+        // Two sources for RGB analysis frames. Prefer plane 0 first:
+        // CameraX `OUTPUT_IMAGE_FORMAT_RGBA_8888` documents R,G,B,A on the
+        // single plane. `getPixelBuffer()` prefers a HardwareBuffer lock whose
+        // byte order has disagreed with the ImageProxy format label on device
+        // (R/B swap → red cards look blue). Fall back to the frame buffer when
+        // planes are empty (iOS non-planar) or unreadable.
         let copy: Uint8Array | null = null;
         let sourceLength = 0;
         let stride = frame.bytesPerRow;
         let bufferSource = 'frame buffer';
         let frameBufferError = '';
-        try {
-          const source = new Uint8Array(frame.getPixelBuffer());
-          sourceLength = source.length;
-          state.read++;
-          // A standalone Hermes-owned buffer. Nothing downstream may touch
-          // frame memory, which stops being valid at `dispose()` below.
-          const copied = new Uint8Array(source.length);
-          copied.set(source);
-          copy = copied;
-          state.copied++;
-        } catch (err) {
-          if (sourceLength > 0) {
-            // The read succeeded and the copy did not, so falling back to a
-            // second source would only hit the same allocation failure.
-            report('bufferCopy', err);
-            return;
+        const preferPlane =
+          typeof frame.pixelFormat === 'string' && frame.pixelFormat.indexOf('rgb') === 0;
+
+        if (preferPlane) {
+          try {
+            const planes = frame.getPlanes();
+            if (planes.length > 0) {
+              const plane = planes[0];
+              const source = new Uint8Array(plane.getPixelBuffer());
+              sourceLength = source.length;
+              state.read++;
+              copy = new Uint8Array(source.length);
+              copy.set(source);
+              state.copied++;
+              state.fromPlane++;
+              stride = plane.bytesPerRow;
+              bufferSource = 'plane 0 (preferred for RGB)';
+            } else {
+              throw new Error('frame exposes no planes');
+            }
+          } catch (err) {
+            const planeError = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+            try {
+              const source = new Uint8Array(frame.getPixelBuffer());
+              sourceLength = source.length;
+              state.read++;
+              copy = new Uint8Array(source.length);
+              copy.set(source);
+              state.copied++;
+              bufferSource = `frame buffer (plane 0 failed: ${planeError})`;
+            } catch (fbErr) {
+              frameBufferError =
+                fbErr instanceof Error ? `${fbErr.name}: ${fbErr.message}` : String(fbErr);
+              report(
+                'pixelBufferRead',
+                `plane 0 — ${planeError}; frame buffer — ${frameBufferError}`,
+              );
+              return;
+            }
           }
-          frameBufferError = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+        } else {
+          try {
+            const source = new Uint8Array(frame.getPixelBuffer());
+            sourceLength = source.length;
+            state.read++;
+            copy = new Uint8Array(source.length);
+            copy.set(source);
+            state.copied++;
+          } catch (err) {
+            if (sourceLength > 0) {
+              report('bufferCopy', err);
+              return;
+            }
+            frameBufferError = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+            try {
+              const planes = frame.getPlanes();
+              if (planes.length === 0) {
+                throw new Error('frame exposes no planes either');
+              }
+              const plane = planes[0];
+              const source = new Uint8Array(plane.getPixelBuffer());
+              sourceLength = source.length;
+              state.read++;
+              copy = new Uint8Array(source.length);
+              copy.set(source);
+              state.copied++;
+              state.fromPlane++;
+              stride = plane.bytesPerRow;
+              bufferSource = `plane 0 (frame buffer failed: ${frameBufferError})`;
+            } catch (planeErr) {
+              const planeError =
+                planeErr instanceof Error ? `${planeErr.name}: ${planeErr.message}` : String(planeErr);
+              report(
+                'pixelBufferRead',
+                `frame buffer — ${frameBufferError}; plane 0 — ${planeError}`,
+              );
+              return;
+            }
+          }
         }
 
         if (copy === null) {
-          try {
-            const planes = frame.getPlanes();
-            if (planes.length === 0) {
-              throw new Error('frame exposes no planes either');
-            }
-            const plane = planes[0];
-            const source = new Uint8Array(plane.getPixelBuffer());
-            sourceLength = source.length;
-            state.read++;
-            const copied = new Uint8Array(source.length);
-            copied.set(source);
-            copy = copied;
-            state.copied++;
-            state.fromPlane++;
-            stride = plane.bytesPerRow;
-            bufferSource = `plane 0 (frame buffer failed: ${frameBufferError})`;
-          } catch (err) {
-            const planeError = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-            report('pixelBufferRead', `frame buffer — ${frameBufferError}; plane 0 — ${planeError}`);
-            return;
-          }
+          report('pixelBufferRead', 'no pixel copy produced');
+          return;
         }
 
         if (climb) {

@@ -92,6 +92,10 @@ export function CameraScanScreen() {
     imageUri: string | null;
     reportText: string;
   } | null>(null);
+  const [detectorColorOk, setDetectorColorOk] = useState<'yes' | 'no' | 'unverified'>('unverified');
+  const [recognitionColorOk, setRecognitionColorOk] = useState<'yes' | 'no' | 'unverified'>(
+    'unverified',
+  );
   const [sourceIndex, setSourceIndex] = useState(0);
   const preferredSource: PreferredSource = RECOGNITION_SOURCES[sourceIndex];
 
@@ -537,8 +541,26 @@ export function CameraScanScreen() {
           </Pressable>
           <Pressable
             onPress={() => {
+              setDetectorColorOk(v => (v === 'unverified' ? 'yes' : v === 'yes' ? 'no' : 'unverified'));
+            }}
+            style={styles.chip}
+          >
+            <Text style={styles.chipLabel}>Det color {detectorColorOk}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setRecognitionColorOk(v =>
+                v === 'unverified' ? 'yes' : v === 'yes' ? 'no' : 'unverified',
+              );
+            }}
+            style={styles.chip}
+          >
+            <Text style={styles.chipLabel}>Rec color {recognitionColorOk}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
               void (async () => {
-                setSaveStatus('Preparing debug…');
+                setSaveStatus('Preparing export…');
                 try {
                   const analysisResult = result;
                   const shareResult = await shareDebugBundle({
@@ -550,6 +572,11 @@ export function CameraScanScreen() {
                       recognition: session.lastNormalized(),
                       recognitionUri: session.debug.normalizedUri,
                     },
+                    pixelFormat: frameMeta?.pixelFormat ?? null,
+                    preferredSource,
+                    detectorInputColorCorrect: detectorColorOk,
+                    recognitionInputColorCorrect: recognitionColorOk,
+                    recognitionSource: session.debug.recognitionSource,
                     panel: {
                       counters,
                       error,
@@ -587,33 +614,36 @@ export function CameraScanScreen() {
                         : null,
                       transfer,
                     },
-                    preferredSource,
                   });
                   if (!shareResult.ok) {
-                    setSaveStatus(`Save debug failed: ${shareResult.reason}`);
+                    setSaveStatus(`Export failed: ${shareResult.reason}`);
                     return;
                   }
                   setDebugViewer({
                     imageUri: shareResult.imageUri,
                     reportText: shareResult.reportText,
                   });
+                  const method =
+                    shareResult.method === 'sharing'
+                      ? 'Share sheet opened — pick an app'
+                      : shareResult.method === 'saf'
+                        ? 'Saved via folder picker (Drive / Downloads)'
+                        : 'Text share only — rebuild APK for file export';
                   setSaveStatus(
-                    shareResult.sharedText
-                      ? shareResult.imageUri
-                        ? 'Share sheet opened — recognition image is on screen too'
-                        : 'Share sheet opened (text only — no recognition image yet)'
-                      : 'Share dismissed — recognition image is on screen',
+                    shareResult.imageUri || shareResult.pngUri
+                      ? method
+                      : `${method} (no recognition PNG yet — lock a card first)`,
                   );
                 } catch (err) {
                   setSaveStatus(
-                    `Save debug crashed: ${err instanceof Error ? err.message : String(err)}`,
+                    `Export crashed: ${err instanceof Error ? err.message : String(err)}`,
                   );
                 }
               })();
             }}
             style={[styles.chip, styles.chipOn]}
           >
-            <Text style={styles.chipLabel}>Save debug</Text>
+            <Text style={styles.chipLabel}>Export</Text>
           </Pressable>
           <Pressable
             onPress={() => {
@@ -634,9 +664,10 @@ export function CameraScanScreen() {
       >
         <View style={styles.debugModalBackdrop}>
           <View style={[styles.debugModal, { paddingTop: insets.top + 8 }]}>
-            <Text style={styles.debugModalTitle}>Recognition input</Text>
+            <Text style={styles.debugModalTitle}>Recognition export</Text>
             <Text style={styles.debugModalHint}>
-              Screenshot this card image, then share/save the text report from the share sheet.
+              Checklist (Det/Rec color chips + source / format / channel order) is at the top of
+              the shared text and JSON.
             </Text>
             <ScrollView contentContainerStyle={styles.debugModalScroll}>
               {debugViewer?.imageUri ? (
@@ -647,12 +678,14 @@ export function CameraScanScreen() {
                 />
               ) : (
                 <Text style={styles.debugModalHint}>
-                  No recognition image yet — lock a card first, then Save debug again.
+                  No recognition image yet — lock a card first, then Export again.
                 </Text>
               )}
               <Text selectable style={styles.debugModalText}>
                 {(debugViewer?.reportText ?? '').slice(0, 4000)}
-                {(debugViewer?.reportText?.length ?? 0) > 4000 ? '\n…(truncated on screen; full text was shared)' : ''}
+                {(debugViewer?.reportText?.length ?? 0) > 4000
+                  ? '\n…(truncated on screen; full JSON was written to the export file)'
+                  : ''}
               </Text>
             </ScrollView>
             <Pressable

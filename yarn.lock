@@ -1637,6 +1637,27 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@expo/config-plugins@npm:^57.0.9, @expo/config-plugins@npm:~57.0.9":
+  version: 57.0.9
+  resolution: "@expo/config-plugins@npm:57.0.9"
+  dependencies:
+    "@expo/config-types": ^57.0.2
+    "@expo/json-file": ~11.0.1
+    "@expo/plist": ^0.8.1
+    "@expo/require-utils": ^57.0.5
+    "@expo/sdk-runtime-versions": ^1.0.0
+    chalk: ^4.1.2
+    debug: ^4.3.5
+    getenv: ^2.0.0
+    glob: ^13.0.0
+    semver: ^7.5.4
+    slugify: ^1.6.6
+    xcode: ^3.0.1
+    xml2js: 0.6.0
+  checksum: 3d559f5f7ce148eaed4fe8bdc83af256c1c7f60f22e6ba5264fa5e172e98e6fd92960d59b9fa1b3b496e5eed487fd36a20e618dd7962e214b638959959977e2c
+  languageName: node
+  linkType: hard
+
 "@expo/config-plugins@npm:~10.1.2":
   version: 10.1.2
   resolution: "@expo/config-plugins@npm:10.1.2"
@@ -1677,27 +1698,6 @@ __metadata:
     xcode: ^3.0.1
     xml2js: 0.6.0
   checksum: 6c95051f4a01566eb317e9fa73137a9b9b923eda65d8451f1e71a0c7458cfb103c2c5520d1bf7f802007d163d408c6db7b1d0acea0eeef09d64f086a7aa00c51
-  languageName: node
-  linkType: hard
-
-"@expo/config-plugins@npm:~57.0.9":
-  version: 57.0.9
-  resolution: "@expo/config-plugins@npm:57.0.9"
-  dependencies:
-    "@expo/config-types": ^57.0.2
-    "@expo/json-file": ~11.0.1
-    "@expo/plist": ^0.8.1
-    "@expo/require-utils": ^57.0.5
-    "@expo/sdk-runtime-versions": ^1.0.0
-    chalk: ^4.1.2
-    debug: ^4.3.5
-    getenv: ^2.0.0
-    glob: ^13.0.0
-    semver: ^7.5.4
-    slugify: ^1.6.6
-    xcode: ^3.0.1
-    xml2js: 0.6.0
-  checksum: 3d559f5f7ce148eaed4fe8bdc83af256c1c7f60f22e6ba5264fa5e172e98e6fd92960d59b9fa1b3b496e5eed487fd36a20e618dd7962e214b638959959977e2c
   languageName: node
   linkType: hard
 
@@ -6863,6 +6863,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"expo-sharing@npm:~57.0.17":
+  version: 57.0.17
+  resolution: "expo-sharing@npm:57.0.17"
+  dependencies:
+    "@expo/config-plugins": ^57.0.9
+    "@expo/config-types": ^57.0.2
+    "@expo/plist": ^0.8.1
+  peerDependencies:
+    expo: "*"
+    react: "*"
+    react-native: "*"
+  checksum: cd72dd4cef99f6b51138848d3d79496ce37dc9db7962efb502c4f7dd9ac5fa4b1700e8294e07b948cbe3ab4116a8828f2cec8bd53073ab974ba5c905fef48932
+  languageName: node
+  linkType: hard
+
 "expo-status-bar@npm:~57.0.1":
   version: 57.0.1
   resolution: "expo-status-bar@npm:57.0.1"
@@ -9020,6 +9035,8 @@ __metadata:
     expo: ~57.0.19
     expo-constants: ~57.0.17
     expo-dev-client: ~57.0.18
+    expo-file-system: ~57.0.6
+    expo-sharing: ~57.0.17
     expo-status-bar: ~57.0.1
     expo-updates: ^57.0.21
     react: 19.2.3
