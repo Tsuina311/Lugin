@@ -127,10 +127,10 @@ const storedZlib = (raw: Uint8Array): Uint8Array => {
 };
 
 /**
- * `data:image/png;base64,…` for `image`, downscaled to `maxWidth`.
+ * `data:image/png;base64,…` for `image`, downscaled to `maxWidth` when larger.
  *
- * Pixels are copied verbatim apart from the downscale, so whatever is wrong
- * with the detector's input is visibly wrong in the result.
+ * Pass the image width (or larger) to keep full resolution — recognition export
+ * must not shrink 744×1039 or title/rules become unreadable.
  */
 export const scanImageToPngDataUri = (image: ScanImage, maxWidth = 120): string => {
   const small = shrink(image, maxWidth);

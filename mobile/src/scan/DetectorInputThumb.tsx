@@ -6,6 +6,8 @@ type Props = {
   corners: CardCorners | null;
   height: number;
   label: string;
+  /** Long-edge pixel size of the on-screen thumb. Default 132. */
+  maxEdge?: number;
   showNumbers: boolean;
   title?: string;
   uri: string | null;
@@ -13,7 +15,7 @@ type Props = {
 };
 
 const LINE = 2;
-const THUMB_MAX = 132;
+const THUMB_MAX_DEFAULT = 132;
 
 /**
  * "Detector input" — the exact ScanImage handed to detectCardQuad, with that
@@ -23,12 +25,13 @@ export function DetectorInputThumb({
   corners,
   height,
   label,
+  maxEdge = THUMB_MAX_DEFAULT,
   showNumbers,
   title = 'Detector input',
   uri,
   width,
 }: Props) {
-  const box = thumbSize(width, height);
+  const box = thumbSize(width, height, maxEdge);
   const mapped = corners && width > 0 ? mapCorners(corners, { height, width }, box) : null;
 
   return (
@@ -62,12 +65,16 @@ export function DetectorInputThumb({
   );
 }
 
-const thumbSize = (width: number, height: number): { height: number; width: number } => {
-  if (width <= 0 || height <= 0) return { height: THUMB_MAX, width: 100 };
-  const scale = THUMB_MAX / Math.max(width, height);
+const thumbSize = (
+  width: number,
+  height: number,
+  maxEdge: number,
+): { height: number; width: number } => {
+  if (width <= 0 || height <= 0) return { height: maxEdge, width: Math.round(maxEdge * 0.72) };
+  const scale = maxEdge / Math.max(width, height);
   return {
-    height: Math.max(32, Math.round(height * scale)),
-    width: Math.max(32, Math.round(width * scale)),
+    height: Math.max(48, Math.round(height * scale)),
+    width: Math.max(48, Math.round(width * scale)),
   };
 };
 

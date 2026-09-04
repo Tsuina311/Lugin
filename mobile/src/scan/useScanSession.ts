@@ -6,7 +6,6 @@
 // waits a bounded interval before labeled analysis-fallback.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Share } from 'react-native';
 
 import type { CameraPhotoOutput, CameraRef } from 'react-native-vision-camera';
 
@@ -212,14 +211,15 @@ export const useScanSession = (opts: {
       let hiresUri: string | null = null;
       if (normalized && normalized.width === CARD_WIDTH && normalized.height === CARD_HEIGHT) {
         try {
-          normalizedUri = scanImageToPngDataUri(normalized);
+          // Large enough to read title / rules in the panel (~half card width).
+          normalizedUri = scanImageToPngDataUri(normalized, 372);
         } catch {
           normalizedUri = null;
         }
       }
       if (cache?.source && cache.source !== normalized) {
         try {
-          hiresUri = scanImageToPngDataUri(cache.source);
+          hiresUri = scanImageToPngDataUri(cache.source, 280);
         } catch {
           hiresUri = null;
         }
@@ -406,29 +406,24 @@ export const useScanSession = (opts: {
     if (!image || image.width !== CARD_WIDTH || image.height !== CARD_HEIGHT) {
       return { ok: false as const, reason: 'no 744×1039 recognition input yet' };
     }
-    const uri = scanImageToPngDataUri(image);
-    const meta = {
-      artEntries: indexes.art?.entries ?? null,
-      artGenerated: indexes.art?.generated ?? null,
-      height: image.height,
-      recognitionSource: store.current.cache?.attempt.mode ?? null,
-      width: image.width,
-    };
-    try {
-      await Share.share({
-        message: `Lugin recognition input ${meta.width}×${meta.height} source=${meta.recognitionSource ?? 'unknown'}\n${JSON.stringify(meta)}\n${uri.slice(0, 80)}…`,
-        title: 'Export recognition input',
-        url: uri,
-      });
-      return { ok: true as const, meta, uri };
-    } catch (err) {
-      return {
-        ok: false as const,
-        reason: err instanceof Error ? err.message : String(err),
-        uri,
-      };
-    }
-  }, [controller, indexes.art]);
+    const { shareDebugBundle } = await import('./saveDebugBundle');
+    const result = await shareDebugBundle({
+      images: { recognition: image },
+      panel: {
+        note: 'recognition-input-only export',
+        recognitionSource: store.current.cache?.attempt.mode ?? null,
+      },
+    });
+    return result.ok
+      ? { ok: true as const, meta: { height: image.height, width: image.width }, uri: '' }
+      : { ok: false as const, reason: result.reason };
+  }, [controller]);
+
+  const lastNormalized = useCallback((): ScanImage | null => {
+    const image = controller.lastNormalized();
+    if (!image || image.width !== CARD_WIDTH || image.height !== CARD_HEIGHT) return null;
+    return image;
+  }, [controller]);
 
   return {
     debug,
@@ -440,6 +435,7 @@ export const useScanSession = (opts: {
     exportRecognitionInput,
     focusNorm,
     indexes,
+    lastNormalized,
     markTap,
     onAnalyzed: enabled ? onAnalyzed : undefined,
     preferredSources: RECOGNITION_SOURCES,

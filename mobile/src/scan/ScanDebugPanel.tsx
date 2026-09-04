@@ -433,6 +433,7 @@ export function ScanDebugPanel({
                 corners={session.mappedCorners}
                 height={session.sourceHeight}
                 label={`${session.sourceWidth}×${session.sourceHeight} · ${session.recognitionSource}`}
+                maxEdge={200}
                 showNumbers
                 title="High-res source"
                 uri={session.hiresUri}
@@ -465,7 +466,8 @@ export function ScanDebugPanel({
               <DetectorInputThumb
                 corners={null}
                 height={1039}
-                label={`744×1039 · ${session.recognitionSource ?? 'unknown'}`}
+                label={`744×1039 · ${session.recognitionSource ?? 'unknown'} · readable preview`}
+                maxEdge={320}
                 showNumbers={false}
                 title="Recognition input"
                 uri={session.normalizedUri}

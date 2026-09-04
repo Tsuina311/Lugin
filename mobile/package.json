@@ -10,7 +10,7 @@
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
-    "test": "node ./scripts/smoke.cjs && node ./scripts/shared-core-smoke.mjs && node ./scripts/frame-adapter-smoke.mjs && node ./scripts/png-preview-smoke.mjs && node ./scripts/camera-select-smoke.mjs && node ./scripts/analysis-geometry-smoke.mjs && node ./scripts/orientation-lifecycle-smoke.mjs && node ./scripts/hires-map-smoke.mjs && node ./scripts/overlay-ease-smoke.mjs && node ./scripts/index-validate-smoke.mjs && node ./scripts/repository-conformance-smoke.mjs && node ./scripts/raw-pixels-smoke.mjs && node ./scripts/hires-fallback-smoke.mjs",
+    "test": "node ./scripts/smoke.cjs && node ./scripts/shared-core-smoke.mjs && node ./scripts/frame-adapter-smoke.mjs && node ./scripts/png-preview-smoke.mjs && node ./scripts/camera-select-smoke.mjs && node ./scripts/analysis-geometry-smoke.mjs && node ./scripts/orientation-lifecycle-smoke.mjs && node ./scripts/hires-map-smoke.mjs && node ./scripts/overlay-ease-smoke.mjs && node ./scripts/index-validate-smoke.mjs && node ./scripts/repository-conformance-smoke.mjs && node ./scripts/raw-pixels-smoke.mjs && node ./scripts/hires-fallback-smoke.mjs && node ./scripts/save-debug-smoke.mjs",
     "build:dev": "expo prebuild && expo run:android",
     "build:eas": "node ../scripts/write-mobile-build-stamp.mjs && eas build --platform android --profile development",
     "update:development": "node ../scripts/write-mobile-build-stamp.mjs && node ../scripts/mobile-eas.mjs update",

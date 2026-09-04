@@ -29,6 +29,7 @@ import { ScanDebugPanel } from '../scan/ScanDebugPanel';
 import { ScanResultCard } from '../scan/ScanResultCard';
 import { mapCornersToOverlay, type CardCorners, type Point2D } from '../scan/sharedCore';
 import { RECOGNITION_SOURCES, type PreferredSource } from '../scan/hiresCapture';
+import { shareDebugBundle } from '../scan/saveDebugBundle';
 import { useHiResFrameLatch } from '../scan/useHiResFrame';
 import { useScanSession } from '../scan/useScanSession';
 import {
@@ -523,13 +524,68 @@ export function CameraScanScreen() {
           </Pressable>
           <Pressable
             onPress={() => {
-              void session.exportRecognitionInput().then(r => {
-                setPendingAdd(r.ok ? 'exported recognition input' : `export: ${r.reason}`);
-              });
+              void (async () => {
+                const analysisResult = result;
+                const shareResult = await shareDebugBundle({
+                  analysisLongEdge: ANALYSIS_LONG_EDGES[longEdgeIndex],
+                  deviceLine: describeDevice(device),
+                  images: {
+                    detectorUri: preview,
+                    hiresUri: session.debug.hiresUri,
+                    recognition: session.lastNormalized(),
+                    recognitionUri: session.debug.normalizedUri,
+                  },
+                  panel: {
+                    counters,
+                    error,
+                    failure,
+                    frameMeta,
+                    metrics,
+                    orientation,
+                    probeResult,
+                    preferredSource,
+                    result: analysisResult
+                      ? {
+                          analysis: analysisResult.analysis,
+                          brightness: analysisResult.brightness,
+                          detected: analysisResult.detected,
+                          detector: analysisResult.detector,
+                          score: analysisResult.score,
+                        }
+                      : null,
+                    session: session.debug,
+                    snapshot: session.snapshot
+                      ? {
+                          fused: session.snapshot.fused,
+                          message: session.snapshot.message,
+                          motion: session.snapshot.motion,
+                          phase: session.snapshot.phase,
+                          quality: session.snapshot.quality,
+                          recognition: session.snapshot.recognition
+                            ? {
+                                timings: session.snapshot.recognition.timings,
+                                visualTop: session.snapshot.recognition.visualTop,
+                              }
+                            : null,
+                          trackFrames: session.snapshot.trackFrames,
+                        }
+                      : null,
+                    transfer,
+                  },
+                  preferredSource,
+                });
+                setPendingAdd(
+                  shareResult.ok
+                    ? shareResult.hadImage
+                      ? 'debug shared (report + recognition PNG)'
+                      : 'debug shared (report only — no recognition image)'
+                    : `save debug: ${shareResult.reason}`,
+                );
+              })();
             }}
             style={styles.chip}
           >
-            <Text style={styles.chipLabel}>Export input</Text>
+            <Text style={styles.chipLabel}>Save debug</Text>
           </Pressable>
           <Pressable
             onPress={() => {
