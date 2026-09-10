@@ -239,3 +239,40 @@ export const focusGateDecision = (input: {
   }
   return { kind: 'focusing' };
 };
+
+export type FocusAttemptKind = 'idle' | 'waiting' | 'ready' | 'timeout' | 'cooldown';
+
+/**
+ * Bounded, advisory focus lifecycle. Vendor "ok" may flicker; one success or
+ * one timeout is enough. Do not require the callback to stay good.
+ */
+export const focusAttemptDecision = (input: {
+  attemptMs: number;
+  captureFailed?: boolean;
+  cooldownMs: number;
+  lastRequestAt: number | null;
+  movedMaterially: boolean;
+  now: number;
+  requestedAt: number | null;
+  successAt: number | null;
+  trackChanged: boolean;
+}): { allowCapture: boolean; kind: FocusAttemptKind; shouldRequest: boolean } => {
+  const cooling =
+    input.lastRequestAt != null && input.now - input.lastRequestAt < input.cooldownMs;
+  // Cooldown *suppresses* spam. Expiry alone is not a reason to request again.
+  const reasonToRetry =
+    input.trackChanged || (input.movedMaterially && Boolean(input.captureFailed));
+  if (input.requestedAt == null && input.successAt == null) {
+    return { allowCapture: false, kind: 'idle', shouldRequest: true };
+  }
+  const timedOut =
+    input.requestedAt != null && input.now - input.requestedAt >= input.attemptMs;
+  if (input.successAt != null || timedOut) {
+    return {
+      allowCapture: true,
+      kind: input.successAt != null ? (cooling ? 'cooldown' : 'ready') : 'timeout',
+      shouldRequest: reasonToRetry && !cooling,
+    };
+  }
+  return { allowCapture: false, kind: 'waiting', shouldRequest: false };
+};

@@ -42,12 +42,14 @@ export type LuginCardDetectorNativeModule = {
   detectFromRgba(rgba: Uint8Array, width: number, height: number): NativeDetectionResult;
   /**
    * Live path: Y (luma) plane Uint8Array + rowStride (>= width).
-   * Same WORK_WIDTH luma multi-threshold + Sobel edge as RGBA; chroma skipped.
+   * Async — must not block the JS thread.
    */
   detectFromYPlane(
     y: Uint8Array,
     width: number,
     height: number,
     rowStride: number,
-  ): NativeDetectionResult;
+  ): Promise<NativeDetectionResult>;
+  /** Debug: nested sleeve preference. */
+  setNestedSleeveEnabled?(enabled: boolean): void;
 };

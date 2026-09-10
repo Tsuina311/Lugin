@@ -13,50 +13,98 @@ import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Offline OCR via Google ML Kit Text Recognition v2 (Latin, bundled model).
  *
- * Scope (keep Magic / ranking / fusion OUT of this module):
- *   RGBA or image file → raw text + word boxes + confidence + timingMs
+ * Hot path: packed RGBA Uint8Array (ByteArray) → Bitmap → InputImage → ML Kit.
+ * Magic / ranking / fusion stay in shared TypeScript.
  *
- * Intended input: normalized 744×1039 *region crops* from shared TypeScript
- * (`readTitle` / `readRules` / footer), never live camera frames at detector cadence.
+ * Prefer [recognizeFromRgbaBytes] — never base64 on the production path.
+ * [recognizeFromRgba] (base64) remains for old JS until OTA+APK both ship bytes.
  */
 class LuginOcrModule : Module() {
+  /** Single shared client for the module lifetime (do not recreate per crop). */
   private val recognizer by lazy {
     TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
   }
 
+  private val warmed = AtomicBoolean(false)
+
   override fun definition() = ModuleDefinition {
     Name("LuginOcr")
 
-    /**
-     * `ready` once ML Kit Latin is wired. JS adapters gate on module presence;
-     * old APKs without this package still see `null` from requireOptionalNativeModule.
-     */
     Constant("implementationStatus") {
       IMPLEMENTATION_STATUS
     }
 
     /**
-     * RGBA bytes (base64) → NativeOcrResult.
-     * Expected layout: length == width * height * 4, channel order R,G,B,A
-     * (same as portable `ScanImage`).
+     * Production hot path: packed RGBA bytes (no base64).
+     * Layout: length == width * height * 4, channel order R,G,B,A.
+     */
+    AsyncFunction("recognizeFromRgbaBytes") { rgba: ByteArray, width: Int, height: Int, promise: Promise ->
+      val started = System.nanoTime()
+      try {
+        validateDimensions(width, height)
+        val expected = width * height * 4
+        if (rgba.size != expected) {
+          throw InvalidOcrInputException(
+            "RGBA byte length ${rgba.size} != width*height*4 ($expected) for ${width}x$height",
+          )
+        }
+        val tBitmap = System.nanoTime()
+        val bitmap = rgbaToBitmap(rgba, width, height)
+        val bitmapMs = elapsedMs(tBitmap)
+        processBitmap(
+          bitmap = bitmap,
+          width = width,
+          height = height,
+          startedNs = started,
+          promise = promise,
+          decodeMs = 0.0,
+          bitmapMs = bitmapMs,
+          bytesIn = rgba.size,
+          transport = "rgba-bytes",
+        )
+      } catch (e: CodedException) {
+        promise.reject(e)
+      } catch (e: Exception) {
+        promise.reject(OcrFailedException(e.message ?: "recognizeFromRgbaBytes failed"))
+      }
+    }
+
+    /**
+     * Legacy: RGBA as base64. Kept for older OTA JS on pre-bytes APKs.
+     * Do not use on the production hot path.
      */
     AsyncFunction("recognizeFromRgba") { rgbaBase64: String, width: Int, height: Int, promise: Promise ->
       val started = System.nanoTime()
       try {
         validateDimensions(width, height)
+        val tDecode = System.nanoTime()
         val bytes = decodeBase64(rgbaBase64)
+        val decodeMs = elapsedMs(tDecode)
         val expected = width * height * 4
         if (bytes.size != expected) {
           throw InvalidOcrInputException(
             "RGBA byte length ${bytes.size} != width*height*4 ($expected) for ${width}x$height",
           )
         }
+        val tBitmap = System.nanoTime()
         val bitmap = rgbaToBitmap(bytes, width, height)
-        processBitmap(bitmap, started, promise)
+        val bitmapMs = elapsedMs(tBitmap)
+        processBitmap(
+          bitmap = bitmap,
+          width = width,
+          height = height,
+          startedNs = started,
+          promise = promise,
+          decodeMs = decodeMs,
+          bitmapMs = bitmapMs,
+          bytesIn = bytes.size,
+          transport = "rgba-base64",
+        )
       } catch (e: CodedException) {
         promise.reject(e)
       } catch (e: Exception) {
@@ -64,13 +112,10 @@ class LuginOcrModule : Module() {
       }
     }
 
-    /**
-     * JPEG/PNG path → NativeOcrResult.
-     * Accepts absolute paths or file:// URIs (temp files from JS debug bridges).
-     */
     AsyncFunction("recognizeFromFile") { path: String, promise: Promise ->
       val started = System.nanoTime()
       try {
+        val tDecode = System.nanoTime()
         val file = resolveFile(path)
         if (!file.exists() || !file.isFile) {
           throw InvalidOcrInputException("File not found: ${file.absolutePath}")
@@ -78,7 +123,18 @@ class LuginOcrModule : Module() {
         val bitmap =
           BitmapFactory.decodeFile(file.absolutePath)
             ?: throw InvalidOcrInputException("Could not decode image at ${file.absolutePath}")
-        processBitmap(bitmap, started, promise)
+        val decodeMs = elapsedMs(tDecode)
+        processBitmap(
+          bitmap = bitmap,
+          width = bitmap.width,
+          height = bitmap.height,
+          startedNs = started,
+          promise = promise,
+          decodeMs = decodeMs,
+          bitmapMs = 0.0,
+          bytesIn = file.length().toInt().coerceAtLeast(0),
+          transport = "file",
+        )
       } catch (e: CodedException) {
         promise.reject(e)
       } catch (e: Exception) {
@@ -86,19 +142,96 @@ class LuginOcrModule : Module() {
       }
     }
 
+    /**
+     * Fire-and-forget ML Kit warmup with a tiny bitmap.
+     * Idempotent; does not block camera startup when called from JS without await.
+     */
+    AsyncFunction("warmUp") { promise: Promise ->
+      val started = System.nanoTime()
+      if (warmed.get()) {
+        promise.resolve(
+          mapOf(
+            "alreadyWarm" to true,
+            "timingMs" to elapsedMs(started),
+          ),
+        )
+        return@AsyncFunction
+      }
+      try {
+        // 32×32 opaque gray — enough to force model/client init.
+        val w = 32
+        val h = 32
+        val rgba = ByteArray(w * h * 4) { i ->
+          when (i % 4) {
+            3 -> 0xFF.toByte()
+            else -> 0x80.toByte()
+          }
+        }
+        val bitmap = rgbaToBitmap(rgba, w, h)
+        val image = InputImage.fromBitmap(bitmap, 0)
+        recognizer
+          .process(image)
+          .addOnSuccessListener {
+            warmed.set(true)
+            bitmap.recycle()
+            promise.resolve(
+              mapOf(
+                "alreadyWarm" to false,
+                "timingMs" to elapsedMs(started),
+              ),
+            )
+          }
+          .addOnFailureListener { e ->
+            bitmap.recycle()
+            promise.reject(OcrFailedException(e.message ?: "warmUp failed"))
+          }
+      } catch (e: Exception) {
+        promise.reject(OcrFailedException(e.message ?: "warmUp failed"))
+      }
+    }
+
     OnDestroy {
       recognizer.close()
+      warmed.set(false)
     }
   }
 
-  private fun processBitmap(bitmap: Bitmap, startedNs: Long, promise: Promise) {
+  private fun processBitmap(
+    bitmap: Bitmap,
+    width: Int,
+    height: Int,
+    startedNs: Long,
+    promise: Promise,
+    decodeMs: Double,
+    bitmapMs: Double,
+    bytesIn: Int,
+    transport: String,
+  ) {
+    val tMlkit = System.nanoTime()
     val image = InputImage.fromBitmap(bitmap, 0)
     recognizer
       .process(image)
       .addOnSuccessListener { visionText ->
-        promise.resolve(mapVisionText(visionText, elapsedMs(startedNs)))
+        val mlkitMs = elapsedMs(tMlkit)
+        warmed.set(true)
+        val totalMs = elapsedMs(startedNs)
+        if (!bitmap.isRecycled) bitmap.recycle()
+        promise.resolve(
+          mapVisionText(
+            visionText = visionText,
+            timingMs = totalMs,
+            decodeMs = decodeMs,
+            bitmapMs = bitmapMs,
+            mlkitMs = mlkitMs,
+            bytesIn = bytesIn,
+            transport = transport,
+            width = width,
+            height = height,
+          ),
+        )
       }
       .addOnFailureListener { e ->
+        if (!bitmap.isRecycled) bitmap.recycle()
         promise.reject(OcrFailedException(e.message ?: "ML Kit process failed"))
       }
   }
@@ -162,9 +295,19 @@ private fun elapsedMs(startedNs: Long): Double =
 
 /**
  * Shape matches `NativeOcrResult` / portable `TextRecognitionResult`.
- * Word units = ML Kit `Text.Element` (roughly space-separated tokens).
+ * Stage timings are native-clock-local (do not mix with JS performance.now).
  */
-private fun mapVisionText(visionText: Text, timingMs: Double): Map<String, Any?> {
+private fun mapVisionText(
+  visionText: Text,
+  timingMs: Double,
+  decodeMs: Double,
+  bitmapMs: Double,
+  mlkitMs: Double,
+  bytesIn: Int,
+  transport: String,
+  width: Int,
+  height: Int,
+): Map<String, Any?> {
   val words = mutableListOf<Map<String, Any?>>()
   for (block in visionText.textBlocks) {
     for (line in block.lines) {
@@ -202,16 +345,19 @@ private fun mapVisionText(visionText: Text, timingMs: Double): Map<String, Any?>
     "confidence" to mean,
     "words" to words,
     "timingMs" to timingMs,
+    "decodeMs" to decodeMs,
+    "bitmapMs" to bitmapMs,
+    "mlkitMs" to mlkitMs,
+    "bytesIn" to bytesIn,
+    "transport" to transport,
+    "width" to width,
+    "height" to height,
   )
 }
 
-/**
- * ML Kit Element confidence is 0–1 when available; fall back to symbol mean,
- * then a neutral prior so fusion does not treat missing scores as zero-trust.
- */
 private fun elementConfidence(element: Text.Element): Double {
   val symbols = element.symbols
-  if (symbols != null && symbols.isNotEmpty()) {
+  if (symbols.isNotEmpty()) {
     var sum = 0f
     var n = 0
     for (symbol in symbols) {

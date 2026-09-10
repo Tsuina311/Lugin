@@ -67,9 +67,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     icon: './assets/icon.png',
     userInterfaceStyle: 'dark',
     scheme: 'lugin',
-    runtimeVersion: {
-      policy: 'fingerprint',
-    },
+    // Default: fingerprint policy (OTA only applies to matching native APKs).
+    // Escape hatch for JS-only publishes when the Mac tree has native WIP that
+    // must not retarget the installed phone APK: LUGIN_OTA_RUNTIME_VERSION=<hash>
+    // (Settings → Runtime / fingerprint on the device). Never use this to ship
+    // real native changes onto an old binary.
+    runtimeVersion: process.env.LUGIN_OTA_RUNTIME_VERSION?.trim()
+      ? process.env.LUGIN_OTA_RUNTIME_VERSION.trim()
+      : {
+          policy: 'fingerprint',
+        },
     updates: updatesUrl
       ? {
           url: updatesUrl,

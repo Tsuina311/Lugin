@@ -27,6 +27,8 @@ export interface ScannerManifest {
   artIndex: ScannerAssetRef;
   /** Optional until Pages publishes printing-index.json. */
   printingIndex?: ScannerAssetRef;
+  /** Optional compact type-line index. */
+  typeIndex?: ScannerAssetRef;
 }
 
 export const SCANNER_MANIFEST_FILENAME = 'scanner-manifest.json';
@@ -37,6 +39,8 @@ export const SCANNER_MANIFEST_CHECK_INTERVAL_MS = 18 * 60 * 60 * 1000; // 18h
 export const NAME_INDEX_MIN_PRODUCTION_NAMES = 5_000;
 export const ART_INDEX_MIN_PRODUCTION_ENTRIES = 500;
 export const PRINTING_INDEX_MIN_PRODUCTION_ENTRIES = 10_000;
+/** Soft floor for production TypeIndex (oracles). */
+export const TYPE_INDEX_MIN_PRODUCTION_ORACLES = 5_000;
 
 /** Reject absurd payloads (uncompressed). */
 export const SCANNER_ASSET_MAX_BYTES = 80 * 1024 * 1024;
@@ -48,6 +52,7 @@ export const isScannerManifest = (raw: unknown): raw is ScannerManifest => {
   if (typeof m.generatedAt !== 'string' || !m.generatedAt) return false;
   if (!isAssetRef(m.cardNames) || !isAssetRef(m.artIndex)) return false;
   if (m.printingIndex != null && !isAssetRef(m.printingIndex)) return false;
+  if (m.typeIndex != null && !isAssetRef(m.typeIndex)) return false;
   return true;
 };
 

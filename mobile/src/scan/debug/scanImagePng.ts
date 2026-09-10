@@ -178,3 +178,96 @@ export const scanImageToPngBytes = (image: ScanImage, maxWidth = 120): Uint8Arra
  */
 export const scanImageToPngDataUri = (image: ScanImage, maxWidth = 120): string =>
   `data:image/png;base64,${base64(scanImageToPngBytes(image, maxWidth))}`;
+
+export const bytesToBase64 = (bytes: Uint8Array): string => base64(bytes);
+
+const fromBase64 = (text: string): Uint8Array => {
+  const clean = text.replace(/[^A-Za-z0-9+/=]/g, '');
+  const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
+  let o = 0;
+  const val = (c: string): number => {
+    if (c >= 'A' && c <= 'Z') return c.charCodeAt(0) - 65;
+    if (c >= 'a' && c <= 'z') return c.charCodeAt(0) - 71;
+    if (c >= '0' && c <= '9') return c.charCodeAt(0) + 4;
+    if (c === '+') return 62;
+    if (c === '/') return 63;
+    return 0;
+  };
+  for (let i = 0; i + 3 < clean.length; i += 4) {
+    const n = (val(clean[i]) << 18) | (val(clean[i + 1]) << 12) | (val(clean[i + 2]) << 6) | val(clean[i + 3]);
+    out[o++] = (n >>> 16) & 255;
+    if (clean[i + 2] !== '=') out[o++] = (n >>> 8) & 255;
+    if (clean[i + 3] !== '=') out[o++] = n & 255;
+  }
+  return out.subarray(0, o);
+};
+
+const inflateStoredZlib = (zlib: Uint8Array): Uint8Array => {
+  if (zlib.length < 6) throw new Error('zlib too short');
+  let at = 2;
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (at + 5 <= zlib.length) {
+    const header = zlib[at];
+    const final = (header & 1) === 1;
+    const btype = (header >>> 1) & 3;
+    if (btype !== 0) throw new Error('png inflate: only stored blocks supported');
+    at += 1;
+    const len = zlib[at] | (zlib[at + 1] << 8);
+    at += 4;
+    chunks.push(zlib.subarray(at, at + len));
+    total += len;
+    at += len;
+    if (final) break;
+  }
+  const raw = new Uint8Array(total);
+  let o = 0;
+  for (const c of chunks) {
+    raw.set(c, o);
+    o += c.length;
+  }
+  return raw;
+};
+
+/** Decode a PNG written by {@link scanImageToPngBytes} (stored zlib, filter 0, RGBA). */
+export const pngBytesToScanImage = (png: Uint8Array): ScanImage => {
+  for (let i = 0; i < PNG_SIGNATURE.length; i++) {
+    if (png[i] !== PNG_SIGNATURE[i]) throw new Error('not a PNG');
+  }
+  let width = 0;
+  let height = 0;
+  const idats: Uint8Array[] = [];
+  let at = 8;
+  while (at + 12 <= png.length) {
+    const len = (png[at] << 24) | (png[at + 1] << 16) | (png[at + 2] << 8) | png[at + 3];
+    const type = String.fromCharCode(png[at + 4], png[at + 5], png[at + 6], png[at + 7]);
+    const body = png.subarray(at + 8, at + 8 + len);
+    if (type === 'IHDR') {
+      width = (body[0] << 24) | (body[1] << 16) | (body[2] << 8) | body[3];
+      height = (body[4] << 24) | (body[5] << 16) | (body[6] << 8) | body[7];
+    } else if (type === 'IDAT') {
+      idats.push(body);
+    } else if (type === 'IEND') {
+      break;
+    }
+    at += 12 + len;
+  }
+  const zlib = new Uint8Array(idats.reduce((n, c) => n + c.length, 0));
+  let o = 0;
+  for (const c of idats) {
+    zlib.set(c, o);
+    o += c.length;
+  }
+  const raw = inflateStoredZlib(zlib);
+  const stride = width * 4;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const row = y * (stride + 1);
+    if (raw[row] !== 0) throw new Error('png filter not 0');
+    data.set(raw.subarray(row + 1, row + 1 + stride), y * stride);
+  }
+  return { data, height, width };
+};
+
+export const pngBase64ToScanImage = (b64: string): ScanImage => pngBytesToScanImage(fromBase64(b64));
+

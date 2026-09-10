@@ -12,6 +12,7 @@ import {
   collectFlags,
   latencyFromSnapshot,
   mapWinningChannel,
+  ocrTimingFromReport,
   scoreAgainstExpected,
   type ScoreableResult,
 } from './scoreScan';
@@ -25,6 +26,7 @@ import {
 } from './types';
 import { buildStoreZip, bytesToBase64, type ZipEntry } from './zipExport';
 import { enqueueBenchmarkUpload, kickUploadQueue } from './uploadQueue';
+import { enqueueBenchmarkInboxScan, isInboxConfigured, loadInboxSettings } from '../debugInbox';
 
 type LegacyFS = typeof import('expo-file-system/legacy');
 
@@ -68,7 +70,7 @@ const sessionDir = async (sessionId: string): Promise<string> => {
   const dir = `${await rootDir()}${sessionId}/`;
   await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
   await FileSystem.makeDirectoryAsync(`${dir}scans/`, { intermediates: true });
-  await FileSystem.makeDirectoryAsync(`${dir}fixtures/`, { intermediates: true });
+  await FileSystem.makeDirectoryAsync(`${dir}failures/`, { intermediates: true });
   return dir;
 };
 
@@ -172,6 +174,7 @@ export const restoreBenchmarkSession = async (): Promise<BenchmarkSession | null
 export const startBenchmarkSession = async (opts?: {
   expectedManifest?: ExpectedCard[] | null;
   targetCount?: number;
+  environment?: BenchmarkSession['environment'];
 }): Promise<BenchmarkSession> => {
   if (!isBenchmarkToolsEnabled()) {
     throw new Error('Benchmark tools are disabled outside development builds');
@@ -180,6 +183,7 @@ export const startBenchmarkSession = async (opts?: {
   const session: BenchmarkSession = {
     createdAt: new Date().toISOString(),
     endedAt: null,
+    environment: opts?.environment ?? null,
     expectedManifest: opts?.expectedManifest ?? null,
     ingestionUrl: state.settings.ingestionUrl || null,
     scans: [],
@@ -212,7 +216,21 @@ export const endBenchmarkSession = async (): Promise<BenchmarkSession | null> =>
   if (!state.active) return null;
   const session = state.active;
   session.endedAt = new Date().toISOString();
-  session.summary = buildSessionSummary(session.scans, session.targetCount);
+  session.summary = buildSessionSummary(session.scans, session.targetCount, {
+    printingEntries: session.environment?.printingEntries ?? null,
+  });
+  // Also write plain-text summary beside session.json for quick share/screenshot.
+  try {
+    const dir = await sessionDir(session.sessionId);
+    await writeJson(`${dir}session-summary.json`, session.summary);
+    const FileSystem = await fs();
+    await FileSystem.writeAsStringAsync(
+      `${dir}session-summary.txt`,
+      formatSummaryText(session.summary),
+    );
+  } catch {
+    /* non-fatal */
+  }
   await persistSession(session);
   await persistActiveMeta();
   notify();
@@ -226,7 +244,10 @@ export const clearActiveBenchmarkSession = async (): Promise<void> => {
   notify();
 };
 
-const scoreableFromSnapshot = (snapshot: SessionSnapshot): ScoreableResult => {
+const scoreableFromSnapshot = (
+  snapshot: SessionSnapshot,
+  payload: DebugSharePayload,
+): ScoreableResult => {
   const fused = snapshot.fused;
   const rec = snapshot.recognition;
   const printing = fused?.printing;
@@ -236,9 +257,19 @@ const scoreableFromSnapshot = (snapshot: SessionSnapshot): ScoreableResult => {
       rec?.collector?.collectorNumber ||
       rec?.collector?.raw,
   );
+  const finish =
+    Array.isArray(printing?.finishes) && printing!.finishes.length === 1
+      ? printing!.finishes[0]
+      : null;
+  const timings = rec?.timings as Record<string, unknown> | undefined;
+  const ocrTransport =
+    (typeof timings?.titleTransport === 'string' && timings.titleTransport) ||
+    (typeof timings?.footerTransport === 'string' && timings.footerTransport) ||
+    null;
   return {
+    artConflict: Boolean(fused?.artConflict),
     earlyReason: rec?.earlyReason ?? null,
-    finish: null,
+    finish,
     name: fused?.card?.name ?? printing?.name ?? null,
     ocrPresent,
     printing: printing
@@ -255,6 +286,15 @@ const scoreableFromSnapshot = (snapshot: SessionSnapshot): ScoreableResult => {
     status: fused?.status ?? null,
     titleFooterConflict: Boolean(rec?.titleFooterConflict),
     userLatency: snapshot.userLatency ?? null,
+    detectorEngine:
+      (payload.requestedDetectorEngine as string | undefined) ??
+      (payload.detectorEngine as string | undefined) ??
+      null,
+    actualDetectorEngine:
+      (payload.actualDetectorEngine as string | undefined) ??
+      (payload.detectorEngine as string | undefined) ??
+      null,
+    ocrTransport,
   };
 };
 
@@ -265,12 +305,13 @@ const retainAsFixture = async (
 ): Promise<void> => {
   if (!record.flags.length) return;
   const FileSystem = await fs();
-  const dest = `${dir}fixtures/`;
-  const stem = `seq-${String(record.seq).padStart(3, '0')}`;
+  const dest = `${dir}failures/`;
+  await FileSystem.makeDirectoryAsync(dest, { intermediates: true });
+  const stem = String(record.seq).padStart(4, '0');
   try {
     await FileSystem.copyAsync({
       from: `${dir}${record.reportRelativePath}`,
-      to: `${dest}${stem}-report.json`,
+      to: `${dest}${stem}.json`,
     });
   } catch {
     /* report may be missing */
@@ -290,6 +331,7 @@ const retainAsFixture = async (
     seq: record.seq,
     sessionId: session.sessionId,
     stamp: record.stamp,
+    latency: record.latency,
   });
 };
 
@@ -300,7 +342,7 @@ export interface RecordBenchmarkArgs {
 }
 
 /**
- * Persist one completed recognition. Idempotent per lock+identity key.
+ * Persist one completed recognition. Idempotent per lock (one physical scan).
  * Always writes locally first; upload is queued asynchronously.
  */
 export const recordBenchmarkScan = async (
@@ -314,18 +356,26 @@ export const recordBenchmarkScan = async (
   const phase = args.snapshot.phase;
   if (phase !== 'found' && phase !== 'ambiguous') return null;
 
-  const key = `${args.snapshot.lockedAt ?? 0}:${args.snapshot.earlyShownAt ?? 0}:${args.snapshot.finalIdentityAt ?? 0}:${args.snapshot.printingShownAt ?? 0}`;
+  // One record per lock — early→final→printing must not create duplicates.
+  const key = `lock:${args.snapshot.lockedAt ?? 0}`;
   if (key === state.recordingKey) return null;
+  // Also ignore if we already recorded this lock (session restart mid-card).
+  if (
+    args.snapshot.lockedAt != null &&
+    session.scans.some(s => s.lockedAt === args.snapshot.lockedAt)
+  ) {
+    return null;
+  }
   state.recordingKey = key;
 
   const seq = session.scans.length + 1;
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const dir = await sessionDir(session.sessionId);
-  const stem = `scans/${String(seq).padStart(3, '0')}`;
-  const reportRel = `${stem}-report.json`;
-  const pngRel = `${stem}-recognition.png`;
+  const stem = String(seq).padStart(4, '0');
+  const reportRel = `scans/${stem}.json`;
+  const pngRel = `scans/${stem}-recognition.png`;
 
-  const scoreable = scoreableFromSnapshot(args.snapshot);
+  const scoreable = scoreableFromSnapshot(args.snapshot, args.payload);
   const expected =
     session.expectedManifest && session.expectedManifest[seq - 1]
       ? session.expectedManifest[seq - 1]
@@ -345,6 +395,8 @@ export const recordBenchmarkScan = async (
       seq,
       sessionId: session.sessionId,
       winningChannel,
+      artConflict: scoreable.artConflict ?? false,
+      titleFooterConflict: scoreable.titleFooterConflict ?? false,
     },
   };
   await writeJson(`${dir}${reportRel}`, report);
@@ -352,21 +404,26 @@ export const recordBenchmarkScan = async (
   const FileSystem = await fs();
   const image = args.recognition;
   if (image && image.width === CARD_WIDTH && image.height === CARD_HEIGHT) {
+    // Async encode — do not block identity; await only for local persist.
     const png = scanImageToPngBytes(image, CARD_WIDTH);
     await FileSystem.writeAsStringAsync(`${dir}${pngRel}`, bytesToBase64(png), {
       encoding: 'base64',
     });
   } else {
-    // Still create a tiny placeholder note so ZIP layout is stable.
     await writeJson(`${dir}${pngRel}.missing.json`, {
       reason: 'no 744×1039 recognition image at record time',
     });
   }
 
+  const titleBlock = (report as { TITLE?: Record<string, unknown> }).TITLE;
+  const footerBlock = (report as { FOOTER?: Record<string, unknown> }).FOOTER;
+  const typeBlock = (report as { TYPE?: Record<string, unknown> }).TYPE;
+
   const record: BenchmarkScanRecord = {
     earlyReason: scoreable.earlyReason ?? null,
     flags,
     latency,
+    lockedAt: args.snapshot.lockedAt ?? null,
     name: scoreable.name ?? null,
     pngRelativePath: pngRel,
     reportRelativePath: reportRel,
@@ -378,6 +435,15 @@ export const recordBenchmarkScan = async (
     uploadError: null,
     uploadStatus: session.ingestionUrl ? 'pending' : 'skipped',
     winningChannel,
+    ocrTitle: ocrTimingFromReport(titleBlock),
+    ocrFooter: ocrTimingFromReport(footerBlock),
+    ocrType: ocrTimingFromReport(typeBlock),
+    detectorEngine: scoreable.detectorEngine ?? null,
+    actualDetectorEngine: scoreable.actualDetectorEngine ?? null,
+    detectorFallbackReason:
+      (args.payload.detectorFallbackReason as string | undefined) ?? null,
+    artConflict: Boolean(scoreable.artConflict),
+    titleFooterConflict: Boolean(scoreable.titleFooterConflict),
   };
 
   session.scans.push(record);
@@ -388,6 +454,19 @@ export const recordBenchmarkScan = async (
   if (session.ingestionUrl && record.uploadStatus === 'pending') {
     enqueueBenchmarkUpload(session.sessionId, record.seq);
     void kickUploadQueue();
+  }
+
+  await loadInboxSettings();
+  if (isInboxConfigured()) {
+    void enqueueBenchmarkInboxScan({
+      pngUri: image && image.width === CARD_WIDTH && image.height === CARD_HEIGHT
+        ? `${dir}${pngRel}`
+        : null,
+      reportUri: `${dir}${reportRel}`,
+      scannerPhase: phase,
+      seq,
+      sessionId: session.sessionId,
+    });
   }
 
   if (session.scans.length >= session.targetCount) {
@@ -470,7 +549,9 @@ export const exportBenchmarkSessionZip = async (
 
   // Ensure summary exists for export.
   if (!session.summary) {
-    session.summary = buildSessionSummary(session.scans, session.targetCount);
+    session.summary = buildSessionSummary(session.scans, session.targetCount, {
+      printingEntries: session.environment?.printingEntries ?? null,
+    });
     await persistSession(session);
   }
 
@@ -478,6 +559,14 @@ export const exportBenchmarkSessionZip = async (
   entries.push({
     data: new TextEncoder().encode(JSON.stringify(session, null, 2)),
     name: 'session.json',
+  });
+  entries.push({
+    data: new TextEncoder().encode(JSON.stringify(session.summary, null, 2)),
+    name: 'session-summary.json',
+  });
+  entries.push({
+    data: new TextEncoder().encode(formatSummaryText(session.summary)),
+    name: 'session-summary.txt',
   });
   entries.push({
     data: new TextEncoder().encode(formatSummaryText(session.summary)),
@@ -498,7 +587,6 @@ export const exportBenchmarkSessionZip = async (
       const b64 = await FileSystem.readAsStringAsync(`${dir}${scan.pngRelativePath}`, {
         encoding: 'base64',
       });
-      // Decode base64 → bytes for ZIP.
       const binary = atob(b64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -506,6 +594,38 @@ export const exportBenchmarkSessionZip = async (
     } catch {
       /* skip missing png */
     }
+  }
+
+  // Failure corpus copies (if present on disk).
+  try {
+    const failDir = `${dir}failures/`;
+    const failInfo = await FileSystem.getInfoAsync(failDir);
+    if (failInfo.exists) {
+      const names = await FileSystem.readDirectoryAsync(failDir);
+      for (const name of names) {
+        try {
+          if (name.endsWith('.png')) {
+            const b64 = await FileSystem.readAsStringAsync(`${failDir}${name}`, {
+              encoding: 'base64',
+            });
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            entries.push({ data: bytes, name: `failures/${name}` });
+          } else {
+            const text = await FileSystem.readAsStringAsync(`${failDir}${name}`);
+            entries.push({
+              data: new TextEncoder().encode(text),
+              name: `failures/${name}`,
+            });
+          }
+        } catch {
+          /* skip one file */
+        }
+      }
+    }
+  } catch {
+    /* no failures dir */
   }
 
   const zipBytes = buildStoreZip(entries);

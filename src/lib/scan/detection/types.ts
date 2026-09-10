@@ -23,6 +23,22 @@ export interface DetectionCandidateDebug {
 
 export interface DetectionDebug {
   candidates: DetectionCandidateDebug[];
+  /** Instantaneous detector winner (not the tracked lock quad). */
+  rawCorners?: CardCorners | null;
+  recognitionCorners?: CardCorners | null;
+  recognitionQuadSource?: string | null;
+  recognitionQuadValid?: boolean;
+  recognitionRejectReasons?: string[];
+  /** Continuity / hysteresis decision for this frame (optional). */
+  continuityReason?: string;
+  roleSwitchCount?: number;
+  selectedRole?: string;
+  trackAge?: number;
+  trackHoldReason?: string | null;
+  trackId?: number;
+  trackResetReason?: string | null;
+  trackUpdateReason?: string | null;
+  trackedQuadUpdatedAt?: number | null;
   /** Wall time of detectCardQuadExtras, ms. */
   ms: number;
   selectedIndex: number;

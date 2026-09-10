@@ -355,6 +355,14 @@ export const PREPROCESS_VARIANTS: readonly PreprocessVariant[] = [
 export const PRODUCTION_VARIANT = 'trim-polarity-stretch-scurve';
 
 /**
+ * Fast first-pass preprocess for mobile OCR latency.
+ * Skips upscale/scurve — title crops are already ~64–80 px tall.
+ * Fallback to {@link enhanceForOcr} only when the first pass is weak.
+ */
+export const enhanceForOcrFast = (image: ScanImage): ScanImage =>
+  contrastStretch(normalizePolarity(trimToTextBand(image)), 0.02);
+
+/**
  * The shipping preprocessing chain, chosen by `scan-eval.mjs --variants` over the
  * corpus rather than by argument.
  *

@@ -1,5 +1,5 @@
 /**
- * Native OCR result shape — maps 1:1 onto portable `TextRecognitionResult`
+ * Native OCR result shape — maps onto portable `TextRecognitionResult`
  * (`src/lib/scan/textRecognizer.ts`). Magic ranking stays in shared TS.
  */
 
@@ -17,6 +17,18 @@ export type NativeOcrWord = {
   boundingBox?: NativeOcrRect;
 };
 
+/** Native-clock-local stage timings (ms). Do not subtract from JS epochs. */
+export type NativeOcrStageTiming = {
+  /** Base64/file decode only (0 for rgba-bytes). */
+  decodeMs: number;
+  /** RGBA → Bitmap. */
+  bitmapMs: number;
+  /** ML Kit process(). */
+  mlkitMs: number;
+  /** End-to-end native (decode+bitmap+mlkit). */
+  timingMs: number;
+};
+
 export type NativeOcrResult = {
   /** Exactly what the engine returned, before normalization. */
   text: string;
@@ -25,6 +37,13 @@ export type NativeOcrResult = {
   words: NativeOcrWord[];
   /** Recognizer-only duration on the native clock (ms). */
   timingMs: number;
+  decodeMs?: number;
+  bitmapMs?: number;
+  mlkitMs?: number;
+  bytesIn?: number;
+  transport?: 'rgba-bytes' | 'rgba-base64' | 'file' | string;
+  width?: number;
+  height?: number;
   /**
    * Present when the native path could not run (e.g. stub / hard failure).
    * Starts with `ERR_NOT_IMPLEMENTED` for the scaffolding stub path.
@@ -32,18 +51,33 @@ export type NativeOcrResult = {
   errorCode?: string;
 };
 
+export type NativeOcrWarmUpResult = {
+  alreadyWarm: boolean;
+  timingMs: number;
+};
+
 export type ImplementationStatus = 'stub' | 'partial' | 'ready';
 
 export type LuginOcrNativeModule = {
   implementationStatus: ImplementationStatus;
   /**
-   * RGBA base64 (length width*height*4, R,G,B,A) → OCR result.
-   * Intended for normalized 744×1039 region crops, not live camera frames.
+   * Production hot path: packed RGBA Uint8Array (length width*height*4).
+   * Prefer this — no base64.
+   */
+  recognizeFromRgbaBytes?(
+    rgba: Uint8Array,
+    width: number,
+    height: number,
+  ): Promise<NativeOcrResult>;
+  /**
+   * Legacy RGBA base64 — avoid on hot path.
    */
   recognizeFromRgba(rgbaBase64: string, width: number, height: number): Promise<NativeOcrResult>;
   /**
    * JPEG/PNG file path (file:// or absolute) → OCR result.
-   * Useful for debug bundles / temp-file bridges without RGBA round-trips.
+   * Debug / offline only — not the scan hot path.
    */
   recognizeFromFile(path: string): Promise<NativeOcrResult>;
+  /** Tiny dummy OCR to warm ML Kit (idempotent). */
+  warmUp?(): Promise<NativeOcrWarmUpResult>;
 };

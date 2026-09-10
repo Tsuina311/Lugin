@@ -213,6 +213,7 @@ const SEEDS = [
   { set: 'stx', number: '375', tag: 'stx' },
   { set: 'afr', number: '066', tag: 'pixie-guide' },
   { set: 'afc', number: '30', tag: 'chaos-dragon' },
+  { set: 'afc', number: '301', tag: 'maddening-hex-showcase' },
   { set: 'mid', number: '1', tag: 'midnight' },
   { set: 'vow', number: '1', tag: 'vow' },
   { set: 'neo', number: '370', tag: 'neo-showcase' },

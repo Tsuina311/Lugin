@@ -21,6 +21,16 @@ import {
   type PrintingLookupHit,
 } from '../printing/index';
 import {
+  extractFooterEvidence,
+  lookupPrintingTitleRestricted,
+  type FooterEvidence,
+} from '../printing/footerEvidence';
+import {
+  applyTypeEvidenceScores,
+  matchTypeReading,
+  type TypeIndex,
+} from '../typeIndex/index';
+import {
   ARTWORK_ONLY_VISUAL_MARGIN,
   fuseEvidence,
   type CandidateEvidence,
@@ -42,6 +52,13 @@ import {
   temporalSupportFor,
   type TemporalState,
 } from '../temporal/consensus';
+import {
+  buildTitleOcrDebug,
+  captureTitleOcrBuffers,
+  consumeOcrDebugMatrixSlot,
+  runOcrDebugMatrix,
+  type TitleOcrDebug,
+} from '../ocrDebug';
 import { cropImage, type ScanImage } from '../types';
 
 export type EarlyIdentityReason =
@@ -60,14 +77,23 @@ export interface RecognizeDeps {
   nameIndex: CardNameIndex | null;
   /** Local set+collector → printings (offline). */
   printingIndex?: PrintingIndex | null;
+  /** Compact type-line index (supporting evidence). */
+  typeIndex?: TypeIndex | null;
   /** Optional OCR — when omitted, only artwork (if any) runs. */
   ocr?: TextRecognizer | null;
+  /**
+   * Prefer this over reading `ocr` once (e.g. after `{...deps}` spread on a
+   * Proxy). Live mobile wires this to `getOrCreateOcrRecognizer`.
+   */
+  resolveOcr?: () => TextRecognizer | null;
   textIndex?: TextIndexData | null;
   /**
    * Fired when a provisional identity/printing is ready before all channels
    * finish (title-only, footer-printing, dual, etc.).
    */
   onEarlyIdentity?: (result: RecognizeResult) => void;
+  /** Optional per-pass recognize options (mobile perf baseline). */
+  recognizeOptions?: () => RecognizeOptions;
 }
 
 export interface RecognizeOptions {
@@ -84,6 +110,8 @@ export interface RecognizeOptions {
   skipFooter?: boolean;
   /** Force type-line OCR. */
   wantTypeLine?: boolean;
+  /** Skip type-line OCR entirely (perf baseline). */
+  skipTypeLine?: boolean;
   /** Eval: skip artwork matching. */
   skipArtwork?: boolean;
   /** Test/eval: delay artwork so title can win the race. */
@@ -92,6 +120,23 @@ export interface RecognizeOptions {
   footerDelayMs?: number;
   /** Test/eval: delay title. */
   titleDelayMs?: number;
+  /**
+   * Debug: run the one-shot raw/enhanced/full/legacy OCR matrix.
+   * Consumed at most once per process — never the production hot path.
+   */
+  runOcrDebugMatrix?: boolean;
+  /** Debug: old base64 OCR bridge for a same-image comparison. */
+  legacyOcr?: TextRecognizer | null;
+  /**
+   * Title preprocess. Live scanner defaults to fast.
+   * Known-good baseline (`1dd4932`) used full `enhanceForOcr` (false).
+   */
+  fastPreprocess?: boolean;
+  /**
+   * Stop after the first tidied title framing. Live scanner defaults to true.
+   * Known-good baseline ran every title framing (false).
+   */
+  stopAfterFirstTitle?: boolean;
 }
 
 export interface RecognizeTimings {
@@ -113,6 +158,22 @@ export interface RecognizeTimings {
   printingResolvedAt?: number;
   earlyReason?: EarlyIdentityReason;
   artMode?: ArtSearchMode;
+  /** OCR scheduling: title-first | parallel | atlas */
+  ocrSchedule?: string;
+  titleCropW?: number;
+  titleCropH?: number;
+  titleBytes?: number;
+  titleMlkitMs?: number;
+  titleNativeMs?: number;
+  titleEncodeMs?: number;
+  titleJsBridgeMs?: number;
+  titleTransport?: string;
+  footerCropW?: number;
+  footerCropH?: number;
+  footerBytes?: number;
+  footerMlkitMs?: number;
+  footerNativeMs?: number;
+  footerTransport?: string;
 }
 
 export interface RecognizeResult {
@@ -132,6 +193,8 @@ export interface RecognizeResult {
   earlyIdentity?: boolean;
   /** How provisional identity was first surfaced (if at all). */
   earlyReason?: EarlyIdentityReason;
+  /** Exact title-OCR buffers + metadata for the debug inbox. */
+  ocrDebug?: TitleOcrDebug;
 }
 
 const now = (): number =>
@@ -175,23 +238,119 @@ const runTitle = async (
   card: ScanImage,
   profile: ScanProfile,
   deps: RecognizeDeps,
+  options: RecognizeOptions,
   skip: boolean,
 ): Promise<{
+  ocrDebug: TitleOcrDebug;
   readings: Reading[];
   titleCandidates: NameCandidate[];
   titleMs: number;
+  ocrEngineSamples: OcrSampleLite[];
 }> => {
-  if (skip || !deps.ocr || !deps.nameIndex) {
-    return { readings: [], titleCandidates: [], titleMs: 0 };
+  const buffers = captureTitleOcrBuffers(card);
+  const ocrEngine = deps.resolveOcr?.() ?? deps.ocr ?? null;
+  if (skip || !ocrEngine) {
+    return {
+      ocrDebug: buildTitleOcrDebug({
+        card,
+        enhanced: buffers.enhanced,
+        invoked: false,
+        ocrSkippedReason: skip ? 'skipOcr' : 'no-ocr',
+        raw: buffers.raw,
+        rect: buffers.rect,
+      }),
+      readings: [],
+      titleCandidates: [],
+      titleMs: 0,
+      ocrEngineSamples: [],
+    };
   }
   const t0 = now();
-  const title = await readTitle(card, deps.ocr, { profile });
-  const titleCandidates = matchReadings(title.readings, deps.nameIndex, { limit: TITLE_TOP_N });
+  let firstPass: {
+    enhancedCrop: ScanImage;
+    rawCrop: ScanImage;
+    cropRect: typeof buffers.rect;
+  } | null = null;
+  let firstResult: Awaited<ReturnType<TextRecognizer['recognize']>> | null = null;
+  const ocr: TextRecognizer = {
+    recognize: async (image, opts) => {
+      const result = await ocrEngine.recognize(image, opts);
+      if (!firstResult) firstResult = result;
+      return result;
+    },
+  };
+  const title = await readTitle(card, ocr, {
+    profile,
+    stopAfterFirstTitle: options.stopAfterFirstTitle !== false,
+    fastPreprocess: options.fastPreprocess !== false,
+    onTitlePass: info => {
+      if (!firstPass) {
+        firstPass = {
+          cropRect: info.cropRect,
+          enhancedCrop: info.enhancedCrop,
+          rawCrop: info.rawCrop,
+        };
+      }
+    },
+  });
+  const raw = firstPass?.rawCrop ?? buffers.raw;
+  const enhanced = firstPass?.enhancedCrop ?? buffers.enhanced;
+  const rect = firstPass?.cropRect ?? buffers.rect;
+  let matrix = null;
+  if (options.runOcrDebugMatrix === true && consumeOcrDebugMatrixSlot()) {
+    matrix = await runOcrDebugMatrix({
+      card,
+      enhancedTitle: enhanced,
+      legacyRecognize: options.legacyOcr ?? null,
+      rawTitle: raw,
+      recognize: deps.ocr,
+    });
+  }
+  const titleCandidates = deps.nameIndex
+    ? matchReadings(title.readings, deps.nameIndex, { limit: TITLE_TOP_N })
+    : [];
   return {
+    ocrDebug: buildTitleOcrDebug({
+      card,
+      completedAt: now(),
+      enhanced,
+      invoked: true,
+      matrix,
+      ocrSkippedReason: deps.nameIndex ? null : 'no-name-index',
+      raw,
+      rect,
+      result: firstResult,
+      submittedAt: t0,
+    }),
     readings: title.readings,
     titleCandidates,
     titleMs: now() - t0,
+    ocrEngineSamples: title.samples.map(s => ({
+      region: s.region,
+      ms: s.ms,
+      cropWidth: s.cropWidth,
+      cropHeight: s.cropHeight,
+      engineBytes: s.engineBytes,
+      engineTransport: s.engineTransport,
+      engineMlkitMs: s.engineMlkitMs,
+      engineNativeMs: s.engineNativeMs,
+      engineEncodeMs: s.engineEncodeMs,
+      engineJsBridgeMs: s.engineJsBridgeMs,
+    })),
   };
+};
+
+type OcrSampleLite = {
+  region: string;
+  ms: number;
+  cropWidth: number;
+  cropHeight: number;
+  engineBytes?: number;
+  engineTransport?: string;
+  engineMlkitMs?: number;
+  engineNativeMs?: number;
+  engineEncodeMs?: number;
+  engineJsBridgeMs?: number;
 };
 
 const mergeCandidates = (
@@ -267,11 +426,24 @@ export const isStrongDualEvidence = (fused: FusedResult): boolean => {
 
 /** Near-exact title alone may identify the oracle (printing stays pending). */
 export const isStrongTitleOnly = (fused: FusedResult): boolean => {
-  const top = fused.candidates[0];
-  const second = fused.candidates[1];
+  const byTitle = fused.candidates
+    .filter(r => (r.titleScore ?? 0) > 0)
+    .sort((a, b) => (b.titleScore ?? 0) - (a.titleScore ?? 0));
+  const top = byTitle[0];
+  const second = byTitle[1];
   if (!top?.titleScore) return false;
   const titleMargin = top.titleScore - (second?.titleScore ?? 0);
-  return top.titleScore >= 0.94 && titleMargin >= 0.2 && fused.margin >= 0.1;
+  // Accept when title is sticky even if fused #1 was art (sticky fusion promotes).
+  if (top.titleScore >= 0.94 && titleMargin >= 0.2) return true;
+  if (
+    fused.card &&
+    fused.card.name === top.name &&
+    top.titleScore >= TITLE_STRONG &&
+    titleMargin >= 0.12
+  ) {
+    return true;
+  }
+  return false;
 };
 
 /**
@@ -378,7 +550,7 @@ export const recognizeCard = async (
   options: RecognizeOptions = {},
   temporal: TemporalState = emptyTemporal(),
 ): Promise<{ result: RecognizeResult; temporal: TemporalState }> => {
-  const timings: RecognizeTimings = {};
+  const timings: RecognizeTimings = { ocrSchedule: 'title-first' };
   const profile = options.profile ?? profileForCard(card.width, card.height);
   const matcher = deps.artwork ?? createArtworkMatcher(deps.artworkIndex ?? null);
   const totalAt = now();
@@ -387,6 +559,7 @@ export const recognizeCard = async (
   type TitleOut = Awaited<ReturnType<typeof runTitle>>;
   type FooterOut = {
     collector: CollectorParts;
+    evidence: FooterEvidence;
     hit: PrintingLookupHit | null;
     lookupMs: number;
     ms: number;
@@ -400,6 +573,19 @@ export const recognizeCard = async (
   let printingResolvedAt: number | undefined;
   let titleFooterConflict = false;
   let lastPrinting: FusedResult['printing'] | undefined;
+
+  const refineFooterHit = (): void => {
+    if (!footerOut || !deps.printingIndex) return;
+    const title = titleOut?.titleCandidates[0];
+    if (!title || (title.score ?? 0) < 0.82) return;
+    const restricted = lookupPrintingTitleRestricted(deps.printingIndex, {
+      evidence: footerOut.evidence,
+      titleName: title.name,
+    });
+    if (restricted?.candidates?.length) {
+      footerOut = { ...footerOut, hit: restricted };
+    }
+  };
 
   const fireEarly = (
     reason: Exclude<EarlyIdentityReason, null>,
@@ -536,7 +722,8 @@ export const recognizeCard = async (
     if (titleOut && artOut && !footerOut?.hit) {
       if (isStrongDualEvidence(fused)) fireEarly('dual', fused);
       else if (isStrongTitleOnly(fused)) fireEarly('title-only', fused);
-      else if (isStrongArtOnly(fused)) fireEarly('art-only', fused);
+      // Never early-fire art-only when a sticky title already identified the card.
+      else if (!fused.card && isStrongArtOnly(fused)) fireEarly('art-only', fused);
     }
   };
 
@@ -562,18 +749,65 @@ export const recognizeCard = async (
     return null;
   };
 
-  // --- parallel channels ---
+  // --- channels: title first (MODE A), then footer; art parallel with title ---
+  const titlePromise: Promise<TitleOut> = (async (): Promise<TitleOut> => {
+    if (options.titleDelayMs && options.titleDelayMs > 0) await sleep(options.titleDelayMs);
+    const out = await runTitle(card, profile, deps, options, options.skipOcr === true);
+    titleOut = out;
+    timings.titleMs = out.titleMs;
+    timings.titleDoneAt = now() - totalAt;
+    if (out.ocrEngineSamples[0]) {
+      const s = out.ocrEngineSamples[0];
+      timings.titleCropW = s.cropWidth;
+      timings.titleCropH = s.cropHeight;
+      timings.titleBytes = s.engineBytes;
+      timings.titleMlkitMs = s.engineMlkitMs;
+      timings.titleNativeMs = s.engineNativeMs;
+      timings.titleEncodeMs = s.engineEncodeMs;
+      timings.titleJsBridgeMs = s.engineJsBridgeMs;
+      timings.titleTransport = s.engineTransport;
+    }
+    tryEarlyFromPartial();
+    return out;
+  })();
+
   const footerPromise = (async (): Promise<FooterOut | null> => {
     if (options.skipOcr || options.skipFooter || !deps.ocr) return null;
+    // Wait for title so ML Kit isn't contended and identity can publish first.
+    await titlePromise;
+    refineFooterHit();
     if (options.footerDelayMs && options.footerDelayMs > 0) await sleep(options.footerDelayMs);
     const t0 = now();
-    const { parts } = await readCollector(card, deps.ocr, (into, incoming) =>
-      mergePartsForScan(into, incoming, { nameLocked: true }),
+    const { parts, samples } = await readCollector(
+      card,
+      deps.ocr,
+      (into, incoming) => mergePartsForScan(into, incoming, { nameLocked: true }),
+      { fastPreprocess: true, footerPrimaryOnly: true },
     );
+    const rawBlob = [parts.raw, ...samples.map(s => s.rawText)].filter(Boolean).join('\n');
+    const evidence = extractFooterEvidence(rawBlob);
+    const collector: CollectorParts = {
+      ...parts,
+      collectorNumber: parts.collectorNumber ?? evidence.collectorCandidates[0]?.value,
+      setCode: parts.setCode ?? evidence.setCodeCandidates[0]?.value,
+      raw: evidence.rawText || parts.raw,
+    };
     const tLookup = now();
-    const hit = lookupPrinting(deps.printingIndex, parts);
+    let hit = lookupPrinting(deps.printingIndex, collector);
+    const titleSnap = titleOut as {
+      titleCandidates: NameCandidate[];
+    } | null;
+    const title = titleSnap?.titleCandidates[0];
+    if ((!hit || !uniquePrinting(hit)) && title && (title.score ?? 0) >= 0.82) {
+      hit =
+        lookupPrintingTitleRestricted(deps.printingIndex, {
+          evidence,
+          titleName: title.name,
+        }) ?? hit;
+    }
     const out: FooterOut = {
-      collector: parts,
+      collector,
+      evidence,
       hit,
       lookupMs: now() - tLookup,
       ms: now() - t0,
@@ -582,16 +816,14 @@ export const recognizeCard = async (
     timings.footerMs = out.ms;
     timings.footerLookupMs = out.lookupMs;
     timings.footerDoneAt = now() - totalAt;
-    tryEarlyFromPartial();
-    return out;
-  })();
-
-  const titlePromise = (async (): Promise<TitleOut> => {
-    if (options.titleDelayMs && options.titleDelayMs > 0) await sleep(options.titleDelayMs);
-    const out = await runTitle(card, profile, deps, options.skipOcr === true);
-    titleOut = out;
-    timings.titleMs = out.titleMs;
-    timings.titleDoneAt = now() - totalAt;
+    if (samples[0]) {
+      timings.footerCropW = samples[0].cropWidth;
+      timings.footerCropH = samples[0].cropHeight;
+      timings.footerBytes = samples.reduce((sum, s) => sum + (s.engineBytes ?? 0), 0);
+      timings.footerMlkitMs = samples.reduce((sum, s) => sum + (s.engineMlkitMs ?? 0), 0);
+      timings.footerNativeMs = samples.reduce((sum, s) => sum + (s.engineNativeMs ?? 0), 0);
+      timings.footerTransport = samples[0].engineTransport;
+    }
     tryEarlyFromPartial();
     return out;
   })();
@@ -614,12 +846,9 @@ export const recognizeCard = async (
       tryEarlyFromPartial();
       return empty;
     }
-    // Prefer waiting briefly for footer/title restrict signal without hard barrier.
+    // Brief wait for title restrict signal only — never gate art on footer OCR.
     const raceMs = 40;
-    await Promise.race([
-      Promise.all([footerPromise, titlePromise]),
-      sleep(raceMs),
-    ]);
+    await Promise.race([titlePromise, sleep(raceMs)]);
     const restrict = restrictFromEvidence();
     const t0 = now();
     const artCrop = cropImage(card, profile.artwork);
@@ -741,29 +970,26 @@ export const recognizeCard = async (
       fused.status === 'card-ambiguous' ||
       fused.status === 'insufficient-confidence');
 
-  if (needType && !options.skipOcr && deps.ocr) {
+  if (
+    needType &&
+    !options.skipOcr &&
+    !options.skipTypeLine &&
+    deps.ocr
+  ) {
     const t0 = now();
     const typeRead = await readTypeLine(card, deps.ocr, { profile });
-    const typeTokens = new Set(typeRead.tokens);
-    if (typeTokens.size && deps.textIndex) {
-      const byName = new Map(deps.textIndex.entries.map(e => [e.name, e]));
-      for (const c of fused.candidates.slice(0, 8)) {
-        const entry =
-          lookupTextEntry(
-            deps.textIndex,
-            c.oracleId.replace(/^name:/, '').replace(/^oracle:/, ''),
-          ) ?? byName.get(c.name);
-        if (!entry) continue;
-        const hit = entry.tokens.some(t => typeTokens.has(t));
-        if (!hit) continue;
-        const row = byOracle.get(c.oracleId) ?? {
-          name: c.name,
-          oracleId: c.oracleId,
-          possiblePrintingIds: [...(c.possiblePrintingIds ?? [])],
-        };
-        row.typeLineScore = Math.max(row.typeLineScore ?? 0, 0.55);
-        byOracle.set(c.oracleId, row);
-      }
+    const titleOracleHints = fused.candidates
+      .slice(0, 8)
+      .map(c => c.oracleId.replace(/^oracle:/, '').replace(/^name:/, ''))
+      .filter(Boolean);
+    if (deps.typeIndex) {
+      const typeEv = matchTypeReading(
+        typeRead.raw,
+        deps.typeIndex,
+        titleOracleHints.length ? titleOracleHints : undefined,
+      );
+      applyTypeEvidenceScores(byOracle, typeEv);
+      // Weak type must not override exact/sticky title — fuseEvidence sticky handles that.
       fused = fuseEvidence(
         [...byOracle.values()].map(r => ({
           ...r,
@@ -772,6 +998,36 @@ export const recognizeCard = async (
         { allowTitleOnly: true, allowStrongDual: true },
       );
       fused = attachPrinting(fused, lastPrinting);
+    } else {
+      const typeTokens = new Set(typeRead.tokens);
+      if (typeTokens.size && deps.textIndex) {
+        const byName = new Map(deps.textIndex.entries.map(e => [e.name, e]));
+        for (const c of fused.candidates.slice(0, 8)) {
+          const entry =
+            lookupTextEntry(
+              deps.textIndex,
+              c.oracleId.replace(/^name:/, '').replace(/^oracle:/, ''),
+            ) ?? byName.get(c.name);
+          if (!entry) continue;
+          const hit = entry.tokens.some(t => typeTokens.has(t));
+          if (!hit) continue;
+          const row = byOracle.get(c.oracleId) ?? {
+            name: c.name,
+            oracleId: c.oracleId,
+            possiblePrintingIds: [...(c.possiblePrintingIds ?? [])],
+          };
+          row.typeLineScore = Math.max(row.typeLineScore ?? 0, 0.55);
+          byOracle.set(c.oracleId, row);
+        }
+        fused = fuseEvidence(
+          [...byOracle.values()].map(r => ({
+            ...r,
+            temporalSupport: temporalSupportFor(temporal, r.oracleId),
+          })),
+          { allowTitleOnly: true, allowStrongDual: true },
+        );
+        fused = attachPrinting(fused, lastPrinting);
+      }
     }
     timings.typeLineMs = now() - t0;
   }
@@ -822,6 +1078,7 @@ export const recognizeCard = async (
       titleCandidates,
       titleFooterConflict,
       visualTop,
+      ocrDebug: finalTitle.ocrDebug,
     },
     temporal: nextTemporal,
   };

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lugin-geometry-fixture-v1",
+  "title": "Lugin Geometry Fixture",
+  "description": "Ground-truth card quads in source-image pixel coordinates. schemaVersion must be 1.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "image", "source", "cards"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string" },
+    "image": { "type": "string", "description": "Repo-relative path to source image" },
+    "imageWidth": { "type": ["integer", "null"] },
+    "imageHeight": { "type": ["integer", "null"] },
+    "source": {
+      "type": "string",
+      "enum": [
+        "scanner-lab",
+        "focus-series",
+        "capture-quality",
+        "swap-test",
+        "replay",
+        "scan-real",
+        "geometry-trace",
+        "detector-debug",
+        "real-photos",
+        "unknown"
+      ]
+    },
+    "seriesId": { "type": ["string", "null"] },
+    "captureGroup": { "type": ["string", "null"] },
+    "trusted": { "type": "boolean" },
+    "hardRegression": { "type": "boolean" },
+    "negative": { "type": "boolean" },
+    "split": {
+      "type": ["string", "null"],
+      "enum": ["train", "validation", "test", null]
+    },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "cards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "groundTruthSource"],
+        "properties": {
+          "id": { "type": "string" },
+          "groundTruthQuad": {
+            "type": ["object", "null"],
+            "properties": {
+              "tl": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+              "tr": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+              "br": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+              "bl": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }
+            },
+            "required": ["tl", "tr", "br", "bl"]
+          },
+          "visibility": { "enum": ["full", "partial"] },
+          "occluded": { "type": "boolean" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "groundTruthSource": {
+            "enum": [
+              "existing-recognition-quad",
+              "existing-tracked-quad",
+              "existing-raw-quad",
+              "per-snapshot-quad",
+              "existing-annotation",
+              "manually-reviewed",
+              "synthetic",
+              "none"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

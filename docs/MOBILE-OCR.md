@@ -1,21 +1,44 @@
 # Native OCR engine
 
-Status: **engine chosen — ML Kit Latin via thin Expo module.** High-res
-Recognition Input gate **PASSED**. Batch `lugin-ocr` with
-`lugin-card-detector` in the **next development APK** (fingerprint change).
-Do not ship tesseract.js in RN.
+Status: **ML Kit Latin via `lugin-ocr`.** Production hot path is **RGBA
+Uint8Array → native Bitmap → ML Kit** (no base64). High-res Recognition Input
+gate **PASSED**. Changes to the Kotlin module require a **new development APK**
+(fingerprint change). Do not ship tesseract.js in RN.
 
-Artwork matching and fusion already run without OCR. Title / rules / footer
-evidence stay **unavailable** (`ocr: null`) until the new APK links
-`lugin-ocr`; after that, `useScanSession` feature-detects the module and
-passes `createMlkitTextRecognizer()`.
+Artwork matching and fusion already run without OCR. Title / footer evidence
+stay **unavailable** (`ocr: null`) until the APK links `lugin-ocr`; after that,
+`useScanSession` feature-detects the module and passes
+`createMlkitTextRecognizer()`.
 
 The portable seam is `TextRecognizer` in `src/lib/scan/textRecognizer.ts`.
-Native returns `TextRecognitionResult` (raw text + word boxes + confidence).
-It must **not** decide Magic identity — ranking stays in shared TypeScript.
+Native returns `TextRecognitionResult` (raw text + word boxes + confidence +
+optional `engine` stage timings). It must **not** decide Magic identity —
+ranking stays in shared TypeScript.
 
-OCR runs on **normalized 744×1039 region crops** (title, text box, footer,
-collector) — never on full camera frames, and never at detector cadence.
+OCR runs on **normalized 744×1039 region crops** (title, footer, optional type)
+— never on full camera frames, and never at detector cadence.
+
+## Latency emergency path (2026)
+
+| Stage | Contract |
+| --- | --- |
+| Transport | `recognizeFromRgbaBytes(Uint8Array, w, h)` — **no base64** on hot path |
+| Crop | Crop in shared TS **before** bridge (title ≈ 536×75 RGBA ≈ 160 KB) |
+| Schedule | **Title first**; footer waits; art parallel (non-OCR) |
+| Preprocess | `enhanceForOcrFast` first; one full `enhanceForOcr` fallback if empty |
+| Lifecycle | Single lazy ML Kit `TextRecognizer`; `warmUp()` on scanner enter |
+| Identity | Exact / strong title → publish immediately; do not wait for footer/art |
+
+Legacy `recognizeFromRgba(base64, …)` remains only for older APKs until rebuilt.
+
+Expected payload sizes (RGBA, before any trim):
+
+| Region | Approx bytes |
+| --- | --- |
+| Full card 744×1039 | ~3.0 MB (never transfer for OCR) |
+| Title crop | ~160 KB |
+| Footer number+set (2 crops) | ~80–120 KB total |
+| Type line | ~120 KB |
 
 ## Compatibility target
 
@@ -32,20 +55,6 @@ collector) — never on full camera frames, and never at detector cadence.
 | Tesseract native wrappers | Rejected | Unreliable New Arch story. Web keeps `tesseract.js`; do **not** copy it into RN. |
 | VisionCamera frame processors + OCR | Rejected | Would put recognition closer to native pixels; shared code owns identity. OCR stays on warped region crops. |
 
-### Why ML Kit (rationale)
-
-1. Thin local Expo module is smaller and safer than adopting an abandoned RN
-   wrapper on RN 0.86 / New Architecture.
-2. Bundled `com.google.mlkit:text-recognition` (Latin) is offline and does not
-   depend on a Play Services model download for the common EN card path.
-3. Output maps cleanly onto `TextRecognitionResult` (`text`, `words[]` with
-   boxes + confidence). Magic matching stays in `readCard` / fuse.
-4. Fingerprint already changes for `lugin-card-detector` — batch OCR in the
-   same next APK rather than a second native rebuild.
-
-Oracle top-1 / top-5 on fixtures remains the quality bar after the APK lands;
-character accuracy alone is not the ship gate.
-
 ## Wire-up
 
 | Piece | Location |
@@ -53,30 +62,37 @@ character accuracy alone is not the ship gate.
 | Expo module (Android + ML Kit) | `mobile/modules/lugin-ocr/` |
 | JS adapter (`TextRecognizer`) | `mobile/src/scan/mlkitTextRecognizer.ts` |
 | Session | `useScanSession` → `ocr: isNativeOcrLinked() ? createMlkitTextRecognizer() : null` |
+| Warmup | `warmUpMlkitOcr()` when scanner `enabled` (fire-and-forget) |
 | Empty helper (tests / explicit) | `mobile/src/scan/emptyOcr.ts` |
 
 Native API:
 
-- `recognizeFromRgba(base64, width, height)` → `{ text, confidence, words, timingMs }`
-- `recognizeFromFile(path)` → same (JPEG/PNG temp files)
+- **`recognizeFromRgbaBytes(bytes, width, height)`** → text + words + stage timings (`bitmapMs`, `mlkitMs`, `timingMs`, `bytesIn`, `transport`)
+- `recognizeFromRgba(base64, width, height)` → legacy only
+- `recognizeFromFile(path)` → debug / offline only
+- `warmUp()` → tiny 32×32 bitmap once per recognizer lifecycle
 - `implementationStatus`: `"ready"`
 
 `RecognizeOptions` (mode / whitelist) are accepted for seam parity but not
 forwarded to ML Kit; shared preprocess + post-normalization own character
 constraints.
 
-## Remaining work (title-region path)
+Stage timings: **native-clock-local** vs **JS `performance.now` durations**.
+Do not subtract absolute timestamps across runtimes; report stage-local ms
+separately (debug panel “OCR pipeline”, debug bundle `TITLE` / `FOOTER`).
 
-After the APK links the module:
+## Host replay (Mac)
 
-1. Confirm `isNativeOcrLinked()` on Samsung and that title/text/footer debug
-   chips flip from `unavailable` → `present`.
-2. End-to-end: warped 744×1039 → `readTitle` / rules / footer crops → ML Kit
-   → name index / text evidence / fuse.
-3. Benchmark oracle top-1 / top-5 vs web tesseract on the same fixtures.
-4. Tune shared OCR preprocess only if ML Kit underperforms on foil / glare
-   crops (do not add Magic logic in Kotlin).
-5. iOS Vision adapter later behind the same `TextRecognizer` seam.
+Once a Samsung fixture is in `.scan-fixtures/replay/`, recognition-logic
+changes are evaluated with `yarn scan:replay` / `yarn scan:regression` from
+recorded ML Kit strings. Node does not reproduce Android ML Kit. Phone is
+only for new captures, native detector/focus, or a fresh OCR reading.
 
-Do not bundle SQLite / Drive in the OCR+detector APK unless persistence is
-actually next.
+## Remaining work
+
+1. Ship **one** APK with bytes API + warmup; measure Samsung lock→oracle.
+2. Optional: native `recognizeRegions` if JS crop+bytes still dominates.
+3. Optional: atlas / speculative OCR only after transport is proven fast.
+4. iOS Vision adapter later behind the same `TextRecognizer` seam.
+
+Do not bundle SQLite / Drive in the OCR APK unless persistence is next.

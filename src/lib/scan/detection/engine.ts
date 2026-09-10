@@ -29,6 +29,8 @@ export interface NativeDetectionResult {
     candidateCount?: number;
     nestedInnerPreferred?: boolean;
     rejectReason?: string;
+    workHeight?: number;
+    workWidth?: number;
   };
   /** Detector-only duration on the native clock (ms). */
   timingMs: number;
@@ -47,6 +49,7 @@ export interface DetectorEngine {
   };
   /**
    * Live Native path: Y/luma plane only (no full RGB through RN).
+   * May be sync or async (AsyncFunction) — callers must await.
    * Shared-JS engines leave this undefined.
    */
   detectYPlane?: (
@@ -54,9 +57,15 @@ export interface DetectorEngine {
     width: number,
     height: number,
     rowStride: number,
-  ) => {
-    corners: CardCorners | null;
-    score: number;
-    debug: DetectionDebug;
-  };
+  ) =>
+    | {
+        corners: CardCorners | null;
+        score: number;
+        debug: DetectionDebug;
+      }
+    | Promise<{
+        corners: CardCorners | null;
+        score: number;
+        debug: DetectionDebug;
+      }>;
 }

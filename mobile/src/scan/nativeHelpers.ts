@@ -1,6 +1,6 @@
 // Native FrameHelpers for SessionController.
 //
-// Focus: controller already throttles (700 ms / 1600 ms + 0.04). This helper
+// Focus: controller already bounds attempts (FOCUS_ATTEMPT_MS / cooldown). This helper
 // must not add a second throttle. It does ignore card-center focus for a short
 // window after a user tap so the two do not fight.
 //
@@ -10,6 +10,7 @@ import type { CameraRef } from 'react-native-vision-camera';
 
 import {
   canRecognizeFromStore,
+  invalidateHiResCache,
   putFallback,
   refineFromStore,
   type HiResStore,
@@ -111,5 +112,39 @@ export const createFrameHelpers = (
   requestFocusNorm: (x: number, y: number) => {
     if (Date.now() - state.lastTapAt < TAP_FOCUS_GUARD_MS) return;
     requestFocusOnCamera(camera.current, state.preview, x, y);
+  },
+  captureReport: () => {
+    const snap = state.store.stats.snapshot;
+    const photo = state.store.stats.photo;
+    const frame = state.store.stats['high-res-frame'];
+    const success = snap.success + photo.success + frame.success;
+    const failure = snap.failure + photo.failure + frame.failure;
+    const lastError = snap.lastError ?? photo.lastError ?? frame.lastError ?? state.store.lastAttempt?.reason ?? null;
+    const startedAt = snap.lastRequestedAt ?? photo.lastRequestedAt ?? frame.lastRequestedAt ?? state.store.waitStartedAt;
+    const completedAt = snap.lastCompletedAt ?? photo.lastCompletedAt ?? frame.lastCompletedAt ?? null;
+    return {
+      completedAt,
+      corners: state.store.cache?.corners ?? null,
+      error: lastError,
+      failure,
+      startedAt,
+      success,
+    };
+  },
+  invalidateCapture: (reason: string) => {
+    invalidateHiResCache(state.store, reason);
+  },
+  getFrozenRecognitionInput: () => {
+    const cache = state.store.cache;
+    if (!cache?.source || !cache.mapped) return null;
+    if (cache.attempt.mode === 'analysis-fallback') return null;
+    const snap = state.store.stats.snapshot;
+    const photo = state.store.stats.photo;
+    const frame = state.store.stats['high-res-frame'];
+    return {
+      captureAt: snap.lastCompletedAt ?? photo.lastCompletedAt ?? frame.lastCompletedAt ?? null,
+      recognitionQuad: cache.mapped,
+      source: cache.source,
+    };
   },
 });

@@ -26,6 +26,12 @@ class LuginCardDetectorModule : Module() {
       IMPLEMENTATION_STATUS
     }
 
+    /** Debug bisection: nested sleeve preference ON|OFF (affects next detect). */
+    Function("setNestedSleeveEnabled") { enabled: Boolean ->
+      DetectCard.nestedSleeveEnabled = enabled
+      null
+    }
+
     /**
      * Parity / offline path: packed RGBA bytes → NativeDetectionResult.
      *
@@ -49,17 +55,13 @@ class LuginCardDetectorModule : Module() {
     /**
      * Live path: Y (luma) plane from VisionCamera YUV, no full RGB to RN.
      *
-     * Runs the same WORK_WIDTH luma multi-threshold + Sobel edge path as RGBA.
-     * Chroma is skipped (no RGB available from Y alone).
+     * Return-value AsyncFunction (no explicit Promise arg). The Promise-last-arg
+     * form can resolve as Unit/undefined on some expo-modules-core versions,
+     * which made the live polygon disappear after the emergency APK.
      *
-     * Prefer Uint8Array from JS (no base64).
-     *
-     * @param yBytes    plane-0 bytes (may include row padding)
-     * @param width     visible width
-     * @param height    visible height
-     * @param rowStride bytes per row (>= width)
+     * Runs off the JS thread. Hot-path payload is slim (no candidate list).
      */
-    Function("detectFromYPlane") { yBytes: ByteArray, width: Int, height: Int, rowStride: Int ->
+    AsyncFunction("detectFromYPlane") { yBytes: ByteArray, width: Int, height: Int, rowStride: Int ->
       val started = System.nanoTime()
       validateDimensions(width, height)
       if (rowStride < width) {
@@ -73,7 +75,7 @@ class LuginCardDetectorModule : Module() {
       }
 
       val result = DetectCard.detectFromYPlane(yBytes, width, height, rowStride)
-      toNativeResult(result, elapsedMs(started))
+      toNativeResult(result, elapsedMs(started), slim = true)
     }
   }
 
@@ -103,6 +105,8 @@ private fun elapsedMs(startedNs: Long): Double =
 private fun toNativeResult(
   result: DetectCard.DetectionResult,
   timingMs: Double,
+  /** Hot path: omit candidate list (primary corners only). */
+  slim: Boolean = false,
 ): Map<String, Any?> {
   val cornersPts = result.corners
   if (!result.detected || cornersPts == null || cornersPts.size != 4) {
@@ -113,11 +117,33 @@ private fun toNativeResult(
       "diagnostics" to mapOf(
         "candidateCount" to result.candidateCount,
         "rejectReason" to (result.rejectReason ?: "no card"),
+        "workWidth" to result.workWidth,
+        "workHeight" to result.workHeight,
       ),
     )
   }
 
   val corners = cornersPts.map { mapOf("x" to it.x, "y" to it.y) }
+  val diagnostics =
+    mapOf(
+      "areaRatio" to result.areaRatio,
+      "aspectRatio" to result.aspectRatio,
+      "candidateCount" to result.candidateCount,
+      "nestedInnerPreferred" to result.nestedInnerPreferred,
+      "workWidth" to result.workWidth,
+      "workHeight" to result.workHeight,
+    )
+
+  if (slim) {
+    return mapOf(
+      "detected" to true,
+      "corners" to corners,
+      "score" to result.score,
+      "timingMs" to timingMs,
+      "diagnostics" to diagnostics,
+    )
+  }
+
   val candidates =
     result.candidates.map { c ->
       mapOf(
@@ -135,11 +161,6 @@ private fun toNativeResult(
     "score" to result.score,
     "timingMs" to timingMs,
     "candidates" to candidates,
-    "diagnostics" to mapOf(
-      "areaRatio" to result.areaRatio,
-      "aspectRatio" to result.aspectRatio,
-      "candidateCount" to result.candidateCount,
-      "nestedInnerPreferred" to result.nestedInnerPreferred,
-    ),
+    "diagnostics" to diagnostics,
   )
 }

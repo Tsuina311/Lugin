@@ -25,7 +25,9 @@ export interface DebugShareImages {
 export interface DebugSharePayload {
   analysisLongEdge?: number;
   appStamp?: string | null;
+  actualDetectorEngine?: string | null;
   detectorEngine?: string | null;
+  detectorFallbackReason?: string | null;
   detectorInputColorCorrect?: 'yes' | 'no' | 'unverified';
   deviceLine?: string;
   images?: DebugShareImages;
@@ -35,6 +37,7 @@ export interface DebugSharePayload {
   preferredSource?: string;
   recognitionInputColorCorrect?: 'yes' | 'no' | 'unverified';
   recognitionSource?: string | null;
+  requestedDetectorEngine?: string | null;
   stamp?: string;
 }
 
@@ -144,7 +147,10 @@ export const buildDebugReport = (payload: DebugSharePayload): Record<string, unk
     stamp: payload.stamp ?? null,
     appStamp: payload.appStamp ?? null,
     device: payload.deviceLine ?? null,
-    detectorEngine: payload.detectorEngine ?? null,
+    detectorEngine: payload.actualDetectorEngine ?? payload.detectorEngine ?? null,
+    requestedDetectorEngine: payload.requestedDetectorEngine ?? null,
+    actualDetectorEngine: payload.actualDetectorEngine ?? payload.detectorEngine ?? null,
+    detectorFallbackReason: payload.detectorFallbackReason ?? null,
     detectorLatencyMs:
       (payload.panel.result as { detector?: { ms?: number } } | null | undefined)?.detector?.ms ??
       timings?.detectMs ??
@@ -167,6 +173,14 @@ export const buildDebugReport = (payload: DebugSharePayload): Record<string, unk
       topLocalCandidates: top5(titleCandidates, 'score'),
       titleMs: timings?.titleMs ?? null,
       titleDoneAt: timings?.titleDoneAt ?? null,
+      cropW: timings?.titleCropW ?? null,
+      cropH: timings?.titleCropH ?? null,
+      bytes: timings?.titleBytes ?? null,
+      transport: timings?.titleTransport ?? null,
+      encodeMs: timings?.titleEncodeMs ?? null,
+      jsBridgeMs: timings?.titleJsBridgeMs ?? null,
+      nativeMs: timings?.titleNativeMs ?? null,
+      mlkitMs: timings?.titleMlkitMs ?? null,
     },
     FOOTER: {
       cropDimensions: 'profile.collector regions (set-symbol + collector)',
@@ -181,6 +195,12 @@ export const buildDebugReport = (payload: DebugSharePayload): Record<string, unk
       footerMs: timings?.footerMs ?? null,
       footerLookupMs: timings?.footerLookupMs ?? null,
       footerDoneAt: timings?.footerDoneAt ?? null,
+      cropW: timings?.footerCropW ?? null,
+      cropH: timings?.footerCropH ?? null,
+      bytes: timings?.footerBytes ?? null,
+      transport: timings?.footerTransport ?? null,
+      nativeMs: timings?.footerNativeMs ?? null,
+      mlkitMs: timings?.footerMlkitMs ?? null,
     },
     ART: {
       mode: recognitionSnap?.artMode ?? timings?.artMode ?? null,
@@ -200,6 +220,7 @@ export const buildDebugReport = (payload: DebugSharePayload): Record<string, unk
       decisionReason: fused?.reason ?? recognitionSnap?.earlyReason ?? null,
       agreementConflict: recognitionSnap?.titleFooterConflict ?? null,
       status: fused?.status ?? null,
+      ocrSchedule: timings?.ocrSchedule ?? 'title-first',
       name: (fused?.card as { name?: string } | null | undefined)?.name ?? printing?.name ?? null,
       oracleId: (fused?.card as { oracleId?: string } | null | undefined)?.oracleId ?? null,
       printing: printing

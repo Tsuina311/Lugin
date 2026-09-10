@@ -35,9 +35,19 @@ export interface DetectResult {
   corners: CardCorners | null;
   /** Structured candidates for debug / eval — always populated. */
   debug: DetectionDebug;
+  /** Persistent tracked quad for lock / hi-res (not the smoothed overlay). */
+  lockCorners?: CardCorners | null;
   quad: Quad | null;
+  /** Instantaneous detector winner. */
+  rawCorners?: CardCorners | null;
   /** Confidence-ish score from scoreCardQuad; 0 if none. */
   score: number;
+  /** Alias of lockCorners for overlay / traces. */
+  trackedCorners?: CardCorners | null;
+  /** Complete-card quad for warp / OCR. May differ from trackedCorners. */
+  recognitionCorners?: CardCorners | null;
+  recognitionQuadSource?: string | null;
+  recognitionQuadValid?: boolean;
 }
 
 /** Analysis resolution. Corners are mapped back to full resolution at the end. */

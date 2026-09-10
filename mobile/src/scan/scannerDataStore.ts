@@ -10,15 +10,24 @@ import {
   SCANNER_ASSET_MAX_BYTES,
   SCANNER_MANIFEST_CHECK_INTERVAL_MS,
   SCANNER_MANIFEST_FILENAME,
+  TYPE_INDEX_MIN_PRODUCTION_ORACLES,
   isScannerManifest,
   type ScannerManifest,
 } from '@/lib/scan/scannerManifest';
+import {
+  mayAdvanceLastCheckAfterFailure,
+  needPrintingAsset,
+  needTypeAsset,
+  shouldThrottleScannerManifestCheck,
+} from '@/lib/scan/scannerDataPolicy';
 
 import {
   buildNameIndex,
   buildPrintingIndex,
+  buildTypeIndex,
   createArtworkMatcher,
   validatePrintingIndexData,
+  validateTypeIndexData,
   type ArtworkIndexData,
   type ArtworkMatcher,
   type CardNameIndex,
@@ -26,6 +35,8 @@ import {
   type PrintingIndex,
   type PrintingIndexData,
   type TextIndexData,
+  type TypeIndex,
+  type TypeIndexData,
 } from './sharedCore';
 import {
   textIndexFromArtworkPayload,
@@ -52,6 +63,32 @@ export interface ScannerDataStatus {
   printingEntries: number | null;
   printingChecksum: string | null;
   printingOrigin: ScannerDataOrigin | null;
+  /** Explicit PrintingIndex lifecycle for Settings / debug exports. */
+  printingStatus:
+    | 'absent'
+    | 'bundled'
+    | 'cached'
+    | 'downloading'
+    | 'loaded'
+    | 'failed';
+  printingLoadMs: number | null;
+  printingParseMs: number | null;
+  printingVersion: string | null;
+  typeOracles: number | null;
+  typeSubtypes: number | null;
+  typeSignatures: number | null;
+  typeChecksum: string | null;
+  typeOrigin: ScannerDataOrigin | null;
+  typeStatus:
+    | 'absent'
+    | 'bundled'
+    | 'cached'
+    | 'downloading'
+    | 'loaded'
+    | 'failed';
+  typeLoadMs: number | null;
+  typeParseMs: number | null;
+  typeVersion: string | null;
   statusLabel: 'Current' | 'Update available' | 'Offline' | 'Checking' | 'Unknown';
   updating: boolean;
 }
@@ -73,6 +110,10 @@ export interface ActiveScannerIndexes {
   printingIndex: PrintingIndex | null;
   printingOrigin: ScannerDataOrigin | null;
   text: TextIndexData | null;
+  type: TypeIndexData | null;
+  typeChecksum: string;
+  typeIndex: TypeIndex | null;
+  typeOrigin: ScannerDataOrigin | null;
 }
 
 const META_FILE = 'meta.json';
@@ -89,6 +130,9 @@ interface DiskMeta {
   printingChecksum?: string;
   printingSha256?: string;
   printingVersion?: string;
+  typeChecksum?: string;
+  typeSha256?: string;
+  typeVersion?: string;
 }
 
 const state = {
@@ -97,8 +141,15 @@ const state = {
   lastCheckAt: null as number | null,
   manifest: null as ScannerManifest | null,
   updating: false,
+  printingLoadMs: null as number | null,
+  printingParseMs: null as number | null,
+  typeLoadMs: null as number | null,
+  typeParseMs: null as number | null,
   listeners: new Set<() => void>(),
 };
+
+/** Single-flight: at most one heavy PrintingIndex/TypeIndex load/build at a time. */
+let printingIndexLoadPromise: Promise<ActiveScannerIndexes | null> | null = null;
 
 const notify = () => {
   for (const l of state.listeners) l();
@@ -229,6 +280,10 @@ const activateFromNameData = (
     data: PrintingIndexData | null;
     origin: ScannerDataOrigin | null;
   },
+  type?: {
+    data: TypeIndexData | null;
+    origin: ScannerDataOrigin | null;
+  },
 ): ActiveScannerIndexes => {
   const nameIndex = buildNameIndex(data);
   const artData = art.data;
@@ -236,6 +291,7 @@ const activateFromNameData = (
     ? new Set(artData.entries.map(e => e.oracleId)).size
     : 0;
   const printingData = printing?.data ?? null;
+  const typeData = type?.data ?? null;
   const active: ActiveScannerIndexes = {
     art: artData,
     artChecksum: artData
@@ -261,6 +317,16 @@ const activateFromNameData = (
     printingIndex: printingData ? buildPrintingIndex(printingData) : null,
     printingOrigin: printing?.origin ?? null,
     text: art.raw ? textIndexFromArtworkPayload(art.raw) : null,
+    type: typeData,
+    typeChecksum: typeData
+      ? checksumJson({
+          oracles: typeData.oracles.length,
+          version: typeData.version,
+          generated: typeData.generated ?? null,
+        })
+      : '',
+    typeIndex: typeData ? buildTypeIndex(typeData) : null,
+    typeOrigin: type?.origin ?? null,
   };
   state.active = active;
   notify();
@@ -270,9 +336,34 @@ const activateFromNameData = (
 /**
  * Load usable indexes immediately (disk → bundled → null).
  * Does not block on network.
+ *
+ * @param opts.includeHeavy when false (default for live scan), skip PrintingIndex
+ *   and TypeIndex so the camera can start without parsing ~30MB JSON on the JS
+ *   thread. Call again with includeHeavy:true after a delay.
  */
-export const loadScannerIndexesLocal = async (): Promise<ActiveScannerIndexes | null> => {
-  if (state.active) return state.active;
+export const loadScannerIndexesLocal = async (
+  opts: { includeHeavy?: boolean } = {},
+): Promise<ActiveScannerIndexes | null> => {
+  const includeHeavy = opts.includeHeavy === true;
+  if (state.active?.nameIndex && (!includeHeavy || state.active.printingIndex)) {
+    return state.active;
+  }
+  if (includeHeavy) {
+    if (printingIndexLoadPromise) return printingIndexLoadPromise;
+    printingIndexLoadPromise = loadScannerIndexesLocalBody(true).finally(() => {
+      printingIndexLoadPromise = null;
+    });
+    return printingIndexLoadPromise;
+  }
+  return loadScannerIndexesLocalBody(false);
+};
+
+const loadScannerIndexesLocalBody = async (
+  includeHeavy: boolean,
+): Promise<ActiveScannerIndexes | null> => {
+  if (state.active?.nameIndex && (!includeHeavy || state.active.printingIndex)) {
+    return state.active;
+  }
   const meta = await readMeta();
   state.lastCheckAt = meta.lastCheckAt ?? null;
 
@@ -282,16 +373,37 @@ export const loadScannerIndexesLocal = async (): Promise<ActiveScannerIndexes | 
   const artChecked = diskArt
     ? validateArtworkIndexData(diskArt, { minEntries: ART_INDEX_MIN_PRODUCTION_ENTRIES })
     : null;
-  const diskPrinting = await readDiskJson('printing-index.json');
-  const printingChecked = diskPrinting
-    ? validatePrintingIndexData(diskPrinting, { minEntries: 1 })
-    : null;
-  const printingPayload = printingChecked?.data
-    ? {
-        data: printingChecked.data,
-        origin: 'disk' as ScannerDataOrigin,
-      }
-    : { data: null, origin: null };
+
+  let printingPayload: {
+    data: PrintingIndexData | null;
+    origin: ScannerDataOrigin | null;
+  } = { data: null, origin: null };
+  let typePayload: {
+    data: TypeIndexData | null;
+    origin: ScannerDataOrigin | null;
+  } = { data: null, origin: null };
+
+  if (includeHeavy) {
+    const diskPrinting = await readDiskJson('printing-index.json');
+    const printingChecked = diskPrinting
+      ? validatePrintingIndexData(diskPrinting, { minEntries: 1 })
+      : null;
+    printingPayload = printingChecked?.data
+      ? {
+          data: printingChecked.data,
+          origin: 'disk' as ScannerDataOrigin,
+        }
+      : { data: null, origin: null };
+
+    const diskType = await readDiskJson('type-index.json');
+    const typeChecked = diskType ? validateTypeIndexData(diskType, { minOracles: 1 }) : null;
+    typePayload = typeChecked?.data
+      ? {
+          data: typeChecked.data,
+          origin: 'disk' as ScannerDataOrigin,
+        }
+      : { data: null, origin: null };
+  }
 
   if (namesChecked?.data && namesChecked.data.names.length >= NAME_INDEX_MIN_PRODUCTION_NAMES) {
     return activateFromNameData(
@@ -303,6 +415,7 @@ export const loadScannerIndexesLocal = async (): Promise<ActiveScannerIndexes | 
         raw: diskArt ?? undefined,
       },
       printingPayload,
+      typePayload,
     );
   }
 
@@ -317,6 +430,7 @@ export const loadScannerIndexesLocal = async (): Promise<ActiveScannerIndexes | 
         raw: diskArt ?? undefined,
       },
       printingPayload,
+      typePayload,
     );
   }
 
@@ -325,6 +439,32 @@ export const loadScannerIndexesLocal = async (): Promise<ActiveScannerIndexes | 
 
 export const getScannerDataStatus = (): ScannerDataStatus => {
   const a = state.active;
+  const printingEntries = a?.printing?.entries.length ?? null;
+  let printingStatus: ScannerDataStatus['printingStatus'] = 'absent';
+  if (state.updating && !printingEntries) printingStatus = 'downloading';
+  else if (state.lastError && !printingEntries) printingStatus = 'failed';
+  else if (printingEntries != null) {
+    printingStatus =
+      a?.printingOrigin === 'bundled'
+        ? 'bundled'
+        : a?.printingOrigin === 'disk'
+          ? 'cached'
+          : 'loaded';
+  }
+
+  const typeOracles = a?.type?.oracles.length ?? null;
+  let typeStatus: ScannerDataStatus['typeStatus'] = 'absent';
+  if (state.updating && !typeOracles) typeStatus = 'downloading';
+  else if (state.lastError && !typeOracles && state.manifest?.typeIndex) typeStatus = 'failed';
+  else if (typeOracles != null) {
+    typeStatus =
+      a?.typeOrigin === 'bundled'
+        ? 'bundled'
+        : a?.typeOrigin === 'disk'
+          ? 'cached'
+          : 'loaded';
+  }
+
   return {
     artEntries: a?.art?.entries.length ?? null,
     artGenerated: a?.artGenerated ?? null,
@@ -336,15 +476,32 @@ export const getScannerDataStatus = (): ScannerDataStatus => {
     names: a?.names ?? null,
     namesChecksum: a?.nameChecksum ?? null,
     namesOrigin: a?.nameOrigin ?? null,
-    printingEntries: a?.printing?.entries.length ?? null,
+    printingEntries,
     printingChecksum: a?.printingChecksum ?? null,
     printingOrigin: a?.printingOrigin ?? null,
+    printingStatus,
+    printingLoadMs: state.printingLoadMs,
+    printingParseMs: state.printingParseMs,
+    printingVersion:
+      a?.printing?.generated ??
+      (a?.printing?.version != null ? String(a.printing.version) : null),
+    typeOracles,
+    typeSubtypes: a?.type?.subtypes.length ?? null,
+    typeSignatures: a?.type?.signatures ? Object.keys(a.type.signatures).length : null,
+    typeChecksum: a?.typeChecksum ?? null,
+    typeOrigin: a?.typeOrigin ?? null,
+    typeStatus,
+    typeLoadMs: state.typeLoadMs,
+    typeParseMs: state.typeParseMs,
+    typeVersion: a?.type?.generated ?? (a?.type?.version != null ? String(a.type.version) : null),
     statusLabel: state.updating
       ? 'Checking'
       : state.lastError && !a
         ? 'Offline'
         : a
-          ? 'Current'
+          ? printingEntries
+            ? 'Current'
+            : 'Update available'
           : 'Unknown',
     updating: state.updating,
   };
@@ -375,13 +532,23 @@ export const checkScannerDataUpdates = async (
   const base = (opts.base ?? DEFAULT_INDEX_BASE).replace(/\/?$/, '/');
   const now = Date.now();
   const meta = await readMeta();
+  const criticalAssetMissing =
+    !state.active?.printingIndex ||
+    (Boolean(state.manifest?.typeIndex) && !state.active?.typeIndex);
+  // Before first manifest fetch we don't know if type is advertised; printing
+  // absence alone is enough to bypass throttle (Samsung regression).
   if (
-    !opts.force &&
-    meta.lastCheckAt &&
-    now - meta.lastCheckAt < SCANNER_MANIFEST_CHECK_INTERVAL_MS
+    shouldThrottleScannerManifestCheck({
+      force: opts.force,
+      lastCheckAt: meta.lastCheckAt,
+      now,
+      intervalMs: SCANNER_MANIFEST_CHECK_INTERVAL_MS,
+      criticalAssetMissing: !state.active?.printingIndex,
+    })
   ) {
     return { updated: false, reason: 'check throttled' };
   }
+  void criticalAssetMissing;
 
   state.updating = true;
   state.lastError = null;
@@ -407,13 +574,24 @@ export const checkScannerDataUpdates = async (
     const needArt =
       !meta.artSha256 ||
       meta.artSha256.toLowerCase() !== manifestRaw.artIndex.sha256.toLowerCase();
-    const needPrinting =
-      Boolean(manifestRaw.printingIndex) &&
-      (!meta.printingSha256 ||
-        meta.printingSha256.toLowerCase() !==
-          (manifestRaw.printingIndex?.sha256 ?? '').toLowerCase());
+    const diskPrintingExists = Boolean(await readDiskJson('printing-index.json'));
+    const needPrinting = needPrintingAsset({
+      manifestHasPrinting: Boolean(manifestRaw.printingIndex),
+      diskPrintingExists,
+      metaSha256: meta.printingSha256,
+      manifestSha256: manifestRaw.printingIndex?.sha256,
+      activePrintingLoaded: Boolean(state.active?.printingIndex),
+    });
+    const diskTypeExists = Boolean(await readDiskJson('type-index.json'));
+    const needType = needTypeAsset({
+      manifestHasType: Boolean(manifestRaw.typeIndex),
+      diskTypeExists,
+      metaSha256: meta.typeSha256,
+      manifestSha256: manifestRaw.typeIndex?.sha256,
+      activeTypeLoaded: Boolean(state.active?.typeIndex),
+    });
 
-    if (!needNames && !needArt && !needPrinting) {
+    if (!needNames && !needArt && !needPrinting && !needType) {
       await writeMeta({
         ...meta,
         lastCheckAt: now,
@@ -421,6 +599,7 @@ export const checkScannerDataUpdates = async (
         namesSha256: manifestRaw.cardNames.sha256,
         artSha256: manifestRaw.artIndex.sha256,
         printingSha256: manifestRaw.printingIndex?.sha256 ?? meta.printingSha256,
+        typeSha256: manifestRaw.typeIndex?.sha256 ?? meta.typeSha256,
       });
       state.lastCheckAt = now;
       return { updated: false, reason: 'manifest matches disk' };
@@ -429,6 +608,7 @@ export const checkScannerDataUpdates = async (
     let namesRaw: unknown = await readDiskJson('card-names.json');
     let artRaw: unknown = await readDiskJson('art-index.json');
     let printingRaw: unknown = await readDiskJson('printing-index.json');
+    let typeRaw: unknown = await readDiskJson('type-index.json');
 
     if (needNames) {
       namesRaw = await installAsset(
@@ -460,6 +640,7 @@ export const checkScannerDataUpdates = async (
       );
     }
     if (needPrinting && manifestRaw.printingIndex) {
+      const tPrint = Date.now();
       printingRaw = await installAsset(
         manifestRaw.printingIndex.url.startsWith('http')
           ? manifestRaw.printingIndex.url
@@ -473,6 +654,31 @@ export const checkScannerDataUpdates = async (
           if (v.reason || !v.data) throw new Error(v.reason ?? 'bad printing');
         },
       );
+      state.printingLoadMs = Date.now() - tPrint;
+    }
+    if (needType && manifestRaw.typeIndex) {
+      const tType = Date.now();
+      try {
+        typeRaw = await installAsset(
+          manifestRaw.typeIndex.url.startsWith('http')
+            ? manifestRaw.typeIndex.url
+            : `${base}type-index.json`,
+          manifestRaw.typeIndex.sha256,
+          'type-index.json',
+          raw => {
+            const v = validateTypeIndexData(raw, {
+              minOracles: TYPE_INDEX_MIN_PRODUCTION_ORACLES,
+            });
+            if (v.reason || !v.data) throw new Error(v.reason ?? 'bad type index');
+          },
+        );
+        state.typeLoadMs = Date.now() - tType;
+      } catch (typeErr) {
+        // TypeIndex must never block scanning — log and continue.
+        const msg = typeErr instanceof Error ? typeErr.message : String(typeErr);
+        state.lastError = `type-index: ${msg}`;
+        state.typeLoadMs = Date.now() - tType;
+      }
     }
 
     const names = validateNameIndexData(namesRaw);
@@ -482,8 +688,10 @@ export const checkScannerDataUpdates = async (
     const printing = printingRaw
       ? validatePrintingIndexData(printingRaw, { minEntries: 1 })
       : null;
+    const type = typeRaw ? validateTypeIndexData(typeRaw, { minOracles: 1 }) : null;
     if (!names.data) throw new Error(names.reason ?? 'names missing after install');
 
+    const tParse = Date.now();
     activateFromNameData(
       names.data,
       'disk',
@@ -496,7 +704,13 @@ export const checkScannerDataUpdates = async (
         data: printing?.data ?? null,
         origin: printing?.data ? 'disk' : null,
       },
+      {
+        data: type?.data ?? null,
+        origin: type?.data ? 'disk' : null,
+      },
     );
+    if (printing?.data) state.printingParseMs = Date.now() - tParse;
+    if (type?.data) state.typeParseMs = Date.now() - tParse;
 
     await writeMeta({
       lastCheckAt: now,
@@ -504,20 +718,29 @@ export const checkScannerDataUpdates = async (
       namesSha256: manifestRaw.cardNames.sha256,
       artSha256: manifestRaw.artIndex.sha256,
       printingSha256: manifestRaw.printingIndex?.sha256,
+      typeSha256: type?.data ? manifestRaw.typeIndex?.sha256 : meta.typeSha256,
       namesVersion: manifestRaw.cardNames.version,
       artVersion: manifestRaw.artIndex.version,
       printingVersion: manifestRaw.printingIndex?.version,
+      typeVersion: manifestRaw.typeIndex?.version,
       namesChecksum: state.active?.nameChecksum,
       artChecksum: state.active?.artChecksum,
       printingChecksum: state.active?.printingChecksum,
+      typeChecksum: state.active?.typeChecksum,
     });
     state.lastCheckAt = now;
     return { updated: true, reason: 'installed newer scanner data' };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     state.lastError = message;
-    await writeMeta({ ...(await readMeta()), lastCheckAt: now });
-    state.lastCheckAt = now;
+    // Do not advance lastCheckAt when PrintingIndex (or advertised TypeIndex) is
+    // still missing — otherwise a failed ~32MB install silently throttles retries.
+    const printingMissing = !state.active?.printingIndex;
+    const typeMissing = Boolean(state.manifest?.typeIndex) && !state.active?.typeIndex;
+    if (mayAdvanceLastCheckAfterFailure({ printingMissing, typeMissing })) {
+      await writeMeta({ ...(await readMeta()), lastCheckAt: now });
+      state.lastCheckAt = now;
+    }
     return { updated: false, reason: message };
   } finally {
     state.updating = false;
@@ -537,24 +760,34 @@ const legacyDirectRefresh = async (
   } catch {
     printingBytes = null;
   }
+  let typeBytes: Uint8Array | null = null;
+  try {
+    typeBytes = await fetchBytes(`${base}type-index.json`);
+  } catch {
+    typeBytes = null;
+  }
   const namesRaw = parseJsonBytes(namesBytes);
   const artRaw = parseJsonBytes(artBytes);
   const printingRaw = printingBytes ? parseJsonBytes(printingBytes) : null;
+  const typeRaw = typeBytes ? parseJsonBytes(typeBytes) : null;
   const names = validateNameIndexData(namesRaw);
   const art = validateArtworkIndexData(artRaw);
   const printing = printingRaw
     ? validatePrintingIndexData(printingRaw, { minEntries: 1 })
     : null;
+  const type = typeRaw ? validateTypeIndexData(typeRaw, { minOracles: 1 }) : null;
   if (!names.data) throw new Error(names.reason ?? 'bad names');
   if (!art.data) throw new Error(art.reason ?? 'bad art');
 
   const namesSha = await sha256Hex(namesBytes);
   const artSha = await sha256Hex(artBytes);
   const printingSha = printingBytes ? await sha256Hex(printingBytes) : undefined;
+  const typeSha = typeBytes ? await sha256Hex(typeBytes) : undefined;
   if (
     meta.namesSha256 === namesSha &&
     meta.artSha256 === artSha &&
     (!printingSha || meta.printingSha256 === printingSha) &&
+    (!typeSha || meta.typeSha256 === typeSha) &&
     state.active
   ) {
     await writeMeta({ ...meta, lastCheckAt: Date.now() });
@@ -565,6 +798,9 @@ const legacyDirectRefresh = async (
   await atomicWriteJson('art-index.json', new TextDecoder().decode(artBytes));
   if (printingBytes && printing?.data) {
     await atomicWriteJson('printing-index.json', new TextDecoder().decode(printingBytes));
+  }
+  if (typeBytes && type?.data) {
+    await atomicWriteJson('type-index.json', new TextDecoder().decode(typeBytes));
   }
   activateFromNameData(
     names.data,
@@ -578,15 +814,21 @@ const legacyDirectRefresh = async (
       data: printing?.data ?? null,
       origin: printing?.data ? 'disk' : null,
     },
+    {
+      data: type?.data ?? null,
+      origin: type?.data ? 'disk' : null,
+    },
   );
   await writeMeta({
     lastCheckAt: Date.now(),
     namesSha256: namesSha,
     artSha256: artSha,
     printingSha256: printingSha,
+    typeSha256: typeSha,
     namesChecksum: state.active?.nameChecksum,
     artChecksum: state.active?.artChecksum,
     printingChecksum: state.active?.printingChecksum,
+    typeChecksum: state.active?.typeChecksum,
   });
   return { updated: true, reason: 'legacy direct install' };
 };
@@ -597,4 +839,8 @@ export const resetScannerDataState = (): void => {
   state.lastCheckAt = null;
   state.manifest = null;
   state.updating = false;
+  state.printingLoadMs = null;
+  state.printingParseMs = null;
+  state.typeLoadMs = null;
+  state.typeParseMs = null;
 };

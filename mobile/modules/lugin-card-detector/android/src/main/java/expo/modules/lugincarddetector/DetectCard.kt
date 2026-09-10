@@ -38,11 +38,78 @@ internal object DetectCard {
     val rejectReason: String?,
     val workWidth: Int,
     val workHeight: Int,
-    /** Ranked plausible card-like quads (≤12). Primary is [corners]. */
+    /** Ranked plausible card-like quads (≤8 emergency / ≤12 full). Primary is [corners]. */
     val candidates: List<ScoredCandidate> = emptyList(),
     /** True when primary was chosen as inner of a nested sleeve pair. */
     val nestedInnerPreferred: Boolean = false,
+    /**
+     * Host/diagnosis only. Populated when [exportPipelineStages] is true.
+     * Production selection path ignores this — never changes caps or primary pick.
+     */
+    val pipeline: PipelineStages? = null,
   )
+
+  /**
+   * Candidate pipeline snapshots for multi-card ceiling analysis.
+   * Counts/lists are diagnostic; production still returns [DetectionResult.candidates] shortlist only.
+   */
+  data class PipelineStages(
+    /** Quads formed before silhouette/aspect gates (may include weak scores). */
+    val rawAfterQuad: List<ScoredCandidate>,
+    /** Passed score/aspect/weak-method gates. */
+    val postGates: List<ScoredCandidate>,
+    /** After [dedupeCandidates] (cap 12 internal, or [diagnosticDedupeCap]). */
+    val postDedupe: List<ScoredCandidate>,
+    /** After take(CANDIDATE_SHORTLIST=8). */
+    val shortlist: List<ScoredCandidate>,
+    /** Host diagnosis: components/quads that failed a gate, with reason. */
+    val rejected: List<RejectedCandidate> = emptyList(),
+    val rawAfterQuadCount: Int,
+    val postGatesCount: Int,
+    val postDedupeCount: Int,
+    val shortlistCount: Int,
+    val considerAttempts: Int,
+    val topComponentsUsed: Int = DetectParams.DETECT_TOP_COMPONENTS,
+    val dedupeCapUsed: Int = 12,
+  )
+
+  data class RejectedCandidate(
+    val corners: List<Pt>?,
+    val score: Double,
+    val method: String,
+    val areaShare: Double,
+    val reason: String,
+    val stage: String,
+  )
+
+  /** Emergency baseline: cap shortlist before nested O(n²). */
+  private const val CANDIDATE_SHORTLIST = 8
+
+  /** Toggle nested sleeve preference (debug bisection). Default on. */
+  @Volatile
+  var nestedSleeveEnabled: Boolean = true
+
+  /**
+   * Host diagnosis only: when true, [DetectionResult.pipeline] is filled.
+   * Does not change selection, scores, caps, or returned primary.
+   * Default false — production / live path unchanged.
+   */
+  @Volatile
+  var exportPipelineStages: Boolean = false
+
+  /**
+   * Host diagnosis only: override DETECT_TOP_COMPONENTS when non-null.
+   * Null = production default (4). Does not affect Expo module unless host sets it.
+   */
+  @Volatile
+  var diagnosticTopComponents: Int? = null
+
+  /**
+   * Host diagnosis only: override dedupe keep-cap when non-null.
+   * Null = production default (12). Shortlist remains 8 for production return.
+   */
+  @Volatile
+  var diagnosticDedupeCap: Int? = null
 
   /**
    * @param rgba packed R,G,B,A bytes (unsigned via `and 0xFF`), length == fullW*fullH*4
@@ -102,66 +169,95 @@ internal object DetectCard {
     var candidateCount = 0
     var lastReject: String? = "no candidates"
     val scored = ArrayList<ScoredCandidate>()
+    val rawAfterQuad = if (exportPipelineStages) ArrayList<ScoredCandidate>() else null
+    val rejected = if (exportPipelineStages) ArrayList<RejectedCandidate>() else null
+    val topN = diagnosticTopComponents ?: DetectParams.DETECT_TOP_COMPONENTS
+    val dedupeCap = diagnosticDedupeCap ?: 12
 
     fun consider(mask: ByteArray, method: String, edgeExtra: Double? = null) {
-      val comps = topComponents(mask, w, h, DetectParams.DETECT_TOP_COMPONENTS)
+      val comps = topComponents(mask, w, h, topN)
       for (component in comps) {
         candidateCount += 1
         val areaShare = component.area.toDouble() / (w * h)
-        val rejected = mutableListOf<String>()
-        if (areaShare < DetectParams.DETECT_MIN_AREA_SHARE) rejected.add("insufficient area")
-        if (areaShare > DetectParams.DETECT_MAX_AREA_SHARE) rejected.add("covers whole frame")
+        val rejectedReasons = mutableListOf<String>()
+        if (areaShare < DetectParams.DETECT_MIN_AREA_SHARE) rejectedReasons.add("insufficient area")
+        if (areaShare > DetectParams.DETECT_MAX_AREA_SHARE) rejectedReasons.add("covers whole frame")
 
-        if (rejected.isEmpty()) {
+        if (rejectedReasons.isEmpty()) {
           val boundary = boundaryPoints(component.pixels, w, h)
           val hull = convexHull(boundary)
           if (hull.size < 4) {
-            rejected.add("hull too small")
+            rejectedReasons.add("hull too small")
           } else {
             val approx = extremalCorners(hull)
             if (approx == null) {
-              rejected.add("degenerate corners")
+              rejectedReasons.add("degenerate corners")
             } else {
               val refined = refineCorners(boundary, approx) ?: approx
               val scaled = refined.map { Pt(it.x / scale, it.y / scale) }
               val quad = Geometry.orderCorners(scaled)
               val score = Geometry.scoreCardQuad(quad, fullW, fullH)
               val parts = Geometry.scoreParts(quad, fullW, fullH, edgeExtra)
-              if (score < 0.15) rejected.add("low silhouette score")
-              if (parts.aspect < 0.25) rejected.add("aspect ratio")
+              val frameArea = (fullW * fullH).toDouble().coerceAtLeast(1.0)
+              val polyArea =
+                abs(
+                  quad[0].x * quad[1].y +
+                    quad[1].x * quad[2].y +
+                    quad[2].x * quad[3].y +
+                    quad[3].x * quad[0].y -
+                    (quad[0].y * quad[1].x +
+                      quad[1].y * quad[2].x +
+                      quad[2].y * quad[3].x +
+                      quad[3].y * quad[0].x),
+                ) / 2.0
+              val candidate =
+                ScoredCandidate(
+                  corners = quad,
+                  score = score,
+                  aspectRatio = widthHeightAspect(quad),
+                  areaRatio = polyArea / frameArea,
+                  method = method,
+                )
+              // Diagnosis snapshot before gates — selection still uses scored only.
+              rawAfterQuad?.add(candidate)
+              if (score < 0.15) rejectedReasons.add("low silhouette score")
+              if (parts.aspect < 0.25) rejectedReasons.add("aspect ratio")
               if ((method.startsWith("edge") || method.startsWith("chroma")) && score < 0.45) {
-                rejected.add("weak non-luma candidate")
+                rejectedReasons.add("weak non-luma candidate")
               }
-              if (rejected.isEmpty()) {
-                val frameArea = (fullW * fullH).toDouble().coerceAtLeast(1.0)
-                val polyArea =
-                  abs(
-                    quad[0].x * quad[1].y +
-                      quad[1].x * quad[2].y +
-                      quad[2].x * quad[3].y +
-                      quad[3].x * quad[0].y -
-                      (quad[0].y * quad[1].x +
-                        quad[1].y * quad[2].x +
-                        quad[2].y * quad[3].x +
-                        quad[3].y * quad[0].x),
-                  ) / 2.0
-                scored.add(
-                  ScoredCandidate(
+              if (rejectedReasons.isEmpty()) {
+                scored.add(candidate)
+                continue
+              } else {
+                rejected?.add(
+                  RejectedCandidate(
                     corners = quad,
                     score = score,
-                    aspectRatio = widthHeightAspect(quad),
-                    areaRatio = polyArea / frameArea,
                     method = method,
+                    areaShare = areaShare,
+                    reason = rejectedReasons.joinToString("; "),
+                    stage = "gate",
                   ),
                 )
-                continue
               }
             }
           }
         }
 
-        if (rejected.isNotEmpty()) {
-          lastReject = rejected.joinToString("; ")
+        if (rejectedReasons.isNotEmpty()) {
+          lastReject = rejectedReasons.joinToString("; ")
+          if (rejected != null && rejectedReasons.any { it.contains("area") || it.contains("hull") || it.contains("degenerate") }) {
+            rejected.add(
+              RejectedCandidate(
+                corners = null,
+                score = 0.0,
+                method = method,
+                areaShare = areaShare,
+                reason = rejectedReasons.joinToString("; "),
+                stage = "pre-quad",
+              ),
+            )
+          }
         }
       }
     }
@@ -193,7 +289,26 @@ internal object DetectCard {
     val edges = sobelMask(gray, w, h)
     if (edges != null) consider(edges, "edge", edgeExtra = 0.5)
 
-    val unique = dedupeCandidates(scored)
+    val unique = dedupeCandidates(scored, dedupeCap)
+    val shortlist = if (unique.isEmpty()) emptyList() else unique.take(CANDIDATE_SHORTLIST)
+    val pipeline =
+      if (exportPipelineStages) {
+        PipelineStages(
+          rawAfterQuad = rawAfterQuad?.toList() ?: emptyList(),
+          postGates = scored.toList(),
+          postDedupe = unique,
+          shortlist = shortlist,
+          rejected = rejected?.toList() ?: emptyList(),
+          rawAfterQuadCount = rawAfterQuad?.size ?: 0,
+          postGatesCount = scored.size,
+          postDedupeCount = unique.size,
+          shortlistCount = shortlist.size,
+          considerAttempts = candidateCount,
+          topComponentsUsed = topN,
+          dedupeCapUsed = dedupeCap,
+        )
+      } else null
+
     if (unique.isEmpty()) {
       return DetectionResult(
         detected = false,
@@ -207,11 +322,21 @@ internal object DetectCard {
         workHeight = h,
         candidates = emptyList(),
         nestedInnerPreferred = false,
+        pipeline = pipeline,
       )
     }
 
-    val pick = pickPrimaryWithNested(unique)
-    val primary = unique[pick.index]
+    val pick =
+      if (nestedSleeveEnabled) {
+        pickPrimaryWithNested(shortlist)
+      } else {
+        var bi = 0
+        for (i in 1 until shortlist.size) {
+          if (shortlist[i].score > shortlist[bi].score) bi = i
+        }
+        PrimaryPick(index = bi, nestedInner = false)
+      }
+    val primary = shortlist[pick.index]
     return DetectionResult(
       detected = true,
       corners = primary.corners,
@@ -222,8 +347,9 @@ internal object DetectCard {
       rejectReason = null,
       workWidth = w,
       workHeight = h,
-      candidates = unique.take(12),
+      candidates = shortlist,
       nestedInnerPreferred = pick.nestedInner,
+      pipeline = pipeline,
     )
   }
 
@@ -235,7 +361,7 @@ internal object DetectCard {
     for (i in 1 until cands.size) {
       if (cands[i].score > cands[best].score) best = i
     }
-    val n = min(cands.size, 8)
+    val n = min(cands.size, CANDIDATE_SHORTLIST)
     for (o in 0 until n) {
       for (i in 0 until n) {
         if (o == i) continue
@@ -286,7 +412,7 @@ internal object DetectCard {
     return width / max(height, 1e-6)
   }
 
-  private fun dedupeCandidates(raw: List<ScoredCandidate>): List<ScoredCandidate> {
+  private fun dedupeCandidates(raw: List<ScoredCandidate>, keepCap: Int = 12): List<ScoredCandidate> {
     val kept = ArrayList<ScoredCandidate>()
     for (c in raw.sortedByDescending { it.score }) {
       val dup = kept.any { k ->
@@ -297,7 +423,7 @@ internal object DetectCard {
         d < 8.0 && abs(k.areaRatio - c.areaRatio) < 0.04 && !isNestedSleeve(k, c) && !isNestedSleeve(c, k)
       }
       if (!dup) kept.add(c)
-      if (kept.size >= 12) break
+      if (kept.size >= keepCap) break
     }
     return kept
   }

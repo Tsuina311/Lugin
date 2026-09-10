@@ -24,6 +24,13 @@ export interface OcrSample {
   rawText: string;
   region: string;
   variant: string;
+  /** Optional engine payload / stage timings (latency waterfalls). */
+  engineBytes?: number;
+  engineTransport?: string;
+  engineMlkitMs?: number;
+  engineNativeMs?: number;
+  engineEncodeMs?: number;
+  engineJsBridgeMs?: number;
 }
 
 export interface CandidateSample {

@@ -99,10 +99,32 @@ yarn test:web     # server-renders every screen, to catch a blank page early
 
 yarn mobile:android   # Expo development build (VisionCamera; not Expo Go)
 yarn mobile:start     # Metro for the native app
+yarn scan:inbox       # Mac receiver for phone geometry traces (dev only)
+yarn scan:inbox:tunnel # optional HTTPS via cloudflared (current APK)
+yarn scan:replay <id> # host recorded-OCR replay (no phone)
+yarn scan:regression  # all .scan-fixtures/replay fixtures
+yarn scan:device-replay <id> # optional phone ML Kit job (worker ON)
+
+yarn geometry:inventory   # host geometry corpus discovery
+yarn geometry:queue       # priority queue for Geometry Lab review
+yarn geometry:lab         # annotate quads (no phone)
+yarn geometry:benchmark   # shared-js / native DetectCard metrics
+yarn geometry:parity      # JS ↔ Kotlin disagreement report
+yarn geometry:synthetic   # synthetic stress scenes from real warps
+yarn geometry:candidates  # top-K / sleeve / latent multi-card diagnosis
+yarn geometry:refine      # host physical-card edge refiner (Y-first)
+yarn geometry:multicard-ceiling  # raw→shortlist→final multi-card ceiling
+yarn geometry:temporal    # binder video sweep + multi-card tracks (host)
+yarn geometry:y-sensitivity
 ```
+
+Geometry: [`docs/GEOMETRY-BENCHMARK.md`](docs/GEOMETRY-BENCHMARK.md) ·
+native: [`docs/GEOMETRY-NATIVE.md`](docs/GEOMETRY-NATIVE.md) ·
+synthetic: [`docs/GEOMETRY-SYNTHETIC.md`](docs/GEOMETRY-SYNTHETIC.md).
 
 Native deploys from `main` via EAS (fingerprint → OTA or new APK). Setup:
 [`docs/MOBILE-DEPLOYMENT.md`](docs/MOBILE-DEPLOYMENT.md).
+Phone → Cursor debug inbox: [`docs/SCAN-DEBUG-INBOX.md`](docs/SCAN-DEBUG-INBOX.md).
 
 The web build (`web/index.html` → `src/web/`) shows the collection and decks on a
 phone — and imports into them, which is the point: cards get scanned into ManaBox

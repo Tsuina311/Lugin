@@ -18,10 +18,12 @@ export {
   subscribeBenchmark,
 } from './sessionStore';
 export { retryFailedBenchmarkUploads } from './uploadQueue';
-export { formatSummaryText } from './summary';
+export { formatSummaryText, classifyLatencyVerdict, buildSessionSummary } from './summary';
 export {
   DEFAULT_BENCHMARK_TARGET,
+  TARGET_ORACLE_P50_MS,
   type BenchmarkSession,
   type BenchmarkSettings,
   type BenchmarkScanRecord,
+  type BenchmarkSessionSummary,
 } from './types';

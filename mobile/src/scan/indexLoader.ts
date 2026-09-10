@@ -7,9 +7,11 @@
 import {
   buildNameIndex,
   buildPrintingIndex,
+  buildTypeIndex,
   createArtworkMatcher,
   NO_ARTWORK_MATCHER,
   validatePrintingIndexData,
+  validateTypeIndexData,
   type ArtworkIndexData,
   type ArtworkMatcher,
   type CardNameIndex,
@@ -17,6 +19,8 @@ import {
   type PrintingIndex,
   type PrintingIndexData,
   type TextIndexData,
+  type TypeIndex,
+  type TypeIndexData,
 } from './sharedCore';
 import {
   textIndexFromArtworkPayload,
@@ -50,6 +54,20 @@ export interface PrintingIndexLoad {
   warmMs: number;
 }
 
+export interface TypeIndexLoad {
+  checksum: string;
+  coldMs: number;
+  data: TypeIndexData;
+  oracles: number;
+  subtypes: number;
+  signatures: number;
+  index: TypeIndex;
+  source: 'network' | 'memory';
+  version: number;
+  warmMs: number;
+  generated: string | null;
+}
+
 export interface ArtIndexLoad {
   checksum: string;
   coldMs: number;
@@ -72,6 +90,8 @@ const memory = {
   namesInflight: null as Promise<NameIndexLoad | null> | null,
   printing: null as PrintingIndexLoad | null,
   printingInflight: null as Promise<PrintingIndexLoad | null> | null,
+  type: null as TypeIndexLoad | null,
+  typeInflight: null as Promise<TypeIndexLoad | null> | null,
 };
 
 const now = () =>
@@ -218,9 +238,55 @@ export const loadPrintingIndex = async (
   return memory.printingInflight;
 };
 
+export const loadTypeIndex = async (
+  base = DEFAULT_INDEX_BASE,
+): Promise<TypeIndexLoad | null> => {
+  if (memory.type) {
+    return { ...memory.type, source: 'memory', warmMs: 0 };
+  }
+  if (memory.typeInflight) return memory.typeInflight;
+  memory.typeInflight = (async () => {
+    const t0 = now();
+    const raw = await fetchJson(joinUrl(base, 'type-index.json'));
+    const checked = validateTypeIndexData(raw, { minOracles: 500 });
+    if (checked.reason || !checked.data) throw new Error(checked.reason ?? 'invalid type index');
+    const data = checked.data;
+    const builtAt = now();
+    const load: TypeIndexLoad = {
+      checksum: checksumJson({
+        oracles: data.oracles.length,
+        version: data.version,
+        generated: data.generated ?? null,
+      }),
+      coldMs: now() - t0,
+      data,
+      generated: data.generated ?? null,
+      index: buildTypeIndex(data),
+      oracles: data.oracles.length,
+      signatures: Object.keys(data.signatures ?? {}).length,
+      source: 'network',
+      subtypes: data.subtypes.length,
+      version: data.version,
+      warmMs: now() - builtAt,
+    };
+    memory.type = load;
+    return load;
+  })()
+    .catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[lugin] type index load failed: ${message}`);
+      return null;
+    })
+    .finally(() => {
+      memory.typeInflight = null;
+    });
+  return memory.typeInflight;
+};
+
 export const peekNameIndex = (): NameIndexLoad | null => memory.names;
 export const peekArtworkIndex = (): ArtIndexLoad | null => memory.art;
 export const peekPrintingIndex = (): PrintingIndexLoad | null => memory.printing;
+export const peekTypeIndex = (): TypeIndexLoad | null => memory.type;
 
 export const emptyArtMatcher = (): ArtworkMatcher => NO_ARTWORK_MATCHER;
 
@@ -232,4 +298,6 @@ export const resetIndexCache = (): void => {
   memory.namesInflight = null;
   memory.printing = null;
   memory.printingInflight = null;
+  memory.type = null;
+  memory.typeInflight = null;
 };

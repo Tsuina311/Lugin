@@ -30,6 +30,8 @@ export type ScanIdentityStatus =
   | 'insufficient-confidence';
 
 export interface FusedResult {
+  /** True when sticky title disagreed with artwork (art did not win). */
+  artConflict?: boolean;
   candidates: RankedCandidate[];
   /** Best card-level identity when confident enough. */
   card?: { confidence: number; name: string; oracleId: string };
@@ -71,6 +73,14 @@ export const ARTWORK_ONLY_VISUAL_MARGIN = 0.12;
 export const TITLE_ONLY_MIN = 0.94;
 export const TITLE_ONLY_MARGIN = 0.2;
 
+/**
+ * Sticky title: strong enough that disagreeing weak/moderate art must not flip
+ * identity (Samsung Sword → Tovolar regression). Lower than TITLE_ONLY so
+ * localized fuzzy hits (~0.83) still stick.
+ */
+export const TITLE_STICKY_MIN = TITLE_STRONG;
+export const TITLE_STICKY_MARGIN = 0.12;
+
 const weightSum =
   FUSION_WEIGHTS.visual +
   FUSION_WEIGHTS.title +
@@ -78,6 +88,62 @@ const weightSum =
   FUSION_WEIGHTS.typeLine +
   FUSION_WEIGHTS.footer +
   FUSION_WEIGHTS.temporal;
+
+/** Best title row that clears sticky / title-only bars (any rank). */
+export const findStickyTitle = (
+  ranked: readonly RankedCandidate[],
+): RankedCandidate | null => {
+  const byTitle = ranked
+    .filter(r => (r.titleScore ?? 0) > 0)
+    .sort(
+      (a, b) =>
+        (b.titleScore ?? 0) - (a.titleScore ?? 0) || a.name.localeCompare(b.name),
+    );
+  const best = byTitle[0];
+  if (!best?.titleScore) return null;
+  const secondTitle = byTitle[1]?.titleScore ?? 0;
+  const titleMargin = best.titleScore - secondTitle;
+  if (best.titleScore >= TITLE_ONLY_MIN && titleMargin >= Math.min(TITLE_ONLY_MARGIN, 0.08)) {
+    return best;
+  }
+  if (best.titleScore >= TITLE_STICKY_MIN && titleMargin >= TITLE_STICKY_MARGIN) {
+    return best;
+  }
+  return null;
+};
+
+const promote = (
+  ranked: RankedCandidate[],
+  pick: RankedCandidate,
+): RankedCandidate[] => {
+  if (ranked[0]?.oracleId === pick.oracleId && ranked[0]?.name === pick.name) return ranked;
+  return [pick, ...ranked.filter(r => r !== pick)];
+};
+
+const acceptCard = (
+  ranked: RankedCandidate[],
+  pick: RankedCandidate,
+  margin: number,
+  status: ScanIdentityStatus,
+  extras: Partial<FusedResult> = {},
+): FusedResult => ({
+  candidates: ranked,
+  card: {
+    confidence: pick.titleScore ?? pick.score,
+    name: pick.name,
+    oracleId: pick.oracleId,
+  },
+  margin,
+  status:
+    status === 'identified' || pick.possiblePrintingIds.length === 1
+      ? status === 'card-ambiguous'
+        ? 'card-ambiguous'
+        : pick.possiblePrintingIds.length === 1
+          ? 'identified'
+          : 'printing-ambiguous'
+      : status,
+  ...extras,
+});
 
 export const fuseEvidence = (
   rows: readonly CandidateEvidence[],
@@ -134,6 +200,70 @@ export const fuseEvidence = (
     }
   }
 
+  // Sticky title is already fused leader — accept even when a nearby art-only
+  // row shrinks fused margin below ACCEPT_MARGIN (Sword 0.83 vs Tovolar 0.80).
+  if (options.allowTitleOnly && !artworkOnly) {
+    const sticky = findStickyTitle(ranked);
+    if (sticky && sticky.name === top.name && sticky.oracleId === top.oracleId) {
+      const byTitle = ranked
+        .filter(r => (r.titleScore ?? 0) > 0)
+        .sort((a, b) => (b.titleScore ?? 0) - (a.titleScore ?? 0));
+      const titleMargin = (sticky.titleScore ?? 0) - (byTitle[1]?.titleScore ?? 0);
+      const artDisagree = ranked.some(
+        r =>
+          r.name !== sticky.name &&
+          (r.visualScore ?? 0) >= VISUAL_STRONG * 0.9 &&
+          ((r.titleScore ?? 0) < TITLE_STICKY_MIN),
+      );
+      return acceptCard(ranked, sticky, titleMargin, 'printing-ambiguous', {
+        artConflict: artDisagree || undefined,
+      });
+    }
+  }
+
+  // Sticky title vs disagreeing art — never let weak/moderate global art win.
+  if (options.allowTitleOnly && !artworkOnly) {
+    const sticky = findStickyTitle(ranked);
+    if (sticky) {
+      const leaderDisagrees =
+        top.name !== sticky.name &&
+        (top.titleScore == null || (top.titleScore ?? 0) < TITLE_STICKY_MIN);
+      const leaderIsArtLed =
+        leaderDisagrees &&
+        (top.visualScore ?? 0) > 0 &&
+        (top.titleScore == null || (top.titleScore ?? 0) < (sticky.titleScore ?? 0));
+      if (leaderIsArtLed) {
+        const visualMargin = (top.visualScore ?? 0) - (second?.visualScore ?? 0);
+        const artVeryStrong =
+          (top.visualScore ?? 0) >= VISUAL_STRONG + 0.08 &&
+          visualMargin >= ARTWORK_ONLY_VISUAL_MARGIN + 0.04;
+        const promoted = promote(ranked, sticky);
+        const titleMargin =
+          (sticky.titleScore ?? 0) -
+          (ranked
+            .filter(r => r !== sticky && (r.titleScore ?? 0) > 0)
+            .sort((a, b) => (b.titleScore ?? 0) - (a.titleScore ?? 0))[0]?.titleScore ?? 0);
+        if (artVeryStrong) {
+          // Two strong signals disagree — do not silently flip to art.
+          return {
+            artConflict: true,
+            candidates: promoted,
+            card: {
+              confidence: sticky.titleScore ?? sticky.score,
+              name: sticky.name,
+              oracleId: sticky.oracleId,
+            },
+            margin: titleMargin,
+            status: 'card-ambiguous',
+          };
+        }
+        return acceptCard(promoted, sticky, titleMargin, 'printing-ambiguous', {
+          artConflict: true,
+        });
+      }
+    }
+  }
+
   // Strong dual: title + art agree — accept even with modest fused margin.
   if (options.allowStrongDual) {
     const title = top.titleScore ?? 0;
@@ -153,13 +283,46 @@ export const fuseEvidence = (
   }
 
   // Title-only fast path — oracle identity only; printing stays pending.
+  // Prefer sticky/title-only on *any* row, not only fused #1.
   if (options.allowTitleOnly && !artworkOnly) {
+    const sticky = findStickyTitle(ranked);
+    if (sticky && (sticky.titleScore ?? 0) >= TITLE_ONLY_MIN) {
+      const byTitle = ranked
+        .filter(r => (r.titleScore ?? 0) > 0)
+        .sort((a, b) => (b.titleScore ?? 0) - (a.titleScore ?? 0));
+      const titleMargin = (sticky.titleScore ?? 0) - (byTitle[1]?.titleScore ?? 0);
+      if (titleMargin >= TITLE_ONLY_MARGIN) {
+        return acceptCard(promote(ranked, sticky), sticky, titleMargin, 'printing-ambiguous');
+      }
+    }
     const titleMargin = (top.titleScore ?? 0) - (second?.titleScore ?? 0);
     if ((top.titleScore ?? 0) >= TITLE_ONLY_MIN && titleMargin >= TITLE_ONLY_MARGIN) {
       return {
         candidates: ranked,
         card: { confidence: top.titleScore ?? top.score, name: top.name, oracleId: top.oracleId },
         margin: titleMargin,
+        status: 'printing-ambiguous',
+      };
+    }
+  }
+
+  // Do not ACCEPT a visual-only leader when a sticky title exists elsewhere.
+  if (options.allowTitleOnly && !artworkOnly) {
+    const sticky = findStickyTitle(ranked);
+    if (
+      sticky &&
+      top.name !== sticky.name &&
+      (top.titleScore == null || (top.titleScore ?? 0) < TITLE_STICKY_MIN)
+    ) {
+      return {
+        artConflict: true,
+        candidates: promote(ranked, sticky),
+        card: {
+          confidence: sticky.titleScore ?? sticky.score,
+          name: sticky.name,
+          oracleId: sticky.oracleId,
+        },
+        margin: (sticky.titleScore ?? 0) - (top.titleScore ?? 0),
         status: 'printing-ambiguous',
       };
     }

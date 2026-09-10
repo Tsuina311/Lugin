@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { DetectorInputThumb } from './DetectorInputThumb';
 import { formatCorner } from './analysisGeometry';
@@ -15,6 +15,8 @@ import type {
   TransferCheck,
   WorkletFailure,
 } from './useFrameAnalysis';
+import type { JsLagStats } from './jsLagProbe';
+import { getPerfBaseline } from './perfBaseline';
 
 type SessionBits = {
   artCandidates: { name: string; score: number }[];
@@ -48,6 +50,83 @@ type SessionBits = {
   printingEntries: number | null;
   normalizedUri: string | null;
   phase: string;
+  lockGates?: {
+    bestFrame: boolean;
+    bestFrameSource: string;
+    bestQuality: number | null;
+    blocker: string;
+    consecutiveStable: number;
+    cornerOrderCorrections: number;
+    cornerOrderValid: boolean;
+    detectorHits: number;
+    detectorMisses: number;
+    detectorScore: number;
+    detectorThreshold: number;
+    currentTrackId?: number | null;
+    geometryTrackId?: number | null;
+    cardSessionId?: number;
+    focusCardSessionId?: number | null;
+    sameCardSessionFocus?: boolean;
+    sessionResetReason?: string | null;
+    visualChange?: string;
+    fingerprintDelta?: number | null;
+    visualConfirmPending?: number;
+    cardChangeState?: string | null;
+    cardChangeEvidence?: string | null;
+    changeWatchDelta?: number | null;
+    changeWatchBand?: string | null;
+    changeWatchConfirmCount?: number | null;
+    swapSuspicion?: number | null;
+    resultCardSessionId?: number | null;
+    resultPossiblyStale?: boolean;
+    previousSessionIdentity?: string | null;
+    currentSessionIdentity?: string | null;
+    focusAgeMs: number | null;
+    focusAttemptId?: number;
+    focusKind: string;
+    focusOk: boolean;
+    focusRequestedAt?: number | null;
+    focusResolvedAt?: number | null;
+    focusTimedOutAt?: number | null;
+    focusTrackId?: number | null;
+    sameTrackFocus?: boolean;
+    focusReentries?: number;
+    focusRequests?: number;
+    focusSuccesses?: number;
+    focusTimedOut?: boolean;
+    focusTimeouts?: number;
+    focusWaitMs?: number | null;
+    highResFailure?: number;
+    highResRequests?: number;
+    highResSuccess?: number;
+    lastHighResError?: string | null;
+    postLockStall?: boolean;
+    recognitionStatus?: string | null;
+    retryReason?: string | null;
+    retryScheduledAt?: number | null;
+    geometryDetected: boolean;
+    highResEligible: boolean;
+    lastHitAgeMs: number | null;
+    motionScore: number;
+    motionThreshold: number;
+    poolSize: number;
+    qualityGating: boolean;
+    qualityInput: string;
+    qualityOk: boolean;
+    qualityScore: number | null;
+    qualityThreshold: number;
+    recognitionPending: boolean;
+    requiredStable: number;
+    sharpness: number | null;
+    sharpnessThreshold: number;
+    stable: boolean;
+    stableDurationMs: number | null;
+    staleClearThresholdMs: number;
+    waiting: string;
+  } | null;
+  recognizeInvocations?: number;
+  selectedRole?: string | null;
+  continuityReason?: string | null;
   qualityBest: number | null;
   qualityExposure?: number;
   qualityGlare?: number;
@@ -75,6 +154,44 @@ type SessionBits = {
   titleDoneAt: number | null;
   artDoneAt: number | null;
   earlyIdentityAt: number | null;
+  ocrPipeline: {
+    schedule: string | null;
+    titleBytes: number | null;
+    titleCropW: number | null;
+    titleCropH: number | null;
+    titleEncodeMs: number | null;
+    titleJsBridgeMs: number | null;
+    titleMlkitMs: number | null;
+    titleNativeMs: number | null;
+    titleTransport: string | null;
+    footerBytes: number | null;
+    footerCropW: number | null;
+    footerCropH: number | null;
+    footerMlkitMs: number | null;
+    footerNativeMs: number | null;
+    footerTransport: string | null;
+  } | null;
+  ocrAdapter?: {
+    lastAttempt: string | null;
+    lastError: string | null;
+    nativeModuleAvailable: boolean;
+    ready: boolean;
+    textRecognizerCreated: boolean;
+    transport: string;
+    warmupState: string;
+  } | null;
+  /** Compact Samsung acceptance snapshot (debug only). */
+  acceptance?: {
+    detectorActual: string | null;
+    names: number | null;
+    printing: number | null;
+    type: number | null;
+    art: number | null;
+    lastName: string | null;
+    lastPrinting: string | null;
+    lockToOracleMs: number | null;
+    lockToPrintingMs: number | null;
+  } | null;
 };
 
 type Props = {
@@ -84,6 +201,7 @@ type Props = {
   error: string | null;
   failure: WorkletFailure | null;
   frameMeta: FrameMetadata | null;
+  jsLag?: JsLagStats | null;
   metrics: AnalysisMetrics | null;
   orientation: OrientationDebug;
   ping: PingEcho | null;
@@ -94,6 +212,13 @@ type Props = {
   session?: SessionBits | null;
   showNumbers: boolean;
   transfer: TransferCheck | null;
+  onStartCardSwapTest?: () => void;
+  onStartDeckBenchmark?: () => void;
+  onStartBinderBenchmark?: () => void;
+  realBenchmarkStatus?: {
+    deck?: string | null;
+    binder?: string | null;
+  };
 };
 
 const ms = (s: StageStats) =>
@@ -116,6 +241,7 @@ export function ScanDebugPanel({
   error,
   failure,
   frameMeta,
+  jsLag,
   metrics,
   orientation,
   ping,
@@ -126,27 +252,46 @@ export function ScanDebugPanel({
   session,
   showNumbers,
   transfer,
+  onStartCardSwapTest,
+  onStartDeckBenchmark,
+  onStartBinderBenchmark,
+  realBenchmarkStatus,
 }: Props) {
-  const ladder: [string, number][] = [
-    ['camera out', counters.cameraFrames],
-    ['worklet sampled', counters.sampled],
-    ['pixel buffer read', counters.pixelBufferRead],
-    ['buffer copied', counters.bufferCopied],
-    ['schedule attempted', counters.scheduleAttempted],
-    ['RN ping', counters.rnPing],
-    ['RN meta', counters.rnMeta],
-    ['RN tiny buffer', counters.rnTiny],
-    ['RN full frame', counters.rnFull],
-    ['received', counters.received],
-    ['processed', counters.processed],
-    ['ScanImages', counters.scanImages],
-    ['detector calls', counters.detectorCalls],
-    ['detector hits', counters.detectorHits],
-  ];
+  const baseline = getPerfBaseline();
+  const lagWarn = jsLag != null && jsLag.p95 > 100;
+  const ladder: [string, number][] = diagnosticRungs
+    ? [
+        ['camera out', counters.cameraFrames],
+        ['worklet sampled', counters.sampled],
+        ['pixel buffer read', counters.pixelBufferRead],
+        ['buffer copied', counters.bufferCopied],
+        ['schedule attempted', counters.scheduleAttempted],
+        ['RN ping', counters.rnPing],
+        ['RN meta', counters.rnMeta],
+        ['RN tiny buffer', counters.rnTiny],
+        ['RN full frame', counters.rnFull],
+        ['received', counters.received],
+        ['processed', counters.processed],
+        ['ScanImages', counters.scanImages],
+        ['detector calls', counters.detectorCalls],
+        ['detector hits', counters.detectorHits],
+      ]
+    : [
+        // Fast path never climbs ping/meta/tiny — those zeros are expected.
+        ['camera out', counters.cameraFrames],
+        ['worklet sampled', counters.sampled],
+        ['pixel buffer / Y copy', counters.bufferCopied],
+        ['schedule attempted', counters.scheduleAttempted],
+        ['RN received', counters.received],
+        ['RN full / Y', counters.rnFull],
+        ['processed', counters.processed],
+        ['ScanImages', counters.scanImages],
+        ['detector calls', counters.detectorCalls],
+        ['detector hits', counters.detectorHits],
+      ];
 
   // Flag the first rung that has nothing while the rung above it has something.
-  // The last two rows are allowed to be zero without being a plumbing fault:
-  // a detector that runs and finds no card is a different problem.
+  // Detector hits may stay 0 without being a plumbing fault.
   const breakAt = ladder.findIndex(
     ([, value], i) => i > 0 && i < ladder.length - 1 && value === 0 && ladder[i - 1][1] > 0,
   );
@@ -160,12 +305,51 @@ export function ScanDebugPanel({
             worklet threw in {failure.stage} (×{failure.count}): {failure.message}
           </Text>
         ) : null}
+        {lagWarn ? (
+          <Text style={styles.error}>
+            JS event-loop p95 {jsLag!.p95.toFixed(0)} ms &gt; 100 — UI starved
+          </Text>
+        ) : null}
+
+        <View style={styles.row}>
+          <View style={styles.column}>
+            <Text style={styles.title}>Perf · {baseline.detectorHz} Hz · long {analysisLongEdge}</Text>
+            {jsLag ? (
+              <Text style={[styles.line, lagWarn && styles.bad]}>
+                JS lag p50/p95/max: {jsLag.p50.toFixed(0)}/{jsLag.p95.toFixed(0)}/
+                {jsLag.max.toFixed(0)} ms (n={jsLag.samples})
+              </Text>
+            ) : null}
+            <Text style={styles.line}>
+              nativeDetect {counters.nativeDetectCalls} · sharedJs {counters.sharedJsDetectCalls}
+              {counters.sharedJsDetectCalls > 0 && counters.nativeDetectCalls > 0
+                ? '  ← DUAL ENGINE?'
+                : ''}
+            </Text>
+            <Text style={styles.line}>
+              submitted {counters.submitted} · processed {counters.processed} · droppedBusy{' '}
+              {counters.droppedBusy} · superseded {counters.superseded}
+            </Text>
+            <Text style={styles.dim}>
+              warmup {baseline.ocrWarmup ? 'ON' : 'OFF'} · sleeve{' '}
+              {baseline.nestedSleeve ? 'ON' : 'OFF'} · livePNG{' '}
+              {baseline.liveDebugImages ? 'ON' : 'OFF'} · heavyIdx while scan{' '}
+              {baseline.heavyIndexesWhileScanning ? 'ON' : 'OFF'}
+            </Text>
+          </View>
+        </View>
 
         <View style={styles.row}>
           <View style={styles.column}>
             <Text style={styles.title}>
-              Ladder ({diagnosticRungs ? `rung: ${rung}` : 'fast path'}) · long {analysisLongEdge}
+              Ladder ({diagnosticRungs ? `diag · rung: ${rung}` : 'fast path'}) · long{' '}
+              {analysisLongEdge}
             </Text>
+            {!diagnosticRungs ? (
+              <Text style={styles.dim}>
+                Fast path skips ping/meta/tiny — enable “Ladder on” only to isolate bridge faults.
+              </Text>
+            ) : null}
             {ladder.map(([label, value], i) => (
               <Text key={label} style={[styles.line, i === breakAt && styles.bad]}>
                 {label}: {value}
@@ -182,7 +366,8 @@ export function ScanDebugPanel({
               </Text>
             ) : null}
             <Text style={styles.line}>
-              dropped {counters.droppedByCamera} · superseded {counters.supersededOnJs}
+              dropped {counters.droppedByCamera} · supersededJs {counters.supersededOnJs} ·
+              busyDrop {counters.droppedBusy}
             </Text>
             {ping ? (
               <Text style={styles.line}>
@@ -390,8 +575,197 @@ export function ScanDebugPanel({
 
         {session ? (
           <>
+            {onStartDeckBenchmark || onStartBinderBenchmark || onStartCardSwapTest ? (
+              <>
+                <Text style={styles.title}>REAL BENCHMARKS</Text>
+                {realBenchmarkStatus?.deck ? (
+                  <Text style={styles.dim}>Deck: {realBenchmarkStatus.deck}</Text>
+                ) : null}
+                {realBenchmarkStatus?.binder ? (
+                  <Text style={styles.dim}>Binder: {realBenchmarkStatus.binder}</Text>
+                ) : null}
+                {onStartDeckBenchmark ? (
+                  <Pressable onPress={onStartDeckBenchmark} style={styles.swapStart}>
+                    <Text style={styles.swapStartLabel}>Deck Benchmark</Text>
+                  </Pressable>
+                ) : null}
+                {onStartBinderBenchmark ? (
+                  <Pressable onPress={onStartBinderBenchmark} style={[styles.swapStart, { marginTop: 6 }]}>
+                    <Text style={styles.swapStartLabel}>Binder Benchmark</Text>
+                  </Pressable>
+                ) : null}
+                {onStartCardSwapTest ? (
+                  <Pressable onPress={onStartCardSwapTest} style={[styles.swapStart, { marginTop: 6 }]}>
+                    <Text style={styles.swapStartLabel}>Card Swap Test</Text>
+                  </Pressable>
+                ) : null}
+                <Text style={styles.dim}>
+                  Hands-free capture → upload → Mac analysis. No production detector change.
+                </Text>
+              </>
+            ) : null}
+            <Text style={styles.title}>LOCK GATES</Text>
+            {session.lockGates ? (
+              <>
+                <Text
+                  style={[
+                    styles.line,
+                    session.lockGates.blocker === 'none' ? styles.ok : styles.warn,
+                  ]}
+                >
+                  blocker {session.lockGates.blocker} · {session.lockGates.waiting}
+                </Text>
+                <Text
+                  style={[styles.line, session.lockGates.geometryDetected ? styles.ok : styles.bad]}
+                >
+                  geometry detected {session.lockGates.geometryDetected ? 'YES' : 'NO'} · score{' '}
+                  {session.lockGates.detectorScore.toFixed(2)} /{' '}
+                  {session.lockGates.detectorThreshold.toFixed(2)}
+                </Text>
+                <Text style={[styles.line, session.lockGates.stable ? styles.ok : styles.bad]}>
+                  stable {session.lockGates.stable ? 'YES' : 'NO'} · motion{' '}
+                  {session.lockGates.motionScore.toFixed(3)} /{' '}
+                  {session.lockGates.motionThreshold.toFixed(3)} · consecutive{' '}
+                  {session.lockGates.consecutiveStable}/{session.lockGates.requiredStable}
+                </Text>
+                <Text style={styles.line}>
+                  stable duration{' '}
+                  {session.lockGates.stableDurationMs != null
+                    ? `${session.lockGates.stableDurationMs.toFixed(0)} ms`
+                    : '—'}{' '}
+                  · last hit{' '}
+                  {session.lockGates.lastHitAgeMs != null
+                    ? `${session.lockGates.lastHitAgeMs.toFixed(0)} ms`
+                    : '—'}{' '}
+                  / stale {session.lockGates.staleClearThresholdMs} ms
+                </Text>
+                <Text
+                  style={[
+                    styles.line,
+                    session.lockGates.qualityGating && !session.lockGates.qualityOk
+                      ? styles.bad
+                      : styles.ok,
+                  ]}
+                >
+                  quality {session.lockGates.qualityOk ? 'YES' : 'NO'}{' '}
+                  {session.lockGates.qualityScore != null
+                    ? session.lockGates.qualityScore.toFixed(2)
+                    : '—'}{' '}
+                  / {session.lockGates.qualityThreshold.toFixed(2)} · {session.lockGates.qualityInput}
+                  {session.lockGates.qualityGating ? '' : ' (geometry only)'}
+                </Text>
+                <Text style={[styles.line, session.lockGates.focusOk ? styles.ok : styles.warn]}>
+                  focus {session.lockGates.focusOk ? 'YES' : 'NO'} · {session.lockGates.focusKind}
+                  {session.lockGates.focusAgeMs != null
+                    ? ` · ${session.lockGates.focusAgeMs.toFixed(0)} ms`
+                    : ''}
+                  {session.lockGates.focusTimedOut ? ' · timed out' : ''}
+                  {session.lockGates.focusAttemptId != null
+                    ? ` · attempt ${session.lockGates.focusAttemptId}`
+                    : ''}
+                  {session.lockGates.sameCardSessionFocus
+                    ? ' · same-session'
+                    : ' · new-session/unknown'}
+                </Text>
+                <Text style={styles.line}>
+                  Geometry track: {session.lockGates.geometryTrackId ?? session.lockGates.currentTrackId ?? '—'}
+                  {' · '}Card session: {session.lockGates.cardSessionId ?? '—'}
+                  {session.lockGates.focusCardSessionId != null
+                    ? ` · focusSession ${session.lockGates.focusCardSessionId}`
+                    : ''}
+                </Text>
+                <Text style={styles.line}>
+                  Visual change: {session.lockGates.visualChange ?? '—'}
+                  {session.lockGates.fingerprintDelta != null
+                    ? ` · delta ${session.lockGates.fingerprintDelta.toFixed(3)}`
+                    : ''}
+                  {session.lockGates.changeWatchDelta != null
+                    ? ` · watchΔ ${session.lockGates.changeWatchDelta.toFixed(3)}`
+                    : ''}
+                  {session.lockGates.cardChangeState
+                    ? ` · change ${session.lockGates.cardChangeState}`
+                    : ''}
+                  {session.lockGates.sessionResetReason
+                    ? ` · reset ${session.lockGates.sessionResetReason}`
+                    : ''}
+                  {session.lockGates.resultPossiblyStale ? ' · result STALE?' : ''}
+                </Text>
+                <Text style={styles.line}>
+                  Previous identity: {session.lockGates.previousSessionIdentity ?? '—'}
+                </Text>
+                <Text style={styles.line}>
+                  Current identity: {session.lockGates.currentSessionIdentity ?? '—'}
+                </Text>
+                <Text style={styles.line}>
+                  focus req {session.lockGates.focusRequests ?? 0} · ok{' '}
+                  {session.lockGates.focusSuccesses ?? 0} · timeout{' '}
+                  {session.lockGates.focusTimeouts ?? 0} · reenter{' '}
+                  {session.lockGates.focusReentries ?? 0}
+                  {session.lockGates.focusWaitMs != null
+                    ? ` · wait ${session.lockGates.focusWaitMs.toFixed(0)} ms`
+                    : ''}
+                </Text>
+                <Text
+                  style={[
+                    styles.line,
+                    session.lockGates.postLockStall ? styles.bad : styles.ok,
+                  ]}
+                >
+                  high-res req {session.lockGates.highResRequests ?? 0} · ok{' '}
+                  {session.lockGates.highResSuccess ?? 0} · fail{' '}
+                  {session.lockGates.highResFailure ?? 0}
+                  {session.lockGates.lastHighResError
+                    ? ` · ${session.lockGates.lastHighResError}`
+                    : ''}
+                  {session.lockGates.postLockStall ? ' · POST_LOCK_STALL' : ''}
+                </Text>
+                <Text style={styles.line}>
+                  recognize {session.recognizeInvocations ?? 0}
+                  {session.lockGates.recognitionStatus
+                    ? ` · ${session.lockGates.recognitionStatus}`
+                    : ''}
+                  {session.lockGates.retryReason
+                    ? ` · retry ${session.lockGates.retryReason}`
+                    : ''}
+                </Text>
+                <Text style={[styles.line, session.lockGates.bestFrame ? styles.ok : styles.warn]}>
+                  best frame {session.lockGates.bestFrame ? 'YES' : 'NO'} · pool{' '}
+                  {session.lockGates.poolSize} ·{' '}
+                  {session.lockGates.bestQuality != null
+                    ? session.lockGates.bestQuality.toFixed(2)
+                    : '—'}{' '}
+                  · {session.lockGates.bestFrameSource}
+                </Text>
+                <Text
+                  style={[styles.line, session.lockGates.highResEligible ? styles.ok : styles.bad]}
+                >
+                  high-res eligible {session.lockGates.highResEligible ? 'YES' : 'NO'} · pending{' '}
+                  {session.lockGates.recognitionPending ? 'YES' : 'NO'}
+                </Text>
+                <Text
+                  style={[
+                    styles.line,
+                    session.lockGates.cornerOrderValid ? styles.ok : styles.warn,
+                  ]}
+                >
+                  corner order {session.lockGates.cornerOrderValid ? 'TL TR BR BL' : 'CORRECTED'} ·
+                  fixes {session.lockGates.cornerOrderCorrections} · hits{' '}
+                  {session.lockGates.detectorHits} / miss {session.lockGates.detectorMisses}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.dim}>no lock-gate snapshot yet</Text>
+            )}
             <Text style={styles.title}>SessionController</Text>
-            <Text style={styles.ok}>phase {session.phase}</Text>
+            <Text style={styles.ok}>
+              phase {session.phase}
+              {session.lockGates?.waiting ? ` · ${session.lockGates.waiting}` : ''}
+            </Text>
+            <Text style={styles.line}>
+              recognizeCard ×{session.recognizeInvocations ?? 0}
+              {session.selectedRole ? ` · role ${session.selectedRole}` : ''}
+              {session.continuityReason ? ` · ${session.continuityReason}` : ''}
+            </Text>
             <Text style={styles.line}>
               stable {session.stable ? 'yes' : 'no'} · track {session.trackFrames}
               {session.qualityBest != null ? ` · quality ${session.qualityBest.toFixed(2)}` : ''}
@@ -505,6 +879,79 @@ export function ScanDebugPanel({
             ) : (
               <Text style={styles.dim}>no lock→oracle timing yet</Text>
             )}
+            <Text style={styles.title}>OCR adapter</Text>
+            <Text style={styles.line}>
+              OCR:{' '}
+              {session.ocrAdapter
+                ? !session.ocrAdapter.textRecognizerCreated
+                  ? `unavailable${session.ocrAdapter.lastError ? `: ${session.ocrAdapter.lastError}` : ''}`
+                  : session.ocrAdapter.warmupState === 'warming'
+                    ? 'warming'
+                    : session.ocrAdapter.lastError
+                      ? `error: ${session.ocrAdapter.lastError}`
+                      : 'ready'
+                : '—'}
+            </Text>
+            <Text style={styles.line}>
+              Transport: {session.ocrAdapter?.transport ?? '—'} · Last attempt:{' '}
+              {session.ocrAdapter?.lastAttempt ?? 'not run'}
+            </Text>
+            <Text style={styles.title}>OCR pipeline</Text>
+            {session.ocrPipeline ? (
+              <>
+                <Text style={styles.line}>
+                  schedule {session.ocrPipeline.schedule ?? '—'} · title{' '}
+                  {session.ocrPipeline.titleCropW ?? '—'}×{session.ocrPipeline.titleCropH ?? '—'} ·{' '}
+                  {session.ocrPipeline.titleBytes != null
+                    ? `${(session.ocrPipeline.titleBytes / 1024).toFixed(1)} KB`
+                    : '—'}{' '}
+                  · {session.ocrPipeline.titleTransport ?? '—'}
+                </Text>
+                <Text style={styles.line}>
+                  title encode {latMs(session.ocrPipeline.titleEncodeMs)} · bridge+native{' '}
+                  {latMs(session.ocrPipeline.titleJsBridgeMs)} · native{' '}
+                  {latMs(session.ocrPipeline.titleNativeMs)} · mlkit{' '}
+                  {latMs(session.ocrPipeline.titleMlkitMs)}
+                </Text>
+                <Text style={styles.line}>
+                  footer {session.ocrPipeline.footerCropW ?? '—'}×
+                  {session.ocrPipeline.footerCropH ?? '—'} ·{' '}
+                  {session.ocrPipeline.footerBytes != null
+                    ? `${(session.ocrPipeline.footerBytes / 1024).toFixed(1)} KB`
+                    : '—'}{' '}
+                  · {session.ocrPipeline.footerTransport ?? '—'} · mlkit{' '}
+                  {latMs(session.ocrPipeline.footerMlkitMs)}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.dim}>no OCR stage timings yet</Text>
+            )}
+            {session.acceptance ? (
+              <>
+                <Text style={styles.title}>Samsung acceptance</Text>
+                <Text style={styles.line}>
+                  ENGINE {session.acceptance.detectorActual ?? '—'} · OCR{' '}
+                  {session.ocrPipeline?.titleTransport ?? '—'}
+                </Text>
+                <Text style={styles.line}>
+                  DATA Names {session.acceptance.names ?? '—'} · Printing{' '}
+                  {session.acceptance.printing ?? '—'} · Type {session.acceptance.type ?? '—'} · Art{' '}
+                  {session.acceptance.art ?? '—'}
+                </Text>
+                <Text style={styles.line}>
+                  LAST {session.acceptance.lastName ?? '—'}
+                  {session.acceptance.lastPrinting ? ` · ${session.acceptance.lastPrinting}` : ''}
+                </Text>
+                <Text style={styles.line}>
+                  lock→oracle {latMs(session.acceptance.lockToOracleMs)} · lock→printing{' '}
+                  {latMs(session.acceptance.lockToPrintingMs)}
+                </Text>
+                <Text style={styles.line}>
+                  title MLKit {latMs(session.ocrPipeline?.titleMlkitMs ?? null)} · footer MLKit{' '}
+                  {latMs(session.ocrPipeline?.footerMlkitMs ?? null)}
+                </Text>
+              </>
+            ) : null}
             <Text style={styles.title}>
               Recognition input — {session.sourceLabel === 'high-res' ? 'HIGH RES' : 'analysis fallback'}
             </Text>
@@ -570,6 +1017,20 @@ const styles = StyleSheet.create({
   },
   scroll: {
     padding: 8,
+  },
+  swapStart: {
+    alignSelf: 'stretch',
+    backgroundColor: '#C47A12',
+    borderRadius: 8,
+    marginTop: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  swapStartLabel: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   title: {
     color: '#F5C542',

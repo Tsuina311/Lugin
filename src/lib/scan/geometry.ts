@@ -42,6 +42,10 @@ export const dist = (a: Pt, b: Pt): number => {
   return Math.hypot(dx, dy);
 };
 
+/** Named-corner wrapper around {@link orderCorners}. */
+export const normalizeCardCorners = (corners: CardCorners): CardCorners =>
+  quadToCorners(orderCorners(cornersToQuad(corners)));
+
 /** Reorder any 4 corners into TL, TR, BR, BL. */
 export const orderCorners = (pts: readonly Pt[]): Quad => {
   if (pts.length !== 4) throw new Error('orderCorners expects 4 points');

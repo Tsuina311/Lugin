@@ -9,7 +9,8 @@ import type { CardCorners, Point2D } from './sharedCore';
 /** Weight of the previous display toward the new target per tick (0–1). */
 export const OVERLAY_EASE = 0.35;
 /** Drop the polygon if no detection arrives within this window. */
-export const OVERLAY_STALE_MS = 220;
+/** 8 Hz detect is 125 ms; allow a missed sample without wiping the quad. */
+export const OVERLAY_STALE_MS = 500;
 
 const lerp = (a: Point2D, b: Point2D, t: number): Point2D => ({
   x: a.x + (b.x - a.x) * t,

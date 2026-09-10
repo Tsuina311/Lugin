@@ -23,6 +23,32 @@ export interface TextRecognitionResult {
   /** Exactly what the engine returned, before any normalization. */
   text: string;
   words: RecognizedWord[];
+  /** Optional engine/bridge timings (native + JS). Stage-local; do not mix clocks. */
+  engine?: OcrEngineTimings;
+  /** JS-side RGBA length check failed — native OCR was not called. */
+  ocrInputInvalid?: boolean;
+  /** Native/bridge failure, distinct from a successful empty read. */
+  nativeError?: { code: string; message: string };
+}
+
+/** Per-call OCR transport + native stage timings for latency waterfalls. */
+export interface OcrEngineTimings {
+  /** JS base64 encode (0 when using Uint8Array). */
+  encodeMs: number;
+  /** Native base64/file decode. */
+  decodeMs: number;
+  /** Native RGBA → Bitmap. */
+  bitmapMs: number;
+  /** Native ML Kit process. */
+  mlkitMs: number;
+  /** Native end-to-end. */
+  nativeTotalMs: number;
+  /** JS submit → JS receive (includes bridge + native). */
+  jsBridgeMs: number;
+  bytesIn: number;
+  width: number;
+  height: number;
+  transport: string;
 }
 
 /** How much page structure the engine should assume. */

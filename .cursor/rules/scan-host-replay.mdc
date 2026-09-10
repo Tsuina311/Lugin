@@ -1,0 +1,32 @@
+---
+description: Replay Samsung scan fixtures on Mac; do not ask for phone replay of JS/TS recognition
+alwaysApply: true
+---
+
+# Host-side scanner replay
+
+Once a Samsung fixture is in `.scan-fixtures/replay/`, **do not** ask the user to
+tap Scanner Lab / Run live pipeline / upload for recognition-logic changes.
+
+Evaluate with:
+
+- `yarn scan:replay <fixture-id>` — one fixture (recorded OCR + portable warp)
+- `yarn scan:regression` — full corpus gate
+
+Those cover CardNameIndex, fuzzy match, variant consensus, title decode, and
+acceptance. Recorded strings such as `Maddenino Hey` / `Maddening Hesy` are the
+Samsung OCR observations.
+
+## HOST REPLAYABLE (Mac / Cursor)
+
+Warp, title crop, preprocess, CardNameIndex, strong-fuzzy, fusion/acceptance
+from recorded OCR or existing pixels.
+
+## DEVICE REQUIRED
+
+New camera captures, native detector, focus/camera, or a **fresh** Android ML Kit
+reading. Only then: inbox upload, or `yarn scan:device-replay <fixture-id>` if
+the phone worker is on.
+
+Do not pretend Node reproduces ML Kit. Do not duplicate the same PNG into the
+corpus twice.

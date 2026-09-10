@@ -136,6 +136,108 @@ export const orientedSize = (
   };
 };
 
+/**
+ * Affine map from oriented (rx, ry) → source (sx, sy).
+ * Shared by RGBA `frameToScanImage` and the Y-plane detector path.
+ */
+export const orientedSourceAffine = (
+  orientation: FrameOrientation,
+  isMirrored: boolean,
+  srcW: number,
+  srcH: number,
+): { ax: number; ay: number; bx: number; by: number; cx: number; cy: number } => {
+  let ax = 1;
+  let bx = 0;
+  let cx = 0;
+  let ay = 0;
+  let by = 1;
+  let cy = 0;
+  switch (orientation) {
+    case 'right':
+      ax = 0;
+      bx = -1;
+      cx = srcW - 1;
+      ay = 1;
+      by = 0;
+      cy = 0;
+      break;
+    case 'left':
+      ax = 0;
+      bx = 1;
+      cx = 0;
+      ay = -1;
+      by = 0;
+      cy = srcH - 1;
+      break;
+    case 'down':
+      ax = -1;
+      bx = 0;
+      cx = srcW - 1;
+      ay = 0;
+      by = -1;
+      cy = srcH - 1;
+      break;
+    default:
+      break;
+  }
+  if (isMirrored) {
+    ax = -ax;
+    bx = -bx;
+    cx = srcW - 1 - cx;
+  }
+  return { ax, ay, bx, by, cx, cy };
+};
+
+/** Packed luma after orientation + preview cover-crop + long-edge downscale. */
+export type DetectorLuma = {
+  height: number;
+  width: number;
+  y: Uint8Array;
+};
+
+/**
+ * Y-plane equivalent of {@link frameToScanImage}: same orientation / mirror /
+ * cover-crop / maxLongEdge, luma only (no RGBA through RN).
+ */
+export const yPlaneToDetectorLuma = (
+  yBytes: Uint8Array,
+  frame: Pick<RawFrameView, 'bytesPerRow' | 'height' | 'isMirrored' | 'orientation' | 'width'>,
+  options: FrameConvertOptions = {},
+): DetectorLuma => {
+  const { height: srcH, isMirrored, orientation, width: srcW } = frame;
+  if (srcW <= 0 || srcH <= 0) return { height: 1, width: 1, y: new Uint8Array(1) };
+
+  const minStride = srcW;
+  const stride = frame.bytesPerRow >= minStride ? frame.bytesPerRow : minStride;
+  const oriented = orientedSize(frame);
+  const crop = clampRect(options.crop ?? { ...oriented, x: 0, y: 0 }, { ...oriented, x: 0, y: 0 });
+  const target = analysisSize(frame, { ...options, crop });
+  const outW = target.width;
+  const outH = target.height;
+  const out = new Uint8Array(outW * outH);
+  const { ax, ay, bx, by, cx, cy } = orientedSourceAffine(orientation, isMirrored, srcW, srcH);
+  const colStep = ay * stride + ax;
+  const lastPixel = yBytes.length - 1;
+
+  const xMap = new Int32Array(outW);
+  for (let ox = 0; ox < outW; ox++) {
+    const rx = crop.x + (outW === crop.width ? ox : (ox * crop.width) / outW);
+    xMap[ox] = Math.min(oriented.width - 1, Math.max(0, Math.floor(rx)));
+  }
+
+  let di = 0;
+  for (let oy = 0; oy < outH; oy++) {
+    const ry = crop.y + (outH === crop.height ? oy : (oy * crop.height) / outH);
+    const rowY = Math.min(oriented.height - 1, Math.max(0, Math.floor(ry)));
+    const rowBase = (by * rowY + cy) * stride + (bx * rowY + cx);
+    for (let ox = 0; ox < outW; ox++) {
+      const si = rowBase + xMap[ox] * colStep;
+      out[di++] = si < 0 || si > lastPixel ? 0 : (yBytes[si] ?? 0);
+    }
+  }
+  return { height: outH, width: outW, y: out };
+};
+
 /** Clamp `crop` onto `bounds` so a cover-rect cannot read off the image. */
 export const clampRect = (crop: OrientedRect, bounds: OrientedRect): OrientedRect => {
   const x = Math.min(Math.max(0, crop.x), Math.max(0, bounds.width - 1));
@@ -200,46 +302,7 @@ export const frameToScanImage = (
   // Solving it as coefficients instead of a switch inside the pixel loop keeps
   // all eight orientation/mirror combinations on one code path, and reduces the
   // inner loop to a single multiply-add.
-  let ax = 1;
-  let bx = 0;
-  let cx = 0;
-  let ay = 0;
-  let by = 1;
-  let cy = 0;
-  switch (orientation) {
-    case 'right': // content turned 90° right; counter-rotate left
-      ax = 0;
-      bx = -1;
-      cx = srcW - 1;
-      ay = 1;
-      by = 0;
-      cy = 0;
-      break;
-    case 'left': // content turned 90° left; counter-rotate right
-      ax = 0;
-      bx = 1;
-      cx = 0;
-      ay = -1;
-      by = 0;
-      cy = srcH - 1;
-      break;
-    case 'down':
-      ax = -1;
-      bx = 0;
-      cx = srcW - 1;
-      ay = 0;
-      by = -1;
-      cy = srcH - 1;
-      break;
-    default:
-      break;
-  }
-  if (isMirrored) {
-    // Mirroring is along the buffer's vertical axis: read rows right-to-left.
-    ax = -ax;
-    bx = -bx;
-    cx = srcW - 1 - cx;
-  }
+  const { ax, ay, bx, by, cx, cy } = orientedSourceAffine(orientation, isMirrored, srcW, srcH);
 
   // Column stride through the source buffer, constant for a given orientation.
   const colStep = ay * stride + ax * bpp;

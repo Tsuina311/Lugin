@@ -39,6 +39,17 @@ export {
   detectionsFromDebug,
   primaryCornersFromFrame,
 } from '@/lib/scan/detection/multi';
+export type {
+  ContinuityCandidate,
+  ContinuityDecision,
+  ContinuityState,
+  SelectedRole,
+} from '@/lib/scan/detection/continuity';
+export {
+  emptyContinuity,
+  measureContinuity,
+  stepContinuity,
+} from '@/lib/scan/detection/continuity';
 export type { CardSource, PreparedCard } from '@/lib/scan/prepareCard';
 export { prepareCard } from '@/lib/scan/prepareCard';
 
@@ -66,11 +77,14 @@ export {
 } from '@/lib/scan/tracking';
 export type { FrameQuality } from '@/lib/scan/quality';
 export { frameQualityScore, pushQualityPool, sharpnessScore } from '@/lib/scan/quality';
-export { focusGateDecision, preferredMainLensZoom } from '@/lib/scan/cameraCapabilities';
+export { focusAttemptDecision, focusGateDecision, preferredMainLensZoom } from '@/lib/scan/cameraCapabilities';
 
 // --- Session state machine ---------------------------------------------------
 export type {
   FrameHelpers,
+  LockBlocker,
+  LockGates,
+  PhaseTransition,
   ScanContext,
   ScannerPhase,
   SessionController,
@@ -78,6 +92,26 @@ export type {
   SessionUserLatency,
 } from '@/lib/scan/session/controller';
 export { createSessionController } from '@/lib/scan/session/controller';
+export type { CardSessionResetReason, CardVisualClass } from '@/lib/scan/session/cardSession';
+export {
+  CARD_SESSION_DIFF_MIN,
+  CARD_SESSION_SAME_MAX,
+  CARD_SESSION_VISUAL_CONFIRM,
+  cardFingerprintDistance,
+  cardFingerprintFromWarp,
+  classifyFingerprintDistance,
+  observeCardFingerprint,
+} from '@/lib/scan/session/cardSession';
+export type {
+  PostLockDebug,
+  RecognitionAttempt,
+  RecognitionAttemptStatus,
+} from '@/lib/scan/session/postLock';
+export {
+  compareQuads,
+  emptyPostLock,
+  shouldReplaceCaptureQuad,
+} from '@/lib/scan/session/postLock';
 
 // --- Recognition -------------------------------------------------------------
 export type { RecognizeDeps, RecognizeResult, EarlyIdentityReason } from '@/lib/scan/session/recognize';
@@ -93,8 +127,40 @@ export type {
   RecognizedWord,
   TextRecognitionResult,
   TextRecognizer,
+  OcrEngineTimings,
 } from '@/lib/scan/textRecognizer';
 export { EMPTY_RECOGNITION, meanConfidence } from '@/lib/scan/textRecognizer';
+export {
+  INPUT_CHANNEL_ORDER,
+  NATIVE_EXPECTED_CHANNEL_ORDER,
+  expectedRgbaByteLength,
+  hashScanImage,
+  packedRgbaBytes,
+  shouldSkipDuplicateOcr,
+  validateRgbaScanImage,
+} from '@/lib/scan/ocrInput';
+export type { TitleOcrDebug } from '@/lib/scan/ocrDebug';
+export { classifyOcrOutcome, OCR_DEBUG_INBOX_FILES, titleOcrDebugWithoutImages } from '@/lib/scan/ocrDebug';
+export { attemptDebugDirName, attemptStatusFromOcr, shouldPersistOcrDebugBundle } from '@/lib/scan/ocrAttempt';
+export {
+  acceptCapturedResult,
+  capturedToRecognizeResult,
+  hashRecognitionQuad,
+  recognizeCapturedCard,
+} from '@/lib/scan/recognizeCaptured';
+export type {
+  CapturedRecognitionResult,
+  FrozenRecognitionInput,
+  RecognitionParityHashes,
+} from '@/lib/scan/recognizeCaptured';
+export { runLabRecognition, pickLabWarpQuad, cloneScanImage } from '@/lib/scan/scannerLab/run';
+export {
+  compareLabRuns,
+  KNOWN_GOOD_RECOGNITION_COMMIT,
+  KNOWN_GOOD_RECOGNITION_SUMMARY,
+  PROVEN_RECOGNITION_BASELINE,
+} from '@/lib/scan/scannerLab/types';
+export type { LabInput, LabPipelineId, LabQuadSet, LabRunResult } from '@/lib/scan/scannerLab/types';
 export type { CardNameIndex, CardNameIndexData, MatchTiming, NameCandidate } from '@/lib/scan/matchName';
 export { buildNameIndex, matchName, matchReadings, shapeFold } from '@/lib/scan/matchName';
 export type {
@@ -110,6 +176,16 @@ export {
   lookupPrinting,
   validatePrintingIndexData,
 } from '@/lib/scan/printing/index';
+export {
+  extractFooterEvidence,
+  lookupPrintingTitleRestricted,
+} from '@/lib/scan/printing/footerEvidence';
+export type { TypeIndex, TypeIndexData, TypeEvidence } from '@/lib/scan/typeIndex/index';
+export {
+  buildTypeIndex,
+  matchTypeReading,
+  validateTypeIndexData,
+} from '@/lib/scan/typeIndex/index';
 export type { CardFinish, FinishRecognizer, FinishResult } from '@/lib/scan/finish/types';
 export {
   createUnknownFinishRecognizer,

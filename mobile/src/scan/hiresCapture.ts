@@ -129,6 +129,15 @@ export const isCanonicalCard = (image: ScanImage): boolean =>
 
 export const isTrueHiRes = (mode: RecognitionSource): boolean => mode !== 'analysis-fallback';
 
+/** How Scanner Lab should acquire pixels. Never start a new snapshot after tap. */
+export type LabAcquirePlan = 'reuse-cache' | 'wait-inflight' | 'no-capture';
+
+export const planLabAcquire = (store: Pick<HiResStore, 'cache' | 'inFlight'>): LabAcquirePlan => {
+  if (store.cache && isTrueHiRes(store.cache.attempt.mode)) return 'reuse-cache';
+  if (store.inFlight) return 'wait-inflight';
+  return 'no-capture';
+};
+
 export const markSourceRequest = (
   store: HiResStore,
   mode: 'snapshot' | 'photo' | 'high-res-frame',
@@ -242,6 +251,16 @@ export const refineFromStore = (store: HiResStore): PreparedCard | null => {
   if (!store.cache) return null;
   if (!isTrueHiRes(store.cache.attempt.mode)) return null;
   return store.cache.prepared;
+};
+
+/** Drop a frozen snapshot so the next capture can use a newer tracked quad. */
+export const invalidateHiResCache = (store: HiResStore, reason?: string): void => {
+  store.cache = null;
+  store.inFlight = false;
+  store.phase = 'idle';
+  if (reason) store.lastAttempt = store.lastAttempt
+    ? { ...store.lastAttempt, reason }
+    : null;
 };
 
 export const putFallback = (

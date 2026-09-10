@@ -135,6 +135,10 @@ jobs:
         continue-on-error: true
         run: node scripts/build-printing-index.mjs --out dist-web/printing-index.json
 
+      - name: Type index (full)
+        continue-on-error: true
+        run: node scripts/build-type-index.mjs --out dist-web/type-index.json
+
       - name: Scanner manifest
         continue-on-error: true
         run: >
@@ -142,6 +146,7 @@ jobs:
           --names dist-web/card-names.json
           --art dist-web/art-index.json
           --printing dist-web/printing-index.json
+          --type dist-web/type-index.json
           --out dist-web/scanner-manifest.json
           --base-url https://tsuina311.github.io/${{ github.event.repository.name }}/
 

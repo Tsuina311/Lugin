@@ -70,7 +70,7 @@ export const createNativeDetectorEngine = (): DetectorEngine => {
       const raw = native.detectFromRgba(rgba, input.width, input.height);
       return mapNativeResult(raw, 'native-rgba');
     },
-    detectYPlane: (y, width, height, rowStride) => {
+    detectYPlane: async (y, width, height, rowStride) => {
       if (native.implementationStatus === 'stub') {
         return {
           corners: null,
@@ -78,10 +78,20 @@ export const createNativeDetectorEngine = (): DetectorEngine => {
           debug: stubDebug('native-stub: Y-plane path'),
         };
       }
-      const raw = native.detectFromYPlane(y, width, height, rowStride);
+      const raw = await Promise.resolve(native.detectFromYPlane(y, width, height, rowStride));
+      if (!raw || typeof raw !== 'object') {
+        throw new Error(
+          'detectFromYPlane returned no result (native AsyncFunction mismatch). Rebuild the APK.',
+        );
+      }
       return mapNativeResult(raw, 'native-y');
     },
   };
+};
+
+/** Toggle nested sleeve scoring on the native module (debug bisection). */
+export const setNativeNestedSleeveEnabled = (enabled: boolean): void => {
+  getLuginCardDetectorModule()?.setNestedSleeveEnabled?.(enabled);
 };
 
 /** True when the Expo module is present in this binary (even if still stubbed). */
@@ -104,6 +114,25 @@ const stubDebug = (reason: string): DetectionDebug => ({
   selectedIndex: -1,
 });
 
+const parseCorner = (value: unknown): Point | null => {
+  if (!value || typeof value !== 'object') return null;
+  const rec = value as { x?: unknown; y?: unknown };
+  const x = Number(rec.x);
+  const y = Number(rec.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+};
+
+const parseCorners = (value: unknown): CardCorners | null => {
+  if (!Array.isArray(value) || value.length < 4) return null;
+  const tl = parseCorner(value[0]);
+  const tr = parseCorner(value[1]);
+  const br = parseCorner(value[2]);
+  const bl = parseCorner(value[3]);
+  if (!tl || !tr || !br || !bl) return null;
+  return { topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl };
+};
+
 const mapNativeResult = (
   raw: NativeDetectionResult,
   method: string,
@@ -113,7 +142,8 @@ const mapNativeResult = (
   debug: DetectionDebug;
 } => {
   const reject = raw.diagnostics?.rejectReason;
-  if (!raw.detected || !raw.corners) {
+  const corners = raw.detected ? parseCorners(raw.corners) : null;
+  if (!raw.detected || !corners) {
     const reason =
       reject ??
       (raw.detected === false ? 'native: no card' : 'native: missing corners');
@@ -137,37 +167,53 @@ const mapNativeResult = (
     };
   }
 
-  const [tl, tr, br, bl] = raw.corners;
-  const corners: CardCorners = {
-    topLeft: point(tl),
-    topRight: point(tr),
-    bottomRight: point(br),
-    bottomLeft: point(bl),
-  };
+  const extras = (raw.candidates ?? [])
+    .map(c => {
+      const parsed = parseCorners(c.corners);
+      if (!parsed) return null;
+      return {
+        corners: parsed,
+        method: c.method ?? method,
+        components: {
+          aspect: c.aspectRatio ?? 0,
+          area: c.areaRatio ?? 0,
+          center: 0,
+          parallel: 0,
+        },
+        rejectedBecause: [] as string[],
+        score: c.score,
+      };
+    })
+    .filter((c): c is NonNullable<typeof c> => c != null);
+  const candidates =
+    extras.length > 0
+      ? extras
+      : [
+          {
+            corners,
+            method,
+            components: {
+              aspect: raw.diagnostics?.aspectRatio ?? 0,
+              area: raw.diagnostics?.areaRatio ?? 0,
+              center: 0,
+              parallel: 0,
+            },
+            rejectedBecause: [],
+            score: raw.score ?? 0,
+          },
+        ];
 
   return {
     corners,
     score: raw.score ?? 0,
     debug: {
-      candidates: [
-        {
-          corners,
-          method,
-          components: {
-            aspect: raw.diagnostics?.aspectRatio ?? 0,
-            area: raw.diagnostics?.areaRatio ?? 0,
-            center: 0,
-            parallel: 0,
-          },
-          rejectedBecause: [],
-          score: raw.score ?? 0,
-        },
-      ],
+      candidates,
       ms: raw.timingMs,
       selectedIndex: 0,
-      workSize: { height: 0, width: 0 },
+      workSize: {
+        height: raw.diagnostics?.workHeight ?? 0,
+        width: raw.diagnostics?.workWidth ?? 0,
+      },
     },
   };
 };
-
-const point = (p: { x: number; y: number }): Point => ({ x: p.x, y: p.y });

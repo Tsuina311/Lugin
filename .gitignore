@@ -51,3 +51,10 @@ mobile/.eas-decide.json
 *.p12
 *.mobileprovision
 .scan-cache/
+
+# Local phone → Mac debug inbox (camera images + tokens never belong in git).
+.scan-inbox/
+
+# Geometry benchmark corpus + run snapshots (card imagery / local paths).
+.geometry-corpus/
+.geometry-benchmarks/

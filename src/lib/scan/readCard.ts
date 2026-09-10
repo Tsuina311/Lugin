@@ -13,10 +13,14 @@ import {
   tidyName,
   type CollectorParts,
 } from './parseCollector';
-import { PRODUCTION_VARIANT, enhanceForOcr } from './preprocess';
+import {
+  PRODUCTION_VARIANT,
+  enhanceForOcr,
+  enhanceForOcrFast,
+} from './preprocess';
 import { STANDARD_PROFILE, type NamedRegion, type ScanProfile } from './regions';
 import { type TextRecognitionResult, type TextRecognizer } from './textRecognizer';
-import { cropImage, type ScanImage } from './types';
+import { cropImage, regionToRect, type Rect, type ScanImage } from './types';
 
 /** Latin script plus the punctuation that shows up in card names. */
 export const TITLE_WHITELIST =
@@ -30,17 +34,56 @@ export const COLLECTOR_WHITELIST =
 export const SET_SYMBOL_WHITELIST =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
+/** Soft type-line OCR character set. */
+export const TYPE_WHITELIST =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz -—–';
+
 export interface ReadOptions {
   /** Attach each preprocessed crop to its sample, for the debug view. */
   keepCrops?: boolean;
   /** Which layout to read. Only the standard frame exists so far. */
   profile?: ScanProfile;
   timer?: ScanTimer;
+  /**
+   * Prefer the fast preprocess chain (no upscale/scurve).
+   * Opt-in: mobile hot path sets true; eval/default keeps full enhance.
+   */
+  fastPreprocess?: boolean;
+  /**
+   * After the first title framing yields a tidied name, stop.
+   * Opt-in: mobile hot path sets true.
+   */
+  stopAfterFirstTitle?: boolean;
+  /**
+   * Skip set-symbol / classic-number / wide collector until primary number+set
+   * miss. Opt-in: mobile hot path sets true.
+   */
+  footerPrimaryOnly?: boolean;
+  /**
+   * Debug: the exact raw crop + enhanced crop used for this pass.
+   * Called with the live buffers — do not regenerate later.
+   */
+  onTitlePass?: (info: {
+    card: ScanImage;
+    cropRect: Rect;
+    enhancedCrop: ScanImage;
+    rawCrop: ScanImage;
+    regionName: string;
+    variant: string;
+  }) => void;
 }
 
 const whitelistFor = (name: string): string => {
   if (name.startsWith('title')) return TITLE_WHITELIST;
+  if (name === 'type-line') return TYPE_WHITELIST;
   return name === 'set-symbol' ? SET_SYMBOL_WHITELIST : COLLECTOR_WHITELIST;
+};
+
+const prepareCrop = (raw: ScanImage, options: ReadOptions): { crop: ScanImage; variant: string } => {
+  if (options.fastPreprocess === true) {
+    return { crop: enhanceForOcrFast(raw), variant: 'fast-trim-polarity-stretch' };
+  }
+  return { crop: enhanceForOcr(raw), variant: PRODUCTION_VARIANT };
 };
 
 const runPass = async (
@@ -48,8 +91,21 @@ const runPass = async (
   pass: NamedRegion,
   recognizer: TextRecognizer,
   options: ReadOptions,
+  enhance: (raw: ScanImage) => { crop: ScanImage; variant: string } = raw =>
+    prepareCrop(raw, options),
 ): Promise<{ result: TextRecognitionResult; sample: OcrSample }> => {
-  const crop = enhanceForOcr(cropImage(card, pass.region));
+  const rawCrop = cropImage(card, pass.region);
+  const { crop, variant } = enhance(rawCrop);
+  if (pass.name.startsWith('title')) {
+    options.onTitlePass?.({
+      card,
+      cropRect: regionToRect(card, pass.region),
+      enhancedCrop: crop,
+      rawCrop,
+      regionName: pass.name,
+      variant,
+    });
+  }
   const began = Date.now();
   const result = await recognizer.recognize(crop, {
     mode: pass.mode,
@@ -66,7 +122,17 @@ const runPass = async (
       normalizedText: '',
       rawText: result.text,
       region: pass.name,
-      variant: PRODUCTION_VARIANT,
+      variant,
+      ...(result.engine
+        ? {
+            engineBytes: result.engine.bytesIn,
+            engineTransport: result.engine.transport,
+            engineMlkitMs: result.engine.mlkitMs,
+            engineNativeMs: result.engine.nativeTotalMs,
+            engineEncodeMs: result.engine.encodeMs,
+            engineJsBridgeMs: result.engine.jsBridgeMs,
+          }
+        : {}),
     },
   };
 };
@@ -90,7 +156,10 @@ export interface TitleReading {
   samples: OcrSample[];
 }
 
-/** Read the title from every framing in the profile and tidy each result. */
+/**
+ * Read the title. Hot path: first framing + fast preprocess; stop when a tidied
+ * name appears. Wide framing / full enhance only as fallback when asked.
+ */
 export const readTitle = async (
   card: ScanImage,
   recognizer: TextRecognizer,
@@ -99,14 +168,42 @@ export const readTitle = async (
   const samples: OcrSample[] = [];
   const readings: Reading[] = [];
   const texts: string[] = [];
+  const stopEarly = options.stopAfterFirstTitle === true;
+  const passes = (options.profile ?? STANDARD_PROFILE).title;
 
-  for (const pass of (options.profile ?? STANDARD_PROFILE).title) {
-    const { result, sample } = await runPass(card, pass, recognizer, options);
+  for (let i = 0; i < passes.length; i++) {
+    const pass = passes[i];
+    // Fast preprocess only when opted in; otherwise full enhance every framing.
+    const enhance =
+      options.fastPreprocess === true && i === 0
+        ? (raw: ScanImage) => prepareCrop(raw, { ...options, fastPreprocess: true })
+        : (raw: ScanImage) => ({
+            crop: enhanceForOcr(raw),
+            variant: PRODUCTION_VARIANT,
+          });
+    const { result, sample } = await runPass(card, pass, recognizer, options, enhance);
     samples.push(sample);
     texts.push(result.text);
     const tidied = tidyName(result.text);
     sample.normalizedText = tidied ?? '';
-    if (tidied) readings.push({ source: pass.name, text: tidied });
+    if (tidied) {
+      readings.push({ source: pass.name, text: tidied });
+      if (stopEarly) break;
+    }
+  }
+
+  // One measured fallback: if primary framing failed under fast preprocess.
+  if (!readings.length && passes[0] && options.fastPreprocess === true) {
+    const pass = passes[0];
+    const { result, sample } = await runPass(card, pass, recognizer, options, raw => ({
+      crop: enhanceForOcr(raw),
+      variant: PRODUCTION_VARIANT,
+    }));
+    samples.push(sample);
+    texts.push(result.text);
+    const tidied = tidyName(result.text);
+    sample.normalizedText = tidied ?? '';
+    if (tidied) readings.push({ source: `${pass.name}+full`, text: tidied });
   }
 
   return { name: bestName(...texts), readings, samples };
@@ -120,8 +217,8 @@ export interface CollectorReading {
 /**
  * Read the collector regions and merge whatever came back.
  *
- * Only called once the name is locked, so every hit is merged — the guard
- * against title text masquerading as a set code lives in `mergePartsForScan`.
+ * Hot path (`footerPrimaryOnly`): number + set only. Symbol / classic / wide
+ * strip run only when those miss.
  */
 export const readCollector = async (
   card: ScanImage,
@@ -131,25 +228,40 @@ export const readCollector = async (
 ): Promise<CollectorReading> => {
   const samples: OcrSample[] = [];
   let parts: CollectorParts = { foilMarker: null, raw: '' };
+  const all = (options.profile ?? STANDARD_PROFILE).collector;
+  const primaryOnly = options.footerPrimaryOnly === true;
+  const primary = primaryOnly
+    ? all.filter(p => p.name === 'number' || p.name === 'set')
+    : all;
+  const secondary = primaryOnly
+    ? all.filter(p => p.name !== 'number' && p.name !== 'set')
+    : [];
 
-  for (const pass of (options.profile ?? STANDARD_PROFILE).collector) {
-    const { result, sample } = await runPass(card, pass, recognizer, options);
-    samples.push(sample);
+  const runList = async (list: readonly NamedRegion[]) => {
+    for (const pass of list) {
+      const { result, sample } = await runPass(card, pass, recognizer, options);
+      samples.push(sample);
 
-    if (pass.name === 'set-symbol') {
-      const setCode = parseSetSymbolText(result.text);
-      sample.normalizedText = setCode ?? '';
-      if (setCode) {
-        parts = merge(parts, { foilMarker: null, raw: result.text, setCode });
+      if (pass.name === 'set-symbol') {
+        const setCode = parseSetSymbolText(result.text);
+        sample.normalizedText = setCode ?? '';
+        if (setCode) {
+          parts = merge(parts, { foilMarker: null, raw: result.text, setCode });
+        }
+        continue;
       }
-      continue;
-    }
 
-    const incoming = parseCollectorParts(result.text);
-    sample.normalizedText = [incoming.setCode, incoming.collectorNumber]
-      .filter(Boolean)
-      .join(' ');
-    parts = merge(parts, incoming);
+      const incoming = parseCollectorParts(result.text);
+      sample.normalizedText = [incoming.setCode, incoming.collectorNumber]
+        .filter(Boolean)
+        .join(' ');
+      parts = merge(parts, incoming);
+    }
+  };
+
+  await runList(primary);
+  if (primaryOnly && (!parts.collectorNumber || !parts.setCode) && secondary.length) {
+    await runList(secondary);
   }
 
   return { parts, samples };
@@ -161,9 +273,6 @@ export interface TypeLineReading {
   tokens: string[];
   samples: OcrSample[];
 }
-
-const TYPE_WHITELIST =
-  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz -—–';
 
 /** Soft type-line OCR — only used as secondary evidence when identity is unclear. */
 export const readTypeLine = async (
@@ -177,33 +286,17 @@ export const readTypeLine = async (
     name: 'type-line',
     region: profile.typeLine,
   };
-  const crop = enhanceForOcr(cropImage(card, pass.region));
-  const began = Date.now();
-  const result = await recognizer.recognize(crop, {
-    mode: 'line',
-    whitelist: TYPE_WHITELIST,
-  });
-  const sample: OcrSample = {
-    confidence: result.confidence,
-    ...(options.keepCrops ? { crop } : {}),
-    cropHeight: crop.height,
-    cropWidth: crop.width,
-    ms: Date.now() - began,
-    normalizedText: result.text.trim().toLowerCase(),
-    rawText: result.text,
-    region: pass.name,
-    variant: PRODUCTION_VARIANT,
-  };
+  const { result, sample } = await runPass(card, pass, recognizer, options);
   const tokens = result.text
     .toLowerCase()
     .split(/[^a-z]+/)
-    .filter(t => t.length >= 4);
-  return { raw: result.text, samples: [sample], tokens };
+    .filter(t => t.length >= 3);
+  return { raw: result.text, tokens, samples: [sample] };
 };
 
-/** Fresh diagnostics seeded from a capture, for callers that record a whole scan. */
 export const startDiagnostics = (frame: ScanImage) => ({
   ...emptyDiagnostics(),
   frameHeight: frame.height,
   frameWidth: frame.width,
+  timer: new ScanTimer(),
 });

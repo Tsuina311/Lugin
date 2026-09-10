@@ -8,9 +8,10 @@ export const preparedFromDetection = (
   image: ScanImage,
   detection: DetectResult,
 ): PreparedCard => {
-  const detected = Boolean(detection.corners) && detection.score >= DETECT_MIN_SCORE;
+  const lock = detection.lockCorners ?? detection.trackedCorners ?? detection.corners;
+  const detected = Boolean(lock) && detection.score >= DETECT_MIN_SCORE;
   return {
-    corners: detected ? detection.corners : null,
+    corners: detected ? lock : null,
     detected,
     detection: detection.debug,
     image,

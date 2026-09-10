@@ -50,23 +50,24 @@ export const SET_SYMBOL_REGION: Region = { h: 0.055, w: 0.2, x: 0.74, y: 0.545 }
 
 /**
  * Collector number line (bottom-left): modern `0123 •` or post-2015 `286/361`.
+ * Kept tight so ML Kit does not see artist/copyright noise.
  */
-export const NUMBER_REGION: Region = { h: 0.04, w: 0.42, x: 0.035, y: 0.885 };
+export const NUMBER_REGION: Region = { h: 0.038, w: 0.48, x: 0.03, y: 0.888 };
 
 /**
  * Older frames (e.g. M11) put `134/249` toward the bottom-right of the border,
  * not under the artist credit on the left.
  */
-export const CLASSIC_NUMBER_REGION: Region = { h: 0.04, w: 0.38, x: 0.55, y: 0.915 };
+export const CLASSIC_NUMBER_REGION: Region = { h: 0.038, w: 0.4, x: 0.52, y: 0.918 };
 
 /** Three-letter set code under the number — `CMR`, `DMU`, … (modern frames). */
-export const SET_REGION: Region = { h: 0.035, w: 0.28, x: 0.035, y: 0.928 };
+export const SET_REGION: Region = { h: 0.032, w: 0.36, x: 0.03, y: 0.926 };
 
 /**
- * Wider strip covering both number and set, used as a fallback OCR pass when
- * the split crops miss (phone tilt, older frames, modern one-line prints).
+ * Narrow left-biased strip covering number + set only (not full copyright row).
+ * Fallback when split crops miss.
  */
-export const COLLECTOR_REGION: Region = { h: 0.085, w: 0.94, x: 0.03, y: 0.875 };
+export const COLLECTOR_REGION: Region = { h: 0.055, w: 0.55, x: 0.025, y: 0.885 };
 
 /**
  * Artwork window on a modern portrait frame — between the title bar and the

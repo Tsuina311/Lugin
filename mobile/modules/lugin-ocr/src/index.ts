@@ -7,6 +7,8 @@ export type {
   LuginOcrNativeModule,
   NativeOcrRect,
   NativeOcrResult,
+  NativeOcrStageTiming,
+  NativeOcrWarmUpResult,
   NativeOcrWord,
 } from './LuginOcr.types';
 

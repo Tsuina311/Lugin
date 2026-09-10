@@ -53,6 +53,7 @@ import {
   imageBrightness,
   pixelOrderFor,
   validateFrameView,
+  yPlaneToDetectorLuma,
 } from './frameToScanImage';
 import {
   detectorRotationLabel,
@@ -64,15 +65,20 @@ import {
   cornersToQuad,
   createSessionController,
   DETECT_MIN_SCORE,
+  emptyContinuity,
+  stepContinuity,
   type CardCorners,
+  type ContinuityState,
   type DetectResult,
   type ScanImage,
 } from './sharedCore';
+import { recordGeometrySample } from './geometryTrace';
 import {
   createSharedJsDetectorEngine,
   type DetectorEngine,
 } from './detectorEngine';
-import { yPlaneToGrayScanImage } from './yPlaneToGrayScanImage';
+import { packedYToGrayScanImage } from './yPlaneToGrayScanImage';
+import { getPerfBaseline } from './perfBaseline';
 
 /** How far up the transfer ladder the worklet is allowed to climb. */
 export const RUNGS = ['ping', 'meta', 'tiny', 'full'] as const;
@@ -89,13 +95,15 @@ export const RESOLUTIONS = [
  * Long-edge matrix for the *same* preview FOV crop.
  * Camera target stays 640×480; only the post-crop downscale changes.
  */
-export const ANALYSIS_LONG_EDGES = [640, 480, 400] as const;
+/** Default first: 480 matches the last working Samsung live path. Native still works at 320. */
+export const ANALYSIS_LONG_EDGES = [480, 400, 320] as const;
 
 /** Bytes in the tiny-ArrayBuffer rung. Small enough that size cannot be the issue. */
 const TINY_BYTES = 64;
 /** Thumbnail / debug-panel refresh. Must not run at detector cadence. */
-const PREVIEW_MS = 700;
-const DEBUG_PUBLISH_MS = 400;
+const PREVIEW_MS = 2000;
+/** Detector-input thumb width — pure-JS PNG encode is expensive on device. */
+const PREVIEW_MAX_WIDTH = 96;
 
 /** Per-stage tallies. The first one that stops moving is the broken boundary. */
 export interface StageCounters {
@@ -104,6 +112,9 @@ export interface StageCounters {
   detectorCalls: number;
   detectorHits: number;
   droppedByCamera: number;
+  /** Frames dropped because a detect was already in flight (latest-wins). */
+  droppedBusy: number;
+  nativeDetectCalls: number;
   pixelBufferFromPlane: number;
   pixelBufferRead: number;
   processed: number;
@@ -115,11 +126,16 @@ export interface StageCounters {
   sampled: number;
   scanImages: number;
   scheduleAttempted: number;
+  sharedJsDetectCalls: number;
   skippedForCadence: number;
   skippedForOrientation: number;
   skippedNoPixelBuffer: number;
   skippedPlanar: number;
+  /** Pending Y frame replaced before processing. */
+  superseded: number;
   supersededOnJs: number;
+  /** Detector jobs submitted (attempted). */
+  submitted: number;
 }
 
 /** The actual VisionCamera metadata for the latest frame, from the meta rung. */
@@ -213,9 +229,16 @@ export interface OrientationDebug {
 
 export interface OverlayState {
   analysis: { height: number; width: number };
+  /** Presented / smoothed quad (green). */
   corners: CardCorners | null;
   detected: boolean;
+  /** Instantaneous native/JS primary (blue). */
+  rawCorners: CardCorners | null;
   score: number;
+  /** Persistent tracked quad (yellow). */
+  trackedCorners: CardCorners | null;
+  /** Complete-card warp quad (magenta). */
+  recognitionCorners: CardCorners | null;
 }
 
 export interface FrameAnalysisOptions {
@@ -248,6 +271,11 @@ export interface FrameAnalysisOptions {
   /** Highest ladder rung to attempt. Lower it to isolate a failure. */
   rung?: Rung;
   targetAnalysisFps?: number;
+  /**
+   * When false, skip full-res gray proxy (use ≤96 long-edge). Default from
+   * performance baseline.
+   */
+  buildGrayProxy?: boolean;
 }
 
 const now = () =>
@@ -261,6 +289,8 @@ const emptyCounters = (): StageCounters => ({
   detectorCalls: 0,
   detectorHits: 0,
   droppedByCamera: 0,
+  droppedBusy: 0,
+  nativeDetectCalls: 0,
   pixelBufferFromPlane: 0,
   pixelBufferRead: 0,
   processed: 0,
@@ -272,11 +302,14 @@ const emptyCounters = (): StageCounters => ({
   sampled: 0,
   scanImages: 0,
   scheduleAttempted: 0,
+  sharedJsDetectCalls: 0,
   skippedForCadence: 0,
   skippedForOrientation: 0,
   skippedNoPixelBuffer: 0,
   skippedPlanar: 0,
+  superseded: 0,
   supersededOnJs: 0,
+  submitted: 0,
 });
 
 /** Rank rejection reasons by how often the detector cited them. */
@@ -302,7 +335,7 @@ const describeBytes = (value: unknown): string => {
 
 export const useFrameAnalysis = ({
   analysisMaxWidth = 480,
-  debugPreview = true,
+  debugPreview = false,
   detectorEngine: detectorEngineOption,
   diagnosticRungs = false,
   enabled = true,
@@ -311,8 +344,12 @@ export const useFrameAnalysis = ({
   previewSize = { height: 0, width: 0 },
   resolutionIndex = 0,
   rung = 'full',
-  targetAnalysisFps = 10,
+  targetAnalysisFps,
 }: FrameAnalysisOptions = {}) => {
+  const baseline = getPerfBaseline();
+  const effectiveFps = targetAnalysisFps ?? baseline.detectorHz;
+  const debugPublishMs = Math.max(200, Math.round(1000 / Math.max(0.5, baseline.debugMetricsHz)));
+  const liveDebugImages = baseline.liveDebugImages && debugPreview;
   const detectorEngine = useMemo(
     () => detectorEngineOption ?? createSharedJsDetectorEngine(),
     [detectorEngineOption],
@@ -345,6 +382,57 @@ export const useFrameAnalysis = ({
 
   const onAnalyzedRef = useRef(onAnalyzed);
   onAnalyzedRef.current = onAnalyzed;
+  const continuityRef = useRef<ContinuityState>(emptyContinuity());
+
+  const stabilizeDetection = (raw: DetectResult, image: ScanImage | null): DetectResult => {
+    const candidates = raw.debug.candidates
+      .filter(c => c.corners && c.rejectedBecause.length === 0)
+      .map(c => ({
+        aspect: c.components.aspect,
+        corners: c.corners!,
+        score: c.score,
+      }));
+    const decided = stepContinuity(continuityRef.current, {
+      candidates,
+      frameSize: image ? { height: image.height, width: image.width } : raw.debug.workSize,
+      rawCorners: raw.corners,
+      rawScore: raw.score,
+    });
+    continuityRef.current = decided.state;
+    recordGeometrySample({ candidates, decision: decided, image, rawScore: raw.score });
+    const presented = decided.presentedCorners ?? decided.trackedCorners;
+    const tracked = decided.trackedCorners ?? presented;
+    return {
+      corners: presented,
+      debug: {
+        ...raw.debug,
+        continuityReason: decided.selectionReason,
+        rawCorners: raw.corners,
+        recognitionCorners: decided.recognitionQuad,
+        recognitionQuadSource: decided.recognitionQuadSource,
+        recognitionQuadValid: decided.recognitionQuadValid,
+        recognitionRejectReasons: decided.recognitionRejectReasons,
+        roleSwitchCount: decided.state.roleSwitchCount,
+        selectedIndex:
+          decided.selectedIndex >= 0 ? decided.selectedIndex : raw.debug.selectedIndex,
+        selectedRole: decided.selectedRole,
+        trackAge: decided.track?.age,
+        trackHoldReason: decided.trackHoldReason,
+        trackId: decided.track?.id,
+        trackResetReason: decided.state.lastResetReason,
+        trackUpdateReason: decided.trackUpdateReason,
+        trackedQuadUpdatedAt: decided.trackedQuadUpdatedAt,
+      },
+      lockCorners: tracked,
+      quad: presented ? cornersToQuad(presented) : null,
+      rawCorners: raw.corners,
+      recognitionCorners: decided.recognitionQuad,
+      recognitionQuadSource: decided.recognitionQuadSource,
+      recognitionQuadValid: decided.recognitionQuadValid,
+      score: Math.max(decided.track?.score ?? 0, raw.score),
+      trackedCorners: tracked,
+    };
+  };
 
   const stages = useMemo(
     () => ({
@@ -390,10 +478,21 @@ export const useFrameAnalysis = ({
     width: number;
   } | null>(null);
   const draining = useRef(false);
+  const detectBusy = useRef(false);
+  const pendingY = useRef<{
+    bytes: ArrayBuffer;
+    width: number;
+    height: number;
+    rowStride: number;
+    orientation: string;
+    isMirrored: boolean;
+    sampleAcceptedAt: number;
+    seq: number;
+  } | null>(null);
 
   const publish = useCallback((force = false) => {
     const t = now();
-    if (!force && t - lastDebugAt.current < DEBUG_PUBLISH_MS) return;
+    if (!force && t - lastDebugAt.current < debugPublishMs) return;
     lastDebugAt.current = t;
     setCounters({ ...tally.current });
     setMetrics({
@@ -418,7 +517,7 @@ export const useFrameAnalysis = ({
       totalMs: stages.total.read(),
       transferMs: stages.transfer.read(),
     });
-  }, [rates, stages]);
+  }, [debugPublishMs, rates, stages]);
 
   // ---------------------------------------------------------------------------
   // RN-runtime callbacks.
@@ -606,13 +705,17 @@ export const useFrameAnalysis = ({
       stages.rnToScan.push(convertedAt - rnMono);
 
       tally.current.detectorCalls++;
-      const rawDetection = detectorEngineRef.current.detect(image);
-      const detection: DetectResult = {
+      const eng = detectorEngineRef.current;
+      if (eng.id === 'shared-js') tally.current.sharedJsDetectCalls++;
+      else tally.current.nativeDetectCalls++;
+      const rawDetection = eng.detect(image);
+      const rawResult: DetectResult = {
         corners: rawDetection.corners,
         debug: rawDetection.debug,
         quad: rawDetection.corners ? cornersToQuad(rawDetection.corners) : null,
         score: rawDetection.score,
       };
+      const detection = stabilizeDetection(rawResult, image);
       const finishedAt = now();
       const finishedWall = Date.now();
 
@@ -631,7 +734,10 @@ export const useFrameAnalysis = ({
         analysis: { height: image.height, width: image.width },
         corners: detection.corners,
         detected,
+        rawCorners: rawDetection.corners,
+        recognitionCorners: detection.recognitionCorners ?? null,
         score: detection.score,
+        trackedCorners: detection.trackedCorners ?? detection.lockCorners ?? null,
       });
       pushFiniteAge(stages.cameraToOverlay, Date.now() - sampleAt);
       onAnalyzedRef.current?.({
@@ -668,7 +774,7 @@ export const useFrameAnalysis = ({
       if (heavy) {
         lastPreviewAt.current = finishedAt;
         try {
-          setPreview(scanImageToPngDataUri(image));
+          setPreview(scanImageToPngDataUri(image, PREVIEW_MAX_WIDTH));
         } catch (err) {
           setPreview(null);
           setError(`Preview encode failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -693,33 +799,40 @@ export const useFrameAnalysis = ({
   }, [analyse]);
 
   /**
-   * Native live path: Y/luma plane only → native detectFromYPlane.
-   * Builds a grayscale ScanImage solely for session quality / prepareAnalysis.
+   * Native live path: Y/luma → async detectFromYPlane (must not block JS).
+   * Latest-frame-wins: if busy, stash newest and drop intermediates.
    */
-  const onYLuma = useCallback(
-    (
-      bytes: ArrayBuffer,
-      width: number,
-      height: number,
-      rowStride: number,
-      orientation: string,
-      isMirrored: boolean,
-      sampleAcceptedAt: number,
-      seq: number,
-    ) => {
-      void seq;
-      void isMirrored;
+  const processYLuma = useCallback(
+    async (payload: {
+      bytes: ArrayBuffer;
+      width: number;
+      height: number;
+      rowStride: number;
+      orientation: string;
+      isMirrored: boolean;
+      sampleAcceptedAt: number;
+      seq: number;
+    }) => {
       const engine = detectorEngineRef.current;
       if (!engine.detectYPlane) {
         setError('Native detector has no detectYPlane — rebuild APK with lugin-card-detector');
         return;
       }
 
+      const {
+        bytes,
+        width,
+        height,
+        rowStride,
+        orientation,
+        isMirrored,
+        sampleAcceptedAt,
+      } = payload;
       const y = new Uint8Array(bytes);
       const orientationParsed = parseOrientation(orientation);
       const desired = desiredOutput;
       const coherent = isFrameCoherentWithOutput(desired, width, height, orientationParsed);
-      if (!coherent || debugPreview) {
+      if (!coherent || liveDebugImages) {
         setOrientationDebug({
           desired,
           detectorRotation: detectorRotationLabel(orientationParsed),
@@ -730,7 +843,8 @@ export const useFrameAnalysis = ({
       }
       if (!coherent) {
         tally.current.skippedForOrientation++;
-        setOverlay(null);
+        // Keep the last good polygon — clearing here made the overlay vanish
+        // on a single incoherent sample.
         publish();
         return;
       }
@@ -742,67 +856,106 @@ export const useFrameAnalysis = ({
         analysisMaxWidth,
       );
 
+      // Same geometry as the RGBA path: orient → preview cover-crop → downscale.
+      // Native still sees Y only. Corners land in detector / preview FOV space.
+      const luma = yPlaneToDetectorLuma(
+        y,
+        {
+          bytesPerRow: rowStride,
+          height,
+          isMirrored,
+          orientation: orientationParsed,
+          width,
+        },
+        { crop: spaces.visible, maxLongEdge: analysisMaxWidth },
+      );
+
+      tally.current.submitted++;
+      tally.current.rnFull++;
+      tally.current.received++;
+      tally.current.nativeDetectCalls++;
+      tally.current.detectorCalls++;
+
       const startedAt = now();
-      const rawDetection = engine.detectYPlane(y, width, height, rowStride);
-      const detection: DetectResult = {
+      let rawDetection: {
+        corners: CardCorners | null;
+        score: number;
+        debug: DetectResult['debug'];
+      };
+      try {
+        rawDetection = await Promise.resolve(
+          engine.detectYPlane(luma.y, luma.width, luma.height, luma.width),
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        publish(true);
+        return;
+      }
+      const finishedAt = now();
+      const rawResult: DetectResult = {
         corners: rawDetection.corners,
         debug: rawDetection.debug,
         quad: rawDetection.corners ? cornersToQuad(rawDetection.corners) : null,
         score: rawDetection.score,
       };
-      const finishedAt = now();
+      const image = packedYToGrayScanImage(luma);
+      lastImage.current = image;
+      const detection = stabilizeDetection(rawResult, image);
       const detected = Boolean(detection.corners) && detection.score >= DETECT_MIN_SCORE;
 
-      tally.current.detectorCalls++;
       if (detected) tally.current.detectorHits++;
       tally.current.processed++;
       stages.detect.push(rawDetection.debug.ms || finishedAt - startedAt);
       pushFiniteAge(stages.cameraToDetect, Date.now() - sampleAcceptedAt);
       rates.analysis.mark(finishedAt);
-
-      // Gray proxy for session — not used for geometry (already done natively).
-      const image = yPlaneToGrayScanImage(y, width, height, rowStride);
-      lastImage.current = image;
+      tally.current.scanImages++;
 
       setOverlay({
-        analysis: { height, width },
+        analysis: { height: luma.height, width: luma.width },
         corners: detection.corners,
         detected,
+        rawCorners: rawDetection.corners,
+        recognitionCorners: detection.recognitionCorners ?? null,
         score: detection.score,
+        trackedCorners: detection.trackedCorners ?? detection.lockCorners ?? null,
       });
       pushFiniteAge(stages.cameraToOverlay, Date.now() - sampleAcceptedAt);
 
-      setFrameMeta({
-        bufferSource: 'yuv plane 0 (native live)',
+      lastMeta.current = {
+        bufferSource: 'yuv plane 0 → orient+cover (native live)',
         bytesKind: 'ArrayBuffer',
-        bytesPerRow: rowStride,
-        copiedByteLength: y.byteLength,
-        expectedPacked: width * height,
-        height,
-        isMirrored: false,
+        bytesPerRow: luma.width,
+        copiedByteLength: luma.y.byteLength,
+        expectedPacked: luma.width * luma.height,
+        height: luma.height,
+        isMirrored,
         orientation,
         pixelFormat: 'yuv-y-plane',
         sourceByteLength: y.byteLength,
         timestamp: sampleAcceptedAt,
-        width,
-      });
+        width: luma.width,
+      };
 
       onAnalyzedRef.current?.({
         detection,
         image,
-        spaces: { ...spaces, detector: { height, width } },
+        spaces: {
+          ...spaces,
+          detector: { height: luma.height, width: luma.width },
+        },
       });
 
-      const heavy = debugPreview && finishedAt - lastPreviewAt.current >= PREVIEW_MS;
+      const heavy =
+        liveDebugImages && finishedAt - lastPreviewAt.current >= PREVIEW_MS;
       if (heavy) {
         lastPreviewAt.current = finishedAt;
         try {
-          setPreview(scanImageToPngDataUri(image));
+          setPreview(scanImageToPngDataUri(image, PREVIEW_MAX_WIDTH));
         } catch {
           setPreview(null);
         }
         setResult({
-          analysis: { height, width },
+          analysis: { height: luma.height, width: luma.width },
           brightness: imageBrightness(image),
           corners: detection.corners,
           detected,
@@ -823,7 +976,10 @@ export const useFrameAnalysis = ({
           },
           quad: detection.corners ? quadDiagnostics(detection.corners, image) : null,
           score: detection.score,
-          spaces: { ...spaces, detector: { height, width } },
+          spaces: {
+            ...spaces,
+            detector: { height: luma.height, width: luma.width },
+          },
         });
       }
 
@@ -831,12 +987,60 @@ export const useFrameAnalysis = ({
     },
     [
       analysisMaxWidth,
-      debugPreview,
       desiredOutput,
+      liveDebugImages,
       publish,
       rates,
       stages,
     ],
+  );
+
+  const onYLuma = useCallback(
+    (
+      bytes: ArrayBuffer,
+      width: number,
+      height: number,
+      rowStride: number,
+      orientation: string,
+      isMirrored: boolean,
+      sampleAcceptedAt: number,
+      seq: number,
+    ) => {
+      const payload = {
+        bytes,
+        width,
+        height,
+        rowStride,
+        orientation,
+        isMirrored,
+        sampleAcceptedAt,
+        seq,
+      };
+      if (detectBusy.current) {
+        if (pendingY.current) tally.current.superseded++;
+        tally.current.droppedBusy++;
+        pendingY.current = payload;
+        return;
+      }
+      detectBusy.current = true;
+      void (async () => {
+        try {
+          let current: typeof payload | null = payload;
+          while (current) {
+            try {
+              await processYLuma(current);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : String(err));
+            }
+            current = pendingY.current;
+            pendingY.current = null;
+          }
+        } finally {
+          detectBusy.current = false;
+        }
+      })();
+    },
+    [processYLuma],
   );
 
   /** Rung 4. The full copied analysis buffer, positional args only. */
@@ -961,7 +1165,7 @@ export const useFrameAnalysis = ({
     dropReason.current = reason;
   }, []);
 
-  const minIntervalMs = Math.max(1, Math.round(1000 / Math.max(1, targetAnalysisFps)));
+  const minIntervalMs = Math.max(1, Math.round(1000 / Math.max(1, effectiveFps)));
   const maxRung = RUNGS.indexOf(rung) + 1;
 
   const onFrame = useCallback(
@@ -1070,19 +1274,14 @@ export const useFrameAnalysis = ({
             const stride = plane.bytesPerRow;
             const fw = frame.width;
             const fh = frame.height;
-            // Downscale long edge to analysisMaxWidth before crossing RN.
-            const long = Math.max(fw, fh);
-            const scale = long > analysisMaxWidth ? analysisMaxWidth / long : 1;
-            const dw = Math.max(32, Math.round(fw * scale));
-            const dh = Math.max(32, Math.round(fh * scale));
-            const packed = new Uint8Array(dw * dh);
-            for (let y = 0; y < dh; y++) {
-              const sy = Math.min(fh - 1, Math.floor((y + 0.5) * (fh / dh)));
-              const srcRow = sy * stride;
-              const dstRow = y * dw;
-              for (let x = 0; x < dw; x++) {
-                const sx = Math.min(fw - 1, Math.floor((x + 0.5) * (fw / dw)));
-                packed[dstRow + x] = source[srcRow + sx] ?? 0;
+            // Tight-pack raw Y only. Orientation + preview cover-crop happen
+            // on JS so they match the RGBA path (spaces.visible / videoMap).
+            const packed = new Uint8Array(fw * fh);
+            for (let row = 0; row < fh; row++) {
+              const srcRow = row * stride;
+              const dstRow = row * fw;
+              for (let col = 0; col < fw; col++) {
+                packed[dstRow + col] = source[srcRow + col] ?? 0;
               }
             }
             state.copied++;
@@ -1091,9 +1290,9 @@ export const useFrameAnalysis = ({
             scheduleOnRN(
               onYLuma,
               packed.buffer,
-              dw,
-              dh,
-              dw,
+              fw,
+              fh,
+              fw,
               frame.orientation,
               frame.isMirrored,
               stamp,
@@ -1335,7 +1534,7 @@ export const useFrameAnalysis = ({
       rejectReasons: topRejectReasons(detection.debug.candidates.map(c => c.rejectedBecause)),
       size: `${image.width}×${image.height}`,
     });
-    setPreview(scanImageToPngDataUri(image));
+    setPreview(scanImageToPngDataUri(image, PREVIEW_MAX_WIDTH));
 
     // Same pixels, a throwaway controller — isolates "would this frame lock?"
     // from the live session that already consumed it.
@@ -1421,6 +1620,7 @@ export const useFrameAnalysis = ({
     setResult(null);
     setPreview(null);
     setProbeResult(null);
+    continuityRef.current = emptyContinuity();
     setOrientationDebug({
       desired: desiredOutput,
       detectorRotation: detectorRotationLabel(PORTRAIT_OUTPUT_ORIENTATION),

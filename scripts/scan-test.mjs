@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -13,6 +14,7 @@ const dir = await mkdtemp(join(tmpdir(), 'lugin-scan-'));
 const bundle = join(dir, 'scan.mjs');
 
 await esbuild.build({
+  alias: { '@': join(root, 'src') },
   bundle: true,
   format: 'esm',
   outfile: bundle,
@@ -30,9 +32,12 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/readCard.ts')}';
       export * from '${join(root, 'src/lib/scan/detectCard.ts')}';
       export * from '${join(root, 'src/lib/scan/detection/multi.ts')}';
+      export * from '${join(root, 'src/lib/scan/detection/continuity.ts')}';
       export * from '${join(root, 'src/lib/scan/regions.ts')}';
       export * from '${join(root, 'src/lib/scan/matchName.ts')}';
       export * from '${join(root, 'src/lib/scan/printing/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/printing/footerEvidence.ts')}';
+      export * from '${join(root, 'src/lib/scan/typeIndex/index.ts')}';
       export * from '${join(root, 'src/lib/scan/finish/types.ts')}';
       export * from '${join(root, 'src/lib/scan/artwork/descriptors.ts')}';
       export * from '${join(root, 'src/lib/scan/artwork/match.ts')}';
@@ -42,10 +47,54 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/tracking.ts')}';
       export * from '${join(root, 'src/lib/scan/params.ts')}';
       export * from '${join(root, 'src/lib/scan/session/controller.ts')}';
+      export * from '${join(root, 'src/lib/scan/recognitionQuad.ts')}';
+      export * from '${join(root, 'src/lib/scan/session/postLock.ts')}';
       export * from '${join(root, 'src/lib/scan/session/recognize.ts')}';
+      export * from '${join(root, 'src/lib/scan/ocrInput.ts')}';
+      export * from '${join(root, 'src/lib/scan/ocrDebug.ts')}';
+      export * from '${join(root, 'src/lib/scan/ocrAttempt.ts')}';
+      export { pngBytesToScanImage } from '${join(root, 'mobile/src/scan/debug/scanImagePng.ts')}';
+      export * from '${join(root, 'src/lib/scan/recognizeCaptured.ts')}';
+      export * from '${join(root, 'src/lib/scan/titleDecode.ts')}';
+      export * from '${join(root, 'src/lib/scan/scannerLab/run.ts')}';
+      export * from '${join(root, 'src/lib/scan/scannerLab/types.ts')}';
+      export { isTrueHiRes, planLabAcquire } from '${join(root, 'mobile/src/scan/hiresCapture.ts')}';
+      export * from '${join(root, 'src/lib/scan/captureQuality/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/timing.ts')}';
+      export * from '${join(root, 'src/lib/scan/focusSeries/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/swapTest/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/deckBenchmark/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/binderBenchmark/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/session/cardSession.ts')}';
+      export * from '${join(root, 'src/lib/scan/session/cardChangeWatch.ts')}';
+      export { mapCornersToHiRes } from '${join(root, 'mobile/src/scan/hiresMap.ts')}';
+      export { startGeometryTrace, finishGeometryTrace, isGeometryTraceActive } from '${join(root, 'mobile/src/scan/geometryTrace.ts')}';
       export * from '${join(root, 'src/lib/scan/videoMap.ts')}';
       export * from '${join(root, 'src/lib/scan/cameraCapabilities.ts')}';
+      export * from '${join(root, 'src/lib/scan/scannerDataPolicy.ts')}';
+      export * from '${join(root, 'src/lib/scan/scannerManifest.ts')}';
       export { polygonIoU } from '${join(root, 'src/lib/scan/detectCard.ts')}';
+      export {
+        buildSessionSummary,
+        classifyLatencyVerdict,
+        formatSummaryText,
+      } from '${join(root, 'mobile/src/scan/benchmark/summary.ts')}';
+      export {
+        collectFlags,
+        latencyFromSnapshot,
+        mapWinningChannel,
+        scoreAgainstExpected,
+      } from '${join(root, 'mobile/src/scan/benchmark/scoreScan.ts')}';
+      export {
+        parseExpectedManifest,
+        collectorNumbersEqual,
+      } from '${join(root, 'mobile/src/scan/benchmark/expectedManifest.ts')}';
+      export {
+        PERF_BASELINE,
+        PERF_FULL,
+        applyPerfPreset,
+        getPerfBaseline,
+      } from '${join(root, 'mobile/src/scan/perfBaseline.ts')}';
     `,
     resolveDir: root,
     sourcefile: 'entry.ts',
@@ -69,6 +118,11 @@ const {
   contrastStretch,
   finishFromMetadata,
   lookupPrinting,
+  extractFooterEvidence,
+  lookupPrintingTitleRestricted,
+  buildTypeIndex,
+  matchTypeReading,
+  findStickyTitle,
   convexHull,
   cornersToQuad,
   cropImage,
@@ -141,12 +195,132 @@ const {
   buildPointFocusConstraints,
   buildCameraConstraintPlan,
   cameraConstraintFallbacks,
+  focusAttemptDecision,
   focusGateDecision,
+  durationMs,
+  tagsFromLabel,
+  summarizeFocusSeries,
+  summarizeSwapTest,
+  summarizeDeckBenchmark,
+  reconcileDeckMultiset,
+  deckCardFileStem,
+  classifyDeckFailure,
+  binderFrameFile,
+  summarizeBinderCapture,
+  swapIdForIndex,
+  attachFocusSeriesDiagnostics,
+  driftVsT0,
+  expectedIdentityFromLabel,
+  identityMatchesExpected,
+  classifySampleOutcome,
+  simulatePolicy,
+  CAPTURE_POLICIES,
+  formatCapturePolicyReport,
+  partitionFocusSeries,
+  bestTitleSharpnessSeparator,
+  labelQualitySample,
+  cardFingerprintFromWarp,
+  cardFingerprintDistance,
+  classifyFingerprintDistance,
+  observeCardFingerprint,
+  CARD_SESSION_DIFF_MIN,
+  CARD_SESSION_SAME_MAX,
+  CARD_SESSION_VISUAL_CONFIRM,
+  emptyCardSessionVisual,
+  CHANGE_WATCH_DIFF_MIN,
+  CHANGE_WATCH_SAME_MAX,
+  changeFingerprintFromWarpedCard,
+  changeFingerprintDistance,
+  classifyChangeDistance,
+  emptyCardChangeWatch,
+  seedCardChangeWatch,
+  tickCardChangeWatch,
+  CHANGE_WATCH_INTERVAL_MS,
   normalizeCapabilities,
   preferredMainLensZoom,
   supportsTapFocus,
   QUALITY_MIN_SCORE,
   SHARPNESS_MIN,
+  DETECT_STALE_MS,
+  FOCUS_ATTEMPT_MS,
+  FOCUS_COOLDOWN_MS,
+  LOCK_MIN_SCORE,
+  POST_LOCK_STALL_MS,
+  RECOGNIZE_MAX_ATTEMPTS,
+  RECOGNIZE_RETRY_MS,
+  STABILITY_WINDOW,
+  shouldReplaceCaptureQuad,
+  postLockStallActive,
+  selectRecognitionQuad,
+  isPlausibleCardInSleeve,
+  validateRecognitionQuad,
+  TRACK_COAST_FRAMES,
+  normalizeCardCorners,
+  emptyContinuity,
+  stepContinuity,
+  shouldThrottleScannerManifestCheck,
+  mayAdvanceLastCheckAfterFailure,
+  needPrintingAsset,
+  needTypeAsset,
+  isScannerManifest,
+  buildSessionSummary,
+  classifyLatencyVerdict,
+  collectFlags,
+  scoreAgainstExpected,
+  mapWinningChannel,
+  parseExpectedManifest,
+  collectorNumbersEqual,
+  PERF_BASELINE,
+  PERF_FULL,
+  applyPerfPreset,
+  getPerfBaseline,
+  expectedRgbaByteLength,
+  validateRgbaScanImage,
+  packedRgbaBytes,
+  hashScanImage,
+  extractTitleCrop,
+  titleCropRect,
+  shouldSkipDuplicateOcr,
+  ocrInputHashFor,
+  INPUT_CHANNEL_ORDER,
+  NATIVE_EXPECTED_CHANNEL_ORDER,
+  enhanceForOcrFast,
+  classifyOcrOutcome,
+  captureTitleOcrBuffers,
+  runOcrDebugMatrix,
+  resetOcrDebugMatrixForTests,
+  consumeOcrDebugMatrixSlot,
+  OCR_DEBUG_INBOX_FILES,
+  NAME_REGION,
+  attemptStatusFromOcr,
+  shouldPersistOcrDebugBundle,
+  attemptDebugDirName,
+  startGeometryTrace,
+  finishGeometryTrace,
+  isGeometryTraceActive,
+  runLabRecognition,
+  pickLabWarpQuad,
+  compareLabRuns,
+  KNOWN_GOOD_RECOGNITION_COMMIT,
+  isTrueHiRes,
+  planLabAcquire,
+  PROVEN_RECOGNITION_BASELINE,
+  recognizeCapturedCard,
+  acceptCapturedResult,
+  hashRecognitionQuad,
+  decideStrongFuzzyTitle,
+  decodeRecordedTitleVariants,
+  tokenWeightedSimilarity,
+  titlePreservedEnough,
+  formatTitleDecodeReport,
+  TITLE_ONLY_MIN,
+  pngBytesToScanImage,
+  cardDensity,
+  firstPassExactFromVariants,
+  localContrast,
+  classifyMotion,
+  sideMetrics,
+  mapCornersToHiRes,
 } = await import(pathToFileURL(bundle).href);
 
 let failed = 0;
@@ -1482,7 +1656,7 @@ check('track becomes stable only after agreeing frames', () => {
   track = pushTrack(track, sampleFromQuad(corners, 0.8));
   assert.equal(track.stable, true);
   track = pushTrack(track, null);
-  assert.equal(track.stable, false);
+  assert.equal(track.stable, true, 'one miss must not drop an already-stable lock');
   assert.ok(track.history.length > 0, 'coasts — history kept after one miss');
 });
 
@@ -1691,6 +1865,703 @@ check('focus gate: stable+blurry → focusing; sharp → ready; timeout', () => 
     }).kind,
     'unstable',
   );
+});
+
+check('focus attempt: timeout and cooldown bound vendor flicker', () => {
+  const waiting = focusAttemptDecision({
+    attemptMs: FOCUS_ATTEMPT_MS,
+    cooldownMs: FOCUS_COOLDOWN_MS,
+    lastRequestAt: 0,
+    movedMaterially: false,
+    now: 100,
+    requestedAt: 0,
+    successAt: null,
+    trackChanged: false,
+  });
+  assert.equal(waiting.kind, 'waiting');
+  assert.equal(waiting.allowCapture, false);
+  assert.equal(waiting.shouldRequest, false);
+
+  const timed = focusAttemptDecision({
+    attemptMs: FOCUS_ATTEMPT_MS,
+    cooldownMs: FOCUS_COOLDOWN_MS,
+    lastRequestAt: 0,
+    movedMaterially: false,
+    now: FOCUS_ATTEMPT_MS + 20,
+    requestedAt: 0,
+    successAt: null,
+    trackChanged: false,
+  });
+  assert.equal(timed.kind, 'timeout');
+  assert.equal(timed.allowCapture, true);
+  assert.equal(timed.shouldRequest, false);
+
+  const ok = focusAttemptDecision({
+    attemptMs: FOCUS_ATTEMPT_MS,
+    cooldownMs: FOCUS_COOLDOWN_MS,
+    lastRequestAt: 10,
+    movedMaterially: false,
+    now: 50,
+    requestedAt: 10,
+    successAt: 40,
+    trackChanged: false,
+  });
+  assert.equal(ok.allowCapture, true);
+  assert.equal(ok.shouldRequest, false);
+
+  const moved = focusAttemptDecision({
+    attemptMs: FOCUS_ATTEMPT_MS,
+    cooldownMs: FOCUS_COOLDOWN_MS,
+    lastRequestAt: 10,
+    movedMaterially: true,
+    now: 50,
+    requestedAt: 10,
+    successAt: 40,
+    trackChanged: false,
+  });
+  assert.equal(moved.allowCapture, true);
+  assert.equal(moved.shouldRequest, false, 'sleeve/center jitter must not restart focus');
+
+  const afterCooldown = focusAttemptDecision({
+    attemptMs: FOCUS_ATTEMPT_MS,
+    cooldownMs: FOCUS_COOLDOWN_MS,
+    lastRequestAt: 0,
+    movedMaterially: false,
+    now: FOCUS_COOLDOWN_MS + 100,
+    requestedAt: 0,
+    successAt: null,
+    trackChanged: false,
+  });
+  assert.equal(afterCooldown.allowCapture, true);
+  assert.equal(afterCooldown.kind, 'timeout');
+  assert.equal(afterCooldown.shouldRequest, false, 'cooldown expiry is not a new request');
+
+  const newTrack = focusAttemptDecision({
+    attemptMs: FOCUS_ATTEMPT_MS,
+    cooldownMs: FOCUS_COOLDOWN_MS,
+    lastRequestAt: 0,
+    movedMaterially: false,
+    now: FOCUS_COOLDOWN_MS + 100,
+    requestedAt: 0,
+    successAt: null,
+    trackChanged: true,
+  });
+  assert.equal(newTrack.shouldRequest, true);
+});
+
+check('durationMs rejects epoch-minus-monotonic mixes', () => {
+  assert.equal(durationMs(100, 250), 150);
+  assert.equal(durationMs(null, 10), null);
+  assert.ok(durationMs(Date.now(), performance.now()) == null, 'mixed clocks must not yield 1e12');
+  assert.ok(durationMs(50, Date.now()) == null, 'small monotonic minus epoch is invalid');
+  const later = 50 + 400;
+  assert.equal(durationMs(50, later), 400);
+});
+
+check('debug label unsleeved is not sleeved', () => {
+  assert.equal(tagsFromLabel('island unsleeved').sleeved, false);
+  assert.equal(tagsFromLabel('sleeved foil').sleeved, true);
+  assert.equal(tagsFromLabel('Wand of Wonder').sleeved, null);
+});
+
+const unitQuad = (shift = 0) => ({
+  bottomLeft: { x: shift, y: 100 },
+  bottomRight: { x: 100 + shift, y: 100 },
+  topLeft: { x: shift, y: 0 },
+  topRight: { x: 100 + shift, y: 0 },
+});
+
+const focusSample = (over = {}) => ({
+  actualDelayFromFocusRequestMs: over.nominalDelayMs ?? 0,
+  cardContrast: 20,
+  density: {
+    cardAreaPx: 1,
+    cardBoundingHeightPx: 10,
+    cardBoundingWidthPx: 10,
+    sourceHeight: 1920,
+    sourceWidth: 1006,
+    warpHeight: 1039,
+    warpUpscaleX: 1,
+    warpUpscaleY: 1,
+    warpWidth: 744,
+  },
+  failureClass: null,
+  geometry: null,
+  metrics: {
+    cardGlare: 0,
+    cardSharpness: 300,
+    titleContrast: 20,
+    titleGlare: 0,
+    titleSharpness: 200,
+    ...over.metrics,
+  },
+  motion: null,
+  nominalDelayMs: 0,
+  ocr: {
+    decision: 'ocr-empty',
+    firstPassExact: false,
+    matchName: null,
+    matchScore: null,
+    ocrText: '',
+    ocrVariantCount: 0,
+    rawOcrFirst: '',
+    reason: 'ocr-empty',
+    recognitionMs: 10,
+    status: 'ocr-empty',
+    ...over.ocr,
+  },
+  quad: unitQuad(),
+  quadAgeAtCaptureMs: 0,
+  quadLatchedFrom: 'live',
+  quadTimestamp: 0,
+  recognitionQuadSource: 'tracked-card',
+  recognitionQuadValid: true,
+  sourceCardContrast: 20,
+  sourceCardSharpness: 300,
+  sourceContrast: 15,
+  sourceHeight: 1920,
+  sourceSharpness: 40,
+  sourceWidth: 1006,
+  trackId: 2,
+  ...over,
+  metrics: {
+    cardGlare: 0,
+    cardSharpness: 300,
+    titleContrast: 20,
+    titleGlare: 0,
+    titleSharpness: 200,
+    ...over.metrics,
+  },
+  ocr: {
+    decision: 'ocr-empty',
+    firstPassExact: false,
+    matchName: null,
+    matchScore: null,
+    ocrText: '',
+    ocrVariantCount: 0,
+    rawOcrFirst: '',
+    reason: 'ocr-empty',
+    recognitionMs: 10,
+    status: 'ocr-empty',
+    ...over.ocr,
+  },
+});
+
+check('focus series per-snapshot quads record IoU vs T0', () => {
+  const t0 = unitQuad(0);
+  const later = unitQuad(40);
+  const drift = driftVsT0(later, t0);
+  assert.ok(drift.iouVsT0 < 0.75, `expected stale IoU, got ${drift.iouVsT0}`);
+  assert.ok(drift.centerDeltaVsT0 > 0.08);
+  assert.ok(drift.cornerDeltaVsT0 > 0.08);
+  const same = driftVsT0(t0, t0);
+  assert.ok(same.iouVsT0 > 0.99);
+  assert.equal(same.centerDeltaVsT0, 0);
+});
+
+check('focus series classifies SOURCE / WARP / TITLE_REGION / OCR', () => {
+  const t0 = focusSample({
+    metrics: { cardSharpness: 330, titleSharpness: 224, titleContrast: 22 },
+    nominalDelayMs: 0,
+    ocr: { decision: 'insufficient-confidence', rawOcrFirst: 'Wand of Won', status: 'insufficient-confidence' },
+    quad: unitQuad(0),
+  });
+  const wandLater = focusSample({
+    metrics: { cardSharpness: 280, titleSharpness: 9, titleContrast: 4 },
+    nominalDelayMs: 500,
+    quad: unitQuad(0),
+    sourceCardSharpness: 300,
+  });
+  const [t0d, wandD] = attachFocusSeriesDiagnostics([t0, wandLater]);
+  assert.equal(t0d.failureClass, 'OCR_BAD');
+  assert.equal(wandD.failureClass, 'WARP_BAD');
+
+  const teferi = attachFocusSeriesDiagnostics([
+    focusSample({
+      metrics: { cardSharpness: 330, titleSharpness: 6, titleContrast: 5.5 },
+      nominalDelayMs: 0,
+      quad: unitQuad(0),
+    }),
+    focusSample({
+      metrics: { cardSharpness: 340, titleSharpness: 5, titleContrast: 5 },
+      nominalDelayMs: 250,
+      quad: unitQuad(0),
+    }),
+  ]);
+  assert.equal(teferi[0].failureClass, 'TITLE_REGION_BAD');
+  assert.equal(teferi[1].failureClass, 'TITLE_REGION_BAD');
+
+  const soft = attachFocusSeriesDiagnostics([
+    focusSample({
+      metrics: { cardSharpness: 12, titleSharpness: 3, titleContrast: 2 },
+      nominalDelayMs: 0,
+      sourceCardSharpness: 10,
+      sourceSharpness: 4,
+    }),
+  ]);
+  assert.equal(soft[0].failureClass, 'SOURCE_BAD');
+
+  const drifted = attachFocusSeriesDiagnostics([
+    focusSample({ nominalDelayMs: 0, quad: unitQuad(0), metrics: { cardSharpness: 300, titleSharpness: 8, titleContrast: 4 } }),
+    focusSample({
+      nominalDelayMs: 500,
+      quad: unitQuad(50),
+      metrics: { cardSharpness: 290, titleSharpness: 7, titleContrast: 4 },
+      sourceCardSharpness: 300,
+    }),
+  ]);
+  assert.equal(drifted[1].failureClass, 'WARP_BAD');
+  assert.ok(drifted[1].geometry.iouVsT0 < 0.75);
+});
+
+check('focus series summary has a best-delay column', () => {
+  const fake = {
+    capturedAt: '2026-01-01T00:00:00.000Z',
+    currentTrackId: 1,
+    fixtureId: 'focus-series-test',
+    focusAttemptId: 1,
+    focusRequestedAt: 0,
+    focusTrackId: 1,
+    label: 'Test Card',
+    sameTrackFocus: true,
+    tags: { borderStyle: null, foil: null, glare: null, language: null, sleeved: null },
+    samples: [0, 250, 500, 800].map((n, i) => ({
+      actualDelayFromFocusRequestMs: n + 5,
+      density: {
+        cardAreaPx: 1,
+        cardBoundingHeightPx: 10,
+        cardBoundingWidthPx: 10,
+        sourceHeight: 1920,
+        sourceWidth: 1006,
+        warpHeight: 1039,
+        warpUpscaleX: 1,
+        warpUpscaleY: 1,
+        warpWidth: 744,
+      },
+      metrics: {
+        cardGlare: 0,
+        cardSharpness: 10,
+        titleContrast: 20,
+        titleGlare: 0,
+        titleSharpness: 10 + i * 40,
+      },
+      motion: null,
+      nominalDelayMs: n,
+      ocr: {
+        decision: i > 0 ? 'exact-title' : 'ocr-empty',
+        firstPassExact: i > 1,
+        matchName: i > 0 ? 'Test Card' : null,
+        matchScore: i > 0 ? 1 : null,
+        ocrText: i > 0 ? 'Test Card' : '',
+        ocrVariantCount: i > 0 ? 1 : 0,
+        rawOcrFirst: i > 0 ? 'Test Card' : '',
+        reason: i > 0 ? 'exact-title' : 'ocr-empty',
+        recognitionMs: 10,
+        status: i > 0 ? 'identified' : 'ocr-empty',
+      },
+      quad: {
+        bottomLeft: { x: 0, y: 1 },
+        bottomRight: { x: 1, y: 1 },
+        topLeft: { x: 0, y: 0 },
+        topRight: { x: 1, y: 0 },
+      },
+      sourceHeight: 1920,
+      sourceWidth: 1006,
+    })),
+  };
+  const text = summarizeFocusSeries([fake]);
+  assert.match(text, /T800/);
+  assert.match(text, /best-quality delay counts/);
+  assert.match(text, /capture\/source quality vs delay/);
+  assert.match(text, /geometry\/crop failures vs delay/);
+  assert.match(text, /OCR success vs delay/);
+});
+
+check('swap test summary flags sticky geometry + new session', () => {
+  const text = summarizeSwapTest({
+    capturedAt: '2026-09-08T00:00:00.000Z',
+    expectedLabels: ['A', 'B'],
+    fixtureId: 'swap-test-demo',
+    phase: 'done',
+    targetCount: 2,
+    swaps: [
+      {
+        actualDelayFromFocusRequestMs: null,
+        cardSessionId: 8,
+        cardSharpness: 40,
+        changeWatchBand: 'same',
+        changeWatchDelta: 0.1,
+        changeWatchState: 'same',
+        expectedLabel: 'A',
+        focusAttemptId: 1,
+        geometryTrackId: 4,
+        identity: 'A',
+        index: 0,
+        label: swapIdForIndex(0),
+        recognizeAttemptsForTrack: 1,
+        recognitionDecision: 'exact',
+        recognitionStatus: 'identified',
+        sessionResetReason: 'initial',
+        sourceHeight: 100,
+        sourceWidth: 100,
+        swapId: swapIdForIndex(0),
+        titleSharpness: 30,
+        visualFingerprintDelta: 0,
+      },
+      {
+        actualDelayFromFocusRequestMs: null,
+        cardSessionId: 9,
+        cardSharpness: 41,
+        changeWatchBand: 'changed',
+        changeWatchDelta: 0.45,
+        changeWatchState: 'changed',
+        expectedLabel: 'B',
+        focusAttemptId: 2,
+        geometryTrackId: 4,
+        identity: 'B',
+        index: 1,
+        label: swapIdForIndex(1),
+        recognizeAttemptsForTrack: 0,
+        recognitionDecision: 'exact',
+        recognitionStatus: 'identified',
+        sessionResetReason: 'visual-change',
+        sourceHeight: 100,
+        sourceWidth: 100,
+        swapId: swapIdForIndex(1),
+        titleSharpness: 31,
+        visualFingerprintDelta: 0.45,
+      },
+    ],
+    transitions: [
+      {
+        changeWatchBand: 'changed',
+        changeWatchState: 'changed',
+        detection: 'auto-visual',
+        focusAttemptAfter: 2,
+        focusAttemptBefore: 1,
+        fromIndex: 0,
+        fromSwapId: 'swap-01',
+        newCardSessionId: 9,
+        newGeometryTrackId: 4,
+        newIdentity: 'B',
+        previousCardSessionId: 8,
+        previousGeometryTrackId: 4,
+        previousIdentity: 'A',
+        retryBudgetAfter: 0,
+        retryBudgetBefore: 1,
+        sessionResetReason: 'visual-change',
+        timeToDetectSwapMs: 900,
+        toIndex: 1,
+        toSwapId: 'swap-02',
+        visualConfirmCount: 2,
+        visualFingerprintDelta: 0.42,
+      },
+    ],
+  });
+  assert.match(text, /geometry SAME/);
+  assert.match(text, /cardSession CHANGED/);
+  assert.match(text, /GOOD sticky-geometry \+ new-session: 1\/1/);
+});
+
+check('change-watch cheap fingerprint separates Hex→Island on swap fixtures', async () => {
+  const { existsSync, readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const base = join(
+    root,
+    '.scan-inbox/sessions/phone-20260908/swap-test-20260908-171306',
+  );
+  const paths = [1, 2, 3, 4, 5].map(i => join(base, `swap-0${i}-card.png`));
+  if (!paths.every(p => existsSync(p))) {
+    console.log('  (skip — swap-test-20260908-171306 not in inbox)');
+    return;
+  }
+  const fps = paths.map(p => changeFingerprintFromWarpedCard(pngBytesToScanImage(readFileSync(p))));
+  const same = changeFingerprintDistance(fps[0], fps[1]);
+  const hexIsle = changeFingerprintDistance(fps[1], fps[2]);
+  const isleLiv = changeFingerprintDistance(fps[2], fps[3]);
+  const livBlade = changeFingerprintDistance(fps[3], fps[4]);
+  assert.ok(same < CHANGE_WATCH_SAME_MAX + 0.02, `same Hex delta ${same}`);
+  assert.equal(classifyChangeDistance(same), 'same');
+  assert.ok(hexIsle > same, 'Hex→Island should exceed Hex→Hex');
+  assert.ok(isleLiv >= CHANGE_WATCH_DIFF_MIN, `Island→Livaan ${isleLiv}`);
+  assert.ok(livBlade > CHANGE_WATCH_SAME_MAX, `Livaan→Blades ${livBlade}`);
+});
+
+check('change-watch session machine: sticky geom, Hex same, then three new sessions', async () => {
+  const { existsSync, readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const base = join(
+    root,
+    '.scan-inbox/sessions/phone-20260908/swap-test-20260908-171306',
+  );
+  const paths = [1, 2, 3, 4, 5].map(i => join(base, `swap-0${i}-card.png`));
+  if (!paths.every(p => existsSync(p))) {
+    console.log('  (skip — swap-test-20260908-171306 not in inbox)');
+    return;
+  }
+  const warps = paths.map(p => pngBytesToScanImage(readFileSync(p)));
+  // Fake analysis frames = warped cards; corners = full frame.
+  const fullCorners = img => ({
+    bottomLeft: { x: 0, y: img.height - 1 },
+    bottomRight: { x: img.width - 1, y: img.height - 1 },
+    topLeft: { x: 0, y: 0 },
+    topRight: { x: img.width - 1, y: 0 },
+  });
+
+  let watch = emptyCardChangeWatch();
+  const sessions = [1];
+  let geometryTrackId = 1;
+  let now = 0;
+
+  const observe = (img, label) => {
+    // Two ticks spaced beyond interval to allow confirms.
+    for (let k = 0; k < 3; k++) {
+      now += CHANGE_WATCH_INTERVAL_MS + 1;
+      const tick = tickCardChangeWatch({
+        corners: fullCorners(img),
+        detectorMiss: false,
+        frame: img,
+        geometryDelta: 0.01,
+        now,
+        sessionActive: true,
+        state: watch,
+      });
+      watch = tick.state;
+      if (tick.beginSession) {
+        sessions.push(sessions[sessions.length - 1] + 1);
+        watch = seedCardChangeWatch(watch.currentFingerprint);
+        break;
+      }
+      // Uncertain band: simulate identity probe definitive change when delta high enough
+      // and labels differ (host stand-in for OCR identity probe).
+      if (tick.requestIdentityProbe && label !== 'Hex') {
+        sessions.push(sessions[sessions.length - 1] + 1);
+        watch = seedCardChangeWatch(watch.currentFingerprint);
+        break;
+      }
+    }
+  };
+
+  observe(warps[0], 'Hex');
+  const afterHex = sessions[sessions.length - 1];
+  observe(warps[1], 'Hex');
+  assert.equal(sessions[sessions.length - 1], afterHex, 'same Hex must not mint session');
+  observe(warps[2], 'Island');
+  assert.ok(sessions[sessions.length - 1] > afterHex, 'Island must mint new session');
+  const afterIsle = sessions[sessions.length - 1];
+  observe(warps[3], 'Livaan');
+  assert.ok(sessions[sessions.length - 1] > afterIsle, 'Livaan must mint new session');
+  const afterLiv = sessions[sessions.length - 1];
+  observe(warps[4], 'Blades');
+  assert.ok(sessions[sessions.length - 1] > afterLiv, 'Blades must mint new session');
+  assert.equal(geometryTrackId, 1, 'geometry track stays sticky');
+  assert.equal(sessions.length, 4, `expected 4 session ids over sequence, got ${sessions.join(',')}`);
+});
+
+check('focus series expected identity maps French Deck of Many Things', () => {
+  const got = expectedIdentityFromLabel('les cartes merveilleuses french');
+  assert.equal(got.expectedName, 'The Deck of Many Things');
+  assert.equal(identityMatchesExpected('Waker of the Wilds', got.expectedName), false);
+  assert.equal(identityMatchesExpected('The Deck of Many Things', got.expectedName), true);
+});
+
+check('focus series Waker of the Wilds on Deck of Many Things is not success', () => {
+  const sample = {
+    ocr: {
+      decision: 'ambiguous',
+      firstPassExact: false,
+      matchName: 'Waker of the Wilds',
+      matchScore: 0.72,
+      ocrText: 'ryeilleus',
+      ocrVariantCount: 1,
+      rawOcrFirst: '',
+      reason: 'single-reading',
+      recognitionMs: 1,
+      status: 'insufficient-confidence',
+    },
+  };
+  assert.equal(classifySampleOutcome(sample, 'The Deck of Many Things'), 'ambiguous-wrong');
+  assert.equal(
+    classifySampleOutcome(
+      { ocr: { ...sample.ocr, decision: 'exact-title', status: 'identified' } },
+      'The Deck of Many Things',
+    ),
+    'false-positive',
+  );
+});
+
+check('capture policies score predicted==expected on per-snapshot fixtures', () => {
+  const unit = (shift = 0) => ({
+    bottomLeft: { x: shift, y: 100 },
+    bottomRight: { x: 100 + shift, y: 100 },
+    topLeft: { x: shift, y: 0 },
+    topRight: { x: 100 + shift, y: 0 },
+  });
+  const ocr = (over) => ({
+    decision: 'ocr-empty',
+    firstPassExact: false,
+    matchName: null,
+    matchScore: null,
+    ocrText: '',
+    ocrVariantCount: 0,
+    rawOcrFirst: '',
+    reason: 'ocr-empty',
+    recognitionMs: 10,
+    status: 'ocr-empty',
+    ...over,
+  });
+  const sample = (nominal, delay, titleSharp, ocrOver, quadShift = 0) => ({
+    actualDelayFromFocusRequestMs: delay,
+    cardContrast: 20,
+    density: {
+      cardAreaPx: 1,
+      cardBoundingHeightPx: 10,
+      cardBoundingWidthPx: 10,
+      sourceHeight: 1920,
+      sourceWidth: 1006,
+      warpHeight: 1039,
+      warpUpscaleX: 1,
+      warpUpscaleY: 1,
+      warpWidth: 744,
+    },
+    failureClass: ocrOver?.decision === 'exact-title' ? 'OK' : 'OCR_BAD',
+    geometry: { centerDeltaVsT0: 0, cornerDeltaVsT0: 0, iouVsT0: 1 },
+    metrics: {
+      cardGlare: 0,
+      cardSharpness: 300,
+      titleContrast: 20,
+      titleGlare: 0,
+      titleSharpness: titleSharp,
+    },
+    motion: null,
+    nominalDelayMs: nominal,
+    ocr: ocr(ocrOver),
+    quad: unit(quadShift),
+    quadAgeAtCaptureMs: delay,
+    quadLatchedFrom: 'live',
+    quadTimestamp: 0,
+    recognitionQuadSource: 'tracked-card',
+    recognitionQuadValid: true,
+    sourceCardContrast: 20,
+    sourceCardSharpness: 300,
+    sourceContrast: 15,
+    sourceHeight: 1920,
+    sourceSharpness: 40,
+    sourceWidth: 1006,
+    trackId: 1,
+  });
+  const identified = name => ({
+    decision: 'exact-title',
+    firstPassExact: true,
+    matchName: name,
+    matchScore: 1,
+    ocrText: name,
+    ocrVariantCount: 1,
+    rawOcrFirst: name,
+    reason: 'exact-title',
+    status: 'identified',
+  });
+  const series = (label, track, attempt, slots, quadMode = 'per-snapshot') => ({
+    capturedAt: '2026-09-08T13:00:00.000Z',
+    currentTrackId: track,
+    fixtureId: `focus-${label}`,
+    focusAttemptId: attempt,
+    focusRequestedAt: 0,
+    focusTrackId: track,
+    label,
+    quadMode,
+    sameTrackFocus: true,
+    samples: slots,
+    tags: { borderStyle: null, foil: null, glare: null, language: null, sleeved: null },
+    trackChangedDuringSeries: false,
+  });
+  const wand = series('Wand of Wonder', 1, 1, [
+    sample(0, 81, 43, {}),
+    sample(250, 407, 61, identified('Wand of Wonder'), 2),
+    sample(500, 775, 327, identified('Wand of Wonder'), 3),
+    sample(800, 1188, 78, identified('Wand of Wonder'), 4),
+  ]);
+  const livaan = series('Livaan, Cultist of Tiamat foil', 3, 3, [
+    sample(0, 72, 1916, identified('Livaan, Cultist of Tiamat')),
+    sample(250, 379, 1885, identified('Livaan, Cultist of Tiamat')),
+    sample(500, 761, 1956, identified('Livaan, Cultist of Tiamat')),
+    sample(800, 1248, 1727, identified('Livaan, Cultist of Tiamat')),
+  ]);
+  const excalibur = series('Excalibur, Sword of Eden French foil', 4, 4, [
+    sample(0, 75, 638, identified('Excalibur, Sword of Eden')),
+    sample(250, 365, 62, identified('Excalibur, Sword of Eden'), 1),
+    sample(500, 676, 140, identified('Excalibur, Sword of Eden'), 2),
+    sample(800, 1111, 628, identified('Excalibur, Sword of Eden'), 3),
+  ]);
+  const deck = series('les cartes merveilleuses french', 4, 4, [
+    sample(0, 79, 44, {
+      decision: 'ambiguous',
+      matchName: 'Waker of the Wilds',
+      matchScore: 0.72,
+      ocrText: 'ryeilleus',
+      ocrVariantCount: 1,
+      reason: 'single-reading',
+      status: 'insufficient-confidence',
+    }),
+    sample(250, 367, 93, {}),
+    sample(500, 741, 91, {}),
+    sample(800, 1207, 77, {}),
+  ]);
+  const octopus = series('Octopus Form', 1, 1, [
+    sample(0, 98, 115, {}),
+    sample(250, 1200, 80, {}),
+    sample(500, 1830, 74, identified('Octopus Form')),
+    sample(800, 2875, 104, {}),
+  ]);
+  const live = [wand, livaan, excalibur, deck, octopus];
+  const legacy = series(
+    'Wand of Wonder',
+    2,
+    2,
+    [sample(0, 280, 224, {}), sample(250, 606, 28, {}), sample(500, 1047, 9, {}), sample(800, 1487, 13, {})],
+    'legacy-frozen',
+  );
+  const parts = partitionFocusSeries([...live, legacy]);
+  assert.equal(parts.perSnapshot.length, 5);
+  assert.equal(parts.legacy.length, 1);
+
+  const policy = id => CAPTURE_POLICIES.find(p => p.id === id);
+  const score = spec =>
+    live.filter(b => {
+      const pick = simulatePolicy(b.samples, spec, expectedIdentityFromLabel(b.label).expectedName);
+      return pick?.outcome === 'correct';
+    }).length;
+  assert.equal(score(policy('A')), 2);
+  assert.equal(score(policy('B')), 3);
+  assert.equal(score(policy('C')), 4);
+  assert.equal(score(policy('D')), 3);
+  assert.equal(score(policy('E')), 3);
+  assert.equal(score(policy('F')), 4);
+  assert.equal(score(policy('G')), 3);
+
+  const deckT0 = simulatePolicy(deck.samples, policy('A'), 'The Deck of Many Things');
+  assert.equal(deckT0.outcome, 'ambiguous-wrong');
+  assert.equal(deckT0.predicted, 'Waker of the Wilds');
+
+  const labeled = live.flatMap(b =>
+    b.samples
+      .map(s =>
+        labelQualitySample(
+          s,
+          classifySampleOutcome(s, expectedIdentityFromLabel(b.label).expectedName) === 'correct',
+        ),
+      )
+      .filter(Boolean),
+  );
+  const sep = bestTitleSharpnessSeparator(labeled);
+  assert.equal(sep.overlap, true);
+
+  const report = formatCapturePolicyReport([...live, legacy]);
+  assert.match(report, /PER-SNAPSHOT ONLY/);
+  assert.match(report, /The Deck of Many Things/);
+  assert.match(report, /ambiguous-wrong/);
+  assert.match(report, /WARP_BAD samples: 0/);
+  assert.match(report, /title sharpness alone does NOT separate/);
 });
 
 check('quality pool prefers sharper frame', () => {
@@ -1930,9 +2801,3156 @@ check('isStrongArtOnly keeps the artwork-only weak-cluster bar', () => {
   assert.equal(isStrongArtOnly(strong), true);
 });
 
+await checkAsync('hard-case Maddening Hex AFC showcase glare detects when PNG present', async () => {
+  const { existsSync } = await import('node:fs');
+  const { readFile } = await import('node:fs/promises');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const { PNG } = await import('pngjs');
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const catalog = JSON.parse(
+    await readFile(join(root, 'scripts/fixtures/hard-cases.json'), 'utf8'),
+  );
+  const entry = catalog.cases.find(c => c.id === 'maddening-hex-afc-showcase-glare');
+  assert.ok(entry, 'hard-cases catalog missing Maddening Hex entry');
+  const pngPath = join(root, entry.detectPath);
+  if (!existsSync(pngPath)) {
+    console.log('  (skip — place PNG at .scan-real/maddening-hex-afc-showcase-glare.png)');
+    return;
+  }
+  const meta = JSON.parse(
+    await readFile(join(root, '.scan-real/maddening-hex-afc-showcase-glare.json'), 'utf8'),
+  );
+  const png = PNG.sync.read(await readFile(pngPath));
+  const frame = {
+    data: new Uint8ClampedArray(png.data),
+    height: png.height,
+    width: png.width,
+  };
+  const det = detectCardQuad(frame);
+  assert.ok(det.quad, 'showcase+glare+sleeve frame should still detect a card');
+  assert.ok(det.score >= 0.5, `expected usable detect score, got ${det.score}`);
+  if (meta.corners && det.corners) {
+    const iou = polygonIoU(det.corners, meta.corners);
+    assert.ok(iou >= 0.7, `annotated IoU ${iou.toFixed(3)} too low for hard case`);
+  }
+  assert.equal(meta.expectedName, 'Maddening Hex');
+  assert.equal(meta.setCode, 'afc');
+});
+
+await checkAsync('PrintingIndex AFC 301 → Maddening Hex showcase when full index present', async () => {
+  const { existsSync } = await import('node:fs');
+  const { readFile } = await import('node:fs/promises');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const path = join(root, '.scan-fixtures/printing-index.json');
+  if (!existsSync(path)) {
+    console.log('  (skip — no printing-index.json)');
+    return;
+  }
+  const index = buildPrintingIndex(JSON.parse(await readFile(path, 'utf8')));
+  const hit = lookupPrinting(index, {
+    foilMarker: null,
+    raw: 'AFC 301',
+    setCode: 'AFC',
+    collectorNumber: '301',
+  });
+  assert.ok(hit?.candidates?.length, 'AFC 301 should hit PrintingIndex');
+  assert.ok(
+    hit.candidates.some(c => c.name === 'Maddening Hex'),
+    `expected Maddening Hex among ${hit.candidates.map(c => c.name).join(', ')}`,
+  );
+});
+
+check('strong title is not overwritten by disagreeing weaker art (Sword/Tovolar)', () => {
+  const fused = fuseEvidence(
+    [
+      {
+        name: 'Sword of Hearth and Home',
+        oracleId: 'name:Sword of Hearth and Home',
+        possiblePrintingIds: [],
+        titleScore: 0.83,
+      },
+      {
+        name: 'Tovolar, Dire Overlord',
+        oracleId: 'oracle:tovolar',
+        possiblePrintingIds: ['p1'],
+        visualScore: 0.8,
+      },
+    ],
+    { allowTitleOnly: true, allowStrongDual: true },
+  );
+  assert.equal(fused.card?.name, 'Sword of Hearth and Home');
+  assert.ok(fused.artConflict === true);
+  assert.notEqual(fused.card?.name, 'Tovolar, Dire Overlord');
+  assert.ok(findStickyTitle(fused.candidates)?.name === 'Sword of Hearth and Home');
+});
+
+check('exact title sticks against strong disagreeing art → ambiguous keep title', () => {
+  const fused = fuseEvidence(
+    [
+      {
+        name: 'Negate',
+        oracleId: 'name:Negate',
+        possiblePrintingIds: [],
+        titleScore: 0.98,
+      },
+      {
+        name: 'Counterspell',
+        oracleId: 'oracle:counter',
+        possiblePrintingIds: ['p1'],
+        visualScore: 0.95,
+      },
+    ],
+    { allowTitleOnly: true, allowStrongDual: true },
+  );
+  assert.equal(fused.card?.name, 'Negate');
+  assert.ok(fused.status === 'card-ambiguous' || fused.status === 'printing-ambiguous');
+});
+
+check('footer evidence extracts R0337 FFVII / RO360 TDC / 457 L', () => {
+  const a = extractFooterEvidence('R0337 FFVII');
+  assert.ok(a.collectorCandidates.some(c => c.value === '0337' || c.value === '337'));
+  assert.ok(!a.setCodeCandidates.some(c => c.value === 'FFVII'));
+
+  const b = extractFooterEvidence('RO360 TDC');
+  assert.ok(b.collectorCandidates.some(c => c.value === '360'));
+  assert.ok(b.setCodeCandidates.some(c => c.value === 'TDC'));
+
+  const c = extractFooterEvidence('457 L');
+  assert.ok(c.collectorCandidates.some(c => c.value === '457'));
+});
+
+check('title-restricted footer lookup Island + 457', () => {
+  const index = buildPrintingIndex({
+    version: 1,
+    entries: [
+      {
+        setCode: 'clb',
+        collectorNumber: '457',
+        scryfallId: 'island-clb-457',
+        oracleId: 'oracle-island',
+        name: 'Island',
+        lang: 'en',
+        finishes: ['nonfoil'],
+      },
+      {
+        setCode: 'clb',
+        collectorNumber: '458',
+        scryfallId: 'other',
+        oracleId: 'oracle-other',
+        name: 'Swamp',
+        lang: 'en',
+        finishes: ['nonfoil'],
+      },
+    ],
+  });
+  const hit = lookupPrintingTitleRestricted(index, {
+    evidence: extractFooterEvidence('457 L'),
+    titleName: 'Island',
+  });
+  assert.ok(hit);
+  assert.equal(hit.candidates[0].name, 'Island');
+  assert.equal(hit.candidates[0].collectorNumber, '457');
+});
+
+check('title-restricted Champion Helm R0337 ignores FFVII as set', () => {
+  const index = buildPrintingIndex({
+    version: 1,
+    entries: [
+      {
+        setCode: 'fin',
+        collectorNumber: '337',
+        scryfallId: 'helm-337',
+        oracleId: 'oracle-helm',
+        name: "Champion's Helm",
+        lang: 'en',
+        finishes: ['nonfoil'],
+      },
+    ],
+  });
+  const hit = lookupPrintingTitleRestricted(index, {
+    evidence: extractFooterEvidence('R0337 FFVII'),
+    titleName: "Champion's Helm",
+  });
+  assert.ok(hit);
+  assert.equal(hit.candidates[0].collectorNumber, '337');
+  assert.equal(hit.candidates[0].setCode, 'fin');
+});
+
+check('TypeIndex Creature — Faerie + Legendary Creature — Dragon', () => {
+  const data = {
+    version: 1,
+    oracles: ['ora-pixie', 'ora-dragon', 'ora-bolt'],
+    cardTypes: ['artifact', 'creature', 'instant', 'land'],
+    supertypes: ['basic', 'legendary', 'snow'],
+    subtypes: ['dragon', 'faerie', 'human'],
+    faces: [
+      {
+        cardTypeMask: 1 << 1,
+        faceIndex: 0,
+        normalizedTypeLine: 'creature faerie',
+        oracleOrdinal: 0,
+        subtypeIds: [1],
+        supertypeMask: 0,
+      },
+      {
+        cardTypeMask: 1 << 1,
+        faceIndex: 0,
+        normalizedTypeLine: 'legendary creature dragon',
+        oracleOrdinal: 1,
+        subtypeIds: [0],
+        supertypeMask: 1 << 1,
+      },
+      {
+        cardTypeMask: 1 << 2,
+        faceIndex: 0,
+        normalizedTypeLine: 'instant',
+        oracleOrdinal: 2,
+        subtypeIds: [],
+        supertypeMask: 0,
+      },
+    ],
+    signatures: {
+      'creature faerie': [0],
+      'legendary creature dragon': [1],
+    },
+    subtypePostings: {
+      '0': [1],
+      '1': [0],
+    },
+  };
+  const index = buildTypeIndex(data);
+  const faerie = matchTypeReading('Creature — Faerie', index);
+  assert.ok(faerie.subtypes.some(s => s.value === 'faerie'));
+  assert.ok(faerie.candidateOracleIds?.includes('ora-pixie'));
+
+  const dragon = matchTypeReading('Legendary Creature — Dragon', index);
+  assert.ok(dragon.supertypes.some(s => s.value === 'legendary'));
+  assert.ok(dragon.subtypes.some(s => s.value === 'dragon'));
+
+  const junk = matchTypeReading('zzzz not a type', index);
+  assert.equal(junk.confidence, 0);
+});
+
+check('PrintingIndex missing forces manifest check (no 18h throttle)', () => {
+  assert.equal(
+    shouldThrottleScannerManifestCheck({
+      lastCheckAt: Date.now() - 1000,
+      now: Date.now(),
+      criticalAssetMissing: true,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldThrottleScannerManifestCheck({
+      lastCheckAt: Date.now() - 1000,
+      now: Date.now(),
+      criticalAssetMissing: false,
+      intervalMs: 18 * 60 * 60 * 1000,
+    }),
+    true,
+  );
+  assert.equal(
+    mayAdvanceLastCheckAfterFailure({ printingMissing: true, typeMissing: false }),
+    false,
+  );
+  assert.equal(
+    mayAdvanceLastCheckAfterFailure({ printingMissing: false, typeMissing: false }),
+    true,
+  );
+  assert.equal(
+    needPrintingAsset({
+      manifestHasPrinting: true,
+      diskPrintingExists: false,
+      metaSha256: 'abc',
+      manifestSha256: 'abc',
+      activePrintingLoaded: false,
+    }),
+    true,
+  );
+  assert.equal(
+    needTypeAsset({
+      manifestHasType: true,
+      diskTypeExists: true,
+      metaSha256: 'deadbeef',
+      manifestSha256: 'cafebabe',
+      activeTypeLoaded: true,
+    }),
+    true,
+  );
+});
+
+check('scanner manifest accepts optional typeIndex', () => {
+  const ok = isScannerManifest({
+    schemaVersion: 1,
+    generatedAt: '2026-01-01T00:00:00Z',
+    cardNames: {
+      sha256: 'a'.repeat(64),
+      url: 'https://tsuina311.github.io/Lugin/card-names.json',
+      version: '1',
+    },
+    artIndex: {
+      sha256: 'b'.repeat(64),
+      url: 'https://tsuina311.github.io/Lugin/art-index.json',
+      version: '1',
+    },
+    typeIndex: {
+      sha256: 'c'.repeat(64),
+      url: 'https://tsuina311.github.io/Lugin/type-index.json',
+      version: '1',
+      recordCount: 12000,
+      bytes: 4_000_000,
+      compressedBytes: 800_000,
+    },
+  });
+  assert.equal(ok, true);
+});
+
+check('expected manifest keeps collector numbers as strings', () => {
+  const cards = parseExpectedManifest([
+    { name: 'Pixie Guide', setCode: 'AFR', collectorNumber: '066', finish: 'nonfoil' },
+  ]);
+  assert.equal(cards[0].collectorNumber, '066');
+  assert.equal(collectorNumbersEqual('066', '66'), true);
+});
+
+check('benchmark latency verdict + dedupe-facing flags', () => {
+  assert.equal(classifyLatencyVerdict(400, 800), 'pass');
+  assert.equal(classifyLatencyVerdict(2000, 2500), 'warn');
+  assert.equal(classifyLatencyVerdict(4000, 5000), 'fail');
+
+  const score = scoreAgainstExpected(
+    {
+      name: 'Pixie Guide',
+      printing: { setCode: 'afr', collectorNumber: '66' },
+      finish: 'nonfoil',
+      status: 'identified',
+      ocrPresent: true,
+    },
+    { name: 'Pixie Guide', setCode: 'AFR', collectorNumber: '066', finish: 'nonfoil' },
+  );
+  assert.equal(score?.oracleOk, true);
+  assert.equal(score?.printingOk, true);
+  assert.equal(score?.finishOk, true);
+
+  const flags = collectFlags(
+    {
+      name: 'Wrong',
+      status: 'identified',
+      ocrPresent: true,
+      artConflict: true,
+      titleFooterConflict: true,
+      actualDetectorEngine: 'shared-js',
+      ocrTransport: 'rgba-base64',
+      userLatency: { lockToFirstOracleMs: 1200 },
+    },
+    scoreAgainstExpected(
+      { name: 'Wrong', status: 'identified', ocrPresent: true },
+      { name: 'Pixie Guide', setCode: 'AFR', collectorNumber: '066' },
+    ),
+    { lockToFirstOracleMs: 1200, lockToFinalOracleMs: 1200, lockToPrintingMs: null },
+  );
+  assert.ok(flags.includes('title-art-conflict'));
+  assert.ok(flags.includes('title-footer-conflict'));
+  assert.ok(flags.includes('failure'));
+  assert.ok(flags.includes('false-confident'));
+  assert.ok(flags.includes('slow-1s'));
+  assert.ok(flags.includes('detector-js'));
+  assert.ok(flags.includes('ocr-base64'));
+  assert.equal(mapWinningChannel('title-only'), 'title');
+});
+
+check('benchmark session summary percentiles + OCR transport gate', () => {
+  const scans = [
+    {
+      earlyReason: 'title-only',
+      flags: [],
+      latency: { lockToFirstOracleMs: 400, lockToFinalOracleMs: 450, lockToPrintingMs: 700 },
+      lockedAt: 1,
+      name: 'A',
+      pngRelativePath: 'scans/0001-recognition.png',
+      reportRelativePath: 'scans/0001.json',
+      score: {
+        expected: null,
+        finishOk: null,
+        nameOk: true,
+        oracleOk: true,
+        printingOk: true,
+      },
+      seq: 1,
+      stamp: 'a',
+      status: 'identified',
+      uploadAttempts: 0,
+      uploadError: null,
+      uploadStatus: 'skipped',
+      winningChannel: 'title',
+      ocrTitle: {
+        bytes: 160000,
+        cropH: 75,
+        cropW: 536,
+        encodeMs: 0,
+        jsBridgeMs: 220,
+        lookupMs: 1,
+        mlkitMs: 180,
+        nativeMs: 200,
+        totalMs: 250,
+        transport: 'rgba-bytes',
+      },
+      actualDetectorEngine: 'native',
+      detectorEngine: 'native',
+    },
+    {
+      earlyReason: 'title-only',
+      flags: [],
+      latency: { lockToFirstOracleMs: 500, lockToFinalOracleMs: 520, lockToPrintingMs: 800 },
+      lockedAt: 2,
+      name: 'B',
+      pngRelativePath: 'scans/0002-recognition.png',
+      reportRelativePath: 'scans/0002.json',
+      score: {
+        expected: null,
+        finishOk: null,
+        nameOk: true,
+        oracleOk: true,
+        printingOk: true,
+      },
+      seq: 2,
+      stamp: 'b',
+      status: 'identified',
+      uploadAttempts: 0,
+      uploadError: null,
+      uploadStatus: 'skipped',
+      winningChannel: 'title',
+      ocrTitle: {
+        bytes: 160000,
+        cropH: 75,
+        cropW: 536,
+        encodeMs: 0,
+        jsBridgeMs: 210,
+        lookupMs: 1,
+        mlkitMs: 170,
+        nativeMs: 190,
+        totalMs: 240,
+        transport: 'rgba-bytes',
+      },
+      actualDetectorEngine: 'native',
+      detectorEngine: 'native',
+    },
+  ];
+  const summary = buildSessionSummary(scans, 50, { printingEntries: 101912 });
+  assert.equal(summary.latency.verdict, 'pass');
+  assert.equal(summary.ocr.transport, 'rgba-bytes');
+  assert.equal(summary.gates.detectorNative, true);
+  assert.equal(summary.gates.ocrRgbaBytes, true);
+  assert.equal(summary.gates.printingLoaded, true);
+  assert.ok(summary.latency.lockToFirstOracleP50Ms != null);
+});
+
+check('TypeIndex restricts candidates for partial title path', () => {
+  const data = {
+    version: 1,
+    oracles: ['ora-pixie', 'ora-guide', 'ora-bolt'],
+    cardTypes: ['creature', 'instant'],
+    supertypes: [],
+    subtypes: ['faerie', 'human'],
+    faces: [
+      {
+        cardTypeMask: 1,
+        faceIndex: 0,
+        normalizedTypeLine: 'creature faerie',
+        oracleOrdinal: 0,
+        subtypeIds: [0],
+        supertypeMask: 0,
+      },
+      {
+        cardTypeMask: 1,
+        faceIndex: 0,
+        normalizedTypeLine: 'creature human',
+        oracleOrdinal: 1,
+        subtypeIds: [1],
+        supertypeMask: 0,
+      },
+      {
+        cardTypeMask: 1 << 1,
+        faceIndex: 0,
+        normalizedTypeLine: 'instant',
+        oracleOrdinal: 2,
+        subtypeIds: [],
+        supertypeMask: 0,
+      },
+    ],
+    signatures: {
+      'creature faerie': [0],
+      'creature human': [1],
+      instant: [2],
+    },
+    subtypePostings: { 0: [0], 1: [1] },
+  };
+  const index = buildTypeIndex(data);
+  const restricted = matchTypeReading('Creature — Faerie', index, ['ora-pixie', 'ora-guide']);
+  assert.ok(restricted.candidateOracleIds?.includes('ora-pixie'));
+  assert.ok(!restricted.candidateOracleIds?.includes('ora-bolt'));
+});
+
+check('performance baseline preset is UI-first (8 Hz, no warmup/live PNG)', () => {
+  applyPerfPreset('baseline');
+  const b = getPerfBaseline();
+  assert.equal(b.detectorHz, 8);
+  assert.equal(b.analysisLongEdge, 480);
+  assert.equal(b.ocrWarmup, false);
+  assert.equal(b.liveDebugImages, false);
+  assert.equal(b.heavyIndexesWhileScanning, false);
+  assert.equal(b.footerOcr, false);
+  assert.equal(b.typeOcr, false);
+  assert.equal(b.artwork, false);
+  assert.equal(PERF_BASELINE.detectorHz, 8);
+  assert.ok(PERF_FULL.detectorHz >= 10);
+  applyPerfPreset('full');
+  assert.equal(getPerfBaseline().ocrWarmup, true);
+  applyPerfPreset('baseline');
+});
+
+check('normalizeCardCorners restores TL TR BR BL after permutation', () => {
+  const swapped = {
+    topLeft: { x: 0, y: 0 },
+    topRight: { x: 0, y: 20 },
+    bottomRight: { x: 10, y: 20 },
+    bottomLeft: { x: 10, y: 0 },
+  };
+  const n = normalizeCardCorners(swapped);
+  assert.ok(n.topLeft.y <= n.bottomLeft.y);
+  assert.ok(n.topLeft.x <= n.topRight.x);
+  assert.ok(n.bottomLeft.x <= n.bottomRight.x);
+});
+
+check('orderCorners / normalizeCardCorners handle rotated and skewed quads', () => {
+  const rotated = orderCorners([
+    { x: 80, y: 10 },
+    { x: 140, y: 40 },
+    { x: 110, y: 130 },
+    { x: 50, y: 100 },
+  ]);
+  assert.ok(rotated[0].y <= rotated[3].y);
+  assert.ok(rotated[0].x <= rotated[1].x);
+  const skewed = normalizeCardCorners({
+    topLeft: { x: 30, y: 80 },
+    topRight: { x: 20, y: 20 },
+    bottomRight: { x: 120, y: 10 },
+    bottomLeft: { x: 140, y: 90 },
+  });
+  assert.ok(skewed.topLeft.y <= skewed.bottomLeft.y);
+  assert.ok(skewed.topLeft.x <= skewed.topRight.x);
+});
+
+check('stale-clear threshold outlasts a 250 ms native gap', () => {
+  assert.ok(DETECT_STALE_MS > 250);
+  assert.ok(DETECT_STALE_MS < 2000);
+});
+
+const paintCardLike = (img, { gray = false } = {}) => {
+  const { data, height, width } = img;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const inset =
+        x > width * 0.12 && x < width * 0.88 && y > height * 0.08 && y < height * 0.92;
+      let r = 18;
+      let g = 22;
+      let b = 28;
+      if (inset) {
+        const stripe = ((x + y) % 3 === 0 ? 40 : 210);
+        r = gray ? stripe : stripe;
+        g = gray ? stripe : Math.min(255, stripe + (x % 7) * 2);
+        b = gray ? stripe : Math.max(0, stripe - (y % 5) * 3);
+        if (y < height * 0.18) {
+          r = gray ? (x % 2 === 0 ? 20 : 230) : 30;
+          g = gray ? (x % 2 === 0 ? 20 : 230) : 30;
+          b = gray ? (x % 2 === 0 ? 20 : 230) : 30;
+        }
+      }
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+      data[i + 3] = 255;
+    }
+  }
+  return img;
+};
+
+const downscaleGray = (src, width, height) => {
+  const dst = blankImage(width, height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const sx = Math.min(src.width - 1, Math.floor((x / width) * src.width));
+      const sy = Math.min(src.height - 1, Math.floor((y / height) * src.height));
+      const si = (sy * src.width + sx) * 4;
+      const yv = 0.299 * src.data[si] + 0.587 * src.data[si + 1] + 0.114 * src.data[si + 2];
+      const di = (y * width + x) * 4;
+      dst.data[di] = dst.data[di + 1] = dst.data[di + 2] = yv;
+      dst.data[di + 3] = 255;
+    }
+  }
+  return dst;
+};
+
+check('luma-proxy quality is lower than RGB analysis on the same card', () => {
+  const rgb = paintCardLike(blankImage(360, 640));
+  const luma = downscaleGray(rgb, 251, 480);
+  const rgbQ = frameQualityScore(rgb, 0.9);
+  const lumaQ = frameQualityScore(luma, 0.9);
+  assert.ok(rgbQ.score > 0, 'RGB quality must be defined');
+  assert.ok(lumaQ.score >= 0, 'luma quality must be defined');
+  // Sharpness is resolution-dependent; luma proxy is the weaker signal.
+  assert.ok(
+    lumaQ.sharpness <= rgbQ.sharpness * 1.05,
+    `luma sharp ${lumaQ.sharpness} should not exceed RGB ${rgbQ.sharpness}`,
+  );
+});
+
+await checkAsync('luma proxy must not block lock when hi-res is pending', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  let recognizeCalls = 0;
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: {
+      recognize: async () => {
+        recognizeCalls += 1;
+        return { confidence: 0.9, text: 'Sol Ring' };
+      },
+    },
+  });
+  const helpers = {
+    allowRecognize: () => false,
+    prepareAnalysis: frame => ({
+      corners,
+      detected: true,
+      detection: { candidates: [], ms: 1, selectedIndex: 0, workSize: { height: 480, width: 251 } },
+      image: frame,
+      score: 0.86,
+      source: 'detected',
+    }),
+  };
+  let last = null;
+  for (let i = 0; i < STABILITY_WINDOW + 2; i++) {
+    last = await ctrl.onFrame(luma, helpers);
+  }
+  assert.ok(last);
+  assert.equal(last.phase, 'locking', `expected locking, got ${last.phase} (${last.lockGates?.waiting})`);
+  assert.equal(last.lockGates.blocker, 'awaiting-hires');
+  assert.equal(last.lockGates.qualityInput, 'luma-proxy');
+  assert.equal(last.lockGates.qualityGating, false);
+  assert.ok(last.lockGates.stable);
+  assert.equal(recognizeCalls, 0, 'must wait for hi-res, not OCR the luma proxy');
+
+  const go = await ctrl.onFrame(luma, { ...helpers, allowRecognize: () => true });
+  assert.ok(
+    go.phase === 'recognizing' ||
+      go.phase === 'found' ||
+      go.phase === 'ambiguous' ||
+      go.phase === 'locking',
+    `after allowRecognize expected recognition start, got ${go.phase} (must not sit in focusing)`,
+  );
+  assert.ok((go.recognizeInvocations ?? 0) >= 1);
+  assert.notEqual(go.phase, 'focusing', 'insufficient identity must not re-enter focusing');
+});
+
+const cardQuad = (ox = 40, oy = 40, w = 120, h = 168) => ({
+  topLeft: { x: ox, y: oy },
+  topRight: { x: ox + w, y: oy },
+  bottomRight: { x: ox + w, y: oy + h },
+  bottomLeft: { x: ox, y: oy + h },
+});
+
+const jitter = (q, px) => ({
+  topLeft: { x: q.topLeft.x + px, y: q.topLeft.y - px },
+  topRight: { x: q.topRight.x + px, y: q.topRight.y + px },
+  bottomRight: { x: q.bottomRight.x - px, y: q.bottomRight.y + px },
+  bottomLeft: { x: q.bottomLeft.x - px, y: q.bottomLeft.y - px },
+});
+
+check('continuity A: small corner noise keeps the same track', () => {
+  const base = cardQuad();
+  let state = emptyContinuity();
+  let last = null;
+  for (let i = 0; i < 8; i++) {
+    last = stepContinuity(state, { rawCorners: jitter(base, i % 2 === 0 ? 2 : -2), rawScore: 0.88 });
+    state = last.state;
+  }
+  assert.equal(last.track.id, 1);
+  assert.equal(last.switched, false);
+  assert.ok(last.metrics.iou > 0.85);
+});
+
+check('continuity B: inner/outer score oscillation does not switch track', () => {
+  const inner = cardQuad(50, 50, 100, 140);
+  const outer = cardQuad(40, 40, 130, 180);
+  let state = emptyContinuity();
+  let last = stepContinuity(state, { rawCorners: inner, rawScore: 0.91 });
+  state = last.state;
+  const id = last.track.id;
+  for (let i = 0; i < 6; i++) {
+    const useOuter = i % 2 === 0;
+    last = stepContinuity(state, {
+      candidates: [
+        { corners: inner, score: useOuter ? 0.88 : 0.92 },
+        { corners: outer, score: useOuter ? 0.9 : 0.89 },
+      ],
+      rawCorners: useOuter ? outer : inner,
+      rawScore: useOuter ? 0.9 : 0.92,
+    });
+    state = last.state;
+  }
+  assert.equal(last.track.id, id);
+  assert.equal(last.switched, false);
+  assert.ok(last.state.roleSwitchCount <= 1);
+});
+
+check('continuity C: one-frame miss retains the track', () => {
+  const q = cardQuad();
+  let state = emptyContinuity();
+  let last = stepContinuity(state, { rawCorners: q, rawScore: 0.9 });
+  state = last.state;
+  last = stepContinuity(state, { rawCorners: null, rawScore: 0 });
+  assert.equal(last.selectionReason.includes('grace'), true);
+  assert.ok(last.track);
+  assert.ok(last.trackedCorners);
+});
+
+check('continuity D: corner order is normalized before comparison', () => {
+  const q = cardQuad();
+  const permuted = {
+    topLeft: q.topLeft,
+    topRight: q.bottomLeft,
+    bottomRight: q.bottomRight,
+    bottomLeft: q.topRight,
+  };
+  let last = stepContinuity(emptyContinuity(), { rawCorners: q, rawScore: 0.9 });
+  last = stepContinuity(last.state, { rawCorners: permuted, rawScore: 0.9 });
+  assert.equal(last.switched, false);
+  assert.ok(last.metrics.iou > 0.9);
+});
+
+check('continuity E: genuine removal resets after grace', () => {
+  const q = cardQuad();
+  let last = stepContinuity(emptyContinuity(), { rawCorners: q, rawScore: 0.9 });
+  for (let i = 0; i <= TRACK_COAST_FRAMES; i++) {
+    last = stepContinuity(last.state, { rawCorners: null, rawScore: 0 });
+  }
+  assert.equal(last.track, null);
+  assert.ok(String(last.state.lastResetReason).includes('grace'));
+});
+
+check('continuity F: a new card elsewhere starts a new track after the old one is lost', () => {
+  const a = cardQuad(20, 20);
+  const b = cardQuad(220, 300, 110, 150);
+  let last = stepContinuity(emptyContinuity(), { rawCorners: a, rawScore: 0.9 });
+  const firstId = last.track.id;
+  for (let i = 0; i <= TRACK_COAST_FRAMES; i++) {
+    last = stepContinuity(last.state, { rawCorners: null, rawScore: 0 });
+  }
+  last = stepContinuity(last.state, { rawCorners: b, rawScore: 0.9 });
+  assert.ok(last.track);
+  assert.notEqual(last.track.id, firstId);
+});
+
+check('continuity G: slow motion follows without dropping the track', () => {
+  let q = cardQuad(40, 40);
+  let last = stepContinuity(emptyContinuity(), { rawCorners: q, rawScore: 0.88 });
+  const id = last.track.id;
+  for (let i = 1; i <= 8; i++) {
+    q = cardQuad(40 + i * 4, 40 + i * 3);
+    last = stepContinuity(last.state, { rawCorners: q, rawScore: 0.87 });
+  }
+  assert.equal(last.track.id, id);
+  assert.equal(last.switched, false);
+  assert.ok(last.trackedCorners.topLeft.x > 50);
+});
+
+check('continuity: pushTrack accumulates stability on noisy but same-object samples', () => {
+  const base = cardQuad();
+  let track = emptyTrack();
+  for (let i = 0; i < 5; i++) {
+    track = pushTrack(track, sampleFromQuad(jitter(base, i % 2 === 0 ? 1.5 : -1.5), 0.86));
+  }
+  assert.equal(track.stable, true);
+  assert.ok(track.lastIou > 0.9);
+});
+
+check('continuity A: established inner survives outer score flicker', () => {
+  const inner = cardQuad(50, 50, 100, 140);
+  const outer = cardQuad(40, 40, 130, 180);
+  const innerScores = [0.92, 0.88, 0.91];
+  const outerScores = [0.89, 0.9, 0.89];
+  let last = stepContinuity(emptyContinuity(), { rawCorners: inner, rawScore: 0.92 });
+  const id = last.track.id;
+  for (let i = 0; i < innerScores.length; i++) {
+    last = stepContinuity(last.state, {
+      candidates: [
+        { corners: inner, score: innerScores[i] },
+        { corners: outer, score: outerScores[i] },
+      ],
+      rawCorners: outerScores[i] > innerScores[i] ? outer : inner,
+      rawScore: Math.max(innerScores[i], outerScores[i]),
+    });
+  }
+  assert.equal(last.track.id, id);
+  assert.equal(last.track.role, 'card-inner');
+  assert.ok(last.state.roleSwitchCount <= 1);
+  assert.equal(last.switched, false);
+});
+
+check('continuity B: one detector miss keeps the same track id', () => {
+  const q = cardQuad();
+  let last = stepContinuity(emptyContinuity(), { rawCorners: q, rawScore: 0.9 });
+  const id = last.track.id;
+  last = stepContinuity(last.state, { rawCorners: null, rawScore: 0 });
+  assert.equal(last.track.id, id);
+  last = stepContinuity(last.state, { rawCorners: q, rawScore: 0.89 });
+  assert.equal(last.track.id, id);
+});
+
+check('continuity C: minor jitter still accumulates tracked IoU', () => {
+  const base = cardQuad();
+  let last = stepContinuity(emptyContinuity(), { rawCorners: base, rawScore: 0.9 });
+  for (let i = 0; i < 6; i++) {
+    last = stepContinuity(last.state, {
+      rawCorners: jitter(base, i % 2 === 0 ? 2 : -2),
+      rawScore: 0.9,
+    });
+  }
+  assert.ok(last.metrics.iou > 0.8);
+  assert.equal(last.track.id, 1);
+});
+
+check('continuity F: tiny candidate changes keep the same track id', () => {
+  const a = cardQuad(48, 48, 104, 146);
+  const b = cardQuad(50, 50, 100, 140);
+  let last = stepContinuity(emptyContinuity(), { rawCorners: a, rawScore: 0.9 });
+  const id = last.track.id;
+  last = stepContinuity(last.state, { rawCorners: b, rawScore: 0.91 });
+  last = stepContinuity(last.state, { rawCorners: a, rawScore: 0.88 });
+  assert.equal(last.track.id, id);
+  assert.equal(last.switched, false);
+});
+
+check('continuity G: card removed resets after grace', () => {
+  const q = cardQuad();
+  let last = stepContinuity(emptyContinuity(), { rawCorners: q, rawScore: 0.9 });
+  for (let i = 0; i <= TRACK_COAST_FRAMES; i++) {
+    last = stepContinuity(last.state, { rawCorners: null, rawScore: 0 });
+  }
+  assert.equal(last.track, null);
+  assert.equal(last.state.lastResetReason, 'grace exhausted');
+});
+
+const sessionHelpers = (corners, extra = {}) => ({
+  prepareAnalysis: frame => ({
+    corners,
+    detected: true,
+    detection: { candidates: [], ms: 1, selectedIndex: 0, workSize: { height: 480, width: 251 } },
+    image: frame,
+    score: extra.score ?? 0.9,
+    source: 'detected',
+  }),
+  ...extra,
+});
+
+const runFrames = async (ctrl, frame, helpers, n) => {
+  let last = null;
+  for (let i = 0; i < n; i++) last = await ctrl.onFrame(frame, helpers);
+  return last;
+};
+
+await checkAsync('continuity D: focus oscillation still allows capture after bound', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  let focusCalls = 0;
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: { recognize: async () => ({ confidence: 0.9, text: 'Sol Ring' }) },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => false,
+    requestFocusNorm: () => {
+      focusCalls += 1;
+    },
+  });
+  const early = await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  assert.ok(early.lockGates.stable, 'geometry must stay stable during focus wait');
+  assert.ok(focusCalls <= 2, `focus spam: ${focusCalls}`);
+  assert.ok(
+    early.phase === 'focusing' || early.phase === 'locking',
+    `expected focusing/locking, got ${early.phase}`,
+  );
+  await new Promise(r => setTimeout(r, FOCUS_ATTEMPT_MS + 30));
+  const late = await ctrl.onFrame(luma, helpers);
+  assert.equal(late.phase, 'locking', `after timeout expected locking, got ${late.phase}`);
+  assert.ok(late.lockGates.highResRequests >= 1);
+  assert.equal(late.lockGates.focusRequests, 1, 'one focus attempt per track');
+  const again = await runFrames(ctrl, luma, helpers, 4);
+  assert.equal(again.lockGates.focusRequests, 1, 'must not re-request after timeout');
+  assert.equal(again.phase, 'locking');
+  assert.ok(again.lockGates.blocker !== 'awaiting-focus');
+});
+
+await checkAsync('new track id gets a fresh bounded focus attempt', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  let trackId = 1;
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: { recognize: async () => ({ confidence: 0.9, text: 'Sol Ring' }) },
+  });
+  const helpers = {
+    allowRecognize: () => false,
+    prepareAnalysis: frame => ({
+      corners,
+      detected: true,
+      detection: {
+        candidates: [],
+        ms: 1,
+        selectedIndex: 0,
+        trackId,
+        workSize: { height: 480, width: 251 },
+      },
+      image: frame,
+      score: 0.9,
+      source: 'detected',
+    }),
+    requestFocusNorm: () => {},
+  };
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  await new Promise(r => setTimeout(r, FOCUS_ATTEMPT_MS + 30));
+  const first = await ctrl.onFrame(luma, helpers);
+  assert.equal(first.lockGates.focusRequests, 1);
+  assert.equal(first.lockGates.focusCardSessionId, first.lockGates.cardSessionId);
+  assert.equal(first.lockGates.sameCardSessionFocus, true);
+  assert.ok((first.lockGates.focusAgeMs ?? 0) < 5000, `stale focus age ${first.lockGates.focusAgeMs}`);
+  // Geometry track change alone must NOT mint a new focus attempt.
+  trackId = 2;
+  const swapped = await ctrl.onFrame(luma, helpers);
+  assert.equal(swapped.lockGates.focusRequests, 1, 'geometry track ≠ card session — no focus spam');
+  assert.equal(swapped.lockGates.currentTrackId, 2);
+  assert.equal(swapped.lockGates.geometryTrackId, 2);
+  assert.equal(swapped.lockGates.cardSessionId, first.lockGates.cardSessionId);
+  const held = await runFrames(ctrl, luma, helpers, 3);
+  assert.equal(held.lockGates.focusRequests, 1, 'same card session must not spam');
+});
+
+const paintDistinctCard = seed => {
+  const img = blankImage(744, 1039);
+  // Solid base unique per seed
+  const br = (seed * 67) % 200;
+  const bg = (seed * 97 + 40) % 200;
+  const bb = (seed * 37 + 80) % 200;
+  for (let i = 0; i < img.data.length; i += 4) {
+    img.data[i] = br;
+    img.data[i + 1] = bg;
+    img.data[i + 2] = bb;
+    img.data[i + 3] = 255;
+  }
+  // Title: unique barcode stripes
+  for (let y = 40; y < 110; y++) {
+    for (let x = 40; x < 700; x++) {
+      const i = (y * img.width + x) * 4;
+      const on = ((x + seed * 11) % (12 + seed)) < 5;
+      const v = on ? 10 : 245;
+      img.data[i] = v;
+      img.data[i + 1] = v;
+      img.data[i + 2] = v;
+    }
+  }
+  // Artwork: seed-specific geometric pattern
+  for (let y = 160; y < 560; y++) {
+    for (let x = 60; x < 680; x++) {
+      const i = (y * img.width + x) * 4;
+      const cx = x - 370;
+      const cy = y - 360;
+      const ring = Math.floor(Math.hypot(cx, cy) / (18 + seed * 3));
+      const checker = ((x >> (4 + (seed % 3))) ^ (y >> (4 + (seed % 2)))) & 1;
+      if ((ring + seed) % 3 === 0) {
+        img.data[i] = 255;
+        img.data[i + 1] = seed * 20;
+        img.data[i + 2] = 40;
+      } else if (checker) {
+        img.data[i] = 20;
+        img.data[i + 1] = 40 + seed * 15;
+        img.data[i + 2] = 200 - seed * 10;
+      } else {
+        img.data[i] = 180 - seed * 12;
+        img.data[i + 1] = 20;
+        img.data[i + 2] = 180;
+      }
+    }
+  }
+  return img;
+};
+
+const paintSlightVariant = (base, noise = 8) => {
+  const img = blankImage(base.width, base.height);
+  img.data.set(base.data);
+  for (let i = 0; i < img.data.length; i += 16) {
+    img.data[i] = Math.max(0, Math.min(255, img.data[i] + ((i * 13) % (noise * 2)) - noise));
+    img.data[i + 1] = Math.max(0, Math.min(255, img.data[i + 1] + ((i * 7) % (noise * 2)) - noise));
+    img.data[i + 2] = Math.max(0, Math.min(255, img.data[i + 2] + ((i * 3) % (noise * 2)) - noise));
+  }
+  return img;
+};
+
+const loadFocusCard = (seriesId, delay) => {
+  const p = join(
+    root,
+    '.scan-inbox/sessions/phone-20260908',
+    seriesId,
+    `t${String(delay).padStart(3, '0')}-card.png`,
+  );
+  if (!existsSync(p)) return null;
+  return pngBytesToScanImage(new Uint8Array(readFileSync(p)));
+};
+
+check('card fingerprint: same card small visual changes stay below DIFF', () => {
+  const a = loadFocusCard('focus-series-20260908T132712', 0); // Livaan
+  const b = loadFocusCard('focus-series-20260908T132712', 250);
+  if (!a || !b) {
+    console.log('  (skip — Livaan focus-series PNGs not in inbox)');
+    return;
+  }
+  const d = cardFingerprintDistance(cardFingerprintFromWarp(a), cardFingerprintFromWarp(b));
+  assert.ok(d < CARD_SESSION_DIFF_MIN, `same-card delta ${d} should be < ${CARD_SESSION_DIFF_MIN}`);
+  assert.notEqual(classifyFingerprintDistance(d), 'changed');
+});
+
+check('card fingerprint: different cards exceed DIFF threshold', () => {
+  const a = loadFocusCard('focus-series-20260908T132801', 0); // Excalibur
+  const b = loadFocusCard('focus-series-20260908T132852', 0); // Deck of Many Things
+  if (!a || !b) {
+    console.log('  (skip — Excalibur/Deck focus-series PNGs not in inbox)');
+    return;
+  }
+  const d = cardFingerprintDistance(cardFingerprintFromWarp(a), cardFingerprintFromWarp(b));
+  assert.ok(d >= CARD_SESSION_DIFF_MIN, `diff-card delta ${d} should be >= ${CARD_SESSION_DIFF_MIN}`);
+  assert.equal(classifyFingerprintDistance(d), 'changed');
+});
+
+check('card fingerprint: two confirms required before visual reset', () => {
+  const a = loadFocusCard('focus-series-20260908T132801', 0);
+  const b = loadFocusCard('focus-series-20260908T132852', 0);
+  if (!a || !b) {
+    console.log('  (skip — Excalibur/Deck focus-series PNGs not in inbox)');
+    return;
+  }
+  let state = emptyCardSessionVisual();
+  let obs = observeCardFingerprint(state, a, { allowReset: true });
+  state = obs.state;
+  assert.equal(obs.reset, false);
+  obs = observeCardFingerprint(state, b, { allowReset: true });
+  state = obs.state;
+  assert.equal(obs.reset, false, 'first changed observation only pending');
+  assert.equal(state.pendingVisualChanges, 1);
+  obs = observeCardFingerprint(state, b, { allowReset: true });
+  assert.equal(obs.reset, true, 'second confirm resets');
+  assert.ok(CARD_SESSION_VISUAL_CONFIRM >= 2);
+});
+
+check('card fingerprint: glare/noise does not false-reset', () => {
+  const a = loadFocusCard('focus-series-20260908T132712', 0);
+  const b = loadFocusCard('focus-series-20260908T132712', 250);
+  const c = loadFocusCard('focus-series-20260908T132712', 500);
+  if (!a || !b || !c) {
+    // Fallback synthetic mild noise
+    let state = emptyCardSessionVisual();
+    const base = paintDistinctCard(3);
+    let obs = observeCardFingerprint(state, base, { allowReset: true });
+    state = obs.state;
+    for (let i = 0; i < 4; i++) {
+      obs = observeCardFingerprint(state, paintSlightVariant(base, 5 + i), { allowReset: true });
+      state = obs.state;
+      assert.equal(obs.reset, false, `noise step ${i} must not reset`);
+    }
+    return;
+  }
+  let state = emptyCardSessionVisual();
+  let obs = observeCardFingerprint(state, a, { allowReset: true });
+  state = obs.state;
+  for (const frame of [b, c, b, a]) {
+    obs = observeCardFingerprint(state, frame, { allowReset: true });
+    state = obs.state;
+    assert.equal(obs.reset, false, 'same-card focus-series frames must not reset');
+  }
+});
+
+await checkAsync('card session: identity A→B mints new session without clearing geometry track', async () => {
+  const corners = {
+    topLeft: { x: 40, y: 40 },
+    topRight: { x: 700, y: 40 },
+    bottomRight: { x: 700, y: 1000 },
+    bottomLeft: { x: 40, y: 1000 },
+  };
+  let which = 0;
+  const names = ['Excalibur, Sword of Eden', 'The Deck of Many Things'];
+  const idx = buildNameIndex({ names, version: 1 });
+  const ctrl = createSessionController({
+    nameIndex: idx,
+    ocr: {
+      recognize: async () => {
+        const text = names[which];
+        which += 1;
+        return { confidence: 0.99, text };
+      },
+    },
+  });
+  const warpA = paintDistinctCard(1);
+  const warpB = paintDistinctCard(9);
+  await ctrl.recognizeFrozenCapture({
+    recognitionQuad: corners,
+    source: warpA,
+    trackId: 4,
+  });
+  let snap = ctrl.snapshot();
+  const sessionA = snap.lockGates?.cardSessionId ?? 0;
+  assert.ok(snap.lockGates?.currentSessionIdentity || snap.phase === 'found' || snap.phase === 'locking');
+  // Second capture with different strong identity on same geometry track.
+  await ctrl.recognizeFrozenCapture({
+    recognitionQuad: corners,
+    source: warpB,
+    trackId: 4,
+  });
+  snap = ctrl.snapshot();
+  assert.equal(snap.lockGates?.geometryTrackId ?? snap.lockGates?.currentTrackId, 4);
+  // Session id should advance on identity change when first card was identified.
+  if (sessionA && snap.lockGates?.previousSessionIdentity) {
+    assert.ok((snap.lockGates?.cardSessionId ?? 0) > sessionA);
+  }
+});
+
+await checkAsync('card session: mintDebugFocusAttempt always fresh', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: { recognize: async () => ({ confidence: 0.9, text: 'Sol Ring' }) },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => false,
+    requestFocusNorm: () => {},
+  });
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  const before = ctrl.snapshot().lockGates?.focusAttemptId ?? 0;
+  ctrl.mintDebugFocusAttempt();
+  const after = ctrl.snapshot().lockGates?.focusAttemptId ?? 0;
+  assert.equal(after, before + 1);
+  ctrl.mintDebugFocusAttempt();
+  assert.equal(ctrl.snapshot().lockGates?.focusAttemptId, before + 2);
+});
+
+await checkAsync('card session: card-gone begins new session; retry budget resets', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: { recognize: async () => ({ confidence: 0.1, text: '' }) },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => true,
+    refineCard: () => ({
+      corners,
+      detected: true,
+      detection: { candidates: [], ms: 1, selectedIndex: 0, workSize: { height: 480, width: 251 } },
+      image: paintDistinctCard(1),
+      score: 0.9,
+      source: 'detected',
+    }),
+    requestFocusNorm: () => {},
+  });
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 4);
+  await new Promise(r => setTimeout(r, 50));
+  const mid = ctrl.snapshot();
+  const sessionBefore = mid.lockGates?.cardSessionId ?? 0;
+  // Gone frames
+  const emptyHelpers = {
+    allowRecognize: () => false,
+    prepareAnalysis: frame => ({
+      corners: null,
+      detected: false,
+      detection: { candidates: [], ms: 1, selectedIndex: -1, workSize: { height: 480, width: 251 } },
+      image: frame,
+      score: 0,
+      source: 'none',
+    }),
+  };
+  for (let i = 0; i < 6; i++) await ctrl.onFrame(luma, emptyHelpers);
+  const gone = ctrl.snapshot();
+  assert.equal(gone.phase, 'searching');
+  assert.ok((gone.lockGates?.cardSessionId ?? 0) > sessionBefore, 'card-gone must mint new session');
+  assert.equal(gone.postLock?.recognizeAttemptsForTrack ?? 0, 0, 'retry budget resets with session');
+});
+
+check('hard-cases catalog lists The Deck of Many Things French', () => {
+  const hard = JSON.parse(
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/hard-cases.json'), 'utf8'),
+  );
+  const deck = hard.cases.find(c => c.id === 'the-deck-of-many-things-french');
+  assert.ok(deck);
+  assert.equal(deck.expectedName, 'The Deck of Many Things');
+  assert.ok(deck.hardReasons.some(r => r.includes('must-not-publish')));
+});
+
+check('keep-hold must not freeze a weak track score', () => {
+  const inner = cardQuad(50, 50, 100, 140);
+  const outer = cardQuad(40, 40, 130, 180);
+  let last = stepContinuity(emptyContinuity(), { rawCorners: inner, rawScore: 0.66 });
+  last = stepContinuity(last.state, {
+    candidates: [
+      { corners: inner, score: 0.66 },
+      { corners: outer, score: 0.98 },
+    ],
+    rawCorners: outer,
+    rawScore: 0.98,
+  });
+  assert.ok(last.track.score >= 0.98, `track score stayed ${last.track.score}`);
+  assert.equal(last.switched, false);
+});
+
+await checkAsync('continuity E: focus timeout with stable geometry proceeds to high-res', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: { recognize: async () => ({ confidence: 0.9, text: 'Sol Ring' }) },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => false,
+    requestFocusNorm: () => {},
+  });
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 1);
+  await new Promise(r => setTimeout(r, FOCUS_ATTEMPT_MS + 30));
+  const last = await ctrl.onFrame(luma, helpers);
+  assert.equal(last.phase, 'locking');
+  assert.equal(last.lockGates.blocker, 'awaiting-hires');
+  assert.equal(last.lockGates.focusTimedOut, true);
+  assert.ok(last.lockGates.highResRequests > 0);
+});
+
+await checkAsync('continuity H: table/glare rectangle does not trivially lock', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const weak = {
+    topLeft: { x: 10, y: -20 },
+    topRight: { x: 240, y: -18 },
+    bottomRight: { x: 230, y: 200 },
+    bottomLeft: { x: 20, y: 198 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: { recognize: async () => ({ confidence: 0.2, text: '' }) },
+  });
+  const last = await runFrames(
+    ctrl,
+    luma,
+    sessionHelpers(weak, { score: 0.48, allowRecognize: () => true }),
+    STABILITY_WINDOW + 4,
+  );
+  assert.ok(last.phase !== 'locking' && last.phase !== 'recognizing' && last.phase !== 'found');
+  assert.ok(
+    last.lockGates.blocker === 'weak-score' || last.lockGates.blocker === 'clipped' || last.lockGates.blocker === 'stability',
+    `unexpected blocker ${last.lockGates.blocker}`,
+  );
+  assert.ok(last.score == null || last.lockGates.detectorScore < LOCK_MIN_SCORE || last.lockGates.blocker === 'clipped');
+});
+
+const poorQuad = {
+  topLeft: { x: 4, y: 148 },
+  topRight: { x: 130, y: 150 },
+  bottomRight: { x: 138, y: 390 },
+  bottomLeft: { x: 8, y: 388 },
+};
+const goodQuad = {
+  topLeft: { x: 40, y: 160 },
+  topRight: { x: 200, y: 162 },
+  bottomRight: { x: 198, y: 430 },
+  bottomLeft: { x: 38, y: 428 },
+};
+
+check('post-lock A unit: stale capture quad vs later track is replaceable', () => {
+  const cmp = shouldReplaceCaptureQuad(poorQuad, goodQuad);
+  assert.ok(cmp.replace, `expected replace, IoU ${cmp.iou}`);
+  assert.ok(cmp.iou < 0.72, `IoU ${cmp.iou} should be stale`);
+  const same = shouldReplaceCaptureQuad(goodQuad, goodQuad);
+  assert.equal(same.replace, false);
+});
+
+await checkAsync('post-lock A: retry uses newer tracked quad after insufficient', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const names = buildNameIndex({ names: ['Sol Ring'], version: 1 });
+  let live = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const refineQuads = [];
+  const ctrl = createSessionController({
+    nameIndex: names,
+    ocr: { recognize: async () => ({ confidence: 0.1, text: '' }) },
+  });
+  const helpers = {
+    ...sessionHelpers(live),
+    prepareAnalysis: frame => ({
+      corners: live,
+      detected: true,
+      detection: { candidates: [], ms: 1, selectedIndex: 0, workSize: { height: 480, width: 251 } },
+      image: frame,
+      score: 0.95,
+      source: 'detected',
+    }),
+    refineCard: corners => {
+      refineQuads.push(corners);
+      return null;
+    },
+    allowRecognize: () => true,
+  };
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  assert.ok((ctrl.snapshot().recognizeInvocations ?? 0) >= 1, 'first recognize must run');
+  const firstRefine = refineQuads[0];
+  live = {
+    topLeft: { x: live.topLeft.x + 1, y: live.topLeft.y + 1 },
+    topRight: { x: live.topRight.x + 1, y: live.topRight.y + 1 },
+    bottomRight: { x: live.bottomRight.x + 1, y: live.bottomRight.y + 1 },
+    bottomLeft: { x: live.bottomLeft.x + 1, y: live.bottomLeft.y + 1 },
+  };
+  await new Promise(r => setTimeout(r, RECOGNIZE_RETRY_MS + 30));
+  let late = ctrl.snapshot();
+  for (let i = 0; i < 6; i++) {
+    late = await ctrl.onFrame(luma, helpers);
+    if ((late.recognizeInvocations ?? 0) >= 2) break;
+  }
+  const lastRefine = refineQuads[refineQuads.length - 1];
+  assert.ok((late.recognizeInvocations ?? 0) >= 2, `expected retry, got ${late.recognizeInvocations} phase=${late.phase} blocker=${late.lockGates?.blocker} waiting=${late.lockGates?.waiting}`);
+  assert.ok(lastRefine, 'retry must refine');
+  assert.ok(
+    lastRefine.topLeft.x !== firstRefine.topLeft.x || late.phase === 'found',
+    `retry must use newer quad (first ${firstRefine.topLeft.x} last ${lastRefine.topLeft.x})`,
+  );
+});
+
+await checkAsync('post-lock B: insufficient + same track schedules bounded retry', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: buildNameIndex({ names: ['Sol Ring'], version: 1 }),
+    ocr: { recognize: async () => ({ confidence: 0.1, text: '' }) },
+  });
+  const last = await runFrames(
+    ctrl,
+    luma,
+    sessionHelpers(corners, {
+      allowRecognize: () => true,
+    }),
+    STABILITY_WINDOW + 2,
+  );
+  assert.ok((last.recognizeInvocations ?? 0) >= 1);
+  assert.notEqual(last.phase, 'focusing');
+  assert.ok(
+    last.lockGates.blocker === 'awaiting-retry' || last.postLock?.retryScheduledAt != null,
+    `expected retry, blocker=${last.lockGates.blocker} phase=${last.phase}`,
+  );
+});
+
+await checkAsync('post-lock C: success does not schedule retry', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: buildNameIndex({ names: ['Sol Ring'], version: 1 }),
+    ocr: { recognize: async () => ({ confidence: 0.95, text: 'Sol Ring' }) },
+  });
+  const last = await runFrames(
+    ctrl,
+    luma,
+    sessionHelpers(corners, {
+      allowRecognize: () => true,
+    }),
+    STABILITY_WINDOW + 2,
+  );
+  assert.equal(last.phase, 'found');
+  assert.equal(last.postLock?.retryScheduledAt, null);
+  assert.ok(
+    last.postLock?.recognitionStatus === 'identified' ||
+      last.postLock?.recognitionStatus === 'printing-ambiguous',
+  );
+});
+
+await checkAsync('post-lock D: focus timeout + failed recognize does not re-enter focusing', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: { recognize: async () => ({ confidence: 0.1, text: '' }) },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => false,
+    requestFocusNorm: () => {},
+  });
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 1);
+  await new Promise(r => setTimeout(r, FOCUS_ATTEMPT_MS + 30));
+  const locked = await ctrl.onFrame(luma, helpers);
+  assert.equal(locked.lockGates.focusTimedOut, true);
+  const after = await ctrl.onFrame(luma, { ...helpers, allowRecognize: () => true });
+  assert.notEqual(after.phase, 'focusing', `dead focusing after timeout: ${after.phase} ${after.lockGates?.blocker}`);
+  assert.ok(
+    after.phase === 'locking' || after.phase === 'recognizing' || after.phase === 'ambiguous',
+    `got ${after.phase}`,
+  );
+});
+
+await checkAsync('post-lock E: card removed after failed recognize does not retry old track', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: buildNameIndex({ names: ['Sol Ring'], version: 1 }),
+    ocr: { recognize: async () => ({ confidence: 0.1, text: '' }) },
+  });
+  await runFrames(
+    ctrl,
+    luma,
+    sessionHelpers(corners, { allowRecognize: () => true }),
+    STABILITY_WINDOW + 2,
+  );
+  const empty = blankImage(251, 480, 8);
+  let last = null;
+  for (let i = 0; i < TRACK_COAST_FRAMES + 3; i++) {
+    last = await ctrl.onFrame(empty, {
+      prepareAnalysis: frame => ({
+        corners: null,
+        detected: false,
+        detection: { candidates: [], ms: 1, selectedIndex: -1, workSize: { height: 480, width: 251 } },
+        image: frame,
+        score: 0,
+        source: 'whole-frame',
+      }),
+    });
+  }
+  assert.equal(last.phase, 'searching');
+  assert.equal(last.postLock?.retryScheduledAt, null);
+});
+
+await checkAsync('post-lock F: max retries become explicit insufficient, not a loop', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: buildNameIndex({ names: ['Sol Ring'], version: 1 }),
+    ocr: { recognize: async () => ({ confidence: 0.1, text: '' }) },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => true,
+  });
+  let last = await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  for (let i = 0; i < RECOGNIZE_MAX_ATTEMPTS + 2; i++) {
+    await new Promise(r => setTimeout(r, RECOGNIZE_RETRY_MS + 15));
+    last = await runFrames(ctrl, luma, helpers, 2);
+  }
+  assert.ok((last.recognizeInvocations ?? 0) <= RECOGNIZE_MAX_ATTEMPTS);
+  assert.ok(
+    last.phase === 'ambiguous' || last.lockGates.blocker === 'insufficient',
+    `expected terminal insufficient, got ${last.phase} ${last.lockGates.blocker}`,
+  );
+  assert.notEqual(last.phase, 'focusing');
+});
+
+await checkAsync('post-lock G: hi-res request without success is capture-failed', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: { recognize: async () => ({ confidence: 0.9, text: 'Sol Ring' }) },
+  });
+  const last = await runFrames(
+    ctrl,
+    luma,
+    sessionHelpers(corners, {
+      allowRecognize: () => false,
+      captureReport: () => ({
+        completedAt: 1,
+        corners: null,
+        error: 'snapshot failed',
+        failure: 1,
+        startedAt: 1,
+        success: 0,
+      }),
+    }),
+    STABILITY_WINDOW + 3,
+  );
+  assert.ok(last.lockGates.highResRequests >= 1);
+  assert.equal(last.lockGates.highResSuccess, 0);
+  assert.ok(last.lockGates.highResFailure >= 1);
+  assert.ok(
+    last.lockGates.blocker === 'capture-failed' || last.lockGates.blocker === 'awaiting-retry',
+    `blocker ${last.lockGates.blocker}`,
+  );
+  assert.notEqual(last.phase, 'focusing');
+});
+
+await checkAsync('post-lock H: capture success + no recognize trips POST_LOCK_STALL', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: buildNameIndex({ names: ['Sol Ring'], version: 1 }),
+    ocr: { recognize: async () => ({ confidence: 0.95, text: 'Sol Ring' }) },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => false,
+    captureReport: () => ({
+      completedAt: 1,
+      corners,
+      error: null,
+      failure: 0,
+      startedAt: 1,
+      success: 1,
+    }),
+  });
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  assert.equal(ctrl.snapshot().recognizeInvocations ?? 0, 0);
+  await new Promise(r => setTimeout(r, POST_LOCK_STALL_MS + 40));
+  const stalled = await ctrl.onFrame(luma, helpers);
+  assert.equal(stalled.postLock?.postLockStall, true);
+  assert.ok((stalled.postLock?.watchdogActivations ?? 0) >= 1);
+  const forced = await ctrl.onFrame(luma, helpers);
+  assert.ok(
+    (forced.recognizeInvocations ?? 0) >= 1 || forced.phase === 'found' || forced.lockGates.blocker === 'awaiting-retry',
+    `watchdog should force progress, got ${forced.phase} inv=${forced.recognizeInvocations}`,
+  );
+});
+
+check('recognition B: nested artwork box is not a complete card', () => {
+  const card = cardQuad(40, 40, 200, 280);
+  const art = cardQuad(70, 100, 140, 100);
+  const pick = selectRecognitionQuad({
+    candidates: [
+      { corners: art, score: 0.91 },
+      { corners: card, score: 0.8 },
+    ],
+    frame: { width: 320, height: 400 },
+    rawQuad: card,
+    trackingQuad: art,
+  });
+  assert.equal(pick.recognitionQuadSource, 'outer-fallback');
+  assert.equal(pick.recognitionQuad?.topLeft.x, card.topLeft.x);
+  assert.equal(pick.recognitionQuadValid, true);
+  assert.ok(isPlausibleCardInSleeve(art, card).ok === false);
+});
+
+check('recognition C: plausible card inside sleeve is accepted', () => {
+  const sleeve = cardQuad(40, 40, 130, 180);
+  const card = cardQuad(50, 50, 100, 140);
+  assert.equal(isPlausibleCardInSleeve(card, sleeve).ok, true);
+  const pick = selectRecognitionQuad({
+    candidates: [
+      { corners: sleeve, score: 0.92 },
+      { corners: card, score: 0.8 },
+    ],
+    frame: { width: 320, height: 400 },
+    rawQuad: sleeve,
+    trackingQuad: card,
+  });
+  assert.equal(pick.recognitionQuadSource, 'inner-card');
+  assert.equal(pick.recognitionQuad?.topLeft.x, card.topLeft.x);
+});
+
+check('recognition D: uncertain inner + strong outer uses outer', () => {
+  const outer = cardQuad(40, 40, 200, 280);
+  const rules = cardQuad(60, 200, 160, 90);
+  const pick = selectRecognitionQuad({
+    candidates: [
+      { corners: rules, score: 0.88 },
+      { corners: outer, score: 0.84 },
+    ],
+    frame: { width: 320, height: 400 },
+    rawQuad: outer,
+    trackingQuad: rules,
+  });
+  assert.equal(pick.recognitionQuadSource, 'outer-fallback');
+  assert.equal(pick.recognitionQuad?.topLeft.y, outer.topLeft.y);
+});
+
+check('recognition F: grazing / off-frame candidate rejected for warp', () => {
+  const grazing = {
+    topLeft: { x: -40, y: 10 },
+    topRight: { x: 300, y: 12 },
+    bottomRight: { x: 280, y: 80 },
+    bottomLeft: { x: -20, y: 78 },
+  };
+  const hard = validateRecognitionQuad(grazing, { width: 251, height: 480 }, 'hard');
+  assert.equal(hard.ok, false);
+  assert.ok(hard.reasons.includes('off-frame') || hard.reasons.includes('implausible-aspect'));
+  const pick = selectRecognitionQuad({
+    frame: { width: 251, height: 480 },
+    trackingQuad: grazing,
+  });
+  assert.equal(pick.recognitionQuadValid, false);
+  assert.equal(pick.recognitionQuad, null);
+});
+
+check('recognition G: complete-card warp keeps the title band', () => {
+  const src = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = cardQuad(40, 40, 160, 224);
+  const pick = selectRecognitionQuad({
+    frame: { width: 251, height: 480 },
+    trackingQuad: corners,
+  });
+  assert.equal(pick.recognitionQuadValid, true);
+  const warped = warpQuadToCard(src, [
+    corners.topLeft,
+    corners.topRight,
+    corners.bottomRight,
+    corners.bottomLeft,
+  ]);
+  assert.equal(warped.width, CARD_WIDTH);
+  assert.equal(warped.height, CARD_HEIGHT);
+  const titleH = Math.round(CARD_HEIGHT * 0.12);
+  let bright = 0;
+  let dark = 0;
+  for (let y = 4; y < titleH; y += 2) {
+    for (let x = 20; x < CARD_WIDTH - 20; x += 4) {
+      const v = warped.data[(y * CARD_WIDTH + x) * 4];
+      if (v > 180) bright += 1;
+      else if (v < 50) dark += 1;
+    }
+  }
+  assert.ok(bright > 20 && dark > 20, `title band should be high-contrast, bright=${bright} dark=${dark}`);
+});
+
+check('continuity E: keep-hold updates corners without switching track', () => {
+  const a = cardQuad(50, 50, 100, 140);
+  const b = cardQuad(80, 80, 100, 140);
+  let last = stepContinuity(emptyContinuity(), { rawCorners: a, rawScore: 0.88 });
+  const id = last.track.id;
+  last = stepContinuity(last.state, { rawCorners: b, rawScore: 0.89 });
+  assert.equal(last.track.id, id);
+  assert.equal(last.switched, false);
+  assert.ok(last.trackedCorners.topLeft.x > a.topLeft.x, 'corners must move');
+  assert.ok(last.trackUpdateReason.includes('geometry update') || last.metrics.iou >= 0.35);
+});
+
+check('continuity: false-inner hold adopts larger raw (green follows blue)', () => {
+  // Title-band / glare island (wide short) inside a full-card raw — must adopt.
+  const band = cardQuad(60, 120, 140, 28); // aspect ≫ card
+  const outer = cardQuad(50, 50, 160, 220);
+  let last = stepContinuity(emptyContinuity(), { rawCorners: band, rawScore: 0.9 });
+  const id = last.track.id;
+  last = stepContinuity(last.state, { rawCorners: outer, rawScore: 0.92 });
+  assert.equal(last.track.id, id);
+  assert.ok(
+    last.trackUpdateReason.includes('false inner') || last.trackUpdateReason.includes('geometry update'),
+    last.trackUpdateReason,
+  );
+  const trackedW =
+    Math.max(last.trackedCorners.topRight.x, last.trackedCorners.bottomRight.x) -
+    Math.min(last.trackedCorners.topLeft.x, last.trackedCorners.bottomLeft.x);
+  assert.ok(trackedW > 100, `tracked should grow toward raw, got width ${trackedW}`);
+});
+
+check('continuity: sleeved card does not adopt larger outer sleeve', () => {
+  // Established inner card + outer sleeve flicker must KEEP the card.
+  const inner = cardQuad(50, 50, 100, 140);
+  const outer = cardQuad(40, 40, 130, 180);
+  let last = stepContinuity(emptyContinuity(), { rawCorners: inner, rawScore: 0.92 });
+  for (let i = 0; i < 6; i++) {
+    last = stepContinuity(last.state, {
+      candidates: [
+        { corners: inner, score: 0.9 },
+        { corners: outer, score: 0.93 },
+      ],
+      rawCorners: outer,
+      rawScore: 0.93,
+    });
+  }
+  assert.equal(last.track.role, 'card-inner');
+  assert.ok(
+    !String(last.trackUpdateReason).includes('false inner'),
+    `must not adopt sleeve: ${last.trackUpdateReason}`,
+  );
+  const trackedW =
+    Math.max(last.trackedCorners.topRight.x, last.trackedCorners.bottomRight.x) -
+    Math.min(last.trackedCorners.topLeft.x, last.trackedCorners.bottomLeft.x);
+  assert.ok(trackedW < 120, `track should stay near inner width, got ${trackedW}`);
+});
+
+await checkAsync('recognition A: geometry-improved leak stays at 3 attempts', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const base = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: buildNameIndex({ names: ['Sol Ring'], version: 1 }),
+    ocr: { recognize: async () => ({ confidence: 0.1, text: '' }) },
+  });
+  let shift = 0;
+  const helpersFor = () => {
+    const corners = {
+      topLeft: { x: base.topLeft.x + shift, y: base.topLeft.y + shift },
+      topRight: { x: base.topRight.x + shift, y: base.topRight.y + shift },
+      bottomRight: { x: base.bottomRight.x + shift, y: base.bottomRight.y + shift },
+      bottomLeft: { x: base.bottomLeft.x + shift, y: base.bottomLeft.y + shift },
+    };
+    return sessionHelpers(corners, { allowRecognize: () => true });
+  };
+  let last = await runFrames(ctrl, luma, helpersFor(), STABILITY_WINDOW + 2);
+  for (let i = 0; i < 12; i++) {
+    shift += 18;
+    await new Promise(r => setTimeout(r, RECOGNIZE_RETRY_MS + 15));
+    last = await runFrames(ctrl, luma, helpersFor(), 2);
+  }
+  assert.ok(
+    (last.recognizeInvocations ?? 0) <= RECOGNIZE_MAX_ATTEMPTS,
+    `leaked to ${last.recognizeInvocations}`,
+  );
+  assert.ok((last.postLock?.recognizeAttemptsForTrack ?? 0) <= RECOGNIZE_MAX_ATTEMPTS);
+  assert.ok((last.postLock?.retryBudgetRemaining ?? 0) >= 0);
+});
+
+await checkAsync('recognition H: watchdog recovery respects attempt cap', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: buildNameIndex({ names: ['Sol Ring'], version: 1 }),
+    ocr: { recognize: async () => ({ confidence: 0.1, text: '' }) },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => true,
+    captureReport: () => ({
+      completedAt: 1,
+      corners,
+      error: null,
+      failure: 0,
+      startedAt: 1,
+      success: 1,
+    }),
+  });
+  let last = await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  for (let i = 0; i < RECOGNIZE_MAX_ATTEMPTS + 4; i++) {
+    await new Promise(r => setTimeout(r, POST_LOCK_STALL_MS + 20));
+    last = await runFrames(ctrl, luma, helpers, 2);
+  }
+  assert.ok((last.recognizeInvocations ?? 0) <= RECOGNIZE_MAX_ATTEMPTS, `watchdog leaked ${last.recognizeInvocations}`);
+  assert.ok((last.postLock?.recognizeAttemptsForTrack ?? 0) <= RECOGNIZE_MAX_ATTEMPTS);
+});
+
+check('OCR A: RGBA byte length is width * height * 4', () => {
+  const image = blankImage(12, 9);
+  assert.equal(expectedRgbaByteLength(12, 9), 12 * 9 * 4);
+  const ok = validateRgbaScanImage(image);
+  assert.equal(ok.ok, true);
+  assert.equal(ok.ocrInputInvalid, false);
+  assert.equal(ok.actualByteLength, ok.expectedByteLength);
+  const broken = { data: new Uint8ClampedArray(10), height: 9, width: 12 };
+  const bad = validateRgbaScanImage(broken);
+  assert.equal(bad.ok, false);
+  assert.equal(bad.ocrInputInvalid, true);
+  assert.equal(bad.actualByteLength, 10);
+  assert.equal(bad.expectedByteLength, 12 * 9 * 4);
+});
+
+check('OCR B: portable path is packed RGBA matching native', () => {
+  assert.equal(INPUT_CHANNEL_ORDER, 'RGBA');
+  assert.equal(NATIVE_EXPECTED_CHANNEL_ORDER, 'RGBA');
+  const image = blankImage(3, 2);
+  image.data[0] = 250;
+  image.data[1] = 10;
+  image.data[2] = 20;
+  image.data[3] = 255;
+  const bytes = packedRgbaBytes(image);
+  assert.equal(bytes.length, 3 * 2 * 4);
+  assert.equal(bytes[0], 250);
+  assert.equal(bytes[1], 10);
+  assert.equal(bytes[2], 20);
+  assert.equal(bytes[3], 255);
+  const crop = cropImage(image, { x: 0, y: 0, w: 1, h: 1 });
+  assert.equal(crop.data[0], 250);
+  assert.equal(crop.data[1], 10);
+  assert.equal(crop.data[2], 20);
+  assert.equal(crop.data[3], 255);
+});
+
+check('OCR C: title crop on 744×1039 is a readable band, not tiny', () => {
+  const card = blankImage(CARD_WIDTH, CARD_HEIGHT);
+  const rect = titleCropRect(card);
+  assert.equal(card.width, 744);
+  assert.equal(card.height, 1039);
+  assert.ok(rect.w >= 200, `title width ${rect.w}`);
+  assert.ok(rect.h >= 40, `title height ${rect.h}`);
+  assert.ok(rect.h < 160, `title height unexpectedly large ${rect.h}`);
+  assert.equal(rect.x, Math.round(NAME_REGION.x * CARD_WIDTH));
+  assert.equal(rect.y, Math.round(NAME_REGION.y * CARD_HEIGHT));
+  const { image } = extractTitleCrop(card);
+  assert.equal(image.width, rect.w);
+  assert.equal(image.height, rect.h);
+});
+
+check('OCR D: enhanceForOcrFast keeps a usable raster', () => {
+  const raw = blankImage(120, 48);
+  for (let y = 12; y < 36; y++) {
+    for (let x = 8; x < 112; x++) {
+      const i = (y * 120 + x) * 4;
+      const ink = x % 7 < 3 ? 20 : 230;
+      raw.data[i] = raw.data[i + 1] = raw.data[i + 2] = ink;
+    }
+  }
+  const out = enhanceForOcrFast(raw);
+  assert.ok(out.width >= 8 && out.height >= 8, `${out.width}x${out.height}`);
+  assert.equal(validateRgbaScanImage(out).ok, true);
+  let min = 255;
+  let max = 0;
+  for (let i = 0; i < out.data.length; i += 4) {
+    min = Math.min(min, out.data[i]);
+    max = Math.max(max, out.data[i]);
+  }
+  assert.ok(max - min > 40, `enhance flattened contrast to ${min}..${max}`);
+});
+
+await checkAsync('OCR E: synthetic title crop reaches mocked recognizer intact', async () => {
+  const card = blankImage(CARD_WIDTH, CARD_HEIGHT);
+  const { raw, enhanced, rect } = captureTitleOcrBuffers(card);
+  assert.ok(rect.w > 0 && rect.h > 0);
+  let seen = null;
+  const ocr = {
+    recognize: async image => {
+      seen = packedRgbaBytes(image);
+      return { confidence: 0.9, text: 'Wand of Wonder' };
+    },
+  };
+  const reading = await readTitle(card, ocr, { fastPreprocess: true, stopAfterFirstTitle: true });
+  assert.equal(reading.readings[0]?.text, 'Wand of Wonder');
+  assert.ok(seen);
+  const expected = packedRgbaBytes(enhanced);
+  assert.equal(seen.length, expected.length);
+  assert.equal(seen[0], expected[0]);
+  assert.equal(seen[seen.length - 1], expected[expected.length - 1]);
+  assert.equal(raw.width, rect.w);
+});
+
+check('OCR F: native empty success is distinct from native error', () => {
+  assert.equal(classifyOcrOutcome({ confidence: 0, text: '', words: [] }), 'empty-success');
+  assert.equal(
+    classifyOcrOutcome({
+      confidence: 0,
+      nativeError: { code: 'OCR_FAILED', message: 'boom' },
+      text: '',
+      words: [],
+    }),
+    'native-error',
+  );
+  assert.equal(
+    classifyOcrOutcome({
+      confidence: 0,
+      ocrInputInvalid: true,
+      text: '',
+      words: [],
+    }),
+    'input-invalid',
+  );
+  assert.equal(classifyOcrOutcome({ confidence: 0.8, text: 'Sol Ring', words: [] }), 'text');
+});
+
+check('OCR G: identical hashes skip further OCR attempts', () => {
+  assert.equal(
+    shouldSkipDuplicateOcr({
+      currentRecognitionHash: 'a',
+      currentTitleCropHash: 'b',
+      previousRecognitionHash: 'a',
+      previousStatus: 'ocr-empty',
+      previousTitleCropHash: 'b',
+    }),
+    true,
+  );
+  assert.equal(
+    shouldSkipDuplicateOcr({
+      currentRecognitionHash: 'a',
+      currentTitleCropHash: 'b',
+      previousRecognitionHash: 'a',
+      previousStatus: 'ocr-empty',
+      previousTitleCropHash: 'c',
+    }),
+    false,
+  );
+  assert.equal(ocrInputHashFor('a', 'b'), 'a|b');
+});
+
+await checkAsync('OCR G: identical empty input does not burn 3 recognizes', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const sameCard = blankImage(CARD_WIDTH, CARD_HEIGHT);
+  let recognizeCalls = 0;
+  const ctrl = createSessionController({
+    nameIndex: buildNameIndex({ names: ['Sol Ring'], version: 1 }),
+    ocr: {
+      recognize: async () => {
+        recognizeCalls += 1;
+        return { confidence: 0.1, text: '' };
+      },
+    },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => true,
+    refineCard: () => ({
+      corners,
+      detected: true,
+      image: sameCard,
+      score: 0.95,
+      source: 'detected',
+    }),
+  });
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  await ctrl.forceRecognize(helpers);
+  const afterFirst = recognizeCalls;
+  assert.ok(afterFirst >= 1, 'first recognize must run');
+  await ctrl.forceRecognize(helpers);
+  assert.equal(recognizeCalls, afterFirst, `duplicate input burned extra OCR (${recognizeCalls} vs ${afterFirst})`);
+  const last = ctrl.snapshot();
+  assert.equal(last.postLock?.duplicateInputSuppressed, true);
+  assert.equal(last.postLock?.sameInputAsPreviousAttempt, true);
+});
+
+await checkAsync('OCR debug matrix runs once and records four paths', async () => {
+  resetOcrDebugMatrixForTests();
+  assert.equal(consumeOcrDebugMatrixSlot(), true);
+  assert.equal(consumeOcrDebugMatrixSlot(), false);
+  resetOcrDebugMatrixForTests();
+  let calls = 0;
+  const recognize = {
+    recognize: async () => {
+      calls += 1;
+      return { confidence: 0, text: '' };
+    },
+  };
+  const card = blankImage(CARD_WIDTH, CARD_HEIGHT);
+  const { raw, enhanced } = captureTitleOcrBuffers(card);
+  const matrix = await runOcrDebugMatrix({
+    card,
+    enhancedTitle: enhanced,
+    legacyRecognize: recognize,
+    rawTitle: raw,
+    recognize,
+  });
+  assert.equal(calls, 4);
+  assert.equal(matrix.rawTitleBytes.kind, 'empty-success');
+  assert.equal(matrix.rawTitleBytes.invoked, true);
+  assert.equal(matrix.enhancedTitleBytes.kind, 'empty-success');
+  assert.equal(matrix.fullCardBytes.kind, 'empty-success');
+  assert.equal(matrix.legacyTitle.kind, 'empty-success');
+});
+
+check('OCR H: inbox bundle lists unsuffixed recognition/title PNGs', () => {
+  for (const name of [
+    'recognition-card.png',
+    'title-crop-raw.png',
+    'title-crop-ocr.png',
+    'ocr-debug.json',
+    'post-lock.json',
+  ]) {
+    assert.ok(OCR_DEBUG_INBOX_FILES.includes(name), name);
+  }
+});
+
+await checkAsync('OCR flood A: 20 duplicate skips persist one bundle', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const sameCard = blankImage(CARD_WIDTH, CARD_HEIGHT);
+  let recognizeCalls = 0;
+  let persistCalls = 0;
+  const ctrl = createSessionController({
+    nameIndex: buildNameIndex({ names: ['Sol Ring'], version: 1 }),
+    ocr: {
+      recognize: async () => {
+        recognizeCalls += 1;
+        return { confidence: 0.1, text: '' };
+      },
+    },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => true,
+    refineCard: () => ({
+      corners,
+      detected: true,
+      image: sameCard,
+      score: 0.95,
+      source: 'detected',
+    }),
+    onRecognitionAttempt: () => {
+      persistCalls += 1;
+    },
+  });
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  await ctrl.forceRecognize(helpers);
+  const afterFirst = recognizeCalls;
+  const persistAfterFirst = persistCalls;
+  const skipsBefore = ctrl.snapshot().postLock?.duplicateOcrSkips ?? 0;
+  assert.ok(afterFirst >= 1, 'first recognize must run');
+  assert.ok(persistAfterFirst >= 1, `unique persist must run, got ${persistAfterFirst}`);
+  for (let i = 0; i < 20; i += 1) await ctrl.forceRecognize(helpers);
+  assert.equal(recognizeCalls, afterFirst, 'duplicate skips must not invoke OCR');
+  assert.equal(persistCalls, persistAfterFirst, 'duplicate skips must not persist another bundle');
+  const last = ctrl.snapshot();
+  assert.equal(last.postLock?.duplicateOcrSkips, skipsBefore + 20);
+  assert.equal(last.postLock?.duplicateUploadsSuppressed, skipsBefore + 20);
+});
+
+check('OCR flood B: overlapping geometry traces stay exclusive', () => {
+  finishGeometryTrace();
+  assert.equal(startGeometryTrace({ phase: 'searching' }), true);
+  assert.equal(isGeometryTraceActive(), true);
+  assert.equal(startGeometryTrace({ phase: 'locking' }), false);
+  assert.equal(startGeometryTrace({ phase: 'recognizing' }), false);
+  finishGeometryTrace();
+  assert.equal(isGeometryTraceActive(), false);
+  assert.equal(startGeometryTrace({ phase: 'searching' }), true);
+  finishGeometryTrace();
+});
+
+check('OCR flood C: first attempt dir is immutable', () => {
+  assert.equal(attemptDebugDirName(7), 'attempt-7');
+  assert.deepEqual(
+    shouldPersistOcrDebugBundle({
+      attemptId: '1',
+      sameInputAsPreviousAttempt: false,
+    }),
+    { persist: true, upload: true, reason: 'unique-attempt' },
+  );
+  assert.deepEqual(
+    shouldPersistOcrDebugBundle({
+      attemptId: '1',
+      sameInputAsPreviousAttempt: true,
+    }),
+    { persist: false, upload: false, reason: 'duplicate-input' },
+  );
+  assert.deepEqual(
+    shouldPersistOcrDebugBundle({
+      alreadyWrittenAttemptId: '1',
+      attemptId: '1',
+      sameInputAsPreviousAttempt: false,
+    }),
+    { persist: false, upload: false, reason: 'already-written' },
+  );
+});
+
+await checkAsync('OCR flood D: missing adapter is ocr-unavailable not empty', async () => {
+  const card = blankImage(CARD_WIDTH, CARD_HEIGHT);
+  const names = buildNameIndex({ names: ['Sol Ring'], version: 1 });
+  const { result } = await recognizeCard(card, { nameIndex: names, ocr: null }, {});
+  assert.equal(result.ocrDebug?.ocrSkippedReason, 'no-ocr');
+  assert.equal(result.ocrDebug?.native.invoked, false);
+  assert.equal(
+    attemptStatusFromOcr({
+      fusedStatus: result.fused.status,
+      ocrSkippedReason: result.ocrDebug?.ocrSkippedReason,
+      titleRawText: result.readings?.[0]?.text ?? '',
+    }),
+    'ocr-unavailable',
+  );
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController({ nameIndex: names, ocr: null });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => true,
+    refineCard: () => ({
+      corners,
+      detected: true,
+      image: card,
+      score: 0.95,
+      source: 'detected',
+    }),
+  });
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  await ctrl.forceRecognize(helpers);
+  assert.equal(ctrl.snapshot().postLock?.recognitionStatus, 'ocr-unavailable');
+});
+
+await checkAsync('OCR flood E: live OCR dep is resolved at recognize time', async () => {
+  const card = blankImage(CARD_WIDTH, CARD_HEIGHT);
+  const names = buildNameIndex({ names: ['Sol Ring'], version: 1 });
+  const deps = { nameIndex: names, ocr: null };
+  const first = await recognizeCard(card, deps, {});
+  assert.equal(first.result.ocrDebug?.ocrSkippedReason, 'no-ocr');
+  assert.equal(first.result.ocrDebug?.native.invoked, false);
+  let calls = 0;
+  deps.ocr = {
+    recognize: async () => {
+      calls += 1;
+      return { confidence: 0.95, text: 'Sol Ring' };
+    },
+  };
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const ctrl = createSessionController(deps);
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => true,
+    refineCard: () => ({
+      corners,
+      detected: true,
+      image: card,
+      score: 0.95,
+      source: 'detected',
+    }),
+  });
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  const second = await recognizeCard(card, deps, {});
+  assert.ok(calls >= 1, 'recognizer attached after controller/deps creation must run');
+  assert.equal(second.result.ocrDebug?.native.invoked, true);
+  assert.equal(second.result.ocrDebug?.ocrSkippedReason, null);
+});
+
+await checkAsync('OCR flood F: warmup is not required to invoke OCR', async () => {
+  const card = blankImage(CARD_WIDTH, CARD_HEIGHT);
+  const names = buildNameIndex({ names: ['Sol Ring'], version: 1 });
+  let calls = 0;
+  const { result } = await recognizeCard(
+    card,
+    {
+      nameIndex: names,
+      ocr: {
+        recognize: async () => {
+          calls += 1;
+          return { confidence: 0.95, text: 'Sol Ring' };
+        },
+      },
+    },
+    {},
+  );
+  assert.ok(calls >= 1);
+  assert.equal(result.ocrDebug?.native.invoked, true);
+});
+
+await checkAsync('OCR flood G: one-shot matrix runs once per unique debug attempt', async () => {
+  resetOcrDebugMatrixForTests();
+  const card = blankImage(CARD_WIDTH, CARD_HEIGHT);
+  const names = buildNameIndex({ names: ['Sol Ring'], version: 1 });
+  let calls = 0;
+  const ocr = {
+    recognize: async () => {
+      calls += 1;
+      return { confidence: 0, text: '' };
+    },
+  };
+  const first = await recognizeCard(card, { nameIndex: names, ocr }, { runOcrDebugMatrix: true });
+  const afterFirst = calls;
+  assert.ok(first.result.ocrDebug?.matrix, 'first unique debug attempt must include matrix');
+  assert.equal(first.result.ocrDebug.matrix.rawTitleBytes.invoked, true);
+  assert.ok(afterFirst >= 4, `matrix must invoke OCR, got ${afterFirst}`);
+  const second = await recognizeCard(card, { nameIndex: names, ocr }, { runOcrDebugMatrix: true });
+  assert.equal(second.result.ocrDebug?.matrix ?? null, null);
+  assert.ok(
+    calls - afterFirst < afterFirst,
+    `later attempt re-ran matrix (${calls - afterFirst} extra vs first ${afterFirst})`,
+  );
+});
+
+check('LAB: known-good commit is documented', () => {
+  assert.equal(KNOWN_GOOD_RECOGNITION_COMMIT, '1dd4932');
+  assert.match(PROVEN_RECOGNITION_BASELINE, /wand-of-wonder-20260908T073958/);
+});
+
+check('CAPTURE QUALITY: density + first-pass + mapping + metrics', () => {
+  const quad = {
+    topLeft: { x: 10, y: 20 },
+    topRight: { x: 110, y: 20 },
+    bottomRight: { x: 110, y: 160 },
+    bottomLeft: { x: 10, y: 160 },
+  };
+  const dens = cardDensity({ height: 200, width: 160 }, quad, { height: 1039, width: 744 });
+  assert.equal(dens.cardBoundingWidthPx, 100);
+  assert.equal(dens.cardBoundingHeightPx, 140);
+  assert.ok(Math.abs(dens.warpUpscaleX - 7.44) < 1e-9);
+  assert.equal(firstPassExactFromVariants([{ topScore: 0.909 }], TITLE_ONLY_MIN), false);
+  assert.equal(firstPassExactFromVariants([{ topScore: 0.94 }], TITLE_ONLY_MIN), true);
+  const dest = { height: 1920, width: 1006 };
+  const mapped = mapCornersToHiRes(quad, {
+    dest,
+    detector: { height: 200, width: 160 },
+    kind: 'same-fov',
+  });
+  assert.ok(Math.abs(mapped.topRight.x - (110 / 160) * 1006) < 1e-6);
+  const photo = mapCornersToHiRes(quad, {
+    dest: { height: 1440, width: 1920 },
+    destMirrored: true,
+    detector: { height: 200, width: 160 },
+    kind: 'oriented-full',
+    oriented: { height: 1440, width: 1920 },
+    visible: { height: 1440, width: 1920, x: 0, y: 0 },
+  });
+  assert.ok(photo.topLeft.x > photo.topRight.x, 'mirrored photo flips X');
+  const flat = blankImage(64, 64);
+  const a = sideMetrics(flat, flat);
+  const b = sideMetrics(flat, flat);
+  assert.equal(a.titleSharpness, b.titleSharpness);
+  assert.equal(a.titleContrast, localContrast(flat));
+  assert.equal(classifyMotion(3), 'stationary');
+  assert.equal(classifyMotion(12), 'minor-motion');
+  assert.equal(classifyMotion(40), 'moving');
+});
+
+check('LAB: open reuses locked hi-res and never starts a post-tap snapshot', () => {
+  assert.equal(isTrueHiRes('snapshot'), true);
+  assert.equal(isTrueHiRes('analysis-fallback'), false);
+  const attempt = {
+    acquireMs: 1,
+    convertMs: 1,
+    mode: 'snapshot',
+    previewInterrupted: false,
+    sourceSize: { height: 1920, width: 1006 },
+    warpMs: 1,
+  };
+  assert.equal(
+    planLabAcquire({ cache: { attempt, corners: null, mapped: null, prepared: null, source: null }, inFlight: false }),
+    'reuse-cache',
+  );
+  assert.equal(planLabAcquire({ cache: null, inFlight: true }), 'wait-inflight');
+  assert.equal(planLabAcquire({ cache: null, inFlight: false }), 'no-capture');
+  assert.equal(
+    planLabAcquire({
+      cache: { attempt: { ...attempt, mode: 'analysis-fallback' }, corners: null, mapped: null, prepared: null, source: null },
+      inFlight: false,
+    }),
+    'no-capture',
+  );
+});
+
+check('LAB: baseline and current pick different quads when both exist', () => {
+  const tracked = {
+    topLeft: { x: 10, y: 10 },
+    topRight: { x: 90, y: 10 },
+    bottomRight: { x: 90, y: 140 },
+    bottomLeft: { x: 10, y: 140 },
+  };
+  const recognition = {
+    topLeft: { x: 20, y: 20 },
+    topRight: { x: 80, y: 20 },
+    bottomRight: { x: 80, y: 130 },
+    bottomLeft: { x: 20, y: 130 },
+  };
+  const quads = { raw: tracked, recognition, tracked };
+  assert.deepEqual(pickLabWarpQuad('baseline', quads), tracked);
+  assert.deepEqual(pickLabWarpQuad('current', quads), recognition);
+});
+
+await checkAsync('LAB: A/B uses the same source and bypasses the session', async () => {
+  const source = blankImage(200, 280);
+  const quad = {
+    topLeft: { x: 10, y: 10 },
+    topRight: { x: 190, y: 10 },
+    bottomRight: { x: 190, y: 270 },
+    bottomLeft: { x: 10, y: 270 },
+  };
+  const quads = { raw: quad, recognition: quad, tracked: quad };
+  const names = buildNameIndex({ names: ['Wand of Wonder'], version: 1 });
+  let calls = 0;
+  const ocr = {
+    recognize: async () => {
+      calls += 1;
+      return { confidence: 0.9, text: 'Wand of Wonder' };
+    },
+  };
+  const baseline = await runLabRecognition({
+    nameIndex: names,
+    ocr,
+    pipeline: 'baseline',
+    quads,
+    source,
+  });
+  const current = await runLabRecognition({
+    nameIndex: names,
+    ocr,
+    pipeline: 'current',
+    quads,
+    source,
+  });
+  assert.equal(baseline.ocrInvoked, true);
+  assert.equal(current.ocrInvoked, true);
+  assert.equal(baseline.matchName, 'Wand of Wonder');
+  assert.equal(current.matchName, 'Wand of Wonder');
+  assert.equal(compareLabRuns(baseline, current).sameSource, true);
+  assert.ok(calls >= 2);
+});
+
+await checkAsync('LAB: missing OCR is unavailable, not empty', async () => {
+  const source = blankImage(80, 110);
+  const quad = {
+    topLeft: { x: 2, y: 2 },
+    topRight: { x: 78, y: 2 },
+    bottomRight: { x: 78, y: 108 },
+    bottomLeft: { x: 2, y: 108 },
+  };
+  const run = await runLabRecognition({
+    nameIndex: buildNameIndex({ names: ['Sol Ring'], version: 1 }),
+    ocr: null,
+    pipeline: 'current',
+    quads: { raw: quad, recognition: quad, tracked: quad },
+    source,
+  });
+  assert.equal(run.error, 'ocr-unavailable');
+  assert.equal(run.ocrInvoked, false);
+  assert.equal(run.ocrText, '');
+});
+
+const wandQuad = {
+  topLeft: { x: 20, y: 20 },
+  topRight: { x: 180, y: 20 },
+  bottomRight: { x: 180, y: 260 },
+  bottomLeft: { x: 20, y: 260 },
+};
+
+await checkAsync('CANONICAL A: Lab Current and recognizeCapturedCard share hashes+result', async () => {
+  const source = blankImage(200, 280);
+  const quads = { raw: wandQuad, recognition: wandQuad, tracked: wandQuad };
+  const names = buildNameIndex({ names: ['Wand of Wonder'], version: 1 });
+  const ocr = { recognize: async () => ({ confidence: 1, text: 'Wand of Wonder' }) };
+  const lab = await runLabRecognition({
+    nameIndex: names,
+    ocr,
+    pipeline: 'current',
+    quads,
+    source,
+  });
+  const captured = await recognizeCapturedCard({
+    alreadyWarped: false,
+    attemptId: 1,
+    captureAt: null,
+    nameIndex: names,
+    ocr,
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  assert.equal(lab.matchName, 'Wand of Wonder');
+  assert.equal(captured.matchName, 'Wand of Wonder');
+  assert.equal(captured.status, 'identified');
+  assert.equal(lab.hashes.sourceImageHash, captured.hashes.sourceImageHash);
+  assert.equal(lab.hashes.warpedCardHash, captured.hashes.warpedCardHash);
+  assert.equal(lab.hashes.titleCropHash, captured.hashes.titleCropHash);
+  assert.equal(lab.hashes.recognitionQuadHash, captured.hashes.recognitionQuadHash);
+});
+
+await checkAsync('CANONICAL B: live orch publishes found on identified title', async () => {
+  const source = blankImage(200, 280);
+  const names = buildNameIndex({ names: ['Wand of Wonder'], version: 1 });
+  const ocr = { recognize: async () => ({ confidence: 1, text: 'Wand of Wonder' }) };
+  const ctrl = createSessionController({ nameIndex: names, ocr });
+  const snap = await ctrl.recognizeFrozenCapture({
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  assert.equal(snap.phase, 'found');
+  assert.equal(snap.fused?.card?.name, 'Wand of Wonder');
+  assert.equal(snap.postLock?.resultAccepted, true);
+  assert.equal(snap.postLock?.recognitionReturnedStatus, 'identified');
+  assert.ok(snap.postLock?.resultPublishedAt != null);
+});
+
+await checkAsync('CANONICAL B2: frozen capture keeps hashes after failed recognition', async () => {
+  const source = blankImage(200, 280);
+  const names = buildNameIndex({ names: ['Wand of Wonder'], version: 1 });
+  const ocr = { recognize: async () => ({ confidence: 1, text: 'gate' }) };
+  const ctrl = createSessionController({ nameIndex: names, ocr });
+  const snap = await ctrl.recognizeFrozenCapture({
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  assert.notEqual(snap.phase, 'searching');
+  assert.equal(snap.postLock?.recognitionReturnedStatus, 'insufficient-confidence');
+  assert.equal(snap.postLock?.titleRawText, 'gate');
+  assert.ok(snap.postLock?.sourceImageHash);
+  assert.ok(snap.postLock?.titleCropHash);
+  assert.ok(snap.postLock?.warpedCardHash);
+  assert.ok(snap.postLock?.recognitionQuadHash);
+  assert.equal(snap.postLock?.retryScheduledAt, null);
+});
+
+await checkAsync('CANONICAL OCR: exact first pass does not retry', async () => {
+  const source = blankImage(200, 280);
+  const names = buildNameIndex({ names: ['Wand of Wonder'], version: 1 });
+  let calls = 0;
+  const ocr = {
+    recognize: async () => {
+      calls += 1;
+      return { confidence: 1, text: 'Wand of Wonder' };
+    },
+  };
+  const captured = await recognizeCapturedCard({
+    alreadyWarped: false,
+    attemptId: 1,
+    captureAt: null,
+    nameIndex: names,
+    ocr,
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  assert.equal(captured.status, 'identified');
+  assert.equal(captured.matchName, 'Wand of Wonder');
+  assert.equal(calls, 1);
+});
+
+await checkAsync('CANONICAL OCR: weak first pass retries raw crop and identifies', async () => {
+  const source = blankImage(200, 280);
+  const names = buildNameIndex({ names: ['Maddening Hex'], version: 1 });
+  let calls = 0;
+  const ocr = {
+    recognize: async () => {
+      calls += 1;
+      return {
+        confidence: 1,
+        text: calls === 1 ? 'Maddenino Hey' : 'Maddening Hex',
+      };
+    },
+  };
+  const captured = await recognizeCapturedCard({
+    alreadyWarped: false,
+    attemptId: 1,
+    captureAt: null,
+    nameIndex: names,
+    ocr,
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  assert.equal(captured.status, 'identified');
+  assert.equal(captured.matchName, 'Maddening Hex');
+  assert.equal(captured.ocrText, 'Maddening Hex');
+  assert.ok(calls >= 2);
+  assert.ok(captured.matchScore >= 0.94);
+});
+
+check('TITLE_ONLY_MIN stays 0.94', () => {
+  assert.equal(TITLE_ONLY_MIN, 0.94);
+});
+
+check('token-aware similarity rewards a distinctive long token', () => {
+  const hex = tokenWeightedSimilarity('Maddening Hesy', 'Maddening Hex');
+  const hey = tokenWeightedSimilarity('Maddenino Hey', 'Maddening Hex');
+  const gate = tokenWeightedSimilarity('gate', 'Negate');
+  assert.ok(hex >= 0.78, `Hesy token score ${hex}`);
+  assert.ok(hey >= 0.78, `Hey token score ${hey}`);
+  assert.ok(gate < 0.78, `gate token score ${gate}`);
+  assert.equal(titlePreservedEnough('Maddening Hesy', 'Maddening Hex'), true);
+  assert.equal(titlePreservedEnough('gate', 'Negate'), false);
+  assert.equal(titlePreservedEnough('ate', 'Expedite'), false);
+});
+
+check('strong-fuzzy accepts agreeing Hex variants and rejects disagreements', () => {
+  const names = buildNameIndex({
+    names: ['Maddening Hex', 'Maddening Cacophony', 'Negate', 'Expedite', 'Wand of Wonder'],
+    version: 1,
+  });
+  const hexA = {
+    margin: 0.3,
+    ocrMs: 1,
+    ocrText: 'Maddenino Hey',
+    secondName: 'Maddening Cacophony',
+    secondScore: 0.5,
+    source: 'title-fast',
+    tokenSimilarity: tokenWeightedSimilarity('Maddenino Hey', 'Maddening Hex'),
+    topName: 'Maddening Hex',
+    topScore: 0.833,
+  };
+  const hexB = {
+    margin: 0.3,
+    ocrMs: 1,
+    ocrText: 'Maddening Hesy',
+    secondName: 'Maddening Cacophony',
+    secondScore: 0.51,
+    source: 'title-raw',
+    tokenSimilarity: tokenWeightedSimilarity('Maddening Hesy', 'Maddening Hex'),
+    topName: 'Maddening Hex',
+    topScore: 0.846,
+  };
+  const ok = decideStrongFuzzyTitle([hexA, hexB]);
+  assert.equal(ok.accepted, true);
+  assert.equal(ok.name, 'Maddening Hex');
+  assert.equal(ok.consensusCount, 2);
+
+  const disagree = decideStrongFuzzyTitle([
+    hexA,
+    { ...hexB, ocrText: 'Wand of Wondr', topName: 'Wand of Wonder', topScore: 0.88, tokenSimilarity: 0.9 },
+  ]);
+  assert.equal(disagree.accepted, false);
+  assert.equal(disagree.reason, 'variants-disagree');
+
+  const single = decideStrongFuzzyTitle([hexA, { ...hexA, source: 'title-raw' }]);
+  assert.equal(single.accepted, false);
+  assert.equal(single.reason, 'single-reading');
+
+  const thin = decideStrongFuzzyTitle([
+    { ...hexA, margin: 0.04 },
+    { ...hexB, margin: 0.05 },
+  ]);
+  assert.equal(thin.accepted, false);
+  assert.equal(thin.reason, 'thin-margin');
+
+  const fragment = decideStrongFuzzyTitle([
+    {
+      margin: 0.4,
+      ocrMs: 1,
+      ocrText: 'gate',
+      secondName: 'Expedite',
+      secondScore: 0.3,
+      source: 'title-fast',
+      tokenSimilarity: tokenWeightedSimilarity('gate', 'Negate'),
+      topName: 'Negate',
+      topScore: 0.7,
+    },
+    {
+      margin: 0.4,
+      ocrMs: 1,
+      ocrText: 'gat',
+      secondName: 'Expedite',
+      secondScore: 0.3,
+      source: 'title-raw',
+      tokenSimilarity: tokenWeightedSimilarity('gat', 'Negate'),
+      topName: 'Negate',
+      topScore: 0.65,
+    },
+  ]);
+  assert.equal(fragment.accepted, false);
+  void names;
+});
+
+await checkAsync('CANONICAL OCR: Hex phone variants identify via strong-fuzzy', async () => {
+  const source = blankImage(200, 280);
+  const names = buildNameIndex({
+    names: ['Maddening Hex', 'Maddening Cacophony', 'Negate', 'Wand of Wonder'],
+    version: 1,
+  });
+  const hexOcr = () => {
+    let n = 0;
+    return {
+      recognize: async () => {
+        n += 1;
+        return { confidence: 1, text: n === 1 ? 'Maddenino Hey' : 'Maddening Hesy' };
+      },
+      get calls() {
+        return n;
+      },
+    };
+  };
+  const ocr = hexOcr();
+  const captured = await recognizeCapturedCard({
+    alreadyWarped: false,
+    attemptId: 1,
+    captureAt: null,
+    nameIndex: names,
+    ocr,
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  assert.equal(captured.status, 'identified');
+  assert.equal(captured.matchName, 'Maddening Hex');
+  assert.equal(captured.titleDecode.decision, 'strong-fuzzy');
+  assert.ok(captured.titleDecode.consensusCount >= 2);
+  assert.ok(captured.matchScore < 0.94, 'must not lower the 0.94 bar to accept');
+  assert.equal(ocr.calls, 2);
+  assert.equal(TITLE_ONLY_MIN, 0.94);
+  console.log(`\n${formatTitleDecodeReport(captured.titleDecode)}\n`);
+  const ctrl = createSessionController({ nameIndex: names, ocr: hexOcr() });
+  const snap = await ctrl.recognizeFrozenCapture({
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  assert.equal(snap.phase, 'found');
+  assert.equal(snap.fused?.card?.name, 'Maddening Hex');
+  assert.equal(snap.postLock?.variantConsensusCount, 2);
+});
+
+await checkAsync('CANONICAL OCR: generic fragments stay ambiguous', async () => {
+  const source = blankImage(200, 280);
+  const names = buildNameIndex({ names: ['Negate', 'Expedite', 'Gatekeeper'], version: 1 });
+  let calls = 0;
+  const ocr = {
+    recognize: async () => {
+      calls += 1;
+      return { confidence: 1, text: calls === 1 ? 'gate' : 'ate' };
+    },
+  };
+  const captured = await recognizeCapturedCard({
+    alreadyWarped: false,
+    attemptId: 1,
+    captureAt: null,
+    nameIndex: names,
+    ocr,
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  assert.notEqual(captured.status, 'identified');
+  assert.equal(captured.titleDecode.decision, 'ambiguous');
+  assert.ok(calls >= 2);
+});
+
+await checkAsync('CANONICAL C: strong title is not overwritten by later recognize', async () => {
+  const source = blankImage(200, 280);
+  const names = buildNameIndex({ names: ['Wand of Wonder', 'Chaos Dragon'], version: 1 });
+  let calls = 0;
+  const ocr = {
+    recognize: async () => {
+      calls += 1;
+      return { confidence: 1, text: calls === 1 ? 'Wand of Wonder' : 'Chaos Dragon' };
+    },
+  };
+  const ctrl = createSessionController({
+    artwork: {
+      findCandidates: () => [
+        { name: 'Chaos Dragon', oracleId: 'oracle:chaos', visualScore: 0.99 },
+      ],
+    },
+    nameIndex: names,
+    ocr,
+  });
+  const first = await ctrl.recognizeFrozenCapture({
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  assert.equal(first.phase, 'found');
+  assert.equal(first.fused?.card?.name, 'Wand of Wonder');
+  const second = await ctrl.recognizeFrozenCapture({
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  assert.equal(second.fused?.card?.name, 'Wand of Wonder');
+  assert.equal(second.recognizeInvocations, 1);
+});
+
+check('CANONICAL D: watchdog while recognition active is a no-op', () => {
+  assert.equal(
+    postLockStallActive({
+      hasResult: false,
+      highResRequests: 1,
+      lastProgressAt: 0,
+      now: POST_LOCK_STALL_MS + 50_000,
+      recognizing: true,
+      resultApplicationPending: false,
+      retryScheduled: false,
+    }),
+    false,
+  );
+  assert.equal(
+    postLockStallActive({
+      hasResult: false,
+      highResRequests: 1,
+      lastProgressAt: 0,
+      now: POST_LOCK_STALL_MS + 50_000,
+      recognizing: false,
+      resultApplicationPending: true,
+      retryScheduled: false,
+    }),
+    false,
+  );
+});
+
+check('CANONICAL E: track change rejects with stale-track', () => {
+  const rejected = acceptCapturedResult({
+    activeTrackId: 2,
+    result: {
+      alreadyWarped: false,
+      attemptId: 1,
+      crop: { height: 0, width: 0, x: 0, y: 0 },
+      error: null,
+      hashes: {
+        recognitionQuadHash: 'q',
+        sourceImageHash: 's',
+        titleCropHash: 't',
+        warpedCardHash: 'w',
+      },
+      matchName: 'Wand of Wonder',
+      matchScore: 1,
+      ocrInvoked: true,
+      ocrText: 'Wand of Wonder',
+      ocrTransport: 'rgba-bytes',
+      oracleId: null,
+      status: 'identified',
+      timings: { cropMs: 0, lookupMs: 0, ocrMs: 0, preprocessMs: 0, totalMs: 0, warpMs: 0 },
+      titleCandidates: [],
+      titleRaw: null,
+      trackId: 1,
+      warp: null,
+      warpQuad: null,
+    },
+  });
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.reason, 'stale-track');
+});
+
+check('CANONICAL F: same track accepts', () => {
+  const ok = acceptCapturedResult({
+    activeTrackId: 1,
+    result: {
+      alreadyWarped: false,
+      attemptId: 1,
+      crop: { height: 0, width: 0, x: 0, y: 0 },
+      error: null,
+      hashes: {
+        recognitionQuadHash: 'q',
+        sourceImageHash: 's',
+        titleCropHash: 't',
+        warpedCardHash: 'w',
+      },
+      matchName: 'Wand of Wonder',
+      matchScore: 1,
+      ocrInvoked: true,
+      ocrText: 'Wand of Wonder',
+      ocrTransport: 'rgba-bytes',
+      oracleId: null,
+      status: 'identified',
+      timings: { cropMs: 0, lookupMs: 0, ocrMs: 0, preprocessMs: 0, totalMs: 0, warpMs: 0 },
+      titleCandidates: [],
+      titleRaw: null,
+      trackId: 1,
+      warp: null,
+      warpQuad: null,
+    },
+  });
+  assert.equal(ok.accepted, true);
+});
+
+await checkAsync('CANONICAL E2: controller rejects stale track after resolve', async () => {
+  const source = blankImage(200, 280);
+  const names = buildNameIndex({ names: ['Wand of Wonder'], version: 1 });
+  let release;
+  const gate = new Promise(resolve => {
+    release = resolve;
+  });
+  const ocr = {
+    recognize: async () => {
+      await gate;
+      return { confidence: 1, text: 'Wand of Wonder' };
+    },
+  };
+  const ctrl = createSessionController({ nameIndex: names, ocr });
+  const pending = ctrl.recognizeFrozenCapture({
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  ctrl.setActiveTrackId(2);
+  release();
+  const snap = await pending;
+  assert.equal(snap.postLock?.resultAccepted, false);
+  assert.equal(snap.postLock?.resultRejectReason, 'stale-track');
+  assert.notEqual(snap.phase, 'found');
+});
+
+await checkAsync('CANONICAL G: no concurrent second attempt', async () => {
+  const source = blankImage(200, 280);
+  const names = buildNameIndex({ names: ['Wand of Wonder'], version: 1 });
+  let release;
+  const gate = new Promise(resolve => {
+    release = resolve;
+  });
+  let calls = 0;
+  const ocr = {
+    recognize: async () => {
+      calls += 1;
+      await gate;
+      return { confidence: 1, text: 'Wand of Wonder' };
+    },
+  };
+  const ctrl = createSessionController({ nameIndex: names, ocr });
+  const first = ctrl.recognizeFrozenCapture({
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  const second = ctrl.recognizeFrozenCapture({
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 1,
+  });
+  release();
+  const [a, b] = await Promise.all([first, second]);
+  assert.equal(a.recognizeInvocations, 1);
+  assert.equal(b.recognizeInvocations, 1);
+  assert.equal(calls, 1);
+  assert.equal(a.phase, 'found');
+});
+
+await checkAsync('CANONICAL H: saved live attempt replay is deterministic', async () => {
+  const source = blankImage(200, 280);
+  const names = buildNameIndex({ names: ['Wand of Wonder'], version: 1 });
+  const ocr = { recognize: async () => ({ confidence: 1, text: 'Wand of Wonder' }) };
+  const first = await recognizeCapturedCard({
+    alreadyWarped: false,
+    attemptId: 7,
+    captureAt: 10,
+    nameIndex: names,
+    ocr,
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 3,
+  });
+  const replay = await recognizeCapturedCard({
+    alreadyWarped: false,
+    attemptId: 7,
+    captureAt: 10,
+    nameIndex: names,
+    ocr,
+    recognitionQuad: wandQuad,
+    source,
+    trackId: 3,
+  });
+  assert.equal(first.status, replay.status);
+  assert.equal(first.matchName, replay.matchName);
+  assert.equal(first.ocrText, replay.ocrText);
+  assert.equal(first.hashes.sourceImageHash, replay.hashes.sourceImageHash);
+  assert.equal(first.hashes.warpedCardHash, replay.hashes.warpedCardHash);
+  assert.equal(first.hashes.titleCropHash, replay.hashes.titleCropHash);
+  assert.equal(hashRecognitionQuad(wandQuad), first.hashes.recognitionQuadHash);
+});
+
+await checkAsync('CANONICAL: Wand fixture Lab Current + live orch (if present)', async () => {
+  const fixtureDir = join(
+    root,
+    '.scan-inbox/sessions/phone-20260908/wand-of-wonder-20260908T073958',
+  );
+  const pngPath = join(fixtureDir, 'source-highres.png');
+  const fixtureJson = join(fixtureDir, 'fixture.json');
+  const quadJson = join(fixtureDir, 'recognition-quad.json');
+  if (!existsSync(pngPath) || !existsSync(fixtureJson)) {
+    console.log('  skip CANONICAL Wand fixture (not on disk)');
+    return;
+  }
+  const png = new Uint8Array(await readFile(pngPath));
+  const source = pngBytesToScanImage(png);
+  const meta = JSON.parse(await readFile(fixtureJson, 'utf8'));
+  const quads = existsSync(quadJson)
+    ? JSON.parse(await readFile(quadJson, 'utf8'))
+    : meta.quads;
+  const recognition = quads.recognition ?? meta.quads?.recognition;
+  assert.ok(recognition, 'fixture must include recognition quad');
+  const names = buildNameIndex({ names: ['Wand of Wonder'], version: 1 });
+  const ocr = { recognize: async () => ({ confidence: 1, text: 'Wand of Wonder' }) };
+  const lab = await runLabRecognition({
+    nameIndex: names,
+    ocr,
+    pipeline: 'current',
+    quads: {
+      raw: quads.raw ?? recognition,
+      recognition,
+      tracked: quads.tracked ?? recognition,
+    },
+    source,
+  });
+  const ctrl = createSessionController({ nameIndex: names, ocr });
+  const live = await ctrl.recognizeFrozenCapture({
+    recognitionQuad: recognition,
+    source,
+    trackId: 1,
+  });
+  assert.equal(lab.matchName, 'Wand of Wonder');
+  assert.equal(live.fused?.card?.name, 'Wand of Wonder');
+  assert.equal(live.phase, 'found');
+  assert.equal(lab.hashes.sourceImageHash, live.postLock?.sourceImageHash);
+  assert.equal(lab.hashes.warpedCardHash, live.postLock?.warpedCardHash);
+  assert.equal(lab.hashes.titleCropHash, live.postLock?.titleCropHash);
+  assert.equal(lab.titleDecode?.decision, 'exact-title');
+  assert.equal(lab.titleDecode?.fallbackUsed, false);
+});
+
+check('HOST REPLAY: recorded Samsung OCR identifies Hex / exact Wand / rejects fragments', () => {
+  const names = buildNameIndex({
+    names: ['Maddening Hex', 'Maddening Cacophony', 'Negate', 'Wand of Wonder', 'Expedite'],
+    version: 1,
+  });
+  const hex = decodeRecordedTitleVariants(
+    [
+      { source: 'title-fast', text: 'Maddenino Hey' },
+      { source: 'title-raw', text: 'Maddening Hesy' },
+    ],
+    names,
+  );
+  assert.equal(hex.decision, 'strong-fuzzy');
+  assert.equal(hex.matchName, 'Maddening Hex');
+  assert.ok(hex.consensusCount >= 2);
+  assert.ok((hex.matchScore ?? 0) < TITLE_ONLY_MIN);
+  const wand = decodeRecordedTitleVariants([{ source: 'title-fast', text: 'Wand of Wonder' }], names);
+  assert.equal(wand.decision, 'exact-title');
+  assert.equal(wand.matchName, 'Wand of Wonder');
+  const gate = decodeRecordedTitleVariants([{ source: 'title-fast', text: 'gate' }], names);
+  assert.equal(gate.decision, 'ambiguous');
+  const french = decodeRecordedTitleVariants(
+    [{ source: 'title-fast', text: 'ère et de foyer' }],
+    names,
+  );
+  assert.equal(french.decision, 'ambiguous');
+});
+
+await checkAsync('CANONICAL: Hex fixture strong-fuzzy (if present)', async () => {
+  const fixtureDir = join(
+    root,
+    '.scan-inbox/sessions/phone-20260908/maddening-hex-alt-art-20260908T082448',
+  );
+  const pngPath = join(fixtureDir, 'source-highres.png');
+  const fixtureJson = join(fixtureDir, 'fixture.json');
+  const quadJson = join(fixtureDir, 'recognition-quad.json');
+  if (!existsSync(pngPath) || !existsSync(fixtureJson)) {
+    console.log('  skip CANONICAL Hex fixture (not on disk)');
+    return;
+  }
+  const png = new Uint8Array(await readFile(pngPath));
+  const source = pngBytesToScanImage(png);
+  const meta = JSON.parse(await readFile(fixtureJson, 'utf8'));
+  const quads = existsSync(quadJson)
+    ? JSON.parse(await readFile(quadJson, 'utf8'))
+    : meta.quads;
+  const recognition = quads.recognition ?? meta.quads?.recognition;
+  assert.ok(recognition, 'fixture must include recognition quad');
+  const names = buildNameIndex({
+    names: ['Maddening Hex', 'Maddening Cacophony', 'Negate'],
+    version: 1,
+  });
+  let n = 0;
+  const ocr = {
+    recognize: async () => {
+      n += 1;
+      return { confidence: 1, text: n === 1 ? 'Maddenino Hey' : 'Maddening Hesy' };
+    },
+  };
+  const captured = await recognizeCapturedCard({
+    alreadyWarped: false,
+    attemptId: 1,
+    captureAt: null,
+    nameIndex: names,
+    ocr,
+    recognitionQuad: recognition,
+    source,
+    trackId: 1,
+  });
+  assert.equal(captured.status, 'identified');
+  assert.equal(captured.matchName, 'Maddening Hex');
+  assert.equal(captured.titleDecode.decision, 'strong-fuzzy');
+  assert.equal(n, 2);
+});
+
 await rm(dir, { force: true, recursive: true });
 if (failed) {
   console.error(`\n${failed} scan check(s) failed`);
   process.exit(1);
 }
+check('deck benchmark: no duplicate cardSessionId in summary inputs', () => {
+  const cards = [
+    {
+      benchmarkIndex: 1,
+      cardSessionId: 10,
+      geometryTrackId: 1,
+      focusAttemptId: 1,
+      recognizeAttempts: 1,
+      terminal: 'identified',
+      status: 'found',
+      matchName: 'Negate',
+      matchScore: 1,
+      matchMethod: 'exact-title',
+      ocrTexts: ['Negate'],
+      detectorScore: 0.9,
+      recognitionSource: 'snapshot',
+      swapKind: 'automatic',
+      timings: { totalMs: 800, lockToIdentityMs: 400 },
+      files: { metadata: 'deck-001-metadata.json', cardWarp: 'deck-001-card.png' },
+      recordedAt: '2026-09-09T00:00:00.000Z',
+    },
+    {
+      benchmarkIndex: 2,
+      cardSessionId: 11,
+      geometryTrackId: 1,
+      focusAttemptId: 2,
+      recognizeAttempts: 1,
+      terminal: 'ambiguous',
+      status: 'ambiguous',
+      matchName: null,
+      matchScore: null,
+      matchMethod: 'ambiguous',
+      ocrTexts: [],
+      detectorScore: 0.8,
+      recognitionSource: 'snapshot',
+      swapKind: 'manual',
+      timings: { totalMs: 1200, lockToIdentityMs: null },
+      files: { metadata: 'deck-002-metadata.json' },
+      recordedAt: '2026-09-09T00:00:01.000Z',
+    },
+  ];
+  const sessions = new Set(cards.map(c => c.cardSessionId));
+  assert.equal(sessions.size, cards.length);
+  const summary = summarizeDeckBenchmark({
+    kind: 'deck-benchmark',
+    fixtureId: 'deck-test-demo',
+    createdAt: '2026-09-09T00:00:00.000Z',
+    completedAt: '2026-09-09T00:01:00.000Z',
+    targetCount: 2,
+    cards,
+    expectedMultiset: [{ name: 'Negate', quantity: 1 }],
+    expectedDeckId: null,
+    expectedDeckName: null,
+    phase: 'complete',
+    note: 'test',
+  });
+  assert.equal(summary.identified, 1);
+  assert.equal(summary.ambiguous, 1);
+  assert.equal(summary.session.manualSwaps, 1);
+  const recon = reconcileDeckMultiset(cards, [{ name: 'Negate', quantity: 1 }]);
+  assert.equal(recon.paired.length, 1);
+  assert.equal(recon.unresolved.length, 1);
+  assert.equal(deckCardFileStem(17), 'deck-017');
+});
+
+check('binder benchmark: frame naming + capture summary', () => {
+  assert.equal(binderFrameFile(2, 5), 'p02-f005.png');
+  const summary = summarizeBinderCapture({
+    kind: 'binder-benchmark',
+    fixtureId: 'binder-test-demo',
+    createdAt: '2026-09-09T00:00:00.000Z',
+    completedAt: null,
+    targetPages: 2,
+    layout: { rows: 3, cols: 3 },
+    captureDurationMs: 2700,
+    frameCadenceMs: 280,
+    captureSource: 'snapshot',
+    captureNote: 'test',
+    pages: [
+      {
+        pageIndex: 1,
+        layout: { rows: 3, cols: 3 },
+        frames: [{ frameIndex: 1 }, { frameIndex: 2 }],
+        startedAt: 'x',
+        endedAt: 'y',
+        captureDurationMs: 2700,
+        targetFrameCount: 10,
+      },
+    ],
+    phase: 'interrupted',
+    note: 'test',
+  });
+  assert.equal(summary.pages, 1);
+  assert.equal(summary.totalFrames, 2);
+});
+
+check('deck failure class: no geometry → NO_DETECTION', () => {
+  assert.equal(classifyDeckFailure({ gates: { geometryDetected: false } }), 'NO_DETECTION');
+});
+
+check('deck failure class: ocr unavailable beats detection', () => {
+  assert.equal(
+    classifyDeckFailure({
+      gates: { geometryDetected: true },
+      ocrAvailable: false,
+      presentedCorners: { topLeft: { x: 1, y: 1 } },
+    }),
+    'OCR_UNAVAILABLE',
+  );
+});
+
+check('deck failure class: focus timeout without hi-res', () => {
+  assert.equal(
+    classifyDeckFailure({
+      gates: { geometryDetected: true, focusTimedOut: true, highResSuccess: 0 },
+      ocrAvailable: true,
+      rawCorners: {},
+    }),
+    'FOCUS_TIMEOUT',
+  );
+});
+
 console.log('\nall scan checks passed');

@@ -33,6 +33,7 @@ import {
   type BenchmarkSession,
 } from '../scan/benchmark';
 import { useAppUpdates } from '../updates/UpdateProvider';
+import { DebugInboxPanel } from '../scan/debugInbox';
 
 function extraLugin(): { buildId?: string; buildLabel?: string; channel?: string } {
   const extra = Constants.expoConfig?.extra as
@@ -133,6 +134,24 @@ export function SettingsScreen() {
         {scanner.printingOrigin ? ` (${scanner.printingOrigin})` : ''}
       </Text>
       <Text style={styles.line}>
+        Printing status: {scanner.printingStatus}
+        {scanner.printingVersion ? ` · v${scanner.printingVersion}` : ''}
+        {scanner.printingLoadMs != null ? ` · load ${scanner.printingLoadMs}ms` : ''}
+        {scanner.printingParseMs != null ? ` · parse ${scanner.printingParseMs}ms` : ''}
+      </Text>
+      <Text style={styles.line}>
+        Type index: {scanner.typeOracles != null ? scanner.typeOracles.toLocaleString() : '—'}
+        {scanner.typeSubtypes != null ? ` · subtypes ${scanner.typeSubtypes}` : ''}
+        {scanner.typeSignatures != null ? ` · sig ${scanner.typeSignatures}` : ''}
+        {scanner.typeOrigin ? ` (${scanner.typeOrigin})` : ''}
+      </Text>
+      <Text style={styles.line}>
+        Type status: {scanner.typeStatus}
+        {scanner.typeVersion ? ` · v${scanner.typeVersion}` : ''}
+        {scanner.typeLoadMs != null ? ` · load ${scanner.typeLoadMs}ms` : ''}
+        {scanner.typeParseMs != null ? ` · parse ${scanner.typeParseMs}ms` : ''}
+      </Text>
+      <Text style={styles.line}>
         Artwork: {scanner.artEntries != null ? scanner.artEntries.toLocaleString() : '—'}
         {scanner.artOrigin ? ` (${scanner.artOrigin})` : ''}
       </Text>
@@ -156,6 +175,8 @@ export function SettingsScreen() {
 
       {benchEnabled ? (
         <>
+          <DebugInboxPanel />
+
           <Text style={styles.section}>Scanner Benchmark Session</Text>
           <Text style={styles.note}>
             Dev-only. Each recognition auto-saves JSON + full 744×1039 PNG locally. Uploads never
@@ -228,6 +249,12 @@ export function SettingsScreen() {
                           ).parseExpectedManifest(expected)
                         : null,
                       targetCount: n,
+                      environment: {
+                        artEntries: scanner.artEntries,
+                        names: scanner.names,
+                        printingEntries: scanner.printingEntries,
+                        typeOracles: scanner.typeOracles,
+                      },
                     });
                     setBenchSession(session);
                     setBenchStatus(`Started ${session.sessionId}`);

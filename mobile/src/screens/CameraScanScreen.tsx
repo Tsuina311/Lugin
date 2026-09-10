@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type GestureResponderEvent,
   type LayoutChangeEvent,
@@ -49,6 +50,7 @@ import {
   type PreparedDebugBundle,
   type DebugSharePayload,
 } from '../scan/saveDebugBundle';
+import { saveTrainingCapture, shareTrainingDetectorPng } from '../scan/saveTrainingCapture';
 import { useHiResFrameLatch } from '../scan/useHiResFrame';
 import { useScanSession } from '../scan/useScanSession';
 import {
@@ -60,13 +62,54 @@ import {
 import {
   createNativeDetectorEngine,
   createSharedJsDetectorEngine,
+  getNativeDetectorImplementationStatus,
   isNativeDetectorLinked,
+  setNativeNestedSleeveEnabled,
   type DetectorEngineId,
 } from '../scan/detectorEngine';
+import {
+  applyPerfPreset,
+  getPerfBaseline,
+  setPerfBaseline,
+} from '../scan/perfBaseline';
+import {
+  startJsLagProbe,
+  stopJsLagProbe,
+  subscribeJsLag,
+  type JsLagStats,
+} from '../scan/jsLagProbe';
+
+const PERF_BASELINE_HZ = 8;
 import {
   getNativeOcrImplementationStatus,
   isNativeOcrLinked,
 } from '../scan/mlkitTextRecognizer';
+import { getOcrAdapterSnapshot, getOrCreateOcrRecognizer, ocrUnavailableReason } from '../scan/ocrAdapter';
+import { useCardSwapTest } from '../scan/swapTest/useCardSwapTest';
+import { useDeckBenchmark } from '../scan/deckBenchmark/useDeckBenchmark';
+import { DeckBenchmarkHud } from '../scan/deckBenchmark/DeckBenchmarkHud';
+import { useBinderBenchmark } from '../scan/binderBenchmark/useBinderBenchmark';
+import { BinderBenchmarkHud } from '../scan/binderBenchmark/BinderBenchmarkHud';
+import { listDeckRuns } from '../scan/deckBenchmark/persist';
+import { listBinderRuns } from '../scan/binderBenchmark/persist';
+import { ScannerLabScreen, type LabOpenCapture } from './ScannerLabScreen';
+import { getScannerDataStatus } from '../scan/scannerDataStore';
+import {
+  finishGeometryTrace,
+  geometryTraceSampleCount,
+  isGeometryTraceActive,
+  startGeometryTrace,
+} from '../scan/geometryTrace';
+import { shareGeometryTrace, writeGeometryTraceFiles } from '../scan/saveGeometryTrace';
+import {
+  enqueueGeometryTrace,
+  enqueuePreparedReport,
+  restoreInboxQueue,
+  startDeviceReplayWorker,
+  subscribeInbox,
+} from '../scan/debugInbox';
+import type { CaptureQualityRun } from '../scan/captureQuality/runPair';
+import type { FocusSeriesRun } from '../scan/focusSeries/runSeries';
 import Constants from 'expo-constants';
 
 type FocusState = 'idle' | 'focusing' | 'done' | 'error';
@@ -104,42 +147,88 @@ export function CameraScanScreen() {
   const [lastFocusError, setLastFocusError] = useState<string | null>(null);
   const [layout, setLayout] = useState({ height: 0, width: 0 });
   const [detectorOn, setDetectorOn] = useState(true);
-  const [panel, setPanel] = useState<Panel>('scan');
+  const [panel, setPanel] = useState<Panel>('none');
+  const [labOpen, setLabOpen] = useState(false);
+  const [labOpening, setLabOpening] = useState(false);
+  const [labFrozen, setLabFrozen] = useState<LabOpenCapture | null>(null);
+  const [qualityBusy, setQualityBusy] = useState(false);
+  const [qualityDraft, setQualityDraft] = useState<CaptureQualityRun | null>(null);
+  const [qualityLabel, setQualityLabel] = useState('');
+  const [seriesBusy, setSeriesBusy] = useState(false);
+  const [seriesDraft, setSeriesDraft] = useState<FocusSeriesRun | null>(null);
+  const [seriesLabel, setSeriesLabel] = useState('');
   // Diagnostic controls: how far the transfer ladder climbs, and how big the
   // payload is. Lowering either is how a size limit is told from a hard
   // serialization failure.
   const [rungIndex, setRungIndex] = useState(RUNGS.length - 1);
   const [resolutionIndex, setResolutionIndex] = useState(0);
-  const [longEdgeIndex, setLongEdgeIndex] = useState(1);
+  const [longEdgeIndex, setLongEdgeIndex] = useState(0);
+  const [perfTick, setPerfTick] = useState(0);
+  const [jsLag, setJsLag] = useState<JsLagStats | null>(null);
   const [diagnosticRungs, setDiagnosticRungs] = useState(false);
   const [showNumbers, setShowNumbers] = useState(true);
   const [pendingAdd, setPendingAdd] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
+  const [trainBusy, setTrainBusy] = useState(false);
   const [debugViewer, setDebugViewer] = useState<PreparedDebugBundle | null>(null);
   const [detectorColorOk, setDetectorColorOk] = useState<'yes' | 'no' | 'unverified'>('unverified');
   const [recognitionColorOk, setRecognitionColorOk] = useState<'yes' | 'no' | 'unverified'>(
     'unverified',
   );
   const [sourceIndex, setSourceIndex] = useState(0);
-  const [detectorEngineId, setDetectorEngineId] = useState<DetectorEngineId>('shared-js');
+  const [detectorEngineId, setDetectorEngineId] = useState<DetectorEngineId>(() =>
+    isNativeDetectorLinked() && getNativeDetectorImplementationStatus() === 'ready'
+      ? 'native'
+      : 'shared-js',
+  );
+  const [requestedDetectorEngine] = useState<DetectorEngineId>(() =>
+    isNativeDetectorLinked() && getNativeDetectorImplementationStatus() === 'ready'
+      ? 'native'
+      : 'shared-js',
+  );
+  const [detectorFallbackReason, setDetectorFallbackReason] = useState<string | null>(null);
+  const [traceBusy, setTraceBusy] = useState(false);
+  const [traceDir, setTraceDir] = useState<string | null>(null);
+  const [traceCount, setTraceCount] = useState(0);
+  const [traceElapsedMs, setTraceElapsedMs] = useState(0);
+  const [traceUpload, setTraceUpload] = useState<'idle' | 'pending' | 'uploaded' | 'failed'>('idle');
+  const [traceId, setTraceId] = useState<string | null>(null);
+  const [showAllTools, setShowAllTools] = useState(false);
   const [benchHud, setBenchHud] = useState(() => peekBenchmarkHud());
   const preferredSource: PreferredSource = RECOGNITION_SOURCES[sourceIndex];
   const detectorEngine = useMemo(() => {
     if (detectorEngineId === 'native') {
       try {
-        return createNativeDetectorEngine();
-      } catch {
+        const eng = createNativeDetectorEngine();
+        queueMicrotask(() => setDetectorFallbackReason(null));
+        return eng;
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        queueMicrotask(() => setDetectorFallbackReason(reason));
+        console.warn(`[lugin] native detector unavailable → shared-js: ${reason}`);
         return createSharedJsDetectorEngine();
       }
     }
     return createSharedJsDetectorEngine();
   }, [detectorEngineId]);
+  const actualDetectorEngine: DetectorEngineId =
+    detectorEngineId === 'native' && detectorFallbackReason ? 'shared-js' : detectorEngineId;
   // CameraX / frame outputs stall after backgrounding if isActive stays true.
   // Tab switch remounts the screen (works); AppState pause/resume does the same
   // without leaving Scan.
   const appActive = useAppActive();
-  const scanning = detectorOn && appActive;
+  const scanning = detectorOn && appActive && !labOpen && !labOpening;
+
+  useEffect(() => {
+    if (!scanning) {
+      stopJsLagProbe();
+      setJsLag(null);
+      return;
+    }
+    startJsLagProbe();
+    return subscribeJsLag(setJsLag);
+  }, [scanning]);
 
   const photoOutput = usePhotoOutput({
     containerFormat: 'jpeg',
@@ -165,6 +254,88 @@ export function CameraScanScreen() {
     takeHiResFrame: hiResFrame.take,
   });
 
+  const swapTest = useCardSwapTest({
+    cameraRef,
+    getNameIndex: () => session.indexes.names?.index ?? null,
+    getOcr: () => getOrCreateOcrRecognizer(),
+    markDebugCardSwapped: () => session.markDebugCardSwapped(),
+    peekLive: () => session.peekSwapLive(),
+    setLabHold: session.setLabHold,
+  });
+  const swapActive =
+    swapTest.ui.phase !== 'idle' &&
+    swapTest.ui.phase !== 'config' &&
+    swapTest.ui.phase !== 'done' &&
+    swapTest.ui.phase !== 'cancelled';
+
+  const deckBench = useDeckBenchmark({
+    markDebugCardSwapped: () => session.markDebugCardSwapped(),
+    setLabHold: session.setLabHold,
+    peekLive: () => {
+      const live = session.peekSwapLive();
+      const snap = session.snapshot;
+      const readings = snap?.recognition?.readings ?? [];
+      const evidence = session.peekDeckEvidence();
+      const adapter = getOcrAdapterSnapshot();
+      return {
+        gates: live.gates,
+        identity: live.identity,
+        phase: snap?.phase ?? null,
+        recognitionDecision: live.recognitionDecision,
+        recognitionStatus: live.recognitionStatus,
+        recognizeAttempts: live.recognizeAttempts,
+        matchScore: snap?.fused?.card?.score ?? null,
+        ocrTexts: Array.isArray(readings)
+          ? readings
+              .map((r: { text?: string }) => r?.text)
+              .filter((t): t is string => Boolean(t))
+          : [],
+        detectorScore: live.gates?.detectorScore ?? null,
+        recognitionSource: session.debug.recognitionSource ?? null,
+        lockedAt: snap?.lockedAt ?? null,
+        finalIdentityAt: snap?.finalIdentityAt ?? null,
+        cardWarp: session.lastNormalized(),
+        title: null,
+        source: evidence.source,
+        detector: evidence.detector,
+        rawCorners: evidence.rawCorners,
+        trackedCorners: evidence.trackedCorners,
+        presentedCorners: evidence.presentedCorners,
+        recognitionCorners: evidence.recognitionCorners,
+        ocrAvailable: adapter.textRecognizerCreated,
+        ocrTransport: adapter.transport,
+      };
+    },
+  });
+
+  const binderBench = useBinderBenchmark({
+    cameraRef,
+    setLabHold: session.setLabHold,
+    peekLive: () => ({
+      gates: session.peekSwapLive().gates,
+      focusState: focusState ?? null,
+    }),
+  });
+
+  const [realBenchStatus, setRealBenchStatus] = useState<{
+    deck: string | null;
+    binder: string | null;
+  }>({ deck: null, binder: null });
+
+  useEffect(() => {
+    if (!isBenchmarkToolsEnabled()) return;
+    void (async () => {
+      const decks = await listDeckRuns();
+      const binders = await listBinderRuns();
+      const d = decks[0];
+      const b = binders[0];
+      setRealBenchStatus({
+        deck: d ? `${d.cards}/${d.target} · ${d.phase}` : null,
+        binder: b ? `${b.pages}/${b.target} pages · ${b.phase}` : null,
+      });
+    })();
+  }, [deckBench.ui.phase, binderBench.ui.phase]);
+
   const {
     counters,
     error,
@@ -185,7 +356,7 @@ export function CameraScanScreen() {
     transfer,
   } = useFrameAnalysis({
     analysisMaxWidth: ANALYSIS_LONG_EDGES[longEdgeIndex],
-    debugPreview: panel === 'scan',
+    debugPreview: panel === 'scan' && getPerfBaseline().liveDebugImages,
     detectorEngine,
     diagnosticRungs,
     enabled: scanning,
@@ -194,12 +365,117 @@ export function CameraScanScreen() {
     previewSize: layout,
     resolutionIndex,
     rung: RUNGS[rungIndex],
+    targetAnalysisFps: getPerfBaseline().detectorHz,
   });
+
+  const openScannerLab = useCallback(async () => {
+    if (labOpening || labOpen) return;
+    setLabOpening(true);
+    try {
+      const frozen = await session.acquireLabCapture();
+      setLabFrozen(frozen);
+      setLabOpen(true);
+    } finally {
+      setLabOpening(false);
+    }
+  }, [labOpen, labOpening, session]);
+
+  const onCaptureQualityAb = useCallback(() => {
+    if (qualityBusy) return;
+    setQualityBusy(true);
+    setSaveStatus('A/B… keep the card in the preview');
+    void session
+      .captureQualityPair(focusPoint)
+      .then(run => {
+        setQualityDraft(run);
+        setQualityLabel(run.snapshot.ocr.matchName ?? run.photo.ocr.matchName ?? '');
+        setSaveStatus(
+          `A/B ready · fast ${run.snapshot.ocr.decision} / photo ${run.photo.ocr.decision}`,
+        );
+      })
+      .catch(err => {
+        setSaveStatus(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setQualityBusy(false));
+  }, [focusPoint, qualityBusy, session]);
+
+  const onCaptureFocusSeries = useCallback(() => {
+    if (seriesBusy) return;
+    setSeriesBusy(true);
+    setSaveStatus('Focus series… keep the card in the preview');
+    void session
+      .captureFocusSeries()
+      .then(run => {
+        setSeriesDraft(run);
+        const named = run.samples.find(s => s.ocr.matchName)?.ocr.matchName ?? '';
+        setSeriesLabel(named);
+        setSaveStatus(
+          `Focus series ready · ${run.samples.map(s => `T${s.nominalDelayMs}:${s.metrics.titleSharpness.toFixed(0)}`).join(' ')}`,
+        );
+      })
+      .catch(err => {
+        setSaveStatus(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setSeriesBusy(false));
+  }, [seriesBusy, session]);
+
+  const onSaveFocusSeries = useCallback(() => {
+    if (!seriesDraft) return;
+    setSeriesBusy(true);
+    void session
+      .persistFocusSeries(seriesDraft, seriesLabel)
+      .then(saved => {
+        setSaveStatus(`Uploaded ${saved.fixtureId}`);
+        setSeriesDraft(null);
+      })
+      .catch(err => setSaveStatus(err instanceof Error ? err.message : String(err)))
+      .finally(() => setSeriesBusy(false));
+  }, [seriesDraft, seriesLabel, session]);
+
+  const onSaveQualityLabel = useCallback(() => {
+    if (!qualityDraft) return;
+    setQualityBusy(true);
+    void session
+      .persistCaptureQualityPair(qualityDraft, qualityLabel)
+      .then(saved => {
+        setSaveStatus(`Uploaded ${saved.fixtureId}`);
+        setQualityDraft(null);
+      })
+      .catch(err => setSaveStatus(err instanceof Error ? err.message : String(err)))
+      .finally(() => setQualityBusy(false));
+  }, [qualityDraft, qualityLabel, session]);
+
+  // Re-read baseline when toggled (perfTick).
+  void perfTick;
 
   useEffect(() => {
     if (!isBenchmarkToolsEnabled()) return;
     void restoreBenchmarkSession().then(() => setBenchHud(peekBenchmarkHud()));
     return subscribeBenchmark(() => setBenchHud(peekBenchmarkHud()));
+  }, []);
+
+  useEffect(() => {
+    if (!isBenchmarkToolsEnabled()) return;
+    return startDeviceReplayWorker(() => ({
+      nameIndex: session.indexes.names?.index ?? null,
+    }));
+  }, [session.indexes.names?.index]);
+
+  useEffect(() => {
+    if (!isBenchmarkToolsEnabled()) return;
+    void restoreInboxQueue();
+    return subscribeInbox(ev => {
+      if (ev.kind === 'uploaded') {
+        setSaveStatus(`Uploaded ✓ ${ev.traceId}`);
+        setTraceId(current => {
+          if (current && ev.traceId === current) setTraceUpload('uploaded');
+          return current;
+        });
+      }
+      if (ev.kind === 'failed') {
+        setTraceUpload(prev => (prev === 'pending' ? 'failed' : prev));
+      }
+    });
   }, []);
 
   // Auto-persist every completed recognition during an active benchmark session.
@@ -215,7 +491,10 @@ export function CameraScanScreen() {
     const payload: DebugSharePayload = {
       analysisLongEdge: ANALYSIS_LONG_EDGES[longEdgeIndex],
       appStamp: lugin?.buildLabel ?? Constants.expoConfig?.version ?? null,
-      detectorEngine: detectorEngineId,
+      detectorEngine: actualDetectorEngine,
+      requestedDetectorEngine,
+      actualDetectorEngine,
+      detectorFallbackReason,
       deviceLine: device ? describeDevice(device) : undefined,
       images: {
         detector: lastDetectorInput(),
@@ -347,6 +626,51 @@ export function CameraScanScreen() {
     return mapCornersToOverlay(displayCorners, analysisSize, analysisSize, layout);
   }, [analysisSize, displayCorners, layout]);
 
+  const mappedRawCorners = useMemo(() => {
+    if (!overlay?.rawCorners || !analysisSize || layout.width === 0) return null;
+    return mapCornersToOverlay(overlay.rawCorners, analysisSize, analysisSize, layout);
+  }, [analysisSize, layout, overlay?.rawCorners]);
+
+  const mappedTrackedCorners = useMemo(() => {
+    if (!overlay?.trackedCorners || !analysisSize || layout.width === 0) return null;
+    return mapCornersToOverlay(overlay.trackedCorners, analysisSize, analysisSize, layout);
+  }, [analysisSize, layout, overlay?.trackedCorners]);
+
+  const mappedRecognitionCorners = useMemo(() => {
+    if (!overlay?.recognitionCorners || !analysisSize || layout.width === 0) return null;
+    return mapCornersToOverlay(overlay.recognitionCorners, analysisSize, analysisSize, layout);
+  }, [analysisSize, layout, overlay?.recognitionCorners]);
+
+  const rawQuad = useMemo(() => {
+    if (!mappedRawCorners) return null;
+    return [
+      [mappedRawCorners.topLeft, mappedRawCorners.topRight],
+      [mappedRawCorners.topRight, mappedRawCorners.bottomRight],
+      [mappedRawCorners.bottomRight, mappedRawCorners.bottomLeft],
+      [mappedRawCorners.bottomLeft, mappedRawCorners.topLeft],
+    ] as const;
+  }, [mappedRawCorners]);
+
+  const trackedQuad = useMemo(() => {
+    if (!mappedTrackedCorners) return null;
+    return [
+      [mappedTrackedCorners.topLeft, mappedTrackedCorners.topRight],
+      [mappedTrackedCorners.topRight, mappedTrackedCorners.bottomRight],
+      [mappedTrackedCorners.bottomRight, mappedTrackedCorners.bottomLeft],
+      [mappedTrackedCorners.bottomLeft, mappedTrackedCorners.topLeft],
+    ] as const;
+  }, [mappedTrackedCorners]);
+
+  const recognitionQuad = useMemo(() => {
+    if (!mappedRecognitionCorners) return null;
+    return [
+      [mappedRecognitionCorners.topLeft, mappedRecognitionCorners.topRight],
+      [mappedRecognitionCorners.topRight, mappedRecognitionCorners.bottomRight],
+      [mappedRecognitionCorners.bottomRight, mappedRecognitionCorners.bottomLeft],
+      [mappedRecognitionCorners.bottomLeft, mappedRecognitionCorners.topLeft],
+    ] as const;
+  }, [mappedRecognitionCorners]);
+
   const quad = useMemo(() => {
     if (!mappedCorners) return null;
     return [
@@ -386,13 +710,20 @@ export function CameraScanScreen() {
   const phase = session.snapshot?.phase ?? (detected ? 'detected' : 'searching');
   const cardRecognized =
     session.snapshot?.phase === 'found' || session.snapshot?.phase === 'ambiguous';
+  const lockWait = session.snapshot?.lockGates?.waiting ?? session.debug.lockGates?.waiting ?? null;
   const badgeText = !detectorOn
     ? 'DETECTOR OFF'
     : !orientation.ready
       ? counters.cameraFrames === 0
         ? 'Waiting for camera'
         : 'Initializing orientation'
-      : phase.toUpperCase();
+      : lockWait &&
+          phase !== 'found' &&
+          phase !== 'ambiguous' &&
+          phase !== 'recognizing' &&
+          phase !== 'searching'
+        ? `${phase.toUpperCase()}\nWaiting: ${lockWait}`
+        : phase.toUpperCase();
 
   const buildReportPayload = (): DebugSharePayload => {
     const analysisResult = result;
@@ -401,7 +732,10 @@ export function CameraScanScreen() {
     return {
       analysisLongEdge: ANALYSIS_LONG_EDGES[longEdgeIndex],
       appStamp: lugin?.buildLabel ?? Constants.expoConfig?.version ?? null,
-      detectorEngine: detectorEngineId,
+      detectorEngine: actualDetectorEngine,
+      requestedDetectorEngine,
+      actualDetectorEngine,
+      detectorFallbackReason,
       deviceLine: describeDevice(device),
       images: {
         detector: lastDetectorInput(),
@@ -475,6 +809,13 @@ export function CameraScanScreen() {
               printingShownAt: session.snapshot.printingShownAt ?? null,
               userLatency: session.snapshot.userLatency ?? null,
               trackFrames: session.snapshot.trackFrames,
+              lockGates: session.snapshot.lockGates ?? null,
+              lockBlocker: session.snapshot.lockGates?.blocker ?? null,
+              phaseTimeline: session.snapshot.phaseTimeline ?? [],
+              recognizeInvocations: session.snapshot.recognizeInvocations ?? 0,
+              detectorAttempts: session.snapshot.detectorAttempts ?? 0,
+              detectorHitRate: session.snapshot.detectorHitRate ?? null,
+              detectorInterval: session.snapshot.detectorInterval ?? null,
             }
           : null,
         transfer,
@@ -504,6 +845,14 @@ export function CameraScanScreen() {
             ? `Report ready (${parts.join(' + ')}) — Share or Download`
             : 'Report on screen (file write failed — text only)',
         );
+        const lugin = (Constants.expoConfig?.extra as { lugin?: { buildLabel?: string } } | undefined)
+          ?.lugin;
+        void enqueuePreparedReport({
+          appStamp: lugin?.buildLabel ?? Constants.expoConfig?.version ?? null,
+          bundle: prepared.bundle,
+          device: device ? describeDevice(device) : null,
+          scannerPhase: session.snapshot?.phase ?? phase,
+        });
       } catch (err) {
         setSaveStatus(`Report crashed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
@@ -550,6 +899,116 @@ export function CameraScanScreen() {
     })();
   };
 
+  const saveMissFrame = () => {
+    if (trainBusy) return;
+    void (async () => {
+      setTrainBusy(true);
+      try {
+        const det = lastDetectorInput();
+        const analysis = result;
+        const saved = await saveTrainingCapture({
+          detector: det,
+          recognition: session.lastNormalized(),
+          meta: {
+            detected: Boolean(overlay?.detected ?? analysis?.detected),
+            detectorEngine: actualDetectorEngine,
+            requestedDetectorEngine,
+            actualDetectorEngine,
+            detectorFallbackReason,
+            note: 'manual-save-for-training',
+            phase: session.snapshot?.phase ?? phase,
+            recognitionSource: session.debug.recognitionSource,
+            score: overlay?.score ?? analysis?.score ?? null,
+            status: session.snapshot?.fused?.status ?? null,
+          },
+        });
+        if (!saved.ok) {
+          setSaveStatus(`Save frame failed: ${saved.reason}`);
+          return;
+        }
+        setSaveStatus(`Training frame saved → ${saved.directoryHint}`);
+        const shared = await shareTrainingDetectorPng(saved.directoryHint);
+        if (!shared.ok && shared.reason !== 'sharing unavailable') {
+          setSaveStatus(`Saved locally (${saved.directoryHint}); share: ${shared.reason}`);
+        }
+      } catch (err) {
+        setSaveStatus(`Save frame crashed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setTrainBusy(false);
+      }
+    })();
+  };
+
+  const captureGeometryTrace = () => {
+    if (traceBusy || isGeometryTraceActive()) return;
+    const started = startGeometryTrace({
+      actualDetectorEngine,
+      detectorInput: overlay?.analysis ?? result?.analysis ?? null,
+      detectorIntervalP50: metrics?.detectMs.p50 ?? null,
+      detectorIntervalP95: metrics?.detectMs.p95 ?? null,
+      lockBlocker: session.snapshot?.lockGates?.blocker ?? null,
+      orientation: orientation.desired,
+      phase: session.snapshot?.phase ?? phase,
+      previewCrop: result?.spaces.visible ?? null,
+      rowStride: frameMeta?.bytesPerRow ?? null,
+    });
+    if (!started) return;
+    setTraceBusy(true);
+    setTraceDir(null);
+    setTraceCount(0);
+    setTraceElapsedMs(0);
+    setTraceUpload('idle');
+    setTraceId(null);
+    setSaveStatus('Capturing geometry trace… hold the card still');
+    const t0 = Date.now();
+    const iv = setInterval(() => {
+      setTraceElapsedMs(Date.now() - t0);
+      const n = geometryTraceSampleCount();
+      setTraceCount(n);
+      if (n >= 40 || Date.now() - t0 >= 3100) {
+        clearInterval(iv);
+        void (async () => {
+          const bundle = finishGeometryTrace();
+          setTraceBusy(false);
+          if (!bundle) {
+            setSaveStatus('Geometry trace empty — keep the detector on and retry');
+            return;
+          }
+          const saved = await writeGeometryTraceFiles(bundle);
+          if (!saved.ok) {
+            setSaveStatus(`Geometry trace failed: ${saved.reason}`);
+            return;
+          }
+          setTraceDir(saved.uri);
+          setTraceCount(saved.sampleCount);
+          setSaveStatus(`Trace saved ✓ · ${saved.sampleCount} detector samples`);
+          const lugin = (Constants.expoConfig?.extra as { lugin?: { buildLabel?: string } } | undefined)
+            ?.lugin;
+          const queued = await enqueueGeometryTrace({
+            appStamp: lugin?.buildLabel ?? Constants.expoConfig?.version ?? null,
+            device: device ? describeDevice(device) : null,
+            dirUri: saved.uri,
+            scannerPhase: session.snapshot?.phase ?? phase,
+          });
+          if (queued.queued && queued.traceId) {
+            setTraceId(queued.traceId);
+            setTraceUpload('pending');
+            setSaveStatus(`Trace saved ✓ · uploading ${queued.traceId}…`);
+          } else {
+            setTraceUpload('failed');
+          }
+        })();
+      }
+    }, 80);
+  };
+
+  const shareSavedGeometryTrace = () => {
+    if (!traceDir) return;
+    void shareGeometryTrace(traceDir).then(out => {
+      if (!out.ok) setSaveStatus(`Share geometry trace: ${out.reason ?? 'failed'}`);
+    });
+  };
+
   return (
     <View onLayout={onLayout} style={styles.root}>
       <Camera
@@ -584,8 +1043,42 @@ export function CameraScanScreen() {
         </View>
       ) : null}
 
+      <View style={{ paddingTop: insets.top }} pointerEvents="box-none">
+        <DeckBenchmarkHud
+          ui={deckBench.ui}
+          onCancel={deckBench.cancel}
+          onManualNext={deckBench.markManualNext}
+          onResume={() => void deckBench.resume()}
+          onDiscard={() => void deckBench.discardInterrupted()}
+          onFinish={() => void deckBench.finishEarly()}
+        />
+        <BinderBenchmarkHud
+          ui={binderBench.ui}
+          onCancel={binderBench.cancel}
+          onNextPage={() => void binderBench.nextPage()}
+          onResume={() => void binderBench.resume()}
+          onDiscard={() => void binderBench.discardInterrupted()}
+          onFinish={() => void binderBench.finishEarly()}
+        />
+      </View>
+
       {quad ? (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          {panel === 'scan' && rawQuad
+            ? rawQuad.map(([a, b], i) => (
+                <View key={`raw-${i}`} style={[styles.edge, edgeStyle(a, b), styles.edgeRaw]} />
+              ))
+            : null}
+          {panel === 'scan' && trackedQuad
+            ? trackedQuad.map(([a, b], i) => (
+                <View key={`trk-${i}`} style={[styles.edge, edgeStyle(a, b), styles.edgeTracked]} />
+              ))
+            : null}
+          {panel === 'scan' && recognitionQuad
+            ? recognitionQuad.map(([a, b], i) => (
+                <View key={`rec-${i}`} style={[styles.edge, edgeStyle(a, b), styles.edgeRecognition]} />
+              ))
+            : null}
           {quad.map(([a, b], i) => (
             <View
               key={i}
@@ -659,9 +1152,113 @@ export function CameraScanScreen() {
               {saveStatus}
             </Text>
           ) : null}
+          {isBenchmarkToolsEnabled() && !labOpen ? (
+            <>
+            <Pressable
+              disabled={qualityBusy || seriesBusy || swapActive || deckBench.active || binderBench.active}
+              onPress={onCaptureQualityAb}
+              style={[styles.abButton, qualityBusy && styles.reportButtonBusy]}
+            >
+              <Text style={styles.abButtonLabel}>
+                {qualityBusy ? 'A/B… keep card in view' : 'Capture A/B'}
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={qualityBusy || seriesBusy || swapActive || deckBench.active || binderBench.active}
+              onPress={onCaptureFocusSeries}
+              style={[styles.abButton, seriesBusy && styles.reportButtonBusy]}
+            >
+              <Text style={styles.abButtonLabel}>
+                {seriesBusy ? 'Focus series… keep card in view' : 'Focus series'}
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={qualityBusy || seriesBusy || swapActive || deckBench.active || binderBench.active}
+              onPress={swapTest.openConfig}
+              style={[styles.abButton, swapActive && styles.reportButtonBusy]}
+            >
+              <Text style={styles.abButtonLabel}>
+                {swapActive ? `Swap ${swapTest.ui.index}/${swapTest.ui.targetCount}` : 'Card Swap Test'}
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={qualityBusy || seriesBusy || swapActive || deckBench.active || binderBench.active}
+              onPress={deckBench.openConfig}
+              style={[styles.abButton, deckBench.active && styles.reportButtonBusy]}
+            >
+              <Text style={styles.abButtonLabel}>
+                {deckBench.active
+                  ? `Deck ${deckBench.ui.index}/${deckBench.ui.targetCount}`
+                  : 'Deck Benchmark'}
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={qualityBusy || seriesBusy || swapActive || deckBench.active || binderBench.active}
+              onPress={binderBench.openConfig}
+              style={[styles.abButton, binderBench.active && styles.reportButtonBusy]}
+            >
+              <Text style={styles.abButtonLabel}>
+                {binderBench.active
+                  ? `Binder ${binderBench.ui.pageIndex}/${binderBench.ui.targetPages}`
+                  : 'Binder Benchmark'}
+              </Text>
+            </Pressable>
+            </>
+          ) : null}
         </View>
 
         <View pointerEvents="none" style={styles.spacer} />
+
+        {swapActive || swapTest.ui.phase === 'done' ? (
+          <View pointerEvents="box-none" style={styles.swapOverlay}>
+            <View
+              style={[
+                styles.swapBanner,
+                swapTest.ui.phase === 'swap-now' ? styles.swapBannerAlert : null,
+              ]}
+            >
+              <Text style={styles.swapTitle}>
+                Swap Test {Math.max(1, swapTest.ui.index)} / {swapTest.ui.targetCount}
+              </Text>
+              <Text style={styles.swapLine}>
+                Current: geom {swapTest.ui.geometryTrackId ?? '—'} · session{' '}
+                {swapTest.ui.cardSessionId ?? '—'}
+              </Text>
+              <Text
+                style={[
+                  styles.swapState,
+                  swapTest.ui.phase === 'swap-now' ? styles.swapStateAlert : null,
+                ]}
+              >
+                {swapTest.ui.phase === 'waiting-stable'
+                  ? 'waiting for stable card'
+                  : swapTest.ui.phase === 'capturing'
+                    ? 'captured…'
+                    : swapTest.ui.phase === 'swap-now'
+                      ? 'SWAP CARD'
+                      : swapTest.ui.phase === 'waiting-next'
+                        ? 'waiting for next card'
+                        : swapTest.ui.phase === 'done'
+                          ? swapTest.ui.message || 'done'
+                          : swapTest.ui.message}
+              </Text>
+            </View>
+            {swapTest.ui.showMarkSwapped ? (
+              <Pressable onPress={swapTest.markSwapped} style={styles.swapMarkBtn}>
+                <Text style={styles.swapMarkLabel}>Mark card swapped</Text>
+              </Pressable>
+            ) : null}
+            {swapTest.ui.phase !== 'done' ? (
+              <Pressable onPress={swapTest.cancel} style={styles.swapCancelBtn}>
+                <Text style={styles.swapCancelLabel}>Cancel</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={swapTest.cancel} style={styles.swapCancelBtn}>
+                <Text style={styles.swapCancelLabel}>Dismiss</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : null}
 
         {session.snapshot &&
         (session.snapshot.phase === 'found' || session.snapshot.phase === 'ambiguous') ? (
@@ -695,20 +1292,157 @@ export function CameraScanScreen() {
               snapshot={session.snapshot}
             />
             {pendingAdd ? <Text style={styles.pendingAdd}>{pendingAdd}</Text> : null}
+            <View style={styles.resultActions}>
+              <Pressable
+                disabled={reportBusy}
+                onPress={openReport}
+                style={[styles.reportButton, styles.resultActionBtn, reportBusy && styles.reportButtonBusy]}
+              >
+                <Text style={styles.reportButtonLabel}>
+                  {reportBusy ? 'Preparing…' : 'Report'}
+                </Text>
+              </Pressable>
+              <Pressable
+                disabled={trainBusy}
+                onPress={saveMissFrame}
+                style={[
+                  styles.reportButton,
+                  styles.resultActionBtn,
+                  styles.trainButton,
+                  trainBusy && styles.reportButtonBusy,
+                ]}
+              >
+                <Text style={styles.reportButtonLabel}>
+                  {trainBusy ? 'Saving…' : 'Save frame'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Prominent save when we have a card in view but no identity yet */}
+        {showAllTools && !cardRecognized && (phase === 'locking' || phase === 'recognizing' || detected) ? (
+          <View style={styles.missWrap}>
             <Pressable
-              disabled={reportBusy}
-              onPress={openReport}
-              style={[styles.reportButton, reportBusy && styles.reportButtonBusy]}
+              disabled={trainBusy}
+              onPress={saveMissFrame}
+              style={[styles.trainButtonLarge, trainBusy && styles.reportButtonBusy]}
             >
               <Text style={styles.reportButtonLabel}>
-                {reportBusy ? 'Preparing…' : 'Report'}
+                {trainBusy ? 'Saving training frame…' : 'Save detector frame (for training)'}
               </Text>
             </Pressable>
+            {panel === 'scan' && detected ? (
+              <>
+                <Pressable
+                  onPress={() => {
+                    void (async () => {
+                      setSaveStatus('Force snapshot…');
+                      const out = await session.forceSnapshot();
+                      setSaveStatus(
+                        out.ok
+                          ? `Force snapshot OK ${out.width ?? '?'}×${out.height ?? '?'} · ${out.captureMs ?? '?'} ms`
+                          : `Force snapshot failed: ${out.reason}`,
+                      );
+                    })();
+                  }}
+                  style={styles.trainButtonLarge}
+                >
+                  <Text style={styles.reportButtonLabel}>Force high-res snapshot</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    void (async () => {
+                      setSaveStatus('Force recognize…');
+                      const snap = await session.forceRecognize();
+                      const pl = snap.postLock;
+                      setSaveStatus(
+                        snap.fused?.card?.name
+                          ? `Force recognize → ${snap.fused.card.name}`
+                          : `Force recognize · ${pl?.recognitionStatus ?? snap.phase} · OCR "${pl?.titleRawText ?? ''}" · ${pl?.titleTopCandidate ?? snap.message} · hi-res ${pl?.highResSuccess ?? 0}/${pl?.highResRequests ?? 0} · IoU ${pl?.quadIouCaptureVsLatest != null ? pl.quadIouCaptureVsLatest.toFixed(2) : '—'}`,
+                      );
+                    })();
+                  }}
+                  style={styles.trainButtonLarge}
+                >
+                  <Text style={styles.reportButtonLabel}>Force recognize current card</Text>
+                </Pressable>
+              </>
+            ) : null}
           </View>
         ) : null}
 
         {panel === 'scan' ? (
           <View style={styles.panelWrap}>
+            <View style={styles.missWrap}>
+              {(() => {
+                const adapter = getOcrAdapterSnapshot();
+                const last = session.snapshot?.postLock?.recognitionStatus ?? 'not run';
+                const ocrLine = !adapter.textRecognizerCreated
+                  ? `unavailable${adapter.lastOcrAdapterError ? `: ${adapter.lastOcrAdapterError}` : ''}`
+                  : adapter.warmupState === 'warming'
+                    ? 'warming'
+                    : adapter.lastOcrAdapterError
+                      ? `error: ${adapter.lastOcrAdapterError}`
+                      : 'ready';
+                return (
+                  <Text style={styles.saveStatus} numberOfLines={3}>
+                    {`OCR: ${ocrLine}\nTransport: ${adapter.transport}\nLast attempt: ${last}`}
+                  </Text>
+                );
+              })()}
+              {ocrUnavailableReason() ? (
+                <Text style={styles.saveStatus}>{`OCR unavailable: ${ocrUnavailableReason()}`}</Text>
+              ) : null}
+              {isBenchmarkToolsEnabled() ? (
+                <Pressable
+                  disabled={labOpening}
+                  onPress={() => void openScannerLab()}
+                  style={[styles.trainButtonLarge, labOpening && styles.reportButtonBusy]}
+                >
+                  <Text style={styles.reportButtonLabel}>
+                    {labOpening ? 'Opening…' : 'Scanner Lab'}
+                  </Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                disabled={traceBusy || isGeometryTraceActive()}
+                onPress={captureGeometryTrace}
+                style={[styles.trainButtonLarge, traceBusy && styles.reportButtonBusy]}
+              >
+                <Text style={styles.reportButtonLabel}>
+                  {traceBusy
+                    ? `Capturing… ${(traceElapsedMs / 1000).toFixed(1)}s / 3.0s`
+                    : traceDir
+                      ? `Trace saved ✓${traceUpload === 'uploaded' ? ' · Uploaded ✓' : traceUpload === 'pending' ? ' · Pending' : ''}`
+                      : 'Capture geometry trace'}
+                </Text>
+              </Pressable>
+              {showAllTools && traceDir ? (
+                <Pressable onPress={shareSavedGeometryTrace} style={styles.trainButtonLarge}>
+                  <Text style={styles.reportButtonLabel}>Share geometry trace</Text>
+                </Pressable>
+              ) : null}
+              {showAllTools && detected ? (
+                <Pressable
+                  onPress={() => {
+                    void (async () => {
+                      setSaveStatus('Force lock…');
+                      const snap = await session.forceLock();
+                      setSaveStatus(
+                        snap.fused?.card?.name
+                          ? `Force lock → ${snap.fused.card.name}`
+                          : `Force lock · ${snap.phase} · ${snap.message}`,
+                      );
+                    })();
+                  }}
+                  style={styles.trainButtonLarge}
+                >
+                  <Text style={styles.reportButtonLabel}>Force lock current track</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            {showAllTools ? (
             <ScanDebugPanel
               analysisLongEdge={ANALYSIS_LONG_EDGES[longEdgeIndex]}
               counters={counters}
@@ -716,6 +1450,7 @@ export function CameraScanScreen() {
               error={error}
               failure={failure}
               frameMeta={frameMeta}
+              jsLag={jsLag}
               metrics={metrics}
               orientation={orientation}
               ping={ping}
@@ -745,6 +1480,10 @@ export function CameraScanScreen() {
                 printingEntries: session.indexes.printing?.entries ?? null,
                 normalizedUri: session.debug.normalizedUri,
                 phase,
+                lockGates: session.snapshot?.lockGates ?? session.debug.lockGates ?? null,
+                recognizeInvocations: session.debug.recognizeInvocations ?? 0,
+                selectedRole: session.snapshot?.detection?.selectedRole ?? null,
+                continuityReason: session.snapshot?.detection?.continuityReason ?? null,
                 qualityBest: session.snapshot?.quality?.score ?? session.debug.qualityBest,
                 qualityExposure: session.snapshot?.quality?.exposure,
                 qualityGlare: session.snapshot?.quality?.glare,
@@ -767,10 +1506,47 @@ export function CameraScanScreen() {
                 titleDoneAt: session.debug.titleDoneAt,
                 artDoneAt: session.debug.artDoneAt,
                 earlyIdentityAt: session.debug.earlyIdentityAt,
+                ocrPipeline: session.debug.ocrPipeline,
+                ocrAdapter: session.debug.ocrAdapter,
+                acceptance: (() => {
+                  const data = getScannerDataStatus();
+                  const printing = session.snapshot?.fused?.printing;
+                  return {
+                    detectorActual: actualDetectorEngine,
+                    names: data.names,
+                    printing: data.printingEntries,
+                    type: data.typeOracles,
+                    art: data.artEntries,
+                    lastName:
+                      session.snapshot?.fused?.card?.name ?? printing?.name ?? null,
+                    lastPrinting: printing
+                      ? `${(printing.setCode ?? '').toUpperCase()} #${printing.collectorNumber ?? '?'}`
+                      : null,
+                    lockToOracleMs: session.debug.userLatency?.lockToFirstOracleMs ?? null,
+                    lockToPrintingMs: session.debug.userLatency?.lockToPrintingMs ?? null,
+                  };
+                })(),
               }}
+              onStartCardSwapTest={
+                isBenchmarkToolsEnabled() && !swapActive && !deckBench.active && !binderBench.active
+                  ? () => swapTest.openConfig()
+                  : undefined
+              }
+              onStartDeckBenchmark={
+                isBenchmarkToolsEnabled() && !swapActive && !deckBench.active && !binderBench.active
+                  ? () => deckBench.openConfig()
+                  : undefined
+              }
+              onStartBinderBenchmark={
+                isBenchmarkToolsEnabled() && !swapActive && !deckBench.active && !binderBench.active
+                  ? () => binderBench.openConfig()
+                  : undefined
+              }
+              realBenchmarkStatus={realBenchStatus}
               showNumbers={showNumbers}
               transfer={transfer}
             />
+            ) : null}
           </View>
         ) : null}
 
@@ -795,6 +1571,86 @@ export function CameraScanScreen() {
             style={[styles.chip, detectorOn && styles.chipOn]}
           >
             <Text style={styles.chipLabel}>Detector {detectorOn ? 'on' : 'off'}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() =>
+              setPanel(panel === 'scan' ? 'camera' : panel === 'camera' ? 'none' : 'scan')
+            }
+            style={[styles.chip, panel === 'scan' && styles.chipOn]}
+          >
+            <Text style={styles.chipLabel}>
+              {panel === 'scan' ? 'Scan dbg' : panel === 'camera' ? 'Cam dbg' : 'No panel'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setShowAllTools(v => !v)}
+            style={[styles.chip, showAllTools && styles.chipOn]}
+          >
+            <Text style={styles.chipLabel}>{showAllTools ? 'All tools ON' : 'All tools'}</Text>
+          </Pressable>
+          {showAllTools ? (
+          <>
+          <Pressable
+            onPress={() => {
+              const next =
+                getPerfBaseline().detectorHz === PERF_BASELINE_HZ ? 'full' : 'baseline';
+              applyPerfPreset(next);
+              setNativeNestedSleeveEnabled(getPerfBaseline().nestedSleeve);
+              setLongEdgeIndex(
+                Math.max(
+                  0,
+                  ANALYSIS_LONG_EDGES.indexOf(
+                    getPerfBaseline().analysisLongEdge as (typeof ANALYSIS_LONG_EDGES)[number],
+                  ),
+                ),
+              );
+              setPerfTick(t => t + 1);
+            }}
+            style={[
+              styles.chip,
+              getPerfBaseline().detectorHz === PERF_BASELINE_HZ && styles.chipOn,
+            ]}
+          >
+            <Text style={styles.chipLabel}>
+              {getPerfBaseline().detectorHz === PERF_BASELINE_HZ ? 'Perf baseline' : 'Perf full'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              const on = !getPerfBaseline().ocrWarmup;
+              setPerfBaseline({ ocrWarmup: on });
+              setPerfTick(t => t + 1);
+            }}
+            style={[styles.chip, getPerfBaseline().ocrWarmup && styles.chipOn]}
+          >
+            <Text style={styles.chipLabel}>
+              Warmup {getPerfBaseline().ocrWarmup ? 'ON' : 'OFF'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              const on = !getPerfBaseline().nestedSleeve;
+              setPerfBaseline({ nestedSleeve: on });
+              setNativeNestedSleeveEnabled(on);
+              setPerfTick(t => t + 1);
+            }}
+            style={[styles.chip, getPerfBaseline().nestedSleeve && styles.chipOn]}
+          >
+            <Text style={styles.chipLabel}>
+              Sleeve {getPerfBaseline().nestedSleeve ? 'ON' : 'OFF'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              const on = !getPerfBaseline().liveDebugImages;
+              setPerfBaseline({ liveDebugImages: on });
+              setPerfTick(t => t + 1);
+            }}
+            style={[styles.chip, getPerfBaseline().liveDebugImages && styles.chipOn]}
+          >
+            <Text style={styles.chipLabel}>
+              Live PNG {getPerfBaseline().liveDebugImages ? 'ON' : 'OFF'}
+            </Text>
           </Pressable>
           <Pressable
             onPress={() =>
@@ -853,16 +1709,6 @@ export function CameraScanScreen() {
             <Text style={styles.chipLabel}>Reset</Text>
           </Pressable>
           <Pressable
-            onPress={() =>
-              setPanel(panel === 'scan' ? 'camera' : panel === 'camera' ? 'none' : 'scan')
-            }
-            style={styles.chip}
-          >
-            <Text style={styles.chipLabel}>
-              {panel === 'scan' ? 'Scan dbg' : panel === 'camera' ? 'Cam dbg' : 'No panel'}
-            </Text>
-          </Pressable>
-          <Pressable
             onPress={() => {
               setDetectorColorOk(v => (v === 'unverified' ? 'yes' : v === 'yes' ? 'no' : 'unverified'));
             }}
@@ -890,6 +1736,13 @@ export function CameraScanScreen() {
             </Pressable>
           ) : null}
           <Pressable
+            disabled={trainBusy}
+            onPress={saveMissFrame}
+            style={[styles.chip, styles.chipOn]}
+          >
+            <Text style={styles.chipLabel}>{trainBusy ? 'Saving…' : 'Save frame'}</Text>
+          </Pressable>
+          <Pressable
             onPress={() => {
               if (layout.width > 0) void focusAt(layout.width / 2, layout.height / 2);
             }}
@@ -897,6 +1750,8 @@ export function CameraScanScreen() {
           >
             <Text style={styles.chipLabel}>Focus center</Text>
           </Pressable>
+          </>
+          ) : null}
         </View>
       </View>
 
@@ -979,6 +1834,310 @@ export function CameraScanScreen() {
           </View>
         </View>
       </Modal>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => {
+          if (!qualityBusy) setQualityDraft(null);
+        }}
+        transparent
+        visible={Boolean(qualityDraft)}
+      >
+        <View style={styles.debugModalBackdrop}>
+          <View
+            style={[
+              styles.debugModal,
+              { paddingBottom: Math.max(insets.bottom, 12), paddingTop: 12 },
+            ]}
+          >
+            <View style={styles.debugModalHeader}>
+              <Text style={styles.debugModalTitle}>Capture A/B</Text>
+              <Pressable
+                disabled={qualityBusy}
+                onPress={() => setQualityDraft(null)}
+                style={[styles.chip, styles.chipOn, styles.debugModalClose]}
+              >
+                <Text style={styles.chipLabel}>Discard</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.debugModalHint}>
+              Snapshot and still already taken from the live preview. Label, then save to inbox.
+            </Text>
+            {qualityDraft ? (
+              <Text selectable style={styles.debugModalText}>
+                {`FAST ${qualityDraft.snapshot.decodedWidth}×${qualityDraft.snapshot.decodedHeight}` +
+                  `\nOCR ${qualityDraft.snapshot.ocr.rawOcrFirst || '(empty)'}` +
+                  `\n${qualityDraft.snapshot.ocr.decision}` +
+                  `${qualityDraft.snapshot.ocr.firstPassExact ? ' · first-pass exact' : ''}` +
+                  `\nsharp ${qualityDraft.snapshot.metrics.titleSharpness.toFixed(1)} · ${Math.round(qualityDraft.snapshot.timings.totalCaptureToIdentityMs)}ms` +
+                  `\n\nPHOTO ${qualityDraft.photo.decodedWidth}×${qualityDraft.photo.decodedHeight}` +
+                  `\nOCR ${qualityDraft.photo.ocr.rawOcrFirst || '(empty)'}` +
+                  `\n${qualityDraft.photo.ocr.decision}` +
+                  `${qualityDraft.photo.ocr.firstPassExact ? ' · first-pass exact' : ''}` +
+                  `\nsharp ${qualityDraft.photo.metrics.titleSharpness.toFixed(1)} · ${Math.round(qualityDraft.photo.timings.totalCaptureToIdentityMs)}ms`}
+              </Text>
+            ) : null}
+            <TextInput
+              autoCapitalize="words"
+              onChangeText={setQualityLabel}
+              placeholder="label (card name, foil, language…)"
+              placeholderTextColor="#6b7"
+              style={styles.qualityInput}
+              value={qualityLabel}
+            />
+            <Pressable
+              disabled={qualityBusy || !qualityDraft}
+              onPress={onSaveQualityLabel}
+              style={[styles.reportButton, qualityBusy && styles.reportButtonBusy]}
+            >
+              <Text style={styles.reportButtonLabel}>
+                {qualityBusy ? 'Saving…' : 'Save + upload'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => {
+          if (!swapActive) {
+            swapTest.cancel();
+          }
+        }}
+        transparent
+        visible={swapTest.configOpen}
+      >
+        <View style={styles.debugModalBackdrop}>
+          <View
+            style={[
+              styles.debugModal,
+              { paddingBottom: Math.max(insets.bottom, 12), paddingTop: 12 },
+            ]}
+          >
+            <View style={styles.debugModalHeader}>
+              <Text style={styles.debugModalTitle}>Card Swap Test</Text>
+              <Pressable
+                onPress={() => swapTest.cancel()}
+                style={[styles.chip, styles.chipOn, styles.debugModalClose]}
+              >
+                <Text style={styles.chipLabel}>Close</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.debugModalHint}>
+              Keep the phone fixed. One Start → auto-capture → swap cards under the camera. No typing
+              between swaps.
+            </Text>
+            <Text style={styles.debugModalHint}>Number of swaps</Text>
+            <View style={styles.swapCountRow}>
+              {swapTest.swapCounts.map(n => (
+                <Pressable
+                  key={n}
+                  onPress={() => swapTest.setDraftCount(n)}
+                  style={[styles.chip, swapTest.draftCount === n && styles.chipOn]}
+                >
+                  <Text style={styles.chipLabel}>{n}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.debugModalHint}>
+              Optional expected labels (one per line, once before Start)
+            </Text>
+            <TextInput
+              autoCapitalize="words"
+              multiline
+              numberOfLines={5}
+              onChangeText={swapTest.setDraftLabels}
+              placeholder={'Wand of Wonder\nTeferi\'s Veil\nLivaan\nNegate\nIsland'}
+              placeholderTextColor="#6b7"
+              style={[styles.qualityInput, styles.swapLabelsInput]}
+              value={swapTest.draftLabels}
+            />
+            <Pressable
+              onPress={() => swapTest.start()}
+              style={styles.reportButton}
+            >
+              <Text style={styles.reportButtonLabel}>Start Card Swap Test</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => {
+          if (!deckBench.active) deckBench.cancel();
+        }}
+        transparent
+        visible={deckBench.configOpen}
+      >
+        <View style={styles.debugModalBackdrop}>
+          <View
+            style={[
+              styles.debugModal,
+              { paddingBottom: Math.max(insets.bottom, 12), paddingTop: 12 },
+            ]}
+          >
+            <View style={styles.debugModalHeader}>
+              <Text style={styles.debugModalTitle}>Deck Benchmark</Text>
+              <Pressable
+                onPress={() => deckBench.cancel()}
+                style={[styles.chip, styles.chipOn, styles.debugModalClose]}
+              >
+                <Text style={styles.chipLabel}>Close</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.debugModalHint}>
+              Keep camera open. Place card → wait → NEXT CARD → replace. No names between cards.
+            </Text>
+            <Text style={styles.debugModalHint}>Target card count</Text>
+            <View style={styles.swapCountRow}>
+              {deckBench.counts.map(n => (
+                <Pressable
+                  key={n}
+                  onPress={() => deckBench.setDraftCount(n)}
+                  style={[styles.chip, deckBench.draftCount === n && styles.chipOn]}
+                >
+                  <Text style={styles.chipLabel}>{n}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable
+              onPress={() => void deckBench.start({ count: deckBench.draftCount })}
+              style={styles.reportButton}
+            >
+              <Text style={styles.reportButtonLabel}>START DECK BENCHMARK</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => {
+          if (!binderBench.active) binderBench.cancel();
+        }}
+        transparent
+        visible={binderBench.configOpen}
+      >
+        <View style={styles.debugModalBackdrop}>
+          <View
+            style={[
+              styles.debugModal,
+              { paddingBottom: Math.max(insets.bottom, 12), paddingTop: 12 },
+            ]}
+          >
+            <View style={styles.debugModalHeader}>
+              <Text style={styles.debugModalTitle}>Binder Benchmark</Text>
+              <Pressable
+                onPress={() => binderBench.cancel()}
+                style={[styles.chip, styles.chipOn, styles.debugModalClose]}
+              >
+                <Text style={styles.chipLabel}>Close</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.debugModalHint}>
+              Capture-only. Move phone slowly over each page (~3s). Geometry replay is on Mac — phone
+              will not show fake 9/9.
+            </Text>
+            <Text style={styles.debugModalHint}>Pages · layout 3×3</Text>
+            <View style={styles.swapCountRow}>
+              {binderBench.counts.map(n => (
+                <Pressable
+                  key={n}
+                  onPress={() => binderBench.setDraftPages(n)}
+                  style={[styles.chip, binderBench.draftPages === n && styles.chipOn]}
+                >
+                  <Text style={styles.chipLabel}>{n}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable
+              onPress={() => void binderBench.start({ pages: binderBench.draftPages })}
+              style={styles.reportButton}
+            >
+              <Text style={styles.reportButtonLabel}>START BINDER BENCHMARK</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => {
+          if (!seriesBusy) setSeriesDraft(null);
+        }}
+        transparent
+        visible={Boolean(seriesDraft)}
+      >
+        <View style={styles.debugModalBackdrop}>
+          <View
+            style={[
+              styles.debugModal,
+              { paddingBottom: Math.max(insets.bottom, 12), paddingTop: 12 },
+            ]}
+          >
+            <View style={styles.debugModalHeader}>
+              <Text style={styles.debugModalTitle}>Focus series</Text>
+              <Pressable
+                disabled={seriesBusy}
+                onPress={() => setSeriesDraft(null)}
+                style={[styles.chip, styles.chipOn, styles.debugModalClose]}
+              >
+                <Text style={styles.chipLabel}>Discard</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.debugModalHint}>
+              Four fast snapshots after one focus request. Label, then save. Does not change live capture.
+            </Text>
+            {seriesDraft ? (
+              <Text selectable style={styles.debugModalText}>
+                {seriesDraft.samples
+                  .map(
+                    s =>
+                      `T${s.nominalDelayMs} actual ${Math.round(s.actualDelayFromFocusRequestMs)}ms` +
+                      `  age ${s.quadAgeAtCaptureMs == null ? '—' : Math.round(s.quadAgeAtCaptureMs)}` +
+                      `  iou ${s.geometry ? s.geometry.iouVsT0.toFixed(2) : '—'}` +
+                      `\ncard ${s.metrics.cardSharpness.toFixed(0)}  title ${s.metrics.titleSharpness.toFixed(0)}  ${s.failureClass ?? '—'}` +
+                      `\nOCR ${s.ocr.rawOcrFirst || '(empty)'}  ${s.ocr.firstPassExact ? 'exact' : s.ocr.decision}` +
+                      `  ${s.ocr.matchName ?? s.ocr.status}`,
+                  )
+                  .join('\n\n')}
+              </Text>
+            ) : null}
+            <TextInput
+              autoCapitalize="words"
+              onChangeText={setSeriesLabel}
+              placeholder="label (card name, foil, language…)"
+              placeholderTextColor="#6b7"
+              style={styles.qualityInput}
+              value={seriesLabel}
+            />
+            <Pressable
+              disabled={seriesBusy || !seriesDraft}
+              onPress={onSaveFocusSeries}
+              style={[styles.reportButton, seriesBusy && styles.reportButtonBusy]}
+            >
+              <Text style={styles.reportButtonLabel}>
+                {seriesBusy ? 'Saving…' : 'Save + upload'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      {labOpen && isBenchmarkToolsEnabled() ? (
+        <View style={StyleSheet.absoluteFill}>
+          <ScannerLabScreen
+            frozenCapture={labFrozen}
+            nameIndex={session.indexes.names?.index ?? null}
+            onCaptureFocusSeries={async labLabel => {
+              const run = await session.captureFocusSeries();
+              const saved = await session.persistFocusSeries(run, labLabel);
+              return saved;
+            }}
+            onClose={() => {
+              session.releaseLabHold();
+              setLabOpen(false);
+              setLabFrozen(null);
+            }}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1024,6 +2183,101 @@ const styles = StyleSheet.create({
     color: '#A8B3C7',
     lineHeight: 20,
     textAlign: 'center',
+  },
+  abButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#C47A12',
+    borderRadius: 8,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  abButtonLabel: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  swapOverlay: {
+    alignItems: 'center',
+    left: 12,
+    position: 'absolute',
+    right: 12,
+    top: 72,
+    zIndex: 40,
+  },
+  swapBanner: {
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(12, 18, 32, 0.88)',
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  swapBannerAlert: {
+    backgroundColor: 'rgba(180, 40, 20, 0.92)',
+    borderColor: '#FFD080',
+  },
+  swapTitle: {
+    color: '#F5C542',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  swapLine: {
+    color: '#E8EEF7',
+    fontFamily: 'Courier',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  swapState: {
+    color: '#7CFFB2',
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 8,
+  },
+  swapStateAlert: {
+    color: '#FFF6C8',
+    fontSize: 28,
+  },
+  swapMarkBtn: {
+    alignSelf: 'stretch',
+    backgroundColor: '#F5C542',
+    borderRadius: 12,
+    marginTop: 12,
+    paddingVertical: 18,
+  },
+  swapMarkLabel: {
+    color: '#0B1220',
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  swapCancelBtn: {
+    marginTop: 10,
+    padding: 10,
+  },
+  swapCancelLabel: {
+    color: '#A8B3C7',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  swapCountRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  swapLabelsInput: {
+    minHeight: 110,
+    textAlignVertical: 'top',
+  },
+  qualityInput: {
+    backgroundColor: '#162033',
+    borderRadius: 8,
+    color: '#E8EEF7',
+    fontSize: 15,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   bottomBar: {
     flexDirection: 'row',
@@ -1086,6 +2340,17 @@ const styles = StyleSheet.create({
   },
   edgeOn: {
     backgroundColor: '#7CFFB2',
+  },
+  edgeRaw: {
+    backgroundColor: '#2878FF',
+  },
+  edgeTracked: {
+    backgroundColor: '#F5C542',
+    opacity: 0.85,
+  },
+  edgeRecognition: {
+    backgroundColor: '#DC3CDC',
+    opacity: 0.95,
   },
   edgeWeak: {
     backgroundColor: 'rgba(245,197,66,0.75)',
@@ -1183,6 +2448,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
+  },
+  resultActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  resultActionBtn: {
+    flex: 1,
+    marginTop: 8,
+  },
+  trainButton: {
+    backgroundColor: '#C47A12',
+  },
+  trainButtonLarge: {
+    alignItems: 'center',
+    backgroundColor: '#C47A12',
+    borderRadius: 10,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  missWrap: {
+    marginBottom: 4,
   },
   reportSecondary: {
     backgroundColor: '#1E2A3D',

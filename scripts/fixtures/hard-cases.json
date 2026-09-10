@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "note": "Catalog of hard real-world cases. PNGs live under gitignored .scan-real/ and .scan-fixtures/real-photos/ (do not commit card imagery). Tests skip entries whose imageFile is missing.",
+  "cases": [
+    {
+      "id": "maddening-hex-afc-showcase-glare",
+      "expectedName": "Maddening Hex",
+      "setCode": "afc",
+      "collectorNumber": "301",
+      "lang": "en",
+      "scryfallId": "db03809b-d0b3-4265-ad31-b8d0066986c9",
+      "tag": "afc-showcase-glare-sleeve",
+      "imageFile": "maddening-hex-afc-showcase-glare.png",
+      "detectPath": ".scan-real/maddening-hex-afc-showcase-glare.png",
+      "pipelinePath": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+      "hardReasons": [
+        "afc-d&d-showcase-frame",
+        "vertical-mana-cost",
+        "orange-sleeve",
+        "strong-right-glare",
+        "wood-table",
+        "slight-rotation"
+      ]
+    },
+    {
+      "id": "the-deck-of-many-things-french",
+      "expectedName": "The Deck of Many Things",
+      "setCode": "afr",
+      "collectorNumber": "241",
+      "lang": "fr",
+      "printedName": "Les cartes merveilleuses",
+      "tag": "french-long-title-fragment-risk",
+      "imageFile": "the-deck-of-many-things-french.png",
+      "detectPath": ".scan-real/the-deck-of-many-things-french.png",
+      "pipelinePath": ".scan-fixtures/real-photos/the-deck-of-many-things-french.png",
+      "hardReasons": [
+        "french-long-title",
+        "fragment-merveilleuses-false-positive-risk",
+        "weak-waker-of-the-wilds-candidate-must-not-publish",
+        "do-not-lower-title-thresholds"
+      ],
+      "notes": "Focus-series T0 OCR fragment 'ryeilleus' matched Waker of the Wilds at ~0.72 and correctly stayed unpublished (insufficient-confidence). Keep thresholds; improve later via OCR/type/footer/art — not by weakening acceptance."
+    }
+  ]
+}

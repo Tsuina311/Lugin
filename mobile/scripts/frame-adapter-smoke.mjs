@@ -48,8 +48,14 @@ try {
     },
   });
 
-  const { analysisSize, frameToScanImage, imageBrightness, pixelOrderFor, validateFrameView } =
-    await import(pathToFileURL(outfile).href);
+  const {
+    analysisSize,
+    frameToScanImage,
+    imageBrightness,
+    pixelOrderFor,
+    validateFrameView,
+    yPlaneToDetectorLuma,
+  } = await import(pathToFileURL(outfile).href);
 
   /**
    * Build a padded frame buffer whose every pixel encodes its own coordinates,
@@ -318,13 +324,75 @@ try {
     check('empty frame yields a valid image', img.width >= 1 && img.height >= 1);
   }
 
+  // 9. Native Y path must apply the same orientation + cover-crop as RGBA.
+  {
+    const width = 8;
+    const height = 4;
+    const pad = 3;
+    const stride = width + pad;
+    const y = new Uint8Array(stride * height).fill(7);
+    for (let row = 0; row < height; row++) {
+      for (let col = 0; col < width; col++) {
+        y[row * stride + col] = row * 10 + col;
+      }
+    }
+    const right = yPlaneToDetectorLuma(y, {
+      bytesPerRow: stride,
+      height,
+      isMirrored: false,
+      orientation: 'right',
+      width,
+    });
+    check(
+      'Y right: dimensions swap',
+      right.width === 4 && right.height === 8,
+      `${right.width}×${right.height}`,
+    );
+    check(
+      'Y right: source top-left → output bottom-left',
+      right.y[(right.height - 1) * right.width] === 0,
+      `got ${right.y[(right.height - 1) * right.width]}`,
+    );
+
+    const cropped = yPlaneToDetectorLuma(
+      y,
+      {
+        bytesPerRow: stride,
+        height,
+        isMirrored: false,
+        orientation: 'right',
+        width,
+      },
+      { crop: { height: 8, width: 2, x: 2, y: 0 } },
+    );
+    check(
+      'Y cover-crop is 2×8 portrait',
+      cropped.width === 2 && cropped.height === 8,
+      `${cropped.width}×${cropped.height}`,
+    );
+    let sawOrigin = false;
+    for (let i = 0; i < cropped.y.length; i++) {
+      if (cropped.y[i] === 0) sawOrigin = true;
+    }
+    check('Y cover-crop excluded source origin', !sawOrigin);
+
+    const rgba = frameToScanImage(
+      { ...makeFrame(8, 4), orientation: 'right' },
+      { crop: { height: 8, width: 2, x: 2, y: 0 } },
+    );
+    check(
+      'Y crop size matches RGBA crop size',
+      cropped.width === rgba.width && cropped.height === rgba.height,
+    );
+  }
+
   if (failures > 0) {
     console.error(`frame-adapter smoke: ${failures} check(s) failed`);
     process.exit(1);
   }
 
   console.log('frame-adapter smoke ok');
-  console.log('  channel order, row stride, 4 rotations, mirroring, downscale, format gate');
+  console.log('  channel order, row stride, 4 rotations, mirroring, downscale, format gate, Y cover-crop');
 } finally {
   await rm(bundleDir, { force: true, recursive: true });
 }

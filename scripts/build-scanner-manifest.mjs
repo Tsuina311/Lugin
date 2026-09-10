@@ -24,6 +24,7 @@ const arg = name => {
 const namesPath = arg('names') ?? join(root, 'dist-web/card-names.json');
 const artPath = arg('art') ?? join(root, 'dist-web/art-index.json');
 const printingPath = arg('printing');
+const typePath = arg('type');
 const outPath = arg('out') ?? join(root, 'dist-web/scanner-manifest.json');
 const baseUrl = (arg('base-url') ?? 'https://tsuina311.github.io/Lugin/').replace(/\/?$/, '/');
 
@@ -89,6 +90,26 @@ if (printingPath) {
   }
 }
 
+if (typePath) {
+  const typeBuf = await readFile(typePath);
+  const typeJson = JSON.parse(typeBuf.toString('utf8'));
+  manifest.typeIndex = await asset(
+    typePath,
+    'type-index.json',
+    typeJson.oracles?.length ?? typeJson.faces?.length ?? 0,
+  );
+  manifest._meta.typeFile = basename(typePath);
+  manifest._meta.typeBytes = (await stat(typePath)).size;
+  manifest._meta.typeCardTypes = typeJson.cardTypes?.length ?? 0;
+  manifest._meta.typeSubtypes = typeJson.subtypes?.length ?? 0;
+  manifest._meta.typeSignatures = typeJson.signatures
+    ? Object.keys(typeJson.signatures).length
+    : 0;
+  if (typeJson.generated && !manifest.sourceUpdatedAt) {
+    manifest.sourceUpdatedAt = typeJson.generated;
+  }
+}
+
 await writeFile(outPath, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`wrote ${outPath}`);
 console.log(
@@ -96,6 +117,7 @@ console.log(
     (manifest.printingIndex
       ? ` · printing ${manifest.printingIndex.recordCount}`
       : ' · printing (omitted)') +
+    (manifest.typeIndex ? ` · type ${manifest.typeIndex.recordCount}` : ' · type (omitted)') +
     ` · gz names ${(manifest.cardNames.compressedBytes / 1024).toFixed(0)} KB · ` +
     `gz art ${(manifest.artIndex.compressedBytes / 1024).toFixed(0)} KB`,
 );
