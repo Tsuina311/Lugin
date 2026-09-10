@@ -5,8 +5,6 @@ import { enhanceForOcrFast } from './preprocess';
 import type { TextRecognitionResult, TextRecognizer } from './textRecognizer';
 import type { Rect, ScanImage } from './types';
 import {
-  INPUT_CHANNEL_ORDER,
-  NATIVE_EXPECTED_CHANNEL_ORDER,
   extractTitleCrop,
   hashScanImage,
   ocrInputHashFor,

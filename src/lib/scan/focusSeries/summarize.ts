@@ -62,7 +62,7 @@ const byDelay = (
   FOCUS_SERIES_OFFSETS_MS.map(n => {
     const samples = bundles
       .map(b => sampleAt(b.samples, n))
-      .filter((s): s is FocusSeriesSample => Boolean(s) && among(s));
+      .filter((s): s is FocusSeriesSample => s != null && among(s));
     return { n, rate: pct(samples.filter(pick).length, samples.length), count: samples.length };
   });
 

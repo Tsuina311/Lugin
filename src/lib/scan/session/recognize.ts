@@ -266,11 +266,14 @@ const runTitle = async (
     };
   }
   const t0 = now();
-  let firstPass: {
-    enhancedCrop: ScanImage;
-    rawCrop: ScanImage;
-    cropRect: typeof buffers.rect;
-  } | null = null;
+  // Mutable box so CFA doesn't treat the callback assignment as impossible.
+  const firstPass = {
+    current: null as null | {
+      enhancedCrop: ScanImage;
+      rawCrop: ScanImage;
+      cropRect: typeof buffers.rect;
+    },
+  };
   let firstResult: Awaited<ReturnType<TextRecognizer['recognize']>> | null = null;
   const ocr: TextRecognizer = {
     recognize: async (image, opts) => {
@@ -284,8 +287,8 @@ const runTitle = async (
     stopAfterFirstTitle: options.stopAfterFirstTitle !== false,
     fastPreprocess: options.fastPreprocess !== false,
     onTitlePass: info => {
-      if (!firstPass) {
-        firstPass = {
+      if (!firstPass.current) {
+        firstPass.current = {
           cropRect: info.cropRect,
           enhancedCrop: info.enhancedCrop,
           rawCrop: info.rawCrop,
@@ -293,9 +296,9 @@ const runTitle = async (
       }
     },
   });
-  const raw = firstPass?.rawCrop ?? buffers.raw;
-  const enhanced = firstPass?.enhancedCrop ?? buffers.enhanced;
-  const rect = firstPass?.cropRect ?? buffers.rect;
+  const raw = firstPass.current?.rawCrop ?? buffers.raw;
+  const enhanced = firstPass.current?.enhancedCrop ?? buffers.enhanced;
+  const rect = firstPass.current?.cropRect ?? buffers.rect;
   let matrix = null;
   if (options.runOcrDebugMatrix === true && consumeOcrDebugMatrixSlot()) {
     matrix = await runOcrDebugMatrix({
@@ -303,7 +306,7 @@ const runTitle = async (
       enhancedTitle: enhanced,
       legacyRecognize: options.legacyOcr ?? null,
       rawTitle: raw,
-      recognize: deps.ocr,
+      recognize: ocrEngine,
     });
   }
   const titleCandidates = deps.nameIndex

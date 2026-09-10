@@ -46,9 +46,13 @@ export const simulatePolicy = (
 ): PolicyPick | null => {
   const first = sampleAtDelay(samples, spec.firstMs);
   if (!first) return null;
+  const fallbackMs = spec.fallbackMs;
   const useFallback =
-    spec.fallbackMs != null && !shouldStopPolicy(first) && eligibleFallback(first);
-  const selected = useFallback ? sampleAtDelay(samples, spec.fallbackMs) ?? first : first;
+    fallbackMs != null && !shouldStopPolicy(first) && eligibleFallback(first);
+  const selected =
+    useFallback && fallbackMs != null
+      ? sampleAtDelay(samples, fallbackMs) ?? first
+      : first;
   return {
     fallbackUsed: useFallback && selected !== first,
     first,
