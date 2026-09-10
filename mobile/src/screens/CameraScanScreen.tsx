@@ -190,10 +190,10 @@ export function CameraScanScreen() {
   const [detectorFallbackReason, setDetectorFallbackReason] = useState<string | null>(null);
   const [traceBusy, setTraceBusy] = useState(false);
   const [traceDir, setTraceDir] = useState<string | null>(null);
-  const [traceCount, setTraceCount] = useState(0);
+  const [, setTraceCount] = useState(0);
   const [traceElapsedMs, setTraceElapsedMs] = useState(0);
   const [traceUpload, setTraceUpload] = useState<'idle' | 'pending' | 'uploaded' | 'failed'>('idle');
-  const [traceId, setTraceId] = useState<string | null>(null);
+  const [, setTraceId] = useState<string | null>(null);
   const [showAllTools, setShowAllTools] = useState(false);
   const [benchHud, setBenchHud] = useState(() => peekBenchmarkHud());
   const preferredSource: PreferredSource = RECOGNITION_SOURCES[sourceIndex];
@@ -284,7 +284,7 @@ export function CameraScanScreen() {
         recognitionDecision: live.recognitionDecision,
         recognitionStatus: live.recognitionStatus,
         recognizeAttempts: live.recognizeAttempts,
-        matchScore: snap?.fused?.card?.score ?? null,
+        matchScore: snap?.fused?.card?.confidence ?? null,
         ocrTexts: Array.isArray(readings)
           ? readings
               .map((r: { text?: string }) => r?.text)
@@ -401,6 +401,7 @@ export function CameraScanScreen() {
 
   const onCaptureFocusSeries = useCallback(() => {
     if (seriesBusy) return;
+    if (!claimScannerMode('focus-series')) return;
     setSeriesBusy(true);
     setSaveStatus('Focus series… keep the card in the preview');
     void session
@@ -416,7 +417,10 @@ export function CameraScanScreen() {
       .catch(err => {
         setSaveStatus(err instanceof Error ? err.message : String(err));
       })
-      .finally(() => setSeriesBusy(false));
+      .finally(() => {
+        setSeriesBusy(false);
+        releaseScannerMode('focus-series');
+      });
   }, [seriesBusy, session]);
 
   const onSaveFocusSeries = useCallback(() => {

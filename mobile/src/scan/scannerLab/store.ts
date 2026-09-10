@@ -1,6 +1,6 @@
 // Replay fixtures live in documentDirectory so they survive OTA.
 
-import type { CardCorners, ScanImage } from '../sharedCore';
+import type { ScanImage } from '../sharedCore';
 import {
   bytesToBase64,
   pngBase64ToScanImage,

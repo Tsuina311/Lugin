@@ -11,7 +11,6 @@ import {
   type DeckBenchmarkPhase,
   type DeckCardTerminal,
   type DeckExpectedMultisetEntry,
-  type DeckFailureClass,
   type DeckSwapKind,
 } from '@/lib/scan/deckBenchmark';
 import { monoNow } from '@/lib/scan/timing';

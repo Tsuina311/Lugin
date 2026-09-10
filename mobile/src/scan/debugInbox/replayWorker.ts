@@ -17,7 +17,7 @@ export type ReplayWorkerDeps = {
 };
 
 const authHeaders = (): Record<string, string> => {
-  const { token, url } = getInboxSettings();
+  const { token } = getInboxSettings();
   return {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',

@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   },
   json: { color: '#C9D4E5', fontFamily: 'Menlo', fontSize: 10 },
   mono: { color: '#C9D4E5', fontFamily: 'Menlo', fontSize: 11 },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000c', padding: 12 },
+  overlay: { ...StyleSheet.absoluteFill, backgroundColor: '#000c', padding: 12 },
   root: { backgroundColor: '#0B1220', flex: 1 },
   row: { backgroundColor: '#121a28', borderRadius: 6, gap: 6, padding: 8 },
   section: { color: '#7EB0FF', fontSize: 12, fontWeight: '800', marginTop: 6 },

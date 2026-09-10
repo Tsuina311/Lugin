@@ -130,7 +130,9 @@ export const runFocusSeries = async (
   }[] = [];
 
   const peeked = ctx.peekLatest();
-  let lastValid = peeked ? { ...peeked, quadTimestamp: null } : null;
+  let lastValid: FocusSeriesLatch | null = peeked
+    ? { ...peeked, quadTimestamp: null }
+    : null;
   let previousDetector = lastValid?.detectorCorners ?? null;
 
   for (const nominal of FOCUS_SERIES_OFFSETS_MS) {

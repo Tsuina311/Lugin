@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CameraPhotoOutput, CameraRef } from 'react-native-vision-camera';
 
-import { scanImageToPngBytes, scanImageToPngDataUri } from './debug/scanImagePng';
+import { scanImageToPngDataUri } from './debug/scanImagePng';
 import {
   HIRES_WAIT_MS,
   RECOGNITION_SOURCES,
