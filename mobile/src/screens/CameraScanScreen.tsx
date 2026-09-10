@@ -401,7 +401,6 @@ export function CameraScanScreen() {
 
   const onCaptureFocusSeries = useCallback(() => {
     if (seriesBusy) return;
-    if (!claimScannerMode('focus-series')) return;
     setSeriesBusy(true);
     setSaveStatus('Focus series… keep the card in the preview');
     void session
@@ -417,10 +416,7 @@ export function CameraScanScreen() {
       .catch(err => {
         setSaveStatus(err instanceof Error ? err.message : String(err));
       })
-      .finally(() => {
-        setSeriesBusy(false);
-        releaseScannerMode('focus-series');
-      });
+      .finally(() => setSeriesBusy(false));
   }, [seriesBusy, session]);
 
   const onSaveFocusSeries = useCallback(() => {
