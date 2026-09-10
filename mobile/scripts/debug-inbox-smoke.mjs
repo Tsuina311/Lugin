@@ -21,6 +21,7 @@ let fetchImpl = async () => {
 
 const fsStub = join(dir, 'fs.mjs');
 const benchStub = join(dir, 'bench.mjs');
+const ocrStub = join(dir, 'ocr.mjs');
 const rnStub = join(dir, 'rn.mjs');
 const outfile = join(dir, 'inbox.mjs');
 
@@ -46,6 +47,14 @@ export const deleteAsync = async (uri) => { files.delete(uri); };
 
 await writeFile(benchStub, 'export const isBenchmarkToolsEnabled = () => true;\n');
 await writeFile(
+  ocrStub,
+  `
+export const getLuginOcrModule = () => {
+  throw new Error('lugin-ocr stub — not used by debug-inbox smoke');
+};
+`,
+);
+await writeFile(
   rnStub,
   `
 export const Platform = { OS: 'android', select: (spec) => spec.android ?? spec.default };
@@ -66,6 +75,7 @@ globalThis.fetch = async (url, init) => {
 await esbuild.build({
   alias: {
     'expo-file-system/legacy': fsStub,
+    'lugin-ocr': ocrStub,
     'react-native': rnStub,
   },
   bundle: true,
@@ -74,6 +84,7 @@ await esbuild.build({
   format: 'esm',
   outfile,
   platform: 'neutral',
+  mainFields: ['main', 'module'],
   plugins: [
     {
       name: 'stub-benchmark-gate',
