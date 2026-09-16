@@ -112,6 +112,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       'expo-sharing',
       'lugin-card-detector',
       'lugin-ocr',
+      'lugin-visual-recognizer',
     ],
     web: {
       favicon: './assets/favicon.png',

@@ -132,6 +132,26 @@ export const mapCornersToHiRes = (corners: CardCorners, req: HiResMapRequest): C
   topRight: mapDetectorToHiRes(corners.topRight, req),
 });
 
+/**
+ * Canonical analysis→source projection. Prefer this name in new forensics code;
+ * implementation is mapCornersToHiRes (same-fov / oriented-full + optional mirror).
+ */
+export const projectAnalysisQuadToSource = mapCornersToHiRes;
+/** Inverse of same-FOV map — for round-trip tests. */
+export const mapHiResToDetectorSameFov = (p: Point2D, hires: Size2D, detector: Size2D): Point2D =>
+  fromNorm(toNorm(p, hires), detector);
+
+export const mapCornersHiResToDetectorSameFov = (
+  corners: CardCorners,
+  hires: Size2D,
+  detector: Size2D,
+): CardCorners => ({
+  topLeft: mapHiResToDetectorSameFov(corners.topLeft, hires, detector),
+  topRight: mapHiResToDetectorSameFov(corners.topRight, hires, detector),
+  bottomRight: mapHiResToDetectorSameFov(corners.bottomRight, hires, detector),
+  bottomLeft: mapHiResToDetectorSameFov(corners.bottomLeft, hires, detector),
+});
+
 export const mapCornersToOrientedSource = (
   corners: CardCorners,
   detector: Size2D,

@@ -20,6 +20,7 @@ import type {
   DetectionScoreParts,
 } from './detection/types';
 import { selectPrimaryAmongDebugCandidates } from './detection/multi';
+import { evaluateMtgFastAccept } from './detection/mtgFastPath';
 import {
   cornersToQuad,
   dist,
@@ -35,6 +36,9 @@ export interface DetectResult {
   corners: CardCorners | null;
   /** Structured candidates for debug / eval — always populated. */
   debug: DetectionDebug;
+  /** True when evaluateMtgFastAccept passed (fail-closed early accept). */
+  fastAccept?: boolean;
+  fastAcceptConfidence?: number;
   /** Persistent tracked quad for lock / hi-res (not the smoothed overlay). */
   lockCorners?: CardCorners | null;
   quad: Quad | null;
@@ -191,6 +195,8 @@ export const detectCardQuad = (image: ScanImage): DetectResult => {
     return {
       corners: null,
       debug: { candidates, ms, selectedIndex: -1, workSize: { height: h, width: w } },
+      fastAccept: false,
+      fastAcceptConfidence: 0,
       quad: null,
       score: 0,
     };
@@ -203,6 +209,19 @@ export const detectCardQuad = (image: ScanImage): DetectResult => {
     };
   }
 
+  const accepted = candidates
+    .filter(c => c.corners && c.rejectedBecause.length === 0)
+    .sort((a, b) => b.score - a.score);
+  const runnerUp = accepted.find((_, i) => i > 0 && accepted[i]!.index !== selected.index) ??
+    accepted[1] ??
+    null;
+  const fast = evaluateMtgFastAccept({
+    corners: selected.corners,
+    score: selected.score,
+    frame: { width: fullW, height: fullH },
+    runnerUpScore: runnerUp && runnerUp.index !== selected.index ? runnerUp.score : null,
+  });
+
   return {
     corners: selected.corners,
     debug: {
@@ -211,6 +230,8 @@ export const detectCardQuad = (image: ScanImage): DetectResult => {
       selectedIndex: selected.index,
       workSize: { height: h, width: w },
     },
+    fastAccept: fast.accept,
+    fastAcceptConfidence: fast.confidence,
     quad: selected.quad,
     score: selected.score,
   };

@@ -31,13 +31,16 @@ const selectionShortcuts = (): string =>
 /**
  * It only takes on the accent wash — and only shows the actions — once something
  * is selected, so an idle list stays quiet and just says how to start.
+ * `trailing` stays visible either way (e.g. a disabled “Search sellers” control).
  */
 export const SelectionBar = ({
   children,
   selection,
+  trailing,
 }: {
   children?: ReactNode;
   selection: RowSelection;
+  trailing?: ReactNode;
 }) => (
   <div
     className={`flex flex-none flex-wrap items-center gap-1.5 border-b border-line px-2 py-1 text-2xs transition-colors ${
@@ -63,5 +66,6 @@ export const SelectionBar = ({
     ) : (
       <span className="text-ink-faint">{selectionHint()}</span>
     )}
+    {trailing}
   </div>
 );

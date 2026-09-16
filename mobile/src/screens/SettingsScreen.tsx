@@ -34,6 +34,7 @@ import {
 } from '../scan/benchmark';
 import { useAppUpdates } from '../updates/UpdateProvider';
 import { DebugInboxPanel } from '../scan/debugInbox';
+import { PendingUploadsPanel } from '../scan/uploadQueue/PendingUploadsPanel';
 
 function extraLugin(): { buildId?: string; buildLabel?: string; channel?: string } {
   const extra = Constants.expoConfig?.extra as
@@ -176,7 +177,13 @@ export function SettingsScreen() {
       {benchEnabled ? (
         <>
           <DebugInboxPanel />
+          <PendingUploadsPanel />
 
+          <Text style={styles.section}>Developer Tools</Text>
+          <Text style={styles.line}>
+            Deck / Swap / Focus Series / Scanner Lab remain on the camera debug panel (dev builds).
+            Binder product mode is the Binder tab. Geometry is the detector lab tab.
+          </Text>
           <Text style={styles.section}>Scanner Benchmark Session</Text>
           <Text style={styles.note}>
             Dev-only. Each recognition auto-saves JSON + full 744×1039 PNG locally. Uploads never

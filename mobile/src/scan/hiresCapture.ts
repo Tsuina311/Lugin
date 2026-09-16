@@ -77,6 +77,10 @@ export interface HiResSourceStats {
 
 export interface HiResCache {
   attempt: HiResAttempt;
+  /** Session that owned the capture request — never retagged at read time. */
+  cardSessionId: number | null;
+  /** Monotonic capture id for provenance / late-resolve races. */
+  captureId: number | null;
   corners: CardCorners;
   mapped: CardCorners;
   prepared: PreparedCard;
@@ -186,14 +190,38 @@ export const markSourceFailure = (
 /**
  * Whether recognition may proceed.
  * - In-flight capture → wait
- * - True hi-res ready → yes
+ * - True hi-res ready for THIS card session → yes
  * - Within HIRES_WAIT_MS of wait start without a result → wait
  * - After timeout / failed attempt recorded → allow fallback
  */
-export const canRecognizeFromStore = (store: HiResStore, waitMs = HIRES_WAIT_MS): boolean => {
+export const canRecognizeFromStore = (
+  store: HiResStore,
+  waitMs = HIRES_WAIT_MS,
+  cardSessionId?: number | null,
+): boolean => {
   if (store.inFlight) return false;
-  if (store.cache && isTrueHiRes(store.cache.attempt.mode)) return true;
-  if (store.cache && store.cache.attempt.mode === 'analysis-fallback') return true;
+  if (store.cache && isTrueHiRes(store.cache.attempt.mode)) {
+    if (
+      cardSessionId != null &&
+      store.cache.cardSessionId != null &&
+      store.cache.cardSessionId !== cardSessionId
+    ) {
+      return false;
+    }
+    // Untagged legacy cache is not trustworthy across sessions.
+    if (cardSessionId != null && store.cache.cardSessionId == null) return false;
+    return true;
+  }
+  if (store.cache && store.cache.attempt.mode === 'analysis-fallback') {
+    if (
+      cardSessionId != null &&
+      store.cache.cardSessionId != null &&
+      store.cache.cardSessionId !== cardSessionId
+    ) {
+      return false;
+    }
+    return true;
+  }
   if (store.waitStartedAt == null) return false;
   return Date.now() - store.waitStartedAt >= waitMs;
 };
@@ -247,9 +275,19 @@ export const mapAndWarp = (
 };
 
 /** Sync refine: cached hi-res only. Do not pretend analysis-warp is high-res. */
-export const refineFromStore = (store: HiResStore): PreparedCard | null => {
+export const refineFromStore = (
+  store: HiResStore,
+  cardSessionId?: number | null,
+): PreparedCard | null => {
   if (!store.cache) return null;
   if (!isTrueHiRes(store.cache.attempt.mode)) return null;
+  if (
+    cardSessionId != null &&
+    store.cache.cardSessionId != null &&
+    store.cache.cardSessionId !== cardSessionId
+  ) {
+    return null;
+  }
   return store.cache.prepared;
 };
 
@@ -258,6 +296,7 @@ export const invalidateHiResCache = (store: HiResStore, reason?: string): void =
   store.cache = null;
   store.inFlight = false;
   store.phase = 'idle';
+  store.waitStartedAt = null;
   if (reason) store.lastAttempt = store.lastAttempt
     ? { ...store.lastAttempt, reason }
     : null;
@@ -269,6 +308,7 @@ export const putFallback = (
   corners: CardCorners,
   score: number,
   reason?: string,
+  ownership?: { cardSessionId: number | null; captureId: number | null },
 ): PreparedCard => {
   const t0 = now();
   const prepared = warpAnalysisCard(analysis, corners, score);
@@ -292,10 +332,23 @@ export const putFallback = (
   store.phase = 'failed';
   store.cache = {
     attempt,
+    cardSessionId: ownership?.cardSessionId ?? null,
+    captureId: ownership?.captureId ?? null,
     corners,
     mapped: corners,
     prepared,
     source: analysis,
   };
   return prepared;
+};
+
+/** True when cache is owned by the given card session (or untagged legacy). */
+export const hiResCacheOwnedBySession = (
+  store: HiResStore,
+  cardSessionId: number | null | undefined,
+): boolean => {
+  if (!store.cache) return false;
+  if (cardSessionId == null) return true;
+  if (store.cache.cardSessionId == null) return false;
+  return store.cache.cardSessionId === cardSessionId;
 };

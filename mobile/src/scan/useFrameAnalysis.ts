@@ -66,6 +66,7 @@ import {
   createSessionController,
   DETECT_MIN_SCORE,
   emptyContinuity,
+  softResetContinuityForNewCardSession,
   stepContinuity,
   type CardCorners,
   type ContinuityState,
@@ -79,6 +80,7 @@ import {
 } from './detectorEngine';
 import { packedYToGrayScanImage } from './yPlaneToGrayScanImage';
 import { getPerfBaseline } from './perfBaseline';
+import { registerContinuitySoftReset } from './continuityBridge';
 
 /** How far up the transfer ladder the worklet is allowed to climb. */
 export const RUNGS = ['ping', 'meta', 'tiny', 'full'] as const;
@@ -383,6 +385,16 @@ export const useFrameAnalysis = ({
   const onAnalyzedRef = useRef(onAnalyzed);
   onAnalyzedRef.current = onAnalyzed;
   const continuityRef = useRef<ContinuityState>(emptyContinuity());
+
+  useEffect(() => {
+    registerContinuitySoftReset(reason => {
+      continuityRef.current = softResetContinuityForNewCardSession(
+        continuityRef.current,
+        reason,
+      );
+    });
+    return () => registerContinuitySoftReset(null);
+  }, []);
 
   const stabilizeDetection = (raw: DetectResult, image: ScanImage | null): DetectResult => {
     const candidates = raw.debug.candidates

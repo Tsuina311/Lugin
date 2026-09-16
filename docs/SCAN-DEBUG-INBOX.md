@@ -91,6 +91,29 @@ adb reverse tcp:8787 tcp:8787
 
 Then `http://127.0.0.1:8787`. Not the normal current-APK path.
 
+The tunnel is supervised: if cloudflared exits (VPN/network route change), it
+retries with backoff and prints a new Pair line when the Quick Tunnel URL
+changes. Bearer token / inbox name live in `.scan-inbox/config.json` and are
+**not** regenerated on tunnel restart.
+
+Phone Settings → Debug receiver: paste the new Pair line (or bare HTTPS URL).
+Saved token/name on the phone are kept; only the endpoint updates.
+
+Current state is written to `.scan-inbox/tunnel.json` (url, status, pid).
+
+### Named Tunnel (optional, stable hostname)
+
+Quick Tunnel URLs are ephemeral after restart. For daily VPN use, configure a
+[named Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/)
+with your own hostname, then:
+
+1. Keep `yarn scan:inbox` running (same persistent token in `config.json`)
+2. Point the named tunnel at `http://127.0.0.1:8787`
+3. On the phone, set the stable `https://your-hostname` once + same token
+
+`SCAN_INBOX_NAMED_TUNNEL=1 yarn scan:inbox:tunnel` prints guidance only — it does
+not invent credentials or domains. Named tunnels require your Cloudflare account.
+
 Do not use ngrok or other public hosts unless you choose to. The supported optional path is Cloudflare quick tunnel via `yarn scan:inbox:tunnel`.
 
 ## Android cleartext HTTP
@@ -104,4 +127,4 @@ Do not use ngrok or other public hosts unless you choose to. The supported optio
 
 ## Privacy
 
-Explicit debug mode. No analytics. No third-party upload except the optional Cloudflare quick tunnel you start yourself. Queue never runs in production UI. The tunnel URL is not written to disk.
+Explicit debug mode. No analytics. No third-party upload except the optional Cloudflare quick tunnel you start yourself. Queue never runs in production UI. Tunnel URL may be written to local gitignored `.scan-inbox/tunnel.json` for operator convenience; bearer token is not printed into permanent logs by the supervisor.

@@ -36,7 +36,10 @@ export type CardSessionResetReason =
   | 'identity-change'
   | 'scan-again'
   | 'result-dismissed'
-  | 'debug-focus-series';
+  | 'debug-focus-series'
+  | 'verified-next'
+  | 'verified-retake'
+  | 'verified-add-next';
 
 export interface CardFingerprint {
   art: ArtworkDescriptor;

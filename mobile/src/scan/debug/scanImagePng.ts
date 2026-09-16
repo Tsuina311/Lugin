@@ -126,27 +126,19 @@ const storedZlib = (raw: Uint8Array): Uint8Array => {
   return out.subarray(0, at);
 };
 
-/**
- * Encode `image` as an uncompressed PNG byte buffer (optionally downscaled).
- *
- * Pass the image width (or larger) to keep full resolution — recognition export
- * must not shrink 744×1039 or title/rules become unreadable.
- */
-export const scanImageToPngBytes = (image: ScanImage, maxWidth = 120): Uint8Array => {
-  const small = shrink(image, maxWidth);
-
+const encodePngExact = (image: ScanImage): Uint8Array => {
   // PNG scanlines: one filter byte (0 = none) per row, then RGBA.
-  const stride = small.width * 4;
-  const raw = new Uint8Array((stride + 1) * small.height);
-  for (let y = 0; y < small.height; y++) {
+  const stride = image.width * 4;
+  const raw = new Uint8Array((stride + 1) * image.height);
+  for (let y = 0; y < image.height; y++) {
     raw[y * (stride + 1)] = 0;
-    raw.set(small.data.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1);
+    raw.set(image.data.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1);
   }
 
   const ihdr = new Uint8Array(13);
   const header = new DataView(ihdr.buffer);
-  header.setUint32(0, small.width);
-  header.setUint32(4, small.height);
+  header.setUint32(0, image.width);
+  header.setUint32(4, image.height);
   ihdr[8] = 8; // bit depth
   ihdr[9] = 6; // colour type: truecolour with alpha
   ihdr[10] = 0; // deflate
@@ -171,15 +163,70 @@ export const scanImageToPngBytes = (image: ScanImage, maxWidth = 120): Uint8Arra
 };
 
 /**
- * `data:image/png;base64,…` for `image`, downscaled to `maxWidth` when larger.
- *
- * Pass the image width (or larger) to keep full resolution — recognition export
- * must not shrink 744×1039 or title/rules become unreadable.
+ * Debug / UI thumbnail encoder. Default maxWidth=120.
+ * Never use this for benchmark corpus artifacts (source.png / card.png).
+ */
+export const scanImageToThumbnailPngBytes = (
+  image: ScanImage,
+  maxWidth = 120,
+): Uint8Array => encodePngExact(shrink(image, maxWidth));
+
+/**
+ * Full-resolution artifact encoder — no downscale.
+ * Benchmark persistence (Geometry / Deck / Binder) must use this.
+ */
+export const scanImageToArtifactPngBytes = (image: ScanImage): Uint8Array =>
+  encodePngExact(image);
+
+/**
+ * @deprecated Prefer {@link scanImageToThumbnailPngBytes} or
+ * {@link scanImageToArtifactPngBytes}. Default maxWidth=120 is a thumbnail trap.
+ */
+export const scanImageToPngBytes = (image: ScanImage, maxWidth = 120): Uint8Array =>
+  maxWidth >= image.width
+    ? scanImageToArtifactPngBytes(image)
+    : scanImageToThumbnailPngBytes(image, maxWidth);
+
+/** Thumbnail data URI (default 120px wide). */
+export const scanImageToThumbnailPngDataUri = (
+  image: ScanImage,
+  maxWidth = 120,
+): string => `data:image/png;base64,${base64(scanImageToThumbnailPngBytes(image, maxWidth))}`;
+
+/** Full-resolution data URI — no downscale. */
+export const scanImageToArtifactPngDataUri = (image: ScanImage): string =>
+  `data:image/png;base64,${base64(scanImageToArtifactPngBytes(image))}`;
+
+/**
+ * @deprecated Prefer thumbnail or artifact data-URI helpers.
  */
 export const scanImageToPngDataUri = (image: ScanImage, maxWidth = 120): string =>
-  `data:image/png;base64,${base64(scanImageToPngBytes(image, maxWidth))}`;
+  maxWidth >= image.width
+    ? scanImageToArtifactPngDataUri(image)
+    : scanImageToThumbnailPngDataUri(image, maxWidth);
 
 export const bytesToBase64 = (bytes: Uint8Array): string => base64(bytes);
+
+/** Read IHDR width/height without decoding pixels. */
+export const pngIhdrDimensions = (
+  png: Uint8Array,
+): { width: number; height: number } | null => {
+  if (png.length < 24) return null;
+  for (let i = 0; i < PNG_SIGNATURE.length; i++) {
+    if (png[i] !== PNG_SIGNATURE[i]) return null;
+  }
+  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  // signature(8) + len(4) + 'IHDR'(4) + width/height
+  if (
+    png[12] !== 0x49 ||
+    png[13] !== 0x48 ||
+    png[14] !== 0x44 ||
+    png[15] !== 0x52
+  ) {
+    return null;
+  }
+  return { width: view.getUint32(16), height: view.getUint32(20) };
+};
 
 const fromBase64 = (text: string): Uint8Array => {
   const clean = text.replace(/[^A-Za-z0-9+/=]/g, '');
@@ -270,4 +317,10 @@ export const pngBytesToScanImage = (png: Uint8Array): ScanImage => {
 };
 
 export const pngBase64ToScanImage = (b64: string): ScanImage => pngBytesToScanImage(fromBase64(b64));
+
+/** IHDR from the start of a base64 PNG (only needs the first 32 base64 chars). */
+export const pngIhdrDimensionsFromBase64 = (
+  b64: string,
+): { width: number; height: number } | null =>
+  pngIhdrDimensions(fromBase64(b64.slice(0, 48)));
 

@@ -3,11 +3,13 @@
 
 import { dist, type Quad } from './geometry';
 import {
+  STABILITY_FAST_MIN_SCORE,
   STABILITY_MAX_AREA_CHANGE,
   STABILITY_MAX_CENTER_MOVE,
   STABILITY_MAX_CORNER_MOVE,
   STABILITY_MIN_IOU,
   STABILITY_WINDOW,
+  STABILITY_WINDOW_FAST,
   TRACK_COAST_FRAMES,
   TRACK_SMOOTH_ALPHA,
 } from './params';
@@ -162,6 +164,12 @@ export const pushTrack = (
     };
   }
 
+  // Confidence-dependent window: obvious high-score cards may lock sooner.
+  const effectiveWindow =
+    sample.score >= STABILITY_FAST_MIN_SCORE
+      ? Math.min(window, STABILITY_WINDOW_FAST)
+      : window;
+
   const next: TrackSample = {
     ...sample,
     area: sample.area || quadArea(sample.corners),
@@ -223,10 +231,10 @@ export const pushTrack = (
         return Math.abs(d);
       })()
     : 0;
-  const history = [...state.history, next].slice(-Math.max(2, window + 2));
+  const history = [...state.history, next].slice(-Math.max(2, effectiveWindow + 2));
   const smoothed = smoothCorners(state.smoothed, next.corners);
 
-  if (history.length < window) {
+  if (history.length < effectiveWindow) {
     return {
       coast: 0,
       consecutiveStable: history.length,
@@ -242,7 +250,7 @@ export const pushTrack = (
     };
   }
 
-  const recent = history.slice(-window);
+  const recent = history.slice(-effectiveWindow);
   let stable = true;
   for (let i = 1; i < recent.length; i++) {
     const a = recent[i - 1];

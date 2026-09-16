@@ -35,6 +35,11 @@ export interface ContinuityTrack {
   coast: number;
   corners: CardCorners;
   createdAt: number;
+  /**
+   * After a new physical cardSession on the same geometryTrackId, force the
+   * next hit to adopt raw corners immediately (do not hysteresis-hold A).
+   */
+  forceAdoptNext: boolean;
   /** Why tracked corners were last held instead of updated (0015 diagnostics). */
   holdReason: string | null;
   id: number;
@@ -109,6 +114,34 @@ export const emptyContinuity = (): ContinuityState => ({
   roleSwitchCount: 0,
   track: null,
 });
+
+/**
+ * New physical card on the same geometry track: keep track.id, but force the
+ * next detector hit to replace held corners (deck swap / cardSession bump).
+ */
+export const softResetContinuityForNewCardSession = (
+  state: ContinuityState,
+  reason = 'new-card-session',
+): ContinuityState => {
+  if (!state.track) {
+    return { ...state, lastResetReason: reason, pendingSwitch: 0, presented: null };
+  }
+  return {
+    ...state,
+    lastResetReason: reason,
+    pendingSwitch: 0,
+    presented: null,
+    track: {
+      ...state.track,
+      forceAdoptNext: true,
+      holdReason: null,
+      innerPresentCount: 0,
+      lastReason: reason,
+      outerPresentCount: 0,
+      score: 0,
+    },
+  };
+};
 
 const pts = (c: CardCorners): Point[] => [
   c.topLeft,
@@ -481,6 +514,7 @@ export const stepContinuity = (
       coast: 0,
       corners: rawCorners,
       createdAt: now,
+      forceAdoptNext: false,
       holdReason: null,
       id: state.nextId,
       innerPresentCount: 0,
@@ -520,6 +554,44 @@ export const stepContinuity = (
   const picked = pickCandidate(state.track, rawCorners, input.rawScore, candidates);
   const compare = picked.corners;
   const metrics = measureContinuity(state.track.corners, compare);
+
+  // New cardSession on same geometryTrack: adopt raw immediately (fail-open to fresh pixels).
+  if (state.track.forceAdoptNext) {
+    const track: ContinuityTrack = {
+      ...state.track,
+      age: state.track.age + 1,
+      coast: 0,
+      corners: compare,
+      forceAdoptNext: false,
+      holdReason: null,
+      lastHitAt: now,
+      lastReason: 'force adopt after new card session',
+      score: Math.max(picked.score, input.rawScore),
+      updatedAt: now,
+    };
+    return finish(
+      {
+        ...state,
+        lastResetReason: null,
+        pendingSwitch: 0,
+        presented: compare,
+        track,
+      },
+      {
+        hit: true,
+        metrics,
+        presentedCorners: compare,
+        rawCorners,
+        selectedIndex: picked.index,
+        selectedRole: track.role,
+        selectionReason: track.lastReason,
+        switched: false,
+        track,
+        trackedCorners: compare,
+      },
+    );
+  }
+
   const intent = intentFor(state.track, compare, picked.score);
   const nest = nestedKind(state.track.corners, compare);
   let seenInner = nest === 'raw-is-inner';
@@ -657,6 +729,7 @@ export const stepContinuity = (
     coast: 0,
     corners: compare,
     createdAt: now,
+    forceAdoptNext: false,
     holdReason: null,
     id: state.nextId,
     innerPresentCount: 0,

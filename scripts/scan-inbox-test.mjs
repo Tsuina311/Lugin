@@ -143,6 +143,61 @@ await check('scanner lab fixture files are accepted', async () => {
   assert.equal(existsSync(join(dest, 'source-highres.png')), true);
 });
 
+await check('geometry-test source/card/metadata files are accepted', async () => {
+  const res = await upload({
+    files: {
+      'summary.json': {
+        mime: 'application/json',
+        text: '{"kind":"geometry-test","fixtureId":"geometry-test-unit","items":[]}',
+      },
+      'geom-001-source.png': { base64: png.toString('base64'), mime: 'image/png' },
+      'geom-001-card.png': { base64: png.toString('base64'), mime: 'image/png' },
+      'geom-001-metadata.json': {
+        mime: 'application/json',
+        text: '{"itemIndex":1,"manualCapture":false}',
+      },
+    },
+    sessionId: 'geometry-test-unit',
+    traceId: 'summary',
+    traceType: 'geometry-test',
+  });
+  assert.equal(res.status, 200, res.json?.reason ?? res.text);
+  const dest = join(dir, 'sessions', 'geometry-test-unit', 'summary');
+  assert.equal(existsSync(join(dest, 'summary.json')), true);
+  assert.equal(existsSync(join(dest, 'geom-001-card.png')), true);
+  assert.equal(existsSync(join(dest, 'geom-001-source.png')), true);
+});
+
+await check('binder diagnostic page/track files are accepted', async () => {
+  const res = await upload({
+    files: {
+      'summary.json': {
+        mime: 'application/json',
+        text: '{"kind":"binder","fixtureId":"binder-session-unit","pages":[]}',
+      },
+      'p01-f001.png': { base64: png.toString('base64'), mime: 'image/png' },
+      'p01-t01-card.png': { base64: png.toString('base64'), mime: 'image/png' },
+      'p01-metadata.json': {
+        mime: 'application/json',
+        text: '{"pageIndex":1,"status":"DONE"}',
+      },
+      'p01-tracks.json': {
+        mime: 'application/json',
+        text: '{"pageIndex":1,"tracks":[{"binderTrackId":"t1","identificationReady":true}]}',
+      },
+    },
+    sessionId: 'binder-session-unit',
+    traceId: 'summary',
+    traceType: 'binder',
+  });
+  assert.equal(res.status, 200, res.json?.reason ?? res.text);
+  const dest = join(dir, 'sessions', 'binder-session-unit', 'summary');
+  assert.equal(existsSync(join(dest, 'summary.json')), true);
+  assert.equal(existsSync(join(dest, 'p01-f001.png')), true);
+  assert.equal(existsSync(join(dest, 'p01-t01-card.png')), true);
+  assert.equal(existsSync(join(dest, 'p01-tracks.json')), true);
+});
+
 await check('capture-quality A/B bundle is one upload', async () => {
   const res = await upload({
     files: {
@@ -281,6 +336,45 @@ await check('duplicate traceId is idempotent', async () => {
   });
   assert.equal(res.status, 200);
   assert.equal(res.json.already, true);
+  assert.ok(Array.isArray(res.json.receivedFiles));
+});
+
+await check('session file list returns received names across traces', async () => {
+  const sessionId = 'binder-list-demo';
+  const a = await upload({
+    files: {
+      'p01-f001.png': { mime: 'image/png', base64: png.toString('base64') },
+    },
+    sessionId,
+    traceId: 'p01-f001',
+    traceType: 'binder-benchmark',
+  });
+  assert.equal(a.status, 200);
+  const b = await upload({
+    files: {
+      'p01-f002.png': { mime: 'image/png', base64: png.toString('base64') },
+    },
+    sessionId,
+    traceId: 'p01-f002',
+    traceType: 'binder-benchmark',
+  });
+  assert.equal(b.status, 200);
+  const listed = await call(`/api/sessions/${sessionId}`);
+  assert.equal(listed.status, 200);
+  assert.equal(listed.json.ok, true);
+  const names = listed.json.files.map(f => f.name).sort();
+  assert.deepEqual(names, ['p01-f001.png', 'p01-f002.png']);
+  // Idempotent re-upload of same path
+  const again = await upload({
+    files: {
+      'p01-f001.png': { mime: 'image/png', base64: png.toString('base64') },
+    },
+    sessionId,
+    traceId: 'p01-f001',
+    traceType: 'binder-benchmark',
+  });
+  assert.equal(again.status, 200);
+  assert.equal(again.json.already, true);
 });
 
 await check('missing token rejected', async () => {
@@ -433,6 +527,56 @@ await check('receiver unavailable is a client-visible failure (not a write)', as
     threw = true;
   }
   assert.equal(threw, true);
+});
+
+await check('inbox config: token/name persist; restart does not regenerate', async () => {
+  const { ensureInboxConfig, tunnelRestartBackoffMs, writeTunnelState, readTunnelState } =
+    await import('./scan-inbox/inbox-config.mjs');
+  const cfgDir = await mkdtemp(join(tmpdir(), 'lugin-inbox-cfg-'));
+  const first = await ensureInboxConfig(cfgDir, { name: 'dev-phone', token: 'persist-token-abcdefghijklmnopqrst' });
+  assert.equal(first.token, 'persist-token-abcdefghijklmnopqrst');
+  assert.equal(first.name, 'dev-phone');
+  const second = await ensureInboxConfig(cfgDir);
+  assert.equal(second.token, first.token);
+  assert.equal(second.name, first.name);
+  const forced = await ensureInboxConfig(cfgDir, { forceNewToken: true });
+  assert.notEqual(forced.token, first.token);
+  assert.equal(forced.name, 'dev-phone');
+  assert.equal(tunnelRestartBackoffMs(0), 2000);
+  assert.equal(tunnelRestartBackoffMs(2), 8000);
+  assert.ok(tunnelRestartBackoffMs(20) <= 60_000);
+  await writeTunnelState(cfgDir, {
+    url: 'https://old.trycloudflare.com',
+    status: 'exited',
+    inboxName: first.name,
+    tokenRef: 'config.json',
+  });
+  const t1 = await readTunnelState(cfgDir);
+  assert.equal(t1.url, 'https://old.trycloudflare.com');
+  await writeTunnelState(cfgDir, {
+    url: 'https://new.trycloudflare.com',
+    status: 'up',
+    inboxName: first.name,
+    tokenRef: 'config.json',
+  });
+  const t2 = await readTunnelState(cfgDir);
+  assert.equal(t2.url, 'https://new.trycloudflare.com');
+  // Credentials unchanged when endpoint changes
+  const afterUrl = await ensureInboxConfig(cfgDir);
+  assert.equal(afterUrl.token, forced.token);
+  await rm(cfgDir, { force: true, recursive: true });
+});
+
+await check('pairing: URL-only update keeps token absent so phone retains saved token', () => {
+  const urlOnly = parsePairInput('lugin://pair-debug?url=https%3A%2F%2Fnew.trycloudflare.com');
+  assert.ok(urlOnly);
+  assert.equal(urlOnly.url, 'https://new.trycloudflare.com');
+  assert.equal(urlOnly.token, '');
+  const full = parsePairInput(
+    pairingUrl('https://new.trycloudflare.com', 'same-token-abcdefghijklmnopqrstuv'),
+  );
+  assert.ok(full);
+  assert.equal(full.token, 'same-token-abcdefghijklmnopqrstuv');
 });
 
 await rm(dir, { force: true, recursive: true });

@@ -1,10 +1,12 @@
-import { useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react';
 
 import { useCardMetadata } from '../useCardMetadata';
 import { useRowSelection } from '../useRowSelection';
 import { useWideLayout } from '../useWideLayout';
 
+import { AddCardToWant, wantListOptionsFrom } from './AddCardToWant';
 import { Badge } from './Badge';
+import { BestSellersForList } from './BestSellersForList';
 import { Button } from './Button';
 import { CollectionThumb } from './CollectionThumb';
 import { EmptyState } from './EmptyState';
@@ -24,13 +26,14 @@ import {
   Loader2,
   Pencil,
   RefreshCw,
+  Search,
   Trash2,
+  TrendingUp,
   X,
 } from './icons';
 
 import { previewStore } from '@/content/previewStore';
 import { catalogueSearchStore } from '@/content/catalogueSearchStore';
-import { imageUrlFor } from '@/lib/cardImage';
 import { askForLogin, cmToken } from '@/content/session';
 import { taskQueue } from '@/content/taskQueue';
 import {
@@ -44,8 +47,10 @@ import {
   type ListCard,
 } from '@/content/wantsIndex';
 import { wantsStore } from '@/content/wantsStore';
-import { cardKey } from '@/lib/cardName';
+import { cardKey, stripVersion } from '@/lib/cardName';
+import { requestPrices } from '@/lib/messaging';
 import type { CardMetadata } from '@/lib/mtg';
+import { money, priceOf } from '@/lib/prices';
 import {
   CONDITIONS,
   readWantDefaults,
@@ -53,19 +58,42 @@ import {
   type WantDefaults,
 } from '@/sites/cardmarket/wantDefaults';
 import {
+  createWantList,
   deleteWant,
   deleteWantList,
+  fetchAllWantLists,
+  fetchPriceGuide,
+  findProductForCard,
   listWantRows,
   massDeleteWants,
   massMoveWants,
+  metacardUrlFromName,
+  pace,
   renameWantList,
   wantListName,
   WANT_LIST_NAME,
+  type PriceGuide,
   type WantRow,
   type WantsIndexList,
 } from '@/sites/cardmarket/wants';
 import { taskProgress, timeAgo } from '@/ui/format';
 import { holdingPick, PICK_KEY } from '@/ui/modifier';
+import { usePrices } from '@/ui/usePrices';
+
+/** Scratch list used to rank sellers for an arbitrary selection. */
+const LUGIN_SEARCH_NAME = 'Lugin Search';
+
+const parseEuro = (s?: string): number | undefined => {
+  if (!s) return undefined;
+  const v = Number.parseFloat(s.replace(/[^\d,]/g, '').replace(',', '.'));
+  return Number.isFinite(v) ? v : undefined;
+};
+
+const productUrlFor = (idProduct: string): string => {
+  const first = location.pathname.split('/').filter(Boolean)[0] ?? '';
+  const lang = /^[a-z]{2}$/.test(first) ? first : 'en';
+  return `${location.origin}/${lang}/Magic/Products?idProduct=${encodeURIComponent(idProduct)}`;
+};
 
 /** The site's own page for a list, for anything we don't do ourselves yet. */
 const listUrl = (id: string): string => {
@@ -152,9 +180,16 @@ interface PaneProps {
   /** Given, the pane's title becomes a picker for which list it shows. */
   onPick?: (listId: string) => void;
   onRemove: (card: ListCard) => void;
-  /** The lists the picker offers (the other pane's is left out by the caller). */
+  /**
+   * Stage the selection into “Lugin Search” and rank sellers for it, without
+   * leaving this list. Absent on the compare pane.
+   */
+  onSearchSellers?: (cards: ListCard[]) => void;
+  /** Lists the picker offers (the other pane's is left out by the caller). */
   options?: WantsIndexList[];
   removing: Record<string, string>;
+  /** True while the Lugin Search staging run is in flight. */
+  searchSellersBusy?: boolean;
   shape: Shape;
   /** Card keys the other pane wants too, for the doubles split. */
   shared?: Set<string>;
@@ -176,8 +211,10 @@ const ListPane = ({
   onDropWants,
   onPick,
   onRemove,
+  onSearchSellers,
   options = [],
   removing,
+  searchSellersBusy = false,
   shape,
   shared,
   split,
@@ -192,17 +229,146 @@ const ListPane = ({
   const heldCmd = useRef(false);
   const [snag, setSnag] = useState<string | null>(null);
 
+  // Snapshot trend is free; live From/Trend come from product pages on demand.
+  const { snapshot } = usePrices(requestPrices);
+  const [live, setLive] = useState<Record<string, PriceGuide>>({});
+  const [priceBusy, setPriceBusy] = useState(false);
+  const [priceProgress, setPriceProgress] = useState<{
+    done: number;
+    name: string;
+    total: number;
+  } | null>(null);
+  const [priceError, setPriceError] = useState<string | null>(null);
+  const priceAbort = useRef<AbortController | null>(null);
+
+  // A different list means different cards — don't show the last list's prices.
+  useEffect(() => {
+    priceAbort.current?.abort();
+    priceAbort.current = null;
+    setLive({});
+    setPriceBusy(false);
+    setPriceProgress(null);
+    setPriceError(null);
+  }, [list.id]);
+
   const openCardSearch = (name: string) => {
     catalogueSearchStore.request(name, { exact: true });
   };
 
+  const snapCents = (name: string): number | undefined => {
+    if (!snapshot) return undefined;
+    return priceOf({ name }, snapshot)?.cents;
+  };
+
+  const priceLine = (card: ListCard): { from?: string; snap?: string; trend?: string } => {
+    const guide = live[card.key];
+    const snap = snapCents(card.name);
+    return {
+      from: guide?.from,
+      snap: snap != null ? money(snap) : undefined,
+      trend: guide?.trend ?? (snap != null ? `~${money(snap)}` : undefined),
+    };
+  };
+
+  const totals = useMemo(() => {
+    let fromSum = 0;
+    let fromN = 0;
+    let trendSum = 0;
+    let trendN = 0;
+    let snapSum = 0;
+    let snapN = 0;
+    for (const card of cards) {
+      const guide = live[card.key];
+      const from = parseEuro(guide?.from);
+      if (from != null) {
+        fromSum += from;
+        fromN++;
+      }
+      const liveTrend = parseEuro(guide?.trend);
+      if (liveTrend != null) {
+        trendSum += liveTrend;
+        trendN++;
+      } else {
+        const snap = snapCents(card.name);
+        if (snap != null) {
+          snapSum += snap;
+          snapN++;
+        }
+      }
+    }
+    return {
+      from: fromN > 0 ? fromSum : null,
+      fromN,
+      snap: snapN > 0 ? snapSum : null,
+      snapN,
+      trend: trendN > 0 ? trendSum : null,
+      trendN,
+    };
+    // snapCents reads snapshot; list it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards, live, snapshot]);
+
+  const priceList = () => {
+    if (cards.length === 0 || priceBusy) return;
+    priceAbort.current?.abort();
+    const controller = new AbortController();
+    priceAbort.current = controller;
+    setPriceBusy(true);
+    setPriceError(null);
+    setLive({});
+    setPriceProgress({ done: 0, name: cards[0]?.name ?? '', total: cards.length });
+
+    void (async () => {
+      const next: Record<string, PriceGuide> = {};
+      let failed = 0;
+      for (let i = 0; i < cards.length; i++) {
+        if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        const card = cards[i];
+        setPriceProgress({ done: i, name: card.name, total: cards.length });
+        try {
+          const ids = await findProductForCard(card.name, controller.signal);
+          const url =
+            (ids?.idProduct ? productUrlFor(ids.idProduct) : undefined) ??
+            metacardUrlFromName(card.name);
+          if (!url) {
+            failed++;
+            continue;
+          }
+          await pace(controller.signal);
+          next[card.key] = await fetchPriceGuide(url, controller.signal);
+          setLive({ ...next });
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') throw err;
+          failed++;
+        }
+      }
+      setLive(next);
+      if (failed > 0) {
+        setPriceError(
+          `Priced ${cards.length - failed} of ${cards.length} — ${failed} had no Cardmarket page.`,
+        );
+      }
+    })()
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setPriceError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        setPriceBusy(false);
+        setPriceProgress(null);
+        if (priceAbort.current === controller) priceAbort.current = null;
+      });
+  };
+
+  // Only Scryfall CDN URLs from metadata — never `api.scryfall.com/...&format=image`
+  // as an <img src>. Those are rate-limited API redirects; a grid of them 429s.
+  // Metadata loads through the polite queue and already carries cards.scryfall.io.
   const art = (card: ListCard): string[] => {
     const meta = metaByKey[card.key];
-    const faces = meta?.faceImages ?? [];
+    if (!meta?.found) return [];
+    const faces = meta.faceImages ?? [];
     if (faces.length >= 2) return faces;
-    if (meta?.imageUrl) return [meta.imageUrl];
-    const byName = imageUrlFor(undefined, card.name);
-    return byName ? [byName] : [];
+    return meta.imageUrl ? [meta.imageUrl] : [];
   };
 
   // Split, when asked for, puts the cards both lists want in their own section.
@@ -344,6 +510,25 @@ const ListPane = ({
     );
   };
 
+  const priceChip = (card: ListCard) => {
+    const p = priceLine(card);
+    if (!p.from && !p.trend) return null;
+    return (
+      <span
+        className="flex-none text-2xs text-ink-faint"
+        title={
+          p.from
+            ? `Cardmarket From ${p.from}${p.trend ? ` · Trend ${p.trend}` : ''}`
+            : `Snapshot estimate ${p.trend} — click Price for live From / Trend`
+        }
+      >
+        {p.from && <span className="text-pos">{p.from}</span>}
+        {p.from && p.trend && ' · '}
+        {p.trend && <span>{p.trend}</span>}
+      </span>
+    );
+  };
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex flex-none items-center gap-1.5 border-b border-line px-2 py-1">
@@ -364,6 +549,48 @@ const ListPane = ({
           <span className="truncate text-xs font-medium text-ink">{list.name}</span>
         )}
         <Badge>{cards.length}</Badge>
+        {cards.length > 0 && (
+          <>
+            <Button
+              className={priceBusy ? '[&>svg]:animate-spin' : ''}
+              disabled={priceBusy}
+              icon={priceBusy ? Loader2 : TrendingUp}
+              onClick={() => (priceBusy ? priceAbort.current?.abort() : priceList())}
+              size="xs"
+              title="Fetch Cardmarket From and Trend for every card, and sum a buy-all total"
+              variant="neutral"
+            >
+              {priceBusy
+                ? priceProgress
+                  ? `Stop ${priceProgress.done}/${priceProgress.total}`
+                  : 'Stop'
+                : Object.keys(live).length > 0
+                  ? 'Re-price'
+                  : 'Price'}
+            </Button>
+            {(totals.from != null || totals.trend != null || totals.snap != null) && (
+              <span className="truncate text-2xs text-ink-muted">
+                {totals.from != null && (
+                  <span className="font-semibold text-ink">
+                    From {totals.from.toFixed(2).replace('.', ',')} €
+                  </span>
+                )}
+                {totals.from != null && (totals.trend != null || totals.snap != null) && ' · '}
+                {totals.trend != null ? (
+                  <span>
+                    trend {totals.trend.toFixed(2).replace('.', ',')} €
+                    {totals.trendN < cards.length ? ` (${totals.trendN})` : ''}
+                  </span>
+                ) : totals.snap != null ? (
+                  <span title="Scryfall daily EUR — click Price for live From / Trend">
+                    ~{money(Math.round(totals.snap))}
+                    {totals.snapN < cards.length ? ` (${totals.snapN})` : ''}
+                  </span>
+                ) : null}
+              </span>
+            )}
+          </>
+        )}
         <a
           className="ml-auto text-ink-faint hover:text-ink"
           href={listUrl(list.id)}
@@ -375,9 +602,38 @@ const ListPane = ({
         </a>
         {onClose && <IconButton icon={X} label="Close this list" onClick={onClose} />}
       </div>
+      {priceError && <p className="flex-none px-2 py-0.5 text-2xs text-warn">{priceError}</p>}
+      {priceBusy && priceProgress && (
+        <p className="flex-none truncate px-2 py-0.5 text-2xs text-ink-faint">
+          Pricing {priceProgress.name}… ({priceProgress.done + 1}/{priceProgress.total})
+        </p>
+      )}
 
       {cards.length > 0 && (
-        <SelectionBar selection={selection}>
+        <SelectionBar
+          selection={selection}
+          trailing={
+            onSearchSellers ? (
+              <Button
+                className={`${selection.active ? '' : 'ml-auto'}${
+                  searchSellersBusy ? ' [&>svg]:animate-spin' : ''
+                }`}
+                disabled={!selection.active || searchSellersBusy || picked.length === 0}
+                icon={searchSellersBusy ? Loader2 : Search}
+                onClick={() => onSearchSellers(picked)}
+                size="xs"
+                title={
+                  selection.active
+                    ? `Copy ${picked.length} selected card${picked.length === 1 ? '' : 's'} to “${LUGIN_SEARCH_NAME}” and rank sellers`
+                    : `${PICK_KEY}-click cards first, then search sellers for that selection`
+                }
+                variant="primary"
+              >
+                {searchSellersBusy ? 'Preparing…' : 'Search sellers'}
+              </Button>
+            ) : undefined
+          }
+        >
           <Button
             icon={Trash2}
             onClick={() => onBulk({ kind: 'delete' }, picked)}
@@ -496,19 +752,22 @@ const ListPane = ({
                             {card.name}
                           </button>
                         )}
-                        <div className="flex items-center gap-1 px-1 py-0.5">
-                          <button
-                            className="min-w-0 flex-1 truncate text-left text-2xs text-ink-dim hover:text-accent hover:underline"
-                            onClick={e => {
-                              e.stopPropagation();
-                              openCardSearch(card.name);
-                            }}
-                            title={`Search Cardmarket for ${card.name}`}
-                            type="button"
-                          >
-                            {card.name}
-                          </button>
-                          {removeButton(card)}
+                        <div className="flex flex-col gap-0.5 px-1 py-0.5">
+                          <div className="flex items-center gap-1">
+                            <button
+                              className="min-w-0 flex-1 truncate text-left text-2xs text-ink-dim hover:text-accent hover:underline"
+                              onClick={e => {
+                                e.stopPropagation();
+                                openCardSearch(card.name);
+                              }}
+                              title={`Search Cardmarket for ${card.name}`}
+                              type="button"
+                            >
+                              {card.name}
+                            </button>
+                            {removeButton(card)}
+                          </div>
+                          {priceChip(card)}
                         </div>
                       </div>
                     );
@@ -543,6 +802,7 @@ const ListPane = ({
                         >
                           {card.name}
                         </button>
+                        {priceChip(card)}
                         {card.alsoOn.length > 0 && (
                           <Badge title={`Also on ${card.alsoOn.join(', ')}`} tone="neutral">
                             +{card.alsoOn.length}
@@ -588,6 +848,14 @@ export const WantListsPanel = () => {
   const [removing, setRemoving] = useState<Record<string, string>>({});
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [transfer, setTransfer] = useState<Transfer | null>(null);
+  /** Sellers ranked for “Lugin Search” while you stay on another list. */
+  const [sellerFocus, setSellerFocus] = useState<{
+    autoLoad: boolean;
+    listCards: Map<string, string>;
+    wantListId: string;
+  } | null>(null);
+  const [searchSellersBusy, setSearchSellersBusy] = useState(false);
+  const [searchSellersError, setSearchSellersError] = useState<string | null>(null);
 
   const counts = useMemo(() => cardCounts(index), [index]);
 
@@ -615,6 +883,13 @@ export const WantListsPanel = () => {
 
   const open = index?.lists.find(l => l.id === openId) ?? null;
   const compare = index?.lists.find(l => l.id === compareId) ?? null;
+
+  // Leaving a list drops a staged seller ranking that belonged to that view.
+  useEffect(() => {
+    setSellerFocus(null);
+    setSearchSellersError(null);
+  }, [openId]);
+
   /** Everything the second pane may show — anything but what the first one has. */
   const others = useMemo(
     () => (index?.lists ?? []).filter(l => l.id !== open?.id),
@@ -628,6 +903,12 @@ export const WantListsPanel = () => {
     () => (compareId ? listCards(index, compareId) : []),
     [compareId, index],
   );
+  // Keys for best-seller pricing: any-printing match, same as the Search tab.
+  const openListKeys = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of openCards) m.set(stripVersion(c.key), c.name);
+    return m;
+  }, [openCards]);
   // One lookup for both panes, so a card on each isn't asked for twice.
   const names = useMemo(
     () => [...openCards, ...compareCards].map(c => c.name),
@@ -758,6 +1039,118 @@ export const WantListsPanel = () => {
   };
 
   /**
+   * Stage the selection into a dedicated “Lugin Search” list (create or empty),
+   * then rank sellers for that list while staying on the list you picked from.
+   */
+  const searchSellersForSelection = (source: WantsIndexList, cards: ListCard[]) => {
+    if (!index || cards.length === 0 || searchSellersBusy) return;
+    setSearchSellersBusy(true);
+    setSearchSellersError(null);
+    setSellerFocus(null);
+
+    void (async () => {
+      const token = await cmToken();
+      if (!token) {
+        askForLogin();
+        throw new Error('Sign in to Cardmarket to search sellers.');
+      }
+
+      let next = index;
+      const remote = (await fetchAllWantLists()).find(
+        l => l.name.trim().toLowerCase() === LUGIN_SEARCH_NAME.toLowerCase(),
+      );
+      let target: WantsIndexList | undefined = remote
+        ? (next.lists.find(l => l.id === remote.id) ?? {
+            expected: remote.cardCount,
+            extracted: remote.cardCount,
+            id: remote.id,
+            name: remote.name,
+          })
+        : next.lists.find(l => l.name === LUGIN_SEARCH_NAME);
+
+      if (!target) {
+        const made = await createWantList(LUGIN_SEARCH_NAME, token);
+        target = { expected: 0, extracted: 0, id: made.id, name: made.name };
+        next = {
+          ...next,
+          lists: [...next.lists, target],
+        };
+        await wantsStore.applyIndex(next);
+        await pace();
+      } else if (!next.lists.some(l => l.id === target.id)) {
+        next = { ...next, lists: [...next.lists, target] };
+        await wantsStore.applyIndex(next);
+      }
+
+      if (target.id === source.id) {
+        // Already on Lugin Search: drop everything that isn't in the selection.
+        const keep = new Set(cards.map(c => c.idWant));
+        const rows = await listWantRows(target.id);
+        const drop = rows.map(r => r.idWant).filter(id => !keep.has(id));
+        if (drop.length > 0) {
+          const r = await massDeleteWants(target.id, drop, token);
+          if (!r.ok) throw new Error(r.message);
+          next = setListWants(
+            next,
+            target,
+            rows.filter(row => keep.has(row.idWant)),
+          );
+          await wantsStore.applyIndex(next);
+          await pace();
+        }
+      } else {
+        // Empty the scratch list, then copy the selection onto it.
+        const existing = await listWantRows(target.id);
+        if (existing.length > 0) {
+          const r = await massDeleteWants(
+            target.id,
+            existing.map(row => row.idWant),
+            token,
+          );
+          if (!r.ok) throw new Error(r.message);
+          next = setListWants(next, target, []);
+          await wantsStore.applyIndex(next);
+          await pace();
+        }
+
+        const idWants = cards.map(c => c.idWant);
+        const copied = await massMoveWants(
+          {
+            idWants,
+            idWantsList: source.id,
+            keepOriginals: true,
+            target: target.id,
+          },
+          token,
+        );
+        if (!copied.ok) throw new Error(copied.message);
+
+        const wanted = new Set(cards.map(c => c.key));
+        const rows = await readList(target.id, wanted, true);
+        if (rows.length === 0) {
+          throw new Error(
+            `Copied to “${LUGIN_SEARCH_NAME}”, but Cardmarket wouldn’t show the list yet. Sync and try again.`,
+          );
+        }
+        next = setListWants(next, target, rows);
+        await wantsStore.applyIndex(next);
+      }
+
+      const focusCards = new Map<string, string>();
+      for (const c of cards) focusCards.set(stripVersion(c.key), c.name);
+      setSellerFocus({
+        autoLoad: true,
+        listCards: focusCards,
+        wantListId: target.id,
+      });
+    })()
+      .catch((err: unknown) => {
+        setSearchSellersError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setSearchSellersBusy(false));
+  };
+
+  /**
    * Delete, move or copy a handful of picked cards, in one request each way — the
    * same three the site's own want list page offers.
    *
@@ -884,7 +1277,7 @@ export const WantListsPanel = () => {
                 </Select>
               </>
             )}
-            <span className="ml-auto flex items-center gap-1">
+            <span className="ml-auto flex items-center gap-1.5">
               {compare && (
                 <Button
                   active={split !== 'off'}
@@ -905,6 +1298,19 @@ export const WantListsPanel = () => {
                 </Button>
               )}
               {shapeToggle}
+              {index && (
+                <span className="text-2xs text-ink-faint">Synced {timeAgo(index.syncedAt)}</span>
+              )}
+              <Button
+                disabled={working}
+                icon={working ? Loader2 : RefreshCw}
+                onClick={sync}
+                size="xs"
+                title="Re-read the want lists from Cardmarket"
+                variant="primary"
+              >
+                {working ? 'Syncing…' : 'Sync want lists'}
+              </Button>
             </span>
           </>
         ) : (
@@ -915,23 +1321,82 @@ export const WantListsPanel = () => {
               placeholder="Find a want list…"
               value={query}
             />
-            <span className="ml-auto flex items-center gap-1">
+            <span className="ml-auto flex items-center gap-1.5">
+              {index ? (
+                <span className="text-2xs text-ink-faint">
+                  Synced {timeAgo(index.syncedAt)}
+                </span>
+              ) : (
+                <span className="text-2xs text-ink-faint">Not synced yet</span>
+              )}
               {syncing && (
                 <span className="text-2xs text-ink-faint">
                   {syncing.progress ? taskProgress(syncing.progress) : 'Starting…'}
                 </span>
               )}
-              <IconButton
-                className={working ? 'animate-spin' : ''}
+              <Button
                 disabled={working}
-                icon={RefreshCw}
-                label="Re-read the want lists from Cardmarket"
+                icon={working ? Loader2 : RefreshCw}
                 onClick={sync}
-              />
+                size="xs"
+                title="Re-read the want lists from Cardmarket"
+                variant="primary"
+              >
+                {working ? 'Syncing…' : index ? 'Sync want lists' : 'Read want lists'}
+              </Button>
             </span>
           </>
         )}
       </div>
+
+      {open && (
+        <>
+          {searchSellersError && (
+            <p className="flex-none border-b border-line px-2 py-1 text-2xs text-neg">
+              {searchSellersError}
+            </p>
+          )}
+          <AddCardToWant
+            defaultListId={open.id}
+            lists={wantListOptionsFrom(index?.lists)}
+            onAdded={(list) => {
+              void (async () => {
+                const current = wantsStore.getSnapshot().index;
+                if (!current) return;
+                const rows = await listWantRows(list.id);
+                await wantsStore.applyIndex(setListWants(current, list, rows));
+              })();
+            }}
+          />
+          <BestSellersForList
+            key={sellerFocus?.wantListId ?? open.id}
+            autoLoad={sellerFocus?.autoLoad ?? false}
+            heading={
+              sellerFocus
+                ? `Best sellers for “${LUGIN_SEARCH_NAME}” (${sellerFocus.listCards.size} card${
+                    sellerFocus.listCards.size === 1 ? '' : 's'
+                  })`
+                : undefined
+            }
+            listCards={sellerFocus?.listCards ?? openListKeys}
+            wantListId={sellerFocus?.wantListId ?? open.id}
+          />
+        </>
+      )}
+
+      {!open && index && index.lists.length > 0 && (
+        <AddCardToWant
+          lists={wantListOptionsFrom(index.lists)}
+          onAdded={(list) => {
+            void (async () => {
+              const current = wantsStore.getSnapshot().index;
+              if (!current) return;
+              const rows = await listWantRows(list.id);
+              await wantsStore.applyIndex(setListWants(current, list, rows));
+            })();
+          }}
+        />
+      )}
 
       {/* What the sync knows, and the two fields every new want is created with.
           Both used to live under "Tools" in the Search tab, which is where you
@@ -941,10 +1406,10 @@ export const WantListsPanel = () => {
           {index ? (
             <span>
               {index.lists.length} list{index.lists.length === 1 ? '' : 's'} · {totalWanted} card
-              {totalWanted === 1 ? '' : 's'} · read {timeAgo(index.syncedAt)}
+              {totalWanted === 1 ? '' : 's'}
             </span>
           ) : (
-            <span>Not read yet.</span>
+            <span>Want lists haven’t been read from Cardmarket yet.</span>
           )}
 
           <label
@@ -1028,7 +1493,9 @@ export const WantListsPanel = () => {
             onBulk={(action, cards) => runBulk(open, action, cards)}
             onDropWants={compare ? (payload, copy) => dropOnto(open, payload, copy) : undefined}
             onRemove={card => removeWant(open, card)}
+            onSearchSellers={cards => searchSellersForSelection(open, cards)}
             removing={removing}
+            searchSellersBusy={searchSellersBusy}
             shape={shape}
             shared={shared}
             split={split}

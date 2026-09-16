@@ -18,6 +18,7 @@ import type { CameraRef } from 'react-native-vision-camera';
 
 import type { ScanImage } from '../sharedCore';
 import { enqueueSwapTest } from '../debugInbox/enqueueSwapTest';
+import { claimScannerMode, releaseScannerMode } from '../scannerMode';
 import { captureSwapSlot, type SwapSlotLatch } from './captureOne';
 import { saveSwapTestRun } from './persist';
 
@@ -126,6 +127,7 @@ export const useCardSwapTest = (args: UseCardSwapTestArgs) => {
     runRef.current = null;
     capturingRef.current = false;
     argsRef.current.setLabHold(false);
+    releaseScannerMode('card-swap-test');
     setConfigOpen(false);
     setUi(idleUi());
   }, []);
@@ -182,11 +184,13 @@ export const useCardSwapTest = (args: UseCardSwapTestArgs) => {
       }));
     } finally {
       runRef.current = null;
+      releaseScannerMode('card-swap-test');
     }
   }, []);
 
   const start = useCallback(
     (opts?: { count?: SwapTestCount; expectedLabelsText?: string }) => {
+      if (!claimScannerMode('card-swap-test')) return;
       cancelledRef.current = false;
       capturingRef.current = false;
       const count = opts?.count ?? draftCount;

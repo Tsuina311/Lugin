@@ -45,6 +45,30 @@ const strokeQuad = (image: ScanImage, corners: CardCorners, rgb: Rgb) => {
   }
 };
 
+/** Draw recognition/source quad with TL/TR/BR/BL corner ticks (dev forensics). */
+export const annotateSourceWithRecognitionQuad = (
+  source: ScanImage,
+  quad: CardCorners,
+): ScanImage => {
+  const out = cloneScanImage(source);
+  strokeQuad(out, quad, QUAD_MAGENTA);
+  const labels: { p: { x: number; y: number }; rgb: Rgb }[] = [
+    { p: quad.topLeft, rgb: QUAD_GREEN },
+    { p: quad.topRight, rgb: QUAD_BLUE },
+    { p: quad.bottomRight, rgb: QUAD_YELLOW },
+    { p: quad.bottomLeft, rgb: QUAD_MAGENTA },
+  ];
+  for (const { p, rgb } of labels) {
+    const x = Math.round(p.x);
+    const y = Math.round(p.y);
+    for (let dx = -4; dx <= 4; dx++) {
+      setPixel(out, x + dx, y, rgb);
+      setPixel(out, x, y + dx, rgb);
+    }
+  }
+  return out;
+};
+
 /** Draw raw (blue), tracked (yellow), recognition (magenta), presented (green). */
 export const annotateGeometryImage = (
   source: ScanImage,

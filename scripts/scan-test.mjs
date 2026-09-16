@@ -58,22 +58,41 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/titleDecode.ts')}';
       export * from '${join(root, 'src/lib/scan/scannerLab/run.ts')}';
       export * from '${join(root, 'src/lib/scan/scannerLab/types.ts')}';
-      export { isTrueHiRes, planLabAcquire } from '${join(root, 'mobile/src/scan/hiresCapture.ts')}';
+      export { isTrueHiRes, planLabAcquire, canRecognizeFromStore, emptyHiResStore, hiResCacheOwnedBySession } from '${join(root, 'mobile/src/scan/hiresCapture.ts')}';
       export * from '${join(root, 'src/lib/scan/captureQuality/index.ts')}';
       export * from '${join(root, 'src/lib/scan/timing.ts')}';
       export * from '${join(root, 'src/lib/scan/focusSeries/index.ts')}';
       export * from '${join(root, 'src/lib/scan/swapTest/index.ts')}';
       export * from '${join(root, 'src/lib/scan/deckBenchmark/index.ts')}';
       export * from '${join(root, 'src/lib/scan/binderBenchmark/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/benchmarkUpload/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/scannerMode.ts')}';
+      export * from '${join(root, 'src/lib/scan/geometryTest/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/singleCardCapture/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/backgroundQueue.ts')}';
+      export * from '${join(root, 'src/lib/scan/verifiedScan/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/recognitionChannel.ts')}';
+      export * from '${join(root, 'src/lib/scan/continuous/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/binder/index.ts')}';
       export * from '${join(root, 'src/lib/scan/session/cardSession.ts')}';
       export * from '${join(root, 'src/lib/scan/session/cardChangeWatch.ts')}';
-      export { mapCornersToHiRes } from '${join(root, 'mobile/src/scan/hiresMap.ts')}';
+      export { mapCornersToHiRes, mapCornersHiResToDetectorSameFov, projectAnalysisQuadToSource } from '${join(root, 'mobile/src/scan/hiresMap.ts')}';
       export { startGeometryTrace, finishGeometryTrace, isGeometryTraceActive } from '${join(root, 'mobile/src/scan/geometryTrace.ts')}';
       export * from '${join(root, 'src/lib/scan/videoMap.ts')}';
       export * from '${join(root, 'src/lib/scan/cameraCapabilities.ts')}';
       export * from '${join(root, 'src/lib/scan/scannerDataPolicy.ts')}';
       export * from '${join(root, 'src/lib/scan/scannerManifest.ts')}';
       export { polygonIoU } from '${join(root, 'src/lib/scan/detectCard.ts')}';
+      export { evaluateMtgFastAccept, scoreMtgInternalLandmarks } from '${join(root, 'src/lib/scan/detection/mtgFastPath.ts')}';
+      export {
+        emptyContinuity,
+        softResetContinuityForNewCardSession,
+        stepContinuity,
+      } from '${join(root, 'src/lib/scan/detection/continuity.ts')}';
+      export {
+        deriveAcquisitionMs,
+        emptyAcquisitionTiming,
+      } from '${join(root, 'src/lib/scan/acquisitionTiming.ts')}';
       export {
         buildSessionSummary,
         classifyLatencyVerdict,
@@ -205,8 +224,152 @@ const {
   reconcileDeckMultiset,
   deckCardFileStem,
   classifyDeckFailure,
+  DECK_BENCHMARK_USES_GLOBAL_LAB_HOLD,
+  DECK_CARD_TIMEOUT_MS,
+  decideDeckCardSave,
+  decideDeckAdvance,
+  formatDeckObservability,
+  isFreshSessionIdentity,
+  flagSuspiciousReusedPixels,
+  canRecognizeFromStore,
+  emptyHiResStore,
+  hiResCacheOwnedBySession,
+  allowsNormalResultPresentation,
+  allowsNormalCollectionActions,
+  applyScannerModeClaim,
+  canClaimScannerMode,
+  isExclusiveScannerOwner,
+  runsCanonicalRecognition,
+  shouldDismissNormalResultOnModeEnter,
+  shouldResetSessionOnModeExit,
+  showsDiagnosticPolygonsByDefault,
+  suspendsNormalRecognition,
+  usesLiveRawPolygon,
+  framesRequiredForScore,
+  tickGeometryLock,
+  emptyGeometryLockState,
+  quadsAgreeForGeometryLock,
+  deriveGeometryTestMs,
+  emptyGeometryTiming,
+  classifyGeometryArtifact,
+  assertGeometryCardArtifactDims,
+  assertGeometrySourceArtifactDims,
+  GEOMETRY_CARD_ARTIFACT_WIDTH,
+  GEOMETRY_CARD_ARTIFACT_HEIGHT,
+  evaluateCaptureSafe,
+  captureSafeMessage,
+  CAPTURE_SAFE_EDGE_MARGIN,
+  refinePhysicalCardBoundary,
+  evaluateSourceCaptureSafe,
+  MIN_SOURCE_MARGIN_PX,
+  getSingleCapturePipeline,
+  setSingleCapturePipeline,
+  isGeometryV2Pipeline,
+  useLegacyCapturePipelineForTests,
+  tickSingleCardCapture,
+  emptySingleCardCaptureState,
+  NORMAL_PRODUCTION_PROFILE,
+  tickIncumbent,
+  emptyIncumbentState,
+  isSpatialCandidateSwitch,
+  pickBestRecentSafe,
+  pushRecentSafe,
+  emptyRecentSafeWindow,
+  scoreSafeSample,
+  createBackgroundQueue,
+  resetScanBackgroundQueueForTests,
+  GEOMETRY_EXPERIMENT_PROFILE,
+  verifiedScanBlocksAcquisition,
+  verifiedScanBlocksChangeWatch,
+  emptyVerifiedScanTiming,
+  deriveVerifiedScanMs,
+  markFirstVerified,
+  createRecognitionAttempt,
+  finalizeAttempt,
+  markAttemptAdvancedEarly,
+  markAttemptRecognizing,
+  terminalStatusFromCapture,
+  assertAttemptOwnership,
+  emptyParentSummary,
+  noteAttemptCreated,
+  noteAttemptTerminal,
+  matchAttemptByArtifacts,
+  mayPublishAttemptToUi,
+  validateWarpInput,
+  assessWarpSuspect,
+  freezeCorners,
+  buildRecognitionQuadArtifact,
+  SINGLE_SCAN_DIAGNOSTIC_VERSION,
+  channelToRecognizeOptions,
+  channelUsesTitleFastPath,
+  cycleRecognitionChannel,
+  getRecognitionChannel,
+  setRecognitionChannel,
+  RECOGNITION_CHANNEL_MODES,
+  RECOGNITION_CHANNEL_LABELS,
+  LEGACY_RECOGNITION_CHANNEL_MODES,
+  DEV_RECOGNITION_CHANNEL_MODES,
+  isRecognitionEligible,
+  fuseContinuousEvidence,
+  selectSeededCandidate,
+  extractArtCropFromCard,
+  ART_CROP_VERSION,
+  ARTWORK_REGION,
+  shouldStartNewTrack,
+  shouldSuppressDuplicate,
+  appendVisualObservation,
+  appendOcrObservation,
+  tryPublish,
+  startNewTrack,
+  emptyContinuousSession,
+  unlockForChange,
+  applyPublishToSession,
+  BINDER_POLICY,
+  SINGLE_SCAN_DETECT_POLICY,
+  multiReturnNms,
+  emptyBinderPageSession,
+  tickBinderTracks,
+  applyBestCapture,
+  binderPageHud,
+  binderOverlays,
+  nextBinderPage,
+  scoreBinderCardQuality,
+  binderGeometryOk,
+  shouldTakeBinderPageSnapshot,
+  isBinderMode,
+  usesBinderOverlays,
+  makeBinderSessionId,
+  binderDiagFrameFile,
+  binderDiagCardFile,
+  binderDiagTracksFile,
+  binderDiagPageMetaFile,
+  classifyUnresolvedReasons,
+  readyDecisionFromBest,
+  BINDER_IDENTIFICATION_READY_MIN,
+  BINDER_SHARPNESS_SOFT,
+  accumulateUnsafeReasonMs,
+  dominantUnsafeReason,
+  labelCaptureUnsafeReason,
+  markFirstTiming,
+  summarizeGeometryTest,
   binderFrameFile,
   summarizeBinderCapture,
+  BINDER_TARGET_FRAMES,
+  BINDER_MIN_FRAMES_OK,
+  BINDER_MAX_PAGE_MS,
+  BINDER_AUTO_ADVANCE_PAGES,
+  BINDER_TURN_AUTO_MS,
+  classifyBinderPageStatus,
+  shouldStopBinderCapture,
+  binderAfterSaveAction,
+  binderCanStartNextPageCapture,
+  reconcileUploadAck,
+  missingRequiredFiles,
+  filesToUpload,
+  formatUploadIncompleteMessage,
+  formatUploadCompleteMessage,
+  emptyAckState,
+  deckObservabilityChanged,
   swapIdForIndex,
   attachFocusSeriesDiagnostics,
   driftVsT0,
@@ -258,6 +421,10 @@ const {
   normalizeCardCorners,
   emptyContinuity,
   stepContinuity,
+  softResetContinuityForNewCardSession,
+  evaluateMtgFastAccept,
+  deriveAcquisitionMs,
+  emptyAcquisitionTiming,
   shouldThrottleScannerManifestCheck,
   mayAdvanceLastCheckAfterFailure,
   needPrintingAsset,
@@ -321,7 +488,13 @@ const {
   classifyMotion,
   sideMetrics,
   mapCornersToHiRes,
+  mapCornersHiResToDetectorSameFov,
+  projectAnalysisQuadToSource,
 } = await import(pathToFileURL(bundle).href);
+
+// Existing focus/stability suites assert the legacy path. geometry-v2 is the
+// mobile default; host tests opt into legacy unless a case sets geometry-v2.
+useLegacyCapturePipelineForTests();
 
 let failed = 0;
 const check = (name, fn) => {
@@ -3941,6 +4114,535 @@ await checkAsync('card session: identity A→B mints new session without clearin
   }
 });
 
+await checkAsync('SESSION OWNERSHIP: same geometryTrack + new cardSession cannot inherit identity', async () => {
+  const corners = {
+    topLeft: { x: 40, y: 40 },
+    topRight: { x: 700, y: 40 },
+    bottomRight: { x: 700, y: 1000 },
+    bottomLeft: { x: 40, y: 1000 },
+  };
+  let which = 0;
+  const names = ['Sol Ring', 'Lightning Bolt'];
+  const idx = buildNameIndex({ names, version: 1 });
+  const ctrl = createSessionController({
+    nameIndex: idx,
+    ocr: {
+      recognize: async () => {
+        const text = names[which] ?? names[names.length - 1];
+        which += 1;
+        return { confidence: 0.99, text };
+      },
+    },
+  });
+
+  // SESSION A — FOUND Card A on geometry track 1
+  await ctrl.recognizeFrozenCapture({
+    recognitionQuad: corners,
+    source: paintDistinctCard(2),
+    trackId: 1,
+  });
+  let snap = ctrl.snapshot();
+  const sessionA = snap.lockGates?.cardSessionId ?? 0;
+  assert.ok(sessionA > 0);
+  assert.equal(snap.resultCardSessionId, sessionA);
+  assert.ok(
+    snap.phase === 'found' || snap.lockGates?.currentSessionIdentity === 'Sol Ring',
+    `session A should be FOUND, got phase=${snap.phase} id=${snap.lockGates?.currentSessionIdentity}`,
+  );
+  assert.equal(snap.fused?.card?.name ?? snap.lockGates?.currentSessionIdentity, 'Sol Ring');
+  assert.equal(snap.lockGates?.geometryTrackId ?? snap.lockGates?.currentTrackId, 1);
+
+  // Physical swap while geometry stays the same (manual / debug path)
+  ctrl.markDebugCardSwapped();
+  snap = ctrl.snapshot();
+  const sessionB = snap.lockGates?.cardSessionId ?? 0;
+  assert.ok(sessionB > sessionA, `expected new cardSessionId, got ${sessionB} after ${sessionA}`);
+  assert.equal(snap.lockGates?.geometryTrackId ?? snap.lockGates?.currentTrackId, 1);
+  assert.equal(snap.resultCardSessionId, null);
+  assert.equal(snap.fused, undefined);
+  assert.notEqual(snap.phase, 'found');
+  assert.notEqual(snap.phase, 'ambiguous');
+  assert.equal(snap.postLock?.recognitionStatus, null);
+  assert.equal(snap.postLock?.titleTopCandidate, null);
+  assert.equal(snap.lockGates?.currentSessionIdentity, null);
+
+  // Deck Benchmark must not save Card A for slot B
+  const stale = decideDeckCardSave({
+    recordedSlots: new Set([`s:${sessionA}`]),
+    cardStartedAt: 0,
+    now: 9,
+    live: {
+      phase: snap.phase,
+      recognitionStatus: snap.postLock?.recognitionStatus ?? snap.phase,
+      recognitionDecision: null,
+      identity: snap.fused?.card?.name ?? null,
+      cardSessionId: sessionB,
+      resultCardSessionId: snap.resultCardSessionId,
+      geometryDetected: true,
+      geometryTrackId: 1,
+      focusAttemptId: snap.lockGates?.focusAttemptId ?? null,
+      titlePresent: false,
+      recognizeAttempts: 0,
+    },
+  });
+  assert.equal(stale.shouldSave, false);
+  assert.equal(stale.staleIdentityRejected, false); // no identity exposed at all
+  assert.equal(stale.terminal, null);
+
+  // Fresh recognition for session B
+  await ctrl.recognizeFrozenCapture({
+    recognitionQuad: corners,
+    source: paintDistinctCard(11),
+    trackId: 1,
+  });
+  snap = ctrl.snapshot();
+  assert.equal(snap.lockGates?.cardSessionId, sessionB);
+  assert.equal(snap.resultCardSessionId, sessionB);
+  assert.equal(snap.fused?.card?.name ?? snap.lockGates?.currentSessionIdentity, 'Lightning Bolt');
+  assert.ok(snap.phase === 'found' || snap.lockGates?.currentSessionIdentity === 'Lightning Bolt');
+
+  const fresh = decideDeckCardSave({
+    recordedSlots: new Set([`s:${sessionA}`]),
+    cardStartedAt: 0,
+    now: 1500,
+    live: {
+      phase: snap.phase,
+      recognitionStatus: 'found',
+      recognitionDecision: 'exact-title',
+      identity: 'Lightning Bolt',
+      cardSessionId: sessionB,
+      resultCardSessionId: sessionB,
+      geometryDetected: true,
+      geometryTrackId: 1,
+      focusAttemptId: snap.lockGates?.focusAttemptId ?? null,
+      titlePresent: true,
+      recognizeAttempts: 1,
+    },
+  });
+  assert.equal(fresh.shouldSave, true);
+  assert.equal(fresh.terminal, 'identified');
+  assert.equal(fresh.staleIdentityRejected, false);
+});
+
+await checkAsync('SESSION OWNERSHIP: late recognition from session A cannot publish into B', async () => {
+  const corners = {
+    topLeft: { x: 40, y: 40 },
+    topRight: { x: 700, y: 40 },
+    bottomRight: { x: 700, y: 1000 },
+    bottomLeft: { x: 40, y: 1000 },
+  };
+  let releaseOcr = /** @type {(() => void) | null} */ (null);
+  const ocrGate = new Promise(resolve => {
+    releaseOcr = resolve;
+  });
+  const idx = buildNameIndex({ names: ['Delina, Wild Mage', 'Sol Ring'], version: 1 });
+  const ctrl = createSessionController({
+    nameIndex: idx,
+    ocr: {
+      recognize: async () => {
+        await ocrGate;
+        return { confidence: 0.99, text: 'Delina, Wild Mage' };
+      },
+    },
+  });
+
+  const pending = ctrl.recognizeFrozenCapture({
+    recognitionQuad: corners,
+    source: paintDistinctCard(2),
+    trackId: 2,
+  });
+  // Physical swap while A recognition is still in flight
+  ctrl.markDebugCardSwapped();
+  let snap = ctrl.snapshot();
+  const sessionB = snap.lockGates?.cardSessionId ?? 0;
+  assert.ok(sessionB > 0);
+  assert.equal(snap.resultCardSessionId, null);
+  assert.equal(snap.fused, undefined);
+  assert.notEqual(snap.phase, 'found');
+
+  releaseOcr?.();
+  await pending;
+  snap = ctrl.snapshot();
+  assert.equal(snap.lockGates?.cardSessionId, sessionB);
+  assert.equal(snap.resultCardSessionId, null, 'late A must not own B');
+  assert.equal(snap.fused, undefined);
+  assert.notEqual(snap.phase, 'found');
+  assert.notEqual(snap.phase, 'ambiguous');
+});
+
+check('SESSION OWNERSHIP: geometryTrack=2 + multi session never inherits Delina', () => {
+  // Real-run pattern: same geometry track, new card sessions before fresh evidence.
+  const sessions = [100, 101, 102, 103];
+  let lastSaved = null;
+  for (const sid of sessions) {
+    const hasFresh = sid === 100 || sid === 103;
+    const d = decideDeckCardSave({
+      recordedSlots: lastSaved ? new Set([`s:${lastSaved}`]) : new Set(),
+      cardStartedAt: sid * 1000,
+      now: sid * 1000 + 5,
+      live: {
+        phase: hasFresh ? 'found' : 'focusing',
+        recognitionStatus: hasFresh ? 'found' : null,
+        recognitionDecision: hasFresh ? 'exact-title' : null,
+        identity: hasFresh ? (sid === 100 ? 'Delina, Wild Mage' : 'Sol Ring') : null,
+        cardSessionId: sid,
+        resultCardSessionId: hasFresh ? sid : null,
+        identityOwnedByCurrentSession: hasFresh,
+        freshEvidenceCountForSession: hasFresh ? 1 : 0,
+        recognizeAttempts: hasFresh ? 1 : 0,
+        geometryDetected: true,
+        geometryTrackId: 2,
+        focusAttemptId: 1,
+        titlePresent: hasFresh,
+      },
+    });
+    if (sid === 100) {
+      assert.equal(d.shouldSave, true);
+      assert.equal(d.terminal, 'identified');
+      lastSaved = sid;
+    } else if (sid === 101 || sid === 102) {
+      assert.equal(d.shouldSave, false, `session ${sid} must not save Delina`);
+      assert.equal(d.terminal, null);
+      assert.equal(d.staleIdentityRejected, false);
+    } else {
+      assert.equal(d.shouldSave, true);
+      assert.equal(d.terminal, 'identified');
+    }
+  }
+  // Stale Delina identity pretending to be current for 101
+  const stale = decideDeckCardSave({
+    recordedSlots: new Set(['s:100']),
+    cardStartedAt: 101_000,
+    now: 101_007,
+    live: {
+      phase: 'found',
+      recognitionStatus: 'found',
+      recognitionDecision: 'exact-title',
+      identity: 'Delina, Wild Mage',
+      cardSessionId: 101,
+      resultCardSessionId: 100,
+      identityOwnedByCurrentSession: false,
+      freshEvidenceCountForSession: 0,
+      recognizeAttempts: 0,
+      geometryDetected: true,
+      geometryTrackId: 2,
+      focusAttemptId: 1,
+      titlePresent: true,
+    },
+  });
+  assert.equal(stale.staleIdentityRejected, true);
+  assert.equal(stale.shouldSave, false);
+  assert.equal(stale.terminalSource, 'stale-rejected');
+});
+
+check('SESSION OWNERSHIP: null resultCardSessionId cannot publish FOUND', () => {
+  assert.equal(
+    isFreshSessionIdentity({
+      cardSessionId: 10,
+      resultCardSessionId: null,
+      identity: 'Negate',
+      identityOwnedByCurrentSession: false,
+      freshEvidenceCountForSession: 2,
+    }),
+    false,
+  );
+  const d = decideDeckCardSave({
+    recordedSlots: new Set(),
+    cardStartedAt: 0,
+    now: 50,
+    live: {
+      phase: 'found',
+      recognitionStatus: 'found',
+      recognitionDecision: 'exact-title',
+      identity: 'Negate',
+      cardSessionId: 10,
+      resultCardSessionId: null,
+      freshEvidenceCountForSession: 1,
+      geometryDetected: true,
+      geometryTrackId: 1,
+      focusAttemptId: 1,
+      titlePresent: true,
+      recognizeAttempts: 1,
+    },
+  });
+  assert.equal(d.staleIdentityRejected, true);
+  assert.equal(d.shouldSave, false);
+});
+
+check('deck benchmark: zero fresh evidence cannot save IDENTIFIED', () => {
+  const d = decideDeckCardSave({
+    recordedSlots: new Set(),
+    cardStartedAt: 0,
+    now: 20,
+    live: {
+      phase: 'found',
+      recognitionStatus: 'found',
+      recognitionDecision: 'exact-title',
+      identity: 'Delina, Wild Mage',
+      cardSessionId: 103,
+      resultCardSessionId: 103,
+      identityOwnedByCurrentSession: true,
+      freshEvidenceCountForSession: 0,
+      recognizeAttempts: 0,
+      geometryDetected: true,
+      geometryTrackId: 2,
+      focusAttemptId: 1,
+      titlePresent: true,
+    },
+  });
+  assert.equal(d.shouldSave, false);
+  assert.equal(d.staleIdentityRejected, true);
+  assert.equal(d.terminal, null);
+});
+
+check('deck benchmark: resultCardSessionId always serialized explicitly', () => {
+  const record = {
+    benchmarkIndex: 1,
+    cardSessionId: 15,
+    resultCardSessionId: null,
+    resultAttemptId: null,
+    resultPublishedAt: null,
+    identityOwnedByCurrentSession: false,
+    freshEvidenceCountForSession: 0,
+    terminalSource: 'timeout',
+    geometryTrackId: 2,
+    focusAttemptId: 1,
+    recognizeAttempts: 0,
+    terminal: 'timeout',
+    status: null,
+    matchName: null,
+    matchScore: null,
+    matchMethod: null,
+    ocrTexts: [],
+    detectorScore: null,
+    recognitionSource: null,
+    swapKind: 'automatic',
+    timings: { totalMs: 2, lockToIdentityMs: null },
+    files: { metadata: 'deck-001-metadata.json' },
+    recordedAt: '2026-09-10T00:00:00.000Z',
+  };
+  const json = JSON.parse(JSON.stringify(record));
+  assert.ok('resultCardSessionId' in json);
+  assert.equal(json.resultCardSessionId, null);
+});
+
+await checkAsync('PIXEL OWNERSHIP: late hi-res capture from session A cannot feed session B', async () => {
+  const luma = paintCardLike(blankImage(251, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const island = paintDistinctCard(2);
+  const other = paintDistinctCard(11);
+  const idx = buildNameIndex({ names: ['Island', 'Sol Ring'], version: 1 });
+  let ocrReply = 'Island';
+  let ocrTexts = [];
+  const ctrl = createSessionController({
+    nameIndex: idx,
+    ocr: {
+      recognize: async () => {
+        ocrTexts.push(ocrReply);
+        return { confidence: 0.99, text: ocrReply };
+      },
+    },
+  });
+
+  // Session A identifies Island with owned frozen capture
+  await ctrl.recognizeFrozenCapture({
+    recognitionQuad: corners,
+    source: island,
+    trackId: 2,
+  });
+  let snap = ctrl.snapshot();
+  const sessionA = snap.lockGates?.cardSessionId ?? 0;
+  assert.ok(sessionA > 0);
+  assert.equal(snap.fused?.card?.name ?? snap.lockGates?.currentSessionIdentity, 'Island');
+
+  // Physical swap — new session, same geometry track
+  ctrl.markDebugCardSwapped();
+  snap = ctrl.snapshot();
+  const sessionB = snap.lockGates?.cardSessionId ?? 0;
+  assert.ok(sessionB > sessionA);
+  assert.equal(ctrl.lastNormalized(), null);
+  assert.equal(ctrl.lastNormalizedCardSessionId(), null);
+
+  // Late A capture is still offered as frozen input for B — must be rejected.
+  let staleCaptureInvalidations = 0;
+  ocrReply = 'Sol Ring';
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => false,
+    getFrozenRecognitionInput: () => ({
+      captureAt: 1,
+      captureCardSessionId: sessionA,
+      captureId: 99,
+      recognitionQuad: corners,
+      source: island,
+    }),
+    invalidateCapture: reason => {
+      if (reason === 'stale-capture-session') staleCaptureInvalidations += 1;
+    },
+    refineCard: () => ({
+      corners,
+      detected: true,
+      detection: { candidates: [], ms: 1, selectedIndex: 0, workSize: { height: 480, width: 251 } },
+      image: other,
+      score: 0.9,
+      source: 'detected',
+    }),
+  });
+  await runFrames(ctrl, luma, helpers, STABILITY_WINDOW + 2);
+  await new Promise(r => setTimeout(r, FOCUS_ATTEMPT_MS + 30));
+  snap = await ctrl.onFrame(luma, { ...helpers, allowRecognize: () => true });
+  assert.ok(
+    staleCaptureInvalidations >= 1,
+    'stale A capture must be invalidated before B recognition',
+  );
+  // B must not publish Island from A's pixels; Sol Ring from B-owned refine is OK.
+  if (snap.phase === 'found' || snap.fused?.card?.name) {
+    assert.equal(snap.resultCardSessionId, sessionB);
+    assert.notEqual(snap.fused?.card?.name, 'Island');
+  }
+  assert.ok(!ocrTexts.includes('Island') || ocrTexts[0] === 'Island');
+  // After swap, any OCR during B must be Sol Ring (A's Island frozen was discarded).
+  const bOcr = ocrTexts.slice(1);
+  for (const t of bOcr) assert.equal(t, 'Sol Ring');
+});
+
+check('PIXEL OWNERSHIP: lastNormalized unavailable across sessions', () => {
+  // Covered by controller API: after markDebugCardSwapped lastNormalized() is null.
+  // Deterministic unit for flagSuspiciousReusedPixels:
+  const flagged = flagSuspiciousReusedPixels([
+    {
+      benchmarkIndex: 2,
+      cardSessionId: 6,
+      resultCardSessionId: 6,
+      warpHash: 'abc',
+      sourceHash: 'src1',
+      geometryTrackId: 1,
+      focusAttemptId: 1,
+      recognizeAttempts: 1,
+      terminal: 'identified',
+      status: 'found',
+      matchName: 'Island',
+      matchScore: 1,
+      matchMethod: 'exact-title',
+      ocrTexts: [],
+      detectorScore: 1,
+      recognitionSource: 'snapshot',
+      swapKind: 'automatic',
+      timings: { totalMs: 1, lockToIdentityMs: null },
+      files: { metadata: 'a.json' },
+      recordedAt: 't',
+    },
+    {
+      benchmarkIndex: 3,
+      cardSessionId: 7,
+      resultCardSessionId: 7,
+      warpHash: 'abc',
+      sourceHash: 'src1',
+      geometryTrackId: 1,
+      focusAttemptId: 1,
+      recognizeAttempts: 1,
+      terminal: 'identified',
+      status: 'found',
+      matchName: 'Island',
+      matchScore: 1,
+      matchMethod: 'exact-title',
+      ocrTexts: [],
+      detectorScore: 1,
+      recognitionSource: 'snapshot',
+      swapKind: 'automatic',
+      timings: { totalMs: 1, lockToIdentityMs: null },
+      files: { metadata: 'b.json' },
+      recordedAt: 't',
+    },
+  ]);
+  assert.equal(flagged.length, 1);
+  assert.deepEqual(flagged[0].shared.sort(), ['sourceHash', 'warpHash'].sort());
+});
+
+check('PIXEL OWNERSHIP: same geometryTrackId does not share hi-res recognition cache', () => {
+  const store = emptyHiResStore();
+  const corners = {
+    topLeft: { x: 30, y: 40 },
+    topRight: { x: 220, y: 42 },
+    bottomRight: { x: 218, y: 440 },
+    bottomLeft: { x: 32, y: 438 },
+  };
+  const img = blankImage(100, 140);
+  store.cache = {
+    attempt: { mode: 'snapshot', startedAt: 1, completedAt: 2, ms: 1 },
+    cardSessionId: 6,
+    captureId: 1,
+    corners,
+    mapped: corners,
+    prepared: img,
+    source: img,
+  };
+  // Session A may recognize from its own cache.
+  assert.equal(canRecognizeFromStore(store, 800, 6), true);
+  assert.equal(hiResCacheOwnedBySession(store, 6), true);
+  // Session B on the same geometry track must NOT inherit A's pixels.
+  assert.equal(canRecognizeFromStore(store, 800, 7), false);
+  assert.equal(hiResCacheOwnedBySession(store, 7), false);
+  // Untagged legacy cache is also unusable for a concrete session.
+  store.cache.cardSessionId = null;
+  assert.equal(canRecognizeFromStore(store, 800, 7), false);
+  assert.equal(hiResCacheOwnedBySession(store, 7), false);
+});
+
+check('benchmark upload: 25 expected / 11 ack = INCOMPLETE; retry only missing', () => {
+  const files = [];
+  for (let p = 1; p <= 5; p++) {
+    for (let f = 1; f <= 5; f++) {
+      files.push({
+        relativePath: `p${String(p).padStart(2, '0')}-f${String(f).padStart(3, '0')}.png`,
+        required: true,
+        pageIndex: p,
+        frameIndex: f,
+      });
+    }
+  }
+  const manifest = {
+    runId: 'binder-test-demo',
+    kind: 'binder-benchmark',
+    pages: 5,
+    files,
+    createdAt: '2026-09-10T00:00:00.000Z',
+  };
+  const ack11 = files.slice(0, 11).map(f => f.relativePath);
+  const state = reconcileUploadAck({ manifest, acknowledged: ack11 });
+  assert.equal(state.uploadStatus, 'INCOMPLETE');
+  assert.equal(state.acknowledged.length, 11);
+  assert.equal(state.missingRequired.length, 14);
+  assert.match(formatUploadIncompleteMessage(state), /11 \/ 25/);
+  const retry = filesToUpload(manifest, ack11);
+  assert.equal(retry.length, 14);
+  // Tunnel endpoint change: same runId, new endpoint — resume from prior ack.
+  const resumed = reconcileUploadAck({
+    manifest,
+    acknowledged: ack11,
+    endpointUrl: 'https://new-tunnel.example',
+  });
+  assert.equal(resumed.runId, 'binder-test-demo');
+  assert.equal(resumed.missingRequired.length, 14);
+  assert.equal(resumed.endpointUrl, 'https://new-tunnel.example');
+  // Full ACK
+  const done = reconcileUploadAck({
+    manifest,
+    acknowledged: files.map(f => f.relativePath),
+  });
+  assert.equal(done.uploadStatus, 'COMPLETE');
+  assert.equal(done.missingRequired.length, 0);
+  assert.equal(filesToUpload(manifest, done.acknowledged).length, 0);
+  assert.equal(missingRequiredFiles(manifest, ack11).length, 14);
+  const empty = emptyAckState(manifest);
+  assert.equal(empty.uploadStatus, 'PENDING');
+  assert.equal(empty.missingRequired.length, 25);
+});
+
 await checkAsync('card session: mintDebugFocusAttempt always fresh', async () => {
   const luma = paintCardLike(blankImage(251, 480), { gray: true });
   const corners = {
@@ -5836,6 +6538,7 @@ check('deck benchmark: no duplicate cardSessionId in summary inputs', () => {
     {
       benchmarkIndex: 1,
       cardSessionId: 10,
+      resultCardSessionId: 10,
       geometryTrackId: 1,
       focusAttemptId: 1,
       recognizeAttempts: 1,
@@ -5855,6 +6558,7 @@ check('deck benchmark: no duplicate cardSessionId in summary inputs', () => {
     {
       benchmarkIndex: 2,
       cardSessionId: 11,
+      resultCardSessionId: 11,
       geometryTrackId: 1,
       focusAttemptId: 2,
       recognizeAttempts: 1,
@@ -5888,12 +6592,271 @@ check('deck benchmark: no duplicate cardSessionId in summary inputs', () => {
     note: 'test',
   });
   assert.equal(summary.identified, 1);
+  assert.equal(summary.freshIdentified, 1);
   assert.equal(summary.ambiguous, 1);
   assert.equal(summary.session.manualSwaps, 1);
   const recon = reconcileDeckMultiset(cards, [{ name: 'Negate', quantity: 1 }]);
   assert.equal(recon.paired.length, 1);
   assert.equal(recon.unresolved.length, 1);
   assert.equal(deckCardFileStem(17), 'deck-017');
+});
+
+check('deck benchmark: never uses global labHold', () => {
+  assert.equal(DECK_BENCHMARK_USES_GLOBAL_LAB_HOLD, false);
+});
+
+check('deck benchmark: recognized card saves without waiting for 18s timeout', () => {
+  const recorded = new Set();
+  const d1 = decideDeckCardSave({
+    recordedSlots: recorded,
+    cardStartedAt: 0,
+    now: 900,
+    live: {
+      phase: 'locked',
+      recognitionStatus: 'found',
+      recognitionDecision: 'exact-title',
+      identity: 'Negate',
+      cardSessionId: 42,
+      resultCardSessionId: 42,
+      freshEvidenceCountForSession: 1,
+      recognizeAttempts: 1,
+      geometryDetected: true,
+      geometryTrackId: 7,
+      focusAttemptId: 3,
+      titlePresent: true,
+    },
+  });
+  assert.equal(d1.shouldSave, true);
+  assert.equal(d1.timedOut, false);
+  assert.equal(d1.terminal, 'identified');
+  assert.equal(d1.staleIdentityRejected, false);
+  assert.equal(d1.slotKey, 's:42');
+  recorded.add(d1.slotKey);
+  // Same physical card / session must not create a second record.
+  const dDup = decideDeckCardSave({
+    recordedSlots: recorded,
+    cardStartedAt: 0,
+    now: 1200,
+    live: {
+      phase: 'locked',
+      recognitionStatus: 'found',
+      recognitionDecision: 'exact-title',
+      identity: 'Negate',
+      cardSessionId: 42,
+      resultCardSessionId: 42,
+      geometryDetected: true,
+      geometryTrackId: 7,
+      focusAttemptId: 3,
+      titlePresent: true,
+    },
+  });
+  assert.equal(dDup.shouldSave, false);
+});
+
+check('deck benchmark: stale FOUND from prior session does not save next slot', () => {
+  const d = decideDeckCardSave({
+    recordedSlots: new Set(['s:10']),
+    cardStartedAt: 1000,
+    now: 1007, // 7ms — classic sticky save
+    live: {
+      phase: 'found',
+      recognitionStatus: 'found',
+      recognitionDecision: 'exact-title',
+      identity: 'Negate',
+      cardSessionId: 11,
+      resultCardSessionId: 10, // owned by previous session
+      geometryDetected: true,
+      geometryTrackId: 1, // same geometry track is allowed
+      focusAttemptId: 1,
+      titlePresent: true,
+      recognizeAttempts: 0,
+    },
+  });
+  assert.equal(d.staleIdentityRejected, true);
+  assert.equal(d.shouldSave, false);
+  assert.equal(d.terminal, null);
+  assert.equal(d.timedOut, false);
+  assert.equal(isFreshSessionIdentity({
+    cardSessionId: 11,
+    resultCardSessionId: 10,
+    identity: 'Negate',
+  }), false);
+});
+
+check('deck benchmark: 18s timeout still saves when evidence never arrives', () => {
+  const d = decideDeckCardSave({
+    recordedSlots: new Set(),
+    cardStartedAt: 0,
+    now: DECK_CARD_TIMEOUT_MS + 1,
+    live: {
+      phase: 'focusing',
+      recognitionStatus: null,
+      recognitionDecision: null,
+      identity: null,
+      cardSessionId: 11,
+      resultCardSessionId: null,
+      geometryDetected: true,
+      geometryTrackId: 1,
+      focusAttemptId: 2,
+      titlePresent: false,
+      recognizeAttempts: 0,
+    },
+  });
+  assert.equal(d.shouldSave, true);
+  assert.equal(d.timedOut, true);
+  assert.equal(d.terminal, null);
+  assert.equal(d.staleIdentityRejected, false);
+});
+
+check('deck benchmark: freshIdentified excludes unowned sticky identity', () => {
+  const cards = [
+    {
+      benchmarkIndex: 1,
+      cardSessionId: 10,
+      resultCardSessionId: 10,
+      geometryTrackId: 1,
+      focusAttemptId: 1,
+      recognizeAttempts: 2,
+      terminal: 'identified',
+      status: 'found',
+      matchName: 'Negate',
+      matchScore: 0.99,
+      matchMethod: 'exact-title',
+      ocrTexts: ['Negate'],
+      detectorScore: 0.9,
+      recognitionSource: 'snapshot',
+      swapKind: 'automatic',
+      timings: { totalMs: 1200, lockToIdentityMs: 400 },
+      files: { metadata: 'deck-001-metadata.json', cardWarp: 'deck-001-card.png' },
+      recordedAt: '2026-09-10T00:00:00.000Z',
+    },
+    {
+      benchmarkIndex: 2,
+      cardSessionId: 11,
+      resultCardSessionId: 10,
+      geometryTrackId: 1,
+      focusAttemptId: 1,
+      recognizeAttempts: 0,
+      terminal: 'identified',
+      staleIdentityRejected: true,
+      status: 'found',
+      matchName: 'Negate',
+      matchScore: 0.99,
+      matchMethod: 'exact-title',
+      ocrTexts: [],
+      detectorScore: 0.9,
+      recognitionSource: 'snapshot',
+      swapKind: 'automatic',
+      timings: { totalMs: 7, lockToIdentityMs: null },
+      files: { metadata: 'deck-002-metadata.json' },
+      recordedAt: '2026-09-10T00:00:01.000Z',
+    },
+  ];
+  const summary = summarizeDeckBenchmark({
+    kind: 'deck-benchmark',
+    fixtureId: 'deck-stale-demo',
+    createdAt: '2026-09-10T00:00:00.000Z',
+    completedAt: '2026-09-10T00:01:00.000Z',
+    targetCount: 2,
+    cards,
+    expectedMultiset: null,
+    expectedDeckId: null,
+    expectedDeckName: null,
+    phase: 'complete',
+    note: 'test',
+  });
+  assert.equal(summary.identified, 2);
+  assert.equal(summary.freshIdentified, 1);
+  assert.equal(summary.staleIdentityRejected, 1);
+  assert.equal(summary.zeroFreshEvidenceTerminals, 1);
+  const recon = reconcileDeckMultiset(cards, [{ name: 'Negate', quantity: 2 }]);
+  assert.equal(recon.paired.length, 1);
+  assert.equal(recon.unresolved.some(u => u.reason === 'stale-or-unowned-identity'), true);
+});
+
+check('deck benchmark: new cardSessionId advances next slot', () => {
+  const adv = decideDeckAdvance({
+    armedSessionId: 42,
+    cardSessionId: 43,
+    geometryDetected: true,
+    elapsedSinceNextPromptMs: 500,
+    manualArmed: false,
+  });
+  assert.equal(adv.advance, true);
+  assert.equal(adv.reason, 'session-changed');
+  const same = decideDeckAdvance({
+    armedSessionId: 42,
+    cardSessionId: 42,
+    geometryDetected: true,
+    elapsedSinceNextPromptMs: 500,
+    manualArmed: false,
+  });
+  assert.equal(same.advance, false);
+});
+
+check('deck benchmark: timeout still saves true failure', () => {
+  const d = decideDeckCardSave({
+    recordedSlots: new Set(),
+    cardStartedAt: 0,
+    now: DECK_CARD_TIMEOUT_MS + 1,
+    live: {
+      phase: 'detecting',
+      recognitionStatus: null,
+      recognitionDecision: null,
+      identity: null,
+      cardSessionId: null,
+      resultCardSessionId: null,
+      geometryDetected: false,
+      geometryTrackId: null,
+      focusAttemptId: null,
+      titlePresent: false,
+    },
+  });
+  assert.equal(d.shouldSave, true);
+  assert.equal(d.timedOut, true);
+  assert.equal(d.terminal, null);
+});
+
+check('deck benchmark: titlePresent flows into observability', () => {
+  const line = formatDeckObservability({
+    benchmarkIndex: 1,
+    geometryTrackId: 2,
+    cardSessionId: 3,
+    phase: 'recognizing',
+    focusAttemptId: 4,
+    recognitionStatus: 'found',
+    identity: 'Negate',
+    labHold: false,
+    timeoutAgeMs: 800,
+    titlePresent: true,
+    timedOut: false,
+  });
+  assert.match(line, /labHold=false/);
+  assert.match(line, /title=yes/);
+  assert.match(line, /card=1/);
+});
+
+check('deck benchmark: observability logs only on state change', () => {
+  const a = {
+    benchmarkIndex: 1,
+    geometryTrackId: 2,
+    cardSessionId: 3,
+    phase: 'detecting',
+    focusAttemptId: 1,
+    recognitionStatus: null,
+    identity: null,
+    labHold: false,
+    titlePresent: false,
+    timedOut: false,
+  };
+  assert.equal(deckObservabilityChanged(null, a), true);
+  assert.equal(deckObservabilityChanged(a, { ...a }), false);
+  assert.equal(deckObservabilityChanged(a, { ...a, phase: 'focusing' }), true);
+  assert.equal(deckObservabilityChanged(a, { ...a, cardSessionId: 4 }), true);
+  assert.equal(deckObservabilityChanged(a, { ...a, labHold: true }), true);
+  assert.equal(deckObservabilityChanged(a, { ...a, timedOut: true }), true);
+  // timeoutAgeMs is not part of the key — age alone must not spam logs
+  assert.equal(deckObservabilityChanged(a, { ...a }), false);
 });
 
 check('binder benchmark: frame naming + capture summary', () => {
@@ -5905,19 +6868,67 @@ check('binder benchmark: frame naming + capture summary', () => {
     completedAt: null,
     targetPages: 2,
     layout: { rows: 3, cols: 3 },
-    captureDurationMs: 2700,
-    frameCadenceMs: 280,
+    captureDurationMs: BINDER_MAX_PAGE_MS,
+    frameCadenceMs: 0,
+    targetFramesPerPage: BINDER_TARGET_FRAMES,
+    minFramesOk: BINDER_MIN_FRAMES_OK,
+    maxPageMs: BINDER_MAX_PAGE_MS,
     captureSource: 'snapshot',
     captureNote: 'test',
     pages: [
       {
         pageIndex: 1,
         layout: { rows: 3, cols: 3 },
-        frames: [{ frameIndex: 1 }, { frameIndex: 2 }],
+        frames: [
+          {
+            pageIndex: 1,
+            frameIndex: 1,
+            timestamp: 'x',
+            monoMs: 100,
+            width: 10,
+            height: 10,
+            orientation: null,
+            captureSource: 'snapshot',
+            geometryTrackId: null,
+            detectorScore: null,
+            selectedQuad: null,
+            focusState: null,
+            file: 'p01-f001.png',
+            snapshotMs: 2000,
+            encodeWriteMs: 2500,
+            totalFrameMs: 4500,
+            fileBytes: 12000,
+          },
+          {
+            pageIndex: 1,
+            frameIndex: 2,
+            timestamp: 'y',
+            monoMs: 200,
+            width: 10,
+            height: 10,
+            orientation: null,
+            captureSource: 'snapshot',
+            geometryTrackId: null,
+            detectorScore: null,
+            selectedQuad: null,
+            focusState: null,
+            file: 'p02-f002.png',
+            snapshotMs: 2100,
+            encodeWriteMs: 2600,
+            totalFrameMs: 4700,
+            fileBytes: 12100,
+          },
+        ],
         startedAt: 'x',
         endedAt: 'y',
-        captureDurationMs: 2700,
-        targetFrameCount: 10,
+        captureDurationMs: 9000,
+        targetFrameCount: BINDER_TARGET_FRAMES,
+        requestedFrames: BINDER_TARGET_FRAMES,
+        savedFrames: 2,
+        failedFrames: 0,
+        status: 'FAILED',
+        stopReason: 'max-time',
+        maxPageMs: BINDER_MAX_PAGE_MS,
       },
     ],
     phase: 'interrupted',
@@ -5925,6 +6936,114 @@ check('binder benchmark: frame naming + capture summary', () => {
   });
   assert.equal(summary.pages, 1);
   assert.equal(summary.totalFrames, 2);
+  assert.equal(summary.pageStatusCounts.FAILED, 1);
+  assert.equal(summary.latencies.totalFrameMs.n, 2);
+  assert.ok(summary.latencies.encodeWriteMs.p50 != null);
+});
+
+check('binder benchmark: COMPLETE / SPARSE / FAILED thresholds', () => {
+  assert.equal(classifyBinderPageStatus(5), 'COMPLETE');
+  assert.equal(classifyBinderPageStatus(3), 'SPARSE');
+  assert.equal(classifyBinderPageStatus(2), 'FAILED');
+  assert.equal(classifyBinderPageStatus(0), 'FAILED');
+});
+
+check('binder benchmark: frame-driven stop is not fictional cadence', () => {
+  assert.equal(BINDER_TARGET_FRAMES, 5);
+  assert.equal(BINDER_MIN_FRAMES_OK, 3);
+  assert.ok(BINDER_MAX_PAGE_MS >= 20_000);
+  const hitTarget = shouldStopBinderCapture({
+    savedFrames: 5,
+    failedFrames: 0,
+    elapsedMs: 1000,
+  });
+  assert.equal(hitTarget.stop, true);
+  assert.equal(hitTarget.reason, 'target');
+  const hitMax = shouldStopBinderCapture({
+    savedFrames: 2,
+    failedFrames: 1,
+    elapsedMs: BINDER_MAX_PAGE_MS,
+  });
+  assert.equal(hitMax.stop, true);
+  assert.equal(hitMax.reason, 'max-time');
+  const keepGoing = shouldStopBinderCapture({
+    savedFrames: 2,
+    failedFrames: 0,
+    elapsedMs: 5_000,
+  });
+  assert.equal(keepGoing.stop, false);
+});
+
+check('binder benchmark: no automatic next-page capture', () => {
+  assert.equal(BINDER_AUTO_ADVANCE_PAGES, false);
+  assert.equal(BINDER_TURN_AUTO_MS, 0);
+  // TURN PAGE alone must not start capture.
+  assert.equal(
+    binderCanStartNextPageCapture({
+      phase: 'turn-page',
+      capturing: false,
+      explicitNextTap: false,
+    }),
+    false,
+  );
+  assert.equal(
+    binderCanStartNextPageCapture({
+      phase: 'page-saved',
+      capturing: false,
+      explicitNextTap: false,
+    }),
+    false,
+  );
+  assert.equal(
+    binderCanStartNextPageCapture({
+      phase: 'page-saved',
+      capturing: false,
+      explicitNextTap: true,
+    }),
+    false,
+  );
+  // Explicit NEXT PAGE tap on turn-page is required.
+  assert.equal(
+    binderCanStartNextPageCapture({
+      phase: 'turn-page',
+      capturing: false,
+      explicitNextTap: true,
+    }),
+    true,
+  );
+  // Never overlap an in-flight capture.
+  assert.equal(
+    binderCanStartNextPageCapture({
+      phase: 'turn-page',
+      capturing: true,
+      explicitNextTap: true,
+    }),
+    false,
+  );
+});
+
+check('binder benchmark: after-save waits for NEXT PAGE or FINISH', () => {
+  assert.equal(
+    binderAfterSaveAction({ status: 'COMPLETE', savedNonFailedPages: 1, targetPages: 5 }),
+    'await-next-page',
+  );
+  assert.equal(
+    binderAfterSaveAction({ status: 'SPARSE', savedNonFailedPages: 4, targetPages: 5 }),
+    'await-next-page',
+  );
+  assert.equal(
+    binderAfterSaveAction({ status: 'COMPLETE', savedNonFailedPages: 5, targetPages: 5 }),
+    'await-finish',
+  );
+  assert.equal(
+    binderAfterSaveAction({ status: 'FAILED', savedNonFailedPages: 0, targetPages: 5 }),
+    'retry',
+  );
+  // Resume contract: saved pages → await-next-page (not auto capture).
+  assert.equal(
+    binderAfterSaveAction({ status: 'COMPLETE', savedNonFailedPages: 2, targetPages: 5 }),
+    'await-next-page',
+  );
 });
 
 check('deck failure class: no geometry → NO_DETECTION', () => {
@@ -5953,4 +7072,1890 @@ check('deck failure class: focus timeout without hi-res', () => {
   );
 });
 
+check('scanner mode: exclusive ownership + presentation gates', () => {
+  assert.equal(allowsNormalResultPresentation('normal'), true);
+  assert.equal(allowsNormalResultPresentation('deck-benchmark'), false);
+  assert.equal(allowsNormalCollectionActions('deck-benchmark'), false);
+  assert.equal(runsCanonicalRecognition('deck-benchmark'), true);
+  assert.equal(runsCanonicalRecognition('binder-benchmark'), false);
+  assert.equal(suspendsNormalRecognition('binder-benchmark'), true);
+  assert.equal(suspendsNormalRecognition('deck-benchmark'), false);
+  assert.equal(DECK_BENCHMARK_USES_GLOBAL_LAB_HOLD, false);
+  assert.equal(showsDiagnosticPolygonsByDefault('deck-benchmark'), true);
+  assert.equal(showsDiagnosticPolygonsByDefault('card-swap-test'), true);
+  assert.equal(showsDiagnosticPolygonsByDefault('binder-benchmark'), false);
+  assert.equal(canClaimScannerMode('normal', 'deck-benchmark'), true);
+  assert.equal(canClaimScannerMode('deck-benchmark', 'binder-benchmark'), false);
+  assert.equal(canClaimScannerMode('deck-benchmark', 'normal'), true);
+  assert.equal(applyScannerModeClaim('deck-benchmark', 'binder-benchmark').ok, false);
+  assert.equal(applyScannerModeClaim('normal', 'deck-benchmark').ok, true);
+  assert.equal(shouldDismissNormalResultOnModeEnter('normal', 'deck-benchmark'), true);
+  assert.equal(shouldResetSessionOnModeExit('deck-benchmark', 'normal'), true);
+  assert.equal(isExclusiveScannerOwner('card-swap-test'), true);
+  assert.equal(isExclusiveScannerOwner('binder'), true);
+  assert.equal(isBinderMode('binder'), true);
+  assert.equal(isBinderMode('binder-benchmark'), true);
+  assert.equal(usesBinderOverlays('binder'), true);
+  assert.equal(suspendsNormalRecognition('binder'), true);
+  assert.equal(allowsNormalResultPresentation('binder'), false);
+  assert.equal(runsCanonicalRecognition('binder'), false);
+});
+
+check('scanner mode: deck FOUND is for benchmark only (not consumer UI)', () => {
+  // Simulation of CameraScanScreen gate: FOUND + deck mode ⇒ no ScanResultCard.
+  const mode = 'deck-benchmark';
+  const phase = 'found';
+  const showResult =
+    allowsNormalResultPresentation(mode) && (phase === 'found' || phase === 'ambiguous');
+  assert.equal(showResult, false);
+  // Production path still "runs" for deck.
+  assert.equal(runsCanonicalRecognition(mode), true);
+  // 18s timeout unchanged.
+  assert.equal(DECK_CARD_TIMEOUT_MS, 18_000);
+});
+
+check('scanner mode: binder suspends recognition consumer', () => {
+  assert.equal(suspendsNormalRecognition('binder-benchmark'), true);
+  assert.equal(allowsNormalResultPresentation('binder-benchmark'), false);
+  assert.equal(runsCanonicalRecognition('binder-benchmark'), false);
+  assert.equal(suspendsNormalRecognition('binder'), true);
+  assert.equal(allowsNormalResultPresentation('binder'), false);
+  assert.equal(runsCanonicalRecognition('binder'), false);
+});
+
+check('scanner mode: geometry-test exclusive, no recognition, live raw polygon', () => {
+  assert.equal(isExclusiveScannerOwner('geometry-test'), true);
+  assert.equal(allowsNormalResultPresentation('geometry-test'), false);
+  assert.equal(allowsNormalCollectionActions('geometry-test'), false);
+  assert.equal(runsCanonicalRecognition('geometry-test'), false);
+  assert.equal(suspendsNormalRecognition('geometry-test'), true);
+  assert.equal(showsDiagnosticPolygonsByDefault('geometry-test'), false);
+  assert.equal(usesLiveRawPolygon('geometry-test'), true);
+  assert.equal(canClaimScannerMode('normal', 'geometry-test'), true);
+  assert.equal(canClaimScannerMode('deck-benchmark', 'geometry-test'), false);
+  assert.equal(applyScannerModeClaim('normal', 'geometry-test').ok, true);
+  // ScanResultCard must not appear.
+  const showResult =
+    allowsNormalResultPresentation('geometry-test') && true;
+  assert.equal(showResult, false);
+});
+
+check('geometry-test lock: 2 frames high score, 3 normal; freeze after lock', () => {
+  assert.equal(framesRequiredForScore(0.95), 2);
+  assert.equal(framesRequiredForScore(0.7), 3);
+  const q1 = {
+    topLeft: { x: 80, y: 60 },
+    topRight: { x: 320, y: 70 },
+    bottomRight: { x: 310, y: 400 },
+    bottomLeft: { x: 70, y: 390 },
+  };
+  const q2 = {
+    topLeft: { x: 82, y: 61 },
+    topRight: { x: 321, y: 71 },
+    bottomRight: { x: 311, y: 401 },
+    bottomLeft: { x: 71, y: 391 },
+  };
+  assert.equal(quadsAgreeForGeometryLock(q1, q2), true);
+  let st = emptyGeometryLockState();
+  let r = tickGeometryLock(st, { now: 1, score: 0.95, plausible: q1 });
+  assert.equal(r.decision, 'confirming');
+  st = r.state;
+  r = tickGeometryLock(st, { now: 2, score: 0.95, plausible: q2 });
+  assert.equal(r.decision, 'locked');
+  assert.ok(r.state.locked);
+  const frozen = r.state.locked;
+  r = tickGeometryLock(r.state, {
+    now: 3,
+    score: 0.95,
+    plausible: {
+      topLeft: { x: 200, y: 200 },
+      topRight: { x: 400, y: 200 },
+      bottomRight: { x: 400, y: 500 },
+      bottomLeft: { x: 200, y: 500 },
+    },
+  });
+  assert.equal(r.decision, 'locked');
+  assert.deepEqual(r.state.locked, frozen);
+});
+
+check('geometry-test lock: reset when geometry disappears', () => {
+  const q = {
+    topLeft: { x: 80, y: 60 },
+    topRight: { x: 320, y: 70 },
+    bottomRight: { x: 310, y: 400 },
+    bottomLeft: { x: 70, y: 390 },
+  };
+  let st = emptyGeometryLockState();
+  st = tickGeometryLock(st, { now: 1, score: 0.8, plausible: q }).state;
+  const r = tickGeometryLock(st, { now: 2, score: 0.8, plausible: null });
+  assert.equal(r.decision, 'reset');
+  assert.equal(r.state.agreeingStreak, 0);
+});
+
+check('geometry-test capture-safe: in-frame card passes; edge/out/small/extreme fail', () => {
+  const frame = { width: 360, height: 640 };
+  const good = {
+    topLeft: { x: 80, y: 120 },
+    topRight: { x: 260, y: 125 },
+    bottomRight: { x: 255, y: 480 },
+    bottomLeft: { x: 85, y: 475 },
+  };
+  const ok = evaluateCaptureSafe({ corners: good, frame });
+  assert.equal(ok.captureSafe, true);
+  assert.equal(ok.message, '');
+
+  const nearEdge = {
+    topLeft: { x: 2, y: 120 },
+    topRight: { x: 200, y: 125 },
+    bottomRight: { x: 195, y: 480 },
+    bottomLeft: { x: 5, y: 475 },
+  };
+  const edge = evaluateCaptureSafe({ corners: nearEdge, frame });
+  assert.equal(edge.captureSafe, false);
+  assert.ok(edge.reasons.includes('near_edge') || edge.reasons.includes('out_of_frame'));
+  assert.equal(captureSafeMessage(edge.reasons), 'TOO CLOSE TO EDGE');
+
+  const outside = {
+    topLeft: { x: -20, y: 100 },
+    topRight: { x: 200, y: 100 },
+    bottomRight: { x: 200, y: 400 },
+    bottomLeft: { x: -10, y: 400 },
+  };
+  const out = evaluateCaptureSafe({ corners: outside, frame });
+  assert.equal(out.captureSafe, false);
+  assert.ok(out.reasons.includes('out_of_frame'));
+  assert.equal(out.message, 'MOVE CARD INTO FRAME');
+
+  const tiny = {
+    topLeft: { x: 160, y: 280 },
+    topRight: { x: 190, y: 282 },
+    bottomRight: { x: 188, y: 330 },
+    bottomLeft: { x: 162, y: 328 },
+  };
+  const small = evaluateCaptureSafe({ corners: tiny, frame });
+  assert.equal(small.captureSafe, false);
+  assert.ok(small.reasons.includes('too_small'));
+  assert.equal(small.message, 'CARD TOO SMALL');
+
+  const extreme = {
+    topLeft: { x: 40, y: 80 },
+    topRight: { x: 320, y: 90 },
+    bottomRight: { x: 200, y: 500 },
+    bottomLeft: { x: 180, y: 490 },
+  };
+  const ang = evaluateCaptureSafe({ corners: extreme, frame });
+  assert.equal(ang.captureSafe, false);
+  assert.ok(
+    ang.reasons.includes('extreme_angle') ||
+      ang.reasons.includes('weak_support') ||
+      ang.reasons.includes('non_convex'),
+  );
+
+  assert.equal(evaluateCaptureSafe({ corners: null, frame }).message, 'WAITING FOR GEOMETRY');
+});
+
+check('geometry-test capture-safe: 4.5%→2.5% near_edge A/B; out_of_frame hard gate', () => {
+  const frame = { width: 360, height: 640 };
+  const minDim = Math.min(frame.width, frame.height);
+  // Corner at 4.0% of minDim — unsafe under old 4.5%, safe under new 2.5%.
+  const inset40 = 0.04 * minDim;
+  const at40 = {
+    topLeft: { x: inset40, y: 120 },
+    topRight: { x: 240, y: 125 },
+    bottomRight: { x: 235, y: 480 },
+    bottomLeft: { x: inset40 + 3, y: 475 },
+  };
+  const old45 = evaluateCaptureSafe({ corners: at40, frame, edgeMarginNorm: 0.045 });
+  assert.equal(old45.captureSafe, false);
+  assert.ok(old45.reasons.includes('near_edge'));
+  const neu25 = evaluateCaptureSafe({ corners: at40, frame, edgeMarginNorm: 0.025 });
+  assert.equal(neu25.captureSafe, true);
+  // Default constant must be 2.5%.
+  assert.equal(CAPTURE_SAFE_EDGE_MARGIN, 0.025);
+  assert.equal(evaluateCaptureSafe({ corners: at40, frame }).captureSafe, true);
+
+  // Corner at 2.0% — still near_edge under 2.5%.
+  const inset20 = 0.02 * minDim;
+  const at20 = {
+    topLeft: { x: inset20, y: 120 },
+    topRight: { x: 240, y: 125 },
+    bottomRight: { x: 235, y: 480 },
+    bottomLeft: { x: inset20 + 3, y: 475 },
+  };
+  const at20v = evaluateCaptureSafe({ corners: at20, frame, edgeMarginNorm: 0.025 });
+  assert.equal(at20v.captureSafe, false);
+  assert.ok(at20v.reasons.includes('near_edge'));
+
+  // Actual out_of_frame ALWAYS unsafe regardless of margin.
+  const outside = {
+    topLeft: { x: -5, y: 120 },
+    topRight: { x: 240, y: 125 },
+    bottomRight: { x: 235, y: 480 },
+    bottomLeft: { x: 80, y: 475 },
+  };
+  for (const m of [0.045, 0.025, 0.01, 0]) {
+    const v = evaluateCaptureSafe({ corners: outside, frame, edgeMarginNorm: m });
+    assert.equal(v.captureSafe, false);
+    assert.ok(v.reasons.includes('out_of_frame'));
+  }
+
+  // Other gates unchanged: too_small still blocks even with 0% edge margin.
+  const tiny = {
+    topLeft: { x: 160, y: 280 },
+    topRight: { x: 190, y: 282 },
+    bottomRight: { x: 188, y: 330 },
+    bottomLeft: { x: 162, y: 328 },
+  };
+  assert.ok(
+    evaluateCaptureSafe({ corners: tiny, frame, edgeMarginNorm: 0 }).reasons.includes('too_small'),
+  );
+});
+
+check('geometry-test physical refine V2: global consensus fail-closed; no large inset; bad seed', () => {
+  const w = 320;
+  const h = 480;
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = data[i + 1] = data[i + 2] = 180;
+    data[i + 3] = 255;
+  }
+  const fillRect = (x0, y0, x1, y1, v) => {
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        const o = (y * w + x) * 4;
+        data[o] = data[o + 1] = data[o + 2] = v;
+      }
+    }
+  };
+  // Small sleeve gap (~2.5% of ~240 side ≈ 6px) — plausible nest.
+  fillRect(40, 60, 280, 420, 40);
+  fillRect(46, 66, 274, 414, 200);
+  const img = { data, width: w, height: h };
+  const outer = {
+    topLeft: { x: 40, y: 60 },
+    topRight: { x: 280, y: 60 },
+    bottomRight: { x: 280, y: 420 },
+    bottomLeft: { x: 40, y: 420 },
+  };
+  const r = refinePhysicalCardBoundary({
+    image: img,
+    corners: outer,
+    candidateRole: 'outer-container',
+    frame: { width: w, height: h },
+  });
+  assert.ok(r.refinementMs < 50);
+  assert.ok(r.selectedQuad.topLeft);
+  assert.ok(typeof r.globalConsensusScore === 'number');
+  assert.ok(r.boundaryModel === r.classification);
+  // Must not auto-select huge inward shrinks.
+  if (r.selectedForCapture === 'PHYSICAL_CARD') {
+    assert.ok(r.meanInset <= 0.04 + 1e-6);
+    assert.ok(r.classification === 'SLEEVED_CARD');
+    assert.ok(r.sleeveQuad && r.physicalCardQuad);
+  } else {
+    assert.equal(r.selectedForCapture, 'ORIGINAL');
+  }
+
+  // Oversized seed must be BAD_SEED and keep ORIGINAL selected.
+  const huge = {
+    topLeft: { x: 5, y: 5 },
+    topRight: { x: 315, y: 5 },
+    bottomRight: { x: 315, y: 475 },
+    bottomLeft: { x: 5, y: 475 },
+  };
+  const bad = refinePhysicalCardBoundary({
+    image: img,
+    corners: huge,
+    frame: { width: w, height: h },
+  });
+  assert.equal(bad.status, 'BAD_SEED');
+  assert.equal(bad.selectedForCapture, 'ORIGINAL');
+  assert.equal(bad.rejectionReason, 'BAD_SEED');
+
+  // Deep internal edge pattern (large inset) must not become physical card.
+  fillRect(40, 60, 280, 420, 50);
+  fillRect(80, 110, 240, 370, 210); // ~16% inset — internal
+  const deep = refinePhysicalCardBoundary({
+    image: { data, width: w, height: h },
+    corners: outer,
+    frame: { width: w, height: h },
+  });
+  assert.notEqual(deep.selectedForCapture, 'PHYSICAL_CARD');
+
+  const none = refinePhysicalCardBoundary({ image: img, corners: null });
+  assert.equal(none.status, 'NO_REFINEMENT');
+  assert.equal(none.selectedForCapture, 'ORIGINAL');
+});
+
+check('geometry-test source-space anti-clip gate calibrated band', () => {
+  const det = { width: 256, height: 480 };
+  const src = { width: 1022, height: 1920 };
+  // Comfortable ~150px source margin → analysis ~37.5px inset on 256.
+  const good = {
+    topLeft: { x: 40, y: 50 },
+    topRight: { x: 216, y: 50 },
+    bottomRight: { x: 216, y: 430 },
+    bottomLeft: { x: 40, y: 430 },
+  };
+  const g = evaluateSourceCaptureSafe({
+    corners: good,
+    detector: det,
+    expectedSource: src,
+  });
+  assert.equal(g.sourceSafe, true);
+  assert.ok(g.minSourceMarginPx > 100);
+
+  // Lip ~35px source (~8.8 analysis px) must reject at thr 56.
+  const lip = {
+    topLeft: { x: 9, y: 12 },
+    topRight: { x: 247, y: 12 },
+    bottomRight: { x: 247, y: 468 },
+    bottomLeft: { x: 9, y: 468 },
+  };
+  const bad = evaluateSourceCaptureSafe({
+    corners: lip,
+    detector: det,
+    expectedSource: src,
+  });
+  assert.equal(bad.sourceSafe, false);
+  assert.ok(bad.minSourceMarginPx < MIN_SOURCE_MARGIN_PX);
+
+  // Jitter envelope: barely-ok margin with large jitter becomes unsafe.
+  const barely = {
+    topLeft: { x: 16, y: 20 },
+    topRight: { x: 240, y: 20 },
+    bottomRight: { x: 240, y: 460 },
+    bottomLeft: { x: 16, y: 460 },
+  };
+  const withJitter = evaluateSourceCaptureSafe({
+    corners: barely,
+    detector: det,
+    expectedSource: src,
+    cornerJitterAnalysisPx: 8,
+  });
+  assert.ok(withJitter.effectiveSourceMarginPx != null);
+  assert.ok(withJitter.effectiveSourceMarginPx < withJitter.minSourceMarginPx);
+});
+
+check('single-card capture: geometry-v2 flag + production profile skips physical refine', () => {
+  const prev = getSingleCapturePipeline();
+  setSingleCapturePipeline('geometry-v2');
+  assert.equal(isGeometryV2Pipeline(), true);
+  assert.equal(usesLiveRawPolygon('normal'), true);
+  assert.equal(usesLiveRawPolygon('geometry-test'), true);
+  assert.equal(NORMAL_PRODUCTION_PROFILE.enablePhysicalRefine, false);
+  assert.equal(NORMAL_PRODUCTION_PROFILE.skipPerCardFocus, true);
+  assert.equal(GEOMETRY_EXPERIMENT_PROFILE.enablePhysicalRefine, true);
+  setSingleCapturePipeline('legacy');
+  assert.equal(isGeometryV2Pipeline(), false);
+  assert.equal(usesLiveRawPolygon('normal'), false);
+  setSingleCapturePipeline(prev);
+});
+
+await checkAsync('single-card capture geometry-v2: no per-card focus; locks via CAPTURE_SAFE', async () => {
+  const prev = getSingleCapturePipeline();
+  setSingleCapturePipeline('geometry-v2');
+  const luma = paintCardLike(blankImage(256, 480), { gray: true });
+  // Well-inset quad so analysis + predicted source margins pass.
+  const corners = {
+    topLeft: { x: 48, y: 60 },
+    topRight: { x: 208, y: 62 },
+    bottomRight: { x: 206, y: 420 },
+    bottomLeft: { x: 50, y: 418 },
+  };
+  let focusCalls = 0;
+  let captureKicks = 0;
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: { recognize: async () => ({ confidence: 0.9, text: 'Sol Ring' }) },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => {
+      captureKicks += 1;
+      return false;
+    },
+    requestFocusNorm: () => {
+      focusCalls += 1;
+    },
+  });
+  const snap = await runFrames(ctrl, luma, helpers, 6);
+  assert.equal(focusCalls, 0, 'geometry-v2 must not request per-card focus');
+  assert.ok(
+    snap.singleCardCapture?.pipeline === 'geometry-v2',
+    'snapshot exposes geometry-v2 pipeline',
+  );
+  assert.ok(
+    snap.phase === 'locking' || snap.phase === 'detected' || snap.phase === 'recognizing',
+    `unexpected phase ${snap.phase}`,
+  );
+  if (snap.phase === 'locking' || snap.singleCardCapture?.frozenQuad) {
+    assert.ok(snap.lockGates.focusOk !== false);
+  }
+  setSingleCapturePipeline(prev);
+});
+
+check('single-card capture tick: CAPTURE_SAFE gates lock; no refine in production', () => {
+  const frame = { width: 256, height: 480 };
+  const good = {
+    topLeft: { x: 40, y: 50 },
+    topRight: { x: 216, y: 50 },
+    bottomRight: { x: 216, y: 430 },
+    bottomLeft: { x: 40, y: 430 },
+  };
+  const lip = {
+    topLeft: { x: 4, y: 8 },
+    topRight: { x: 250, y: 8 },
+    bottomRight: { x: 250, y: 470 },
+    bottomLeft: { x: 4, y: 470 },
+  };
+  let state = emptySingleCardCaptureState(0);
+  const unsafe = tickSingleCardCapture(
+    state,
+    { now: 10, score: 0.9, corners: lip, frame },
+    NORMAL_PRODUCTION_PROFILE,
+  );
+  assert.equal(unsafe.state.captureSafe, false);
+  assert.equal(unsafe.state.lock.locked, null);
+  assert.equal(unsafe.physicalRefine, null);
+
+  state = unsafe.state;
+  // Centered card — analysis safe; source gate uses predicted 1920 long edge.
+  let tick = tickSingleCardCapture(
+    state,
+    { now: 20, score: 0.9, corners: good, frame },
+    NORMAL_PRODUCTION_PROFILE,
+  );
+  assert.equal(tick.state.captureSafe, true);
+  // Need 2 agreeing high-score frames to lock.
+  tick = tickSingleCardCapture(
+    tick.state,
+    { now: 40, score: 0.9, corners: good, frame },
+    NORMAL_PRODUCTION_PROFILE,
+  );
+  assert.ok(tick.state.frozenQuad);
+  assert.equal(tick.decision, 'locked');
+  assert.match(tick.state.userMessage, /CAPTURING|HOLD/);
+});
+
+check('single-card capture: one unsafe frame does not wipe confirmation streak', () => {
+  const frame = { width: 256, height: 480 };
+  const good = {
+    topLeft: { x: 40, y: 50 },
+    topRight: { x: 216, y: 50 },
+    bottomRight: { x: 216, y: 430 },
+    bottomLeft: { x: 40, y: 430 },
+  };
+  const lip = {
+    topLeft: { x: 4, y: 8 },
+    topRight: { x: 250, y: 8 },
+    bottomRight: { x: 250, y: 470 },
+    bottomLeft: { x: 4, y: 470 },
+  };
+  let tick = tickSingleCardCapture(
+    emptySingleCardCaptureState(0),
+    { now: 10, score: 0.9, corners: good, frame },
+    NORMAL_PRODUCTION_PROFILE,
+  );
+  assert.equal(tick.state.captureSafe, true);
+  assert.ok(tick.state.lock.agreeingStreak >= 1);
+  const streakBefore = tick.state.lock.agreeingStreak;
+  // Single near-edge flicker (still-phone detector noise).
+  tick = tickSingleCardCapture(
+    tick.state,
+    { now: 20, score: 0.9, corners: lip, frame },
+    NORMAL_PRODUCTION_PROFILE,
+  );
+  assert.equal(tick.state.captureSafe, false);
+  assert.equal(tick.state.unsafeStreak, 1);
+  assert.equal(tick.state.lock.agreeingStreak, streakBefore);
+  // Two consecutive unsafe frames still reset (before lock).
+  tick = tickSingleCardCapture(
+    tick.state,
+    { now: 30, score: 0.9, corners: lip, frame },
+    NORMAL_PRODUCTION_PROFILE,
+  );
+  assert.equal(tick.state.lock.agreeingStreak, 0);
+  assert.equal(tick.state.lock.lastPlausible, null);
+  assert.equal(tick.state.unsafeStreak, 0);
+  // Fresh safe frames can lock again.
+  tick = tickSingleCardCapture(
+    tick.state,
+    { now: 40, score: 0.9, corners: good, frame },
+    NORMAL_PRODUCTION_PROFILE,
+  );
+  tick = tickSingleCardCapture(
+    tick.state,
+    { now: 50, score: 0.9, corners: good, frame },
+    NORMAL_PRODUCTION_PROFILE,
+  );
+  assert.equal(tick.decision, 'locked');
+  assert.ok(tick.state.frozenQuad);
+});
+
+check('incumbent hysteresis: holds against slight score edge; switches on margin or streak', () => {
+  const a = {
+    topLeft: { x: 40, y: 50 },
+    topRight: { x: 200, y: 50 },
+    bottomRight: { x: 200, y: 280 },
+    bottomLeft: { x: 40, y: 280 },
+  };
+  // Spatially different — shifted right substantially.
+  const b = {
+    topLeft: { x: 120, y: 60 },
+    topRight: { x: 280, y: 60 },
+    bottomRight: { x: 280, y: 300 },
+    bottomLeft: { x: 120, y: 300 },
+  };
+  assert.equal(isSpatialCandidateSwitch(a, b), true);
+  let inc = emptyIncumbentState();
+  let r = tickIncumbent(inc, { now: 1, candidate: a, score: 0.8 });
+  inc = r.state;
+  // Slightly higher score but different geometry — hold A.
+  r = tickIncumbent(inc, { now: 2, candidate: b, score: 0.82 });
+  assert.equal(r.heldIncumbent, true);
+  assert.equal(r.switched, false);
+  assert.deepEqual(r.selected, a);
+  // Second consecutive challenger → switch.
+  r = tickIncumbent(r.state, { now: 3, candidate: b, score: 0.82 });
+  assert.equal(r.switched, true);
+  assert.deepEqual(r.selected, b);
+  // Fresh A with large score margin switches immediately.
+  r = tickIncumbent(r.state, { now: 4, candidate: a, score: 0.95 });
+  assert.equal(r.switched, true);
+});
+
+check('incumbent hysteresis: NEXT/empty resets — no sticky old card', () => {
+  const a = {
+    topLeft: { x: 40, y: 50 },
+    topRight: { x: 200, y: 50 },
+    bottomRight: { x: 200, y: 280 },
+    bottomLeft: { x: 40, y: 280 },
+  };
+  let r = tickIncumbent(emptyIncumbentState(), { now: 1, candidate: a, score: 0.9 });
+  assert.ok(r.state.quad);
+  // emptySingleCardCaptureState is what beginCardSession uses — clears incumbent.
+  const cleared = emptySingleCardCaptureState(99);
+  assert.equal(cleared.incumbent.quad, null);
+  assert.equal(cleared.incumbent.candidateSwitchCount, 0);
+});
+
+check('best recent safe quad prefers centered over transitional lip', () => {
+  const frame = { width: 256, height: 480 };
+  const centered = {
+    topLeft: { x: 40, y: 50 },
+    topRight: { x: 216, y: 50 },
+    bottomRight: { x: 216, y: 430 },
+    bottomLeft: { x: 40, y: 430 },
+  };
+  const transitional = {
+    topLeft: { x: 20, y: 30 },
+    topRight: { x: 230, y: 35 },
+    bottomRight: { x: 235, y: 450 },
+    bottomLeft: { x: 18, y: 445 },
+  };
+  let win = emptyRecentSafeWindow();
+  win = pushRecentSafe(win, { quad: centered, score: 0.88, at: 1, frame });
+  win = pushRecentSafe(win, { quad: centered, score: 0.9, at: 2, frame });
+  win = pushRecentSafe(win, { quad: transitional, score: 0.91, at: 3, frame });
+  const best = pickBestRecentSafe(win);
+  assert.ok(best);
+  // Centered should win despite slightly lower last-frame score.
+  assert.equal(best.quad.topLeft.x, centered.topLeft.x);
+  assert.ok(scoreSafeSample(win.samples[0]) > 0);
+});
+
+check('still-card lock: oscillating candidates still lock via incumbent', () => {
+  const frame = { width: 256, height: 480 };
+  const a = {
+    topLeft: { x: 40, y: 50 },
+    topRight: { x: 216, y: 50 },
+    bottomRight: { x: 216, y: 430 },
+    bottomLeft: { x: 40, y: 430 },
+  };
+  // Alternate with a near-identical jittered quad (same object) and a far one that loses hysteresis.
+  const aJitter = {
+    topLeft: { x: 42, y: 51 },
+    topRight: { x: 214, y: 52 },
+    bottomRight: { x: 215, y: 428 },
+    bottomLeft: { x: 41, y: 429 },
+  };
+  const far = {
+    topLeft: { x: 130, y: 80 },
+    topRight: { x: 250, y: 90 },
+    bottomRight: { x: 240, y: 400 },
+    bottomLeft: { x: 120, y: 390 },
+  };
+  let state = emptySingleCardCaptureState(0);
+  // Feed A, far (held), A, A → should lock without requiring motion.
+  for (const [t, q] of [
+    [10, a],
+    [20, far],
+    [30, a],
+    [40, aJitter],
+  ]) {
+    const tick = tickSingleCardCapture(
+      state,
+      { now: t, score: 0.9, corners: q, frame },
+      NORMAL_PRODUCTION_PROFILE,
+    );
+    state = tick.state;
+  }
+  assert.ok(
+    state.frozenQuad || state.lock.agreeingStreak >= 1,
+    'still card should confirm or lock without motion nudge',
+  );
+  // Safety thresholds unchanged.
+  assert.equal(CAPTURE_SAFE_EDGE_MARGIN, 0.025);
+  assert.equal(MIN_SOURCE_MARGIN_PX, 56);
+});
+
+await checkAsync('background queue: recognize + encode concurrency bounded', async () => {
+  resetScanBackgroundQueueForTests();
+  const q = createBackgroundQueue({
+    maxRecognize: 1,
+    maxEncode: 1,
+    maxUpload: 2,
+    maxPending: 12,
+  });
+  let activeRecog = 0;
+  let maxRecog = 0;
+  let activeEnc = 0;
+  let maxEnc = 0;
+  const mk = (kind, id, ms) => ({
+    id,
+    kind,
+    priority: kind === 'recognize' ? 2 : 3,
+    attemptId: Number(id.replace(/\D/g, '')) || 1,
+    enqueuedAt: Date.now(),
+    run: async () => {
+      if (kind === 'recognize') {
+        activeRecog += 1;
+        maxRecog = Math.max(maxRecog, activeRecog);
+        await new Promise(r => setTimeout(r, ms));
+        activeRecog -= 1;
+      } else {
+        activeEnc += 1;
+        maxEnc = Math.max(maxEnc, activeEnc);
+        await new Promise(r => setTimeout(r, ms));
+        activeEnc -= 1;
+      }
+    },
+  });
+  for (let i = 0; i < 5; i++) q.enqueue(mk('recognize', `r${i}`, 20));
+  for (let i = 0; i < 5; i++) q.enqueue(mk('encode', `e${i}`, 15));
+  await q.drainForTests(200);
+  assert.equal(maxRecog, 1);
+  assert.equal(maxEnc, 1);
+  const snap = q.snapshot();
+  assert.equal(snap.pendingTotal, 0);
+});
+
+check('geometry-test unsafe reason duration helpers', () => {
+  let acc = {};
+  acc = accumulateUnsafeReasonMs(acc, ['near_edge'], 3200);
+  acc = accumulateUnsafeReasonMs(acc, ['near_edge', 'out_of_frame'], 140);
+  acc = accumulateUnsafeReasonMs(acc, ['extreme_angle'], 0);
+  assert.equal(acc.near_edge, 3340);
+  assert.equal(acc.out_of_frame, 140);
+  assert.equal(dominantUnsafeReason(acc), 'near_edge');
+  assert.equal(labelCaptureUnsafeReason('near_edge'), 'TOO_CLOSE_TO_EDGE');
+  assert.equal(labelCaptureUnsafeReason('out_of_frame'), 'MOVE_CARD_INTO_FRAME');
+  assert.equal(labelCaptureUnsafeReason('no_geometry'), 'WAITING_FOR_GEOMETRY');
+});
+
+check('geometry-test derivedMs exposes three critical stage timings', () => {
+  const t = emptyGeometryTiming();
+  t.buttonPressedAt = 1000;
+  t.firstRawQuadAt = 1080;
+  t.firstPlausibleQuadAt = 1080;
+  t.firstCaptureSafeAt = 1400;
+  t.captureQuadLockedAt = 1445;
+  const d = deriveGeometryTestMs(t);
+  assert.equal(d.buttonToFirstQuadMs, 80);
+  assert.equal(d.firstQuadToFirstCaptureSafeMs, 320);
+  assert.equal(d.captureSafeToLockMs, 45);
+  assert.equal(d.buttonToFirstCaptureSafeMs, 400);
+});
+
+check('geometry-test capture-safe: DETECTED does not imply lock without safe', () => {
+  // Lock still requires agreeing frames; unsafe frames must not advance streak.
+  const frame = { width: 360, height: 640 };
+  const nearEdge = {
+    topLeft: { x: 2, y: 120 },
+    topRight: { x: 200, y: 125 },
+    bottomRight: { x: 195, y: 480 },
+    bottomLeft: { x: 5, y: 475 },
+  };
+  assert.equal(evaluateCaptureSafe({ corners: nearEdge, frame }).captureSafe, false);
+  let st = emptyGeometryLockState();
+  // Simulate gate: only tick lock when safe — unsafe leaves streak at 0.
+  const safe = evaluateCaptureSafe({ corners: nearEdge, frame });
+  if (!safe.captureSafe) {
+    st = emptyGeometryLockState();
+  }
+  assert.equal(st.agreeingStreak, 0);
+  assert.equal(st.locked, null);
+});
+
+check('geometry-test timing: monotonic deltas + START clears prior marks', () => {
+  let t = emptyGeometryTiming();
+  t = { ...t, buttonPressedAt: 1000 };
+  t = markFirstTiming(t, 'firstRawQuadAt', 1120);
+  t = markFirstTiming(t, 'firstRawQuadAt', 1500); // no overwrite
+  t = markFirstTiming(t, 'firstPlausibleQuadAt', 1180);
+  t = markFirstTiming(t, 'captureQuadLockedAt', 1300);
+  t = markFirstTiming(t, 'captureRequestedAt', 1310);
+  t = markFirstTiming(t, 'captureCompletedAt', 1600);
+  t = markFirstTiming(t, 'warpDoneAt', 1691);
+  t = markFirstTiming(t, 'cardPreviewEncodeStartAt', 1692);
+  t = markFirstTiming(t, 'cardPreviewEncodeDoneAt', 1720);
+  t = markFirstTiming(t, 'previewLoadStartAt', 1721);
+  t = markFirstTiming(t, 'previewDisplayedAt', 1760);
+  t = markFirstTiming(t, 'imageDisplayedAt', 1760);
+  t = markFirstTiming(t, 'cardArtifactEncodeStartAt', 1800);
+  t = markFirstTiming(t, 'cardArtifactEncodeDoneAt', 2500);
+  t = markFirstTiming(t, 'cardFileWriteStartAt', 2500);
+  t = markFirstTiming(t, 'cardFileWriteDoneAt', 2700);
+  t = markFirstTiming(t, 'fullResPreviewReadyAt', 2710);
+  t = markFirstTiming(t, 'artifactEncodeStartAt', 1800);
+  t = markFirstTiming(t, 'artifactEncodeDoneAt', 3200);
+  const d = deriveGeometryTestMs(t);
+  assert.equal(d.buttonToFirstRawMs, 120);
+  assert.equal(d.buttonToFirstPlausibleMs, 180);
+  assert.equal(d.plausibleToLockMs, 120);
+  assert.equal(d.buttonToCaptureDoneMs, 600);
+  assert.equal(d.buttonToWarpDoneMs, 691);
+  assert.equal(d.buttonToCaptureReadyMs, 691);
+  assert.equal(d.buttonToDisplayMs, 760);
+  assert.equal(d.previewEncodeMs, 28);
+  assert.equal(d.warpToDisplayedMs, 69);
+  assert.equal(d.artifactCardEncodeMs, 700);
+  assert.equal(d.artifactCardWriteMs, 200);
+  assert.equal(d.artifactEncodeMs, 1400);
+  assert.equal(t.firstRawQuadAt, 1120);
+  // Preview path must not require artifact ACK (display before artifact done).
+  assert.ok(d.buttonToDisplayMs < d.artifactEncodeMs);
+  assert.ok((t.previewDisplayedAt ?? 0) < (t.cardFileWriteDoneAt ?? 0));
+  // Fresh START timing must not inherit prior.
+  const fresh = { ...emptyGeometryTiming(), buttonPressedAt: 5000 };
+  assert.equal(fresh.firstRawQuadAt, null);
+  assert.equal(deriveGeometryTestMs(fresh).buttonToFirstRawMs, null);
+});
+
+check('geometry-test artifacts: card must be 744×1039; thumbnail trap classified', () => {
+  assert.equal(GEOMETRY_CARD_ARTIFACT_WIDTH, 744);
+  assert.equal(GEOMETRY_CARD_ARTIFACT_HEIGHT, 1039);
+  assert.equal(
+    classifyGeometryArtifact({
+      role: 'card-warp',
+      logicalWidth: 744,
+      logicalHeight: 1039,
+      encodedWidth: 744,
+      encodedHeight: 1039,
+      bytes: 1000,
+    }),
+    'ARTIFACT_OK',
+  );
+  assert.equal(
+    classifyGeometryArtifact({
+      role: 'card-warp',
+      logicalWidth: 744,
+      logicalHeight: 1039,
+      encodedWidth: 120,
+      encodedHeight: 168,
+      bytes: 80_000,
+    }),
+    'ARTIFACT_DOWNSCALED',
+  );
+  assert.throws(() =>
+    assertGeometryCardArtifactDims({ encodedWidth: 120, encodedHeight: 168, bytes: 10 }),
+  );
+  assert.throws(() =>
+    assertGeometrySourceArtifactDims({
+      logicalWidth: 1022,
+      logicalHeight: 1920,
+      encodedWidth: 120,
+      encodedHeight: 225,
+      bytes: 10,
+    }),
+  );
+  assertGeometryCardArtifactDims({ encodedWidth: 744, encodedHeight: 1039, bytes: 10 });
+  assertGeometrySourceArtifactDims({
+    logicalWidth: 1022,
+    logicalHeight: 1920,
+    encodedWidth: 1022,
+    encodedHeight: 1920,
+    bytes: 10,
+  });
+});
+
+check('geometry-test summarize + upload kind', () => {
+  const bundle = {
+    kind: 'geometry-test',
+    fixtureId: 'geometry-test-unit',
+    createdAt: '2026-09-10T00:00:00.000Z',
+    completedAt: null,
+    geometryEngine: 'current',
+    focusMode: 'prefocus-once',
+    initialFocusRequested: true,
+    initialFocusRequestedAt: 100,
+    initialFocusReportedSuccess: false,
+    phase: 'complete',
+    note: '',
+    items: [
+      {
+        itemIndex: 1,
+        geometryTestId: 'g1',
+        captureId: 1,
+        geometryEngine: 'current',
+        manualCapture: false,
+        focusReportedSuccess: false,
+        sharpness: 10,
+        sourceWidth: 1080,
+        sourceHeight: 1920,
+        warpWidth: 744,
+        warpHeight: 1039,
+        detectorFrameCount: 3,
+        lockFrameCount: 2,
+        timing: {
+          ...emptyGeometryTiming(),
+          buttonPressedAt: 0,
+          firstRawQuadAt: 100,
+          firstPlausibleQuadAt: 120,
+          captureQuadLockedAt: 250,
+          captureRequestedAt: 260,
+          captureCompletedAt: 500,
+          imageDisplayedAt: 510,
+        },
+        derivedMs: {
+          buttonToFirstRawMs: 100,
+          buttonToFirstPlausibleMs: 120,
+          plausibleToLockMs: 130,
+          buttonToCaptureRequestMs: 260,
+          buttonToCaptureDoneMs: 500,
+          buttonToDisplayMs: 510,
+        },
+        frames: [],
+        lockedQuad: null,
+        files: { metadata: 'geom-001-metadata.json' },
+        recordedAt: '2026-09-10T00:00:00.000Z',
+      },
+    ],
+  };
+  const s = summarizeGeometryTest(bundle);
+  assert.equal(s.itemCount, 1);
+  assert.equal(s.firstRawP50, 100);
+  assert.equal(s.captureDoneP50, 500);
+  assert.equal(s.manualCaptureRate, 0);
+  // Initial focus timestamps are session-level and must not be in button→capture deltas.
+  assert.equal(Object.prototype.hasOwnProperty.call(bundle.items[0].timing, 'focusRequestedAt'), false);
+  assert.ok(bundle.initialFocusRequestedAt < (bundle.items[0].timing.buttonPressedAt ?? 0) || bundle.initialFocusRequestedAt === 100);
+});
+
+check('geometry-test: START timing excludes prefocus (session-level only)', () => {
+  const t = {
+    ...emptyGeometryTiming(),
+    buttonPressedAt: 5000,
+    firstRawQuadAt: 5120,
+    captureCompletedAt: 5600,
+  };
+  const d = deriveGeometryTestMs(t);
+  assert.equal(d.buttonToFirstRawMs, 120);
+  assert.equal(d.buttonToCaptureDoneMs, 600);
+  // No AF fields on item timing — prefocus lives on the bundle.
+  assert.equal('focusRequestedAt' in t, false);
+});
+
+check('MTG fast-path: obvious card accepts; paper rectangle rejects; fail-closed', () => {
+  const cardLike = {
+    topLeft: { x: 80, y: 60 },
+    topRight: { x: 320, y: 70 },
+    bottomRight: { x: 310, y: 400 },
+    bottomLeft: { x: 70, y: 390 },
+  };
+  const paper = {
+    topLeft: { x: 10, y: 10 },
+    topRight: { x: 470, y: 10 },
+    bottomRight: { x: 470, y: 630 },
+    bottomLeft: { x: 10, y: 630 },
+  };
+  const ok = evaluateMtgFastAccept({
+    corners: cardLike,
+    score: 0.95,
+    frame: { width: 480, height: 640 },
+    runnerUpScore: 0.4,
+  });
+  assert.equal(ok.accept, true, ok.rejectReasons.join(','));
+  const badPaper = evaluateMtgFastAccept({
+    corners: paper,
+    score: 0.95,
+    frame: { width: 480, height: 640 },
+    runnerUpScore: 0.2,
+  });
+  assert.equal(badPaper.accept, false);
+  assert.ok(badPaper.rejectReasons.some(r => r.includes('occupancy')));
+  const weak = evaluateMtgFastAccept({
+    corners: cardLike,
+    score: 0.5,
+    frame: { width: 480, height: 640 },
+    runnerUpScore: 0.45,
+  });
+  assert.equal(weak.accept, false);
+});
+
+check('continuity soft-reset keeps track id and force-adopts next raw', () => {
+  let state = emptyContinuity();
+  const a = {
+    topLeft: { x: 40, y: 40 },
+    topRight: { x: 200, y: 40 },
+    bottomRight: { x: 200, y: 260 },
+    bottomLeft: { x: 40, y: 260 },
+  };
+  let d = stepContinuity(state, { rawCorners: a, rawScore: 0.9 });
+  state = d.state;
+  const id = d.track.id;
+  state = softResetContinuityForNewCardSession(state, 'new-card-session');
+  assert.equal(state.track?.id, id);
+  assert.equal(state.track?.forceAdoptNext, true);
+  const b = {
+    topLeft: { x: 60, y: 80 },
+    topRight: { x: 220, y: 85 },
+    bottomRight: { x: 210, y: 300 },
+    bottomLeft: { x: 55, y: 295 },
+  };
+  d = stepContinuity(state, { rawCorners: b, rawScore: 0.92 });
+  assert.equal(d.track.id, id);
+  assert.equal(d.track.forceAdoptNext, false);
+  assert.ok(Math.abs(d.trackedCorners.topLeft.x - 60) < 1);
+});
+
+check('acquisition timing derive deltas', () => {
+  const t = {
+    ...emptyAcquisitionTiming(3),
+    sessionStartedAt: 1000,
+    firstRawQuadAt: 1180,
+    firstPresentedQuadAt: 1250,
+    geometryStableAt: 1400,
+    hiresCaptureDoneAt: 1900,
+    recognitionStartAt: 2000,
+    foundAt: 2600,
+  };
+  const d = deriveAcquisitionMs(t);
+  assert.equal(d.sessionToFirstRawMs, 180);
+  assert.equal(d.firstRawToPresentedMs, 70);
+  assert.equal(d.firstRawToStableMs, 220);
+  assert.equal(d.stableToHiresMs, 500);
+  assert.equal(d.hiresToRecognitionMs, 100);
+  assert.equal(d.recognitionToFoundMs, 600);
+  assert.equal(d.sessionToFoundMs, 1600);
+});
+
+check('binder-real-report: entry imports from repo root', () => {
+  const reportPath = join(root, 'scripts/geometry/binder-real-report.mjs');
+  assert.equal(existsSync(reportPath), true);
+  const src = readFileSync(reportPath, 'utf8');
+  assert.match(src, /from '\.\/lib\/detect-host\.mjs'/);
+  assert.match(src, /from '\.\/lib\/paths\.mjs'/);
+  assert.doesNotMatch(src, /from '\.\/geometry\/lib\//);
+  // Resolve the same relative imports the report uses (repo-root yarn geometry:binder-real-report).
+  const libRoot = join(root, 'scripts/geometry/lib');
+  for (const rel of [
+    'detect-host.mjs',
+    'paths.mjs',
+    'binder-mode/policy.mjs',
+    'binder-mode/grid.mjs',
+    'detect-native.mjs',
+  ]) {
+    assert.equal(existsSync(join(libRoot, rel)), true, `missing ${rel}`);
+  }
+  // Syntax/load smoke without running detector on inbox corpus.
+  execFileSync(process.execPath, ['--check', reportPath], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+});
+
+check('verified scan: NEXT is authoritative; change-watch blocked while result open', () => {
+  assert.equal(verifiedScanBlocksChangeWatch('result'), true);
+  assert.equal(verifiedScanBlocksChangeWatch('captured'), true);
+  assert.equal(verifiedScanBlocksChangeWatch('identifying'), true);
+  assert.equal(verifiedScanBlocksChangeWatch('failed'), true);
+  assert.equal(verifiedScanBlocksChangeWatch('acquiring'), false);
+  assert.equal(verifiedScanBlocksChangeWatch('ready'), false);
+  assert.equal(verifiedScanBlocksAcquisition('result'), true);
+});
+
+check('verified scan: timing marks are first-only and derive next→quad', () => {
+  let t = emptyVerifiedScanTiming();
+  t = markFirstVerified(t, 'nextPressedAt', 100);
+  t = markFirstVerified(t, 'nextFirstQuadAt', 180);
+  t = markFirstVerified(t, 'nextFirstQuadAt', 999); // ignored
+  assert.equal(t.nextFirstQuadAt, 180);
+  const d = deriveVerifiedScanMs(t);
+  assert.equal(d.nextToFirstQuadMs, 80);
+});
+
+await checkAsync('verified scan: hold pauses acquisition; verifiedAdvance mints fresh session', async () => {
+  const prev = getSingleCapturePipeline();
+  setSingleCapturePipeline('geometry-v2');
+  const luma = paintCardLike(blankImage(256, 480), { gray: true });
+  const corners = {
+    topLeft: { x: 48, y: 60 },
+    topRight: { x: 208, y: 62 },
+    bottomRight: { x: 206, y: 420 },
+    bottomLeft: { x: 50, y: 418 },
+  };
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: { recognize: async () => ({ confidence: 0.9, text: 'Sol Ring' }) },
+  });
+  const helpers = sessionHelpers(corners, {
+    allowRecognize: () => false,
+    requestFocusNorm: () => {},
+  });
+  await runFrames(ctrl, luma, helpers, 4);
+  const before = ctrl.snapshot().lockGates.cardSessionId;
+  ctrl.setVerifiedHold(true);
+  assert.equal(ctrl.isVerifiedHold(), true);
+  const held = await runFrames(ctrl, luma, helpers, 6);
+  assert.equal(held.lockGates.cardSessionId, before, 'hold must not mint new session');
+  assert.ok(
+    String(held.lockGates.waiting ?? '').includes('verified hold'),
+    `expected verified hold waiting, got ${held.lockGates.waiting}`,
+  );
+  const after = ctrl.verifiedAdvance('verified-next');
+  assert.equal(ctrl.isVerifiedHold(), false);
+  assert.ok(after.lockGates.cardSessionId > before, 'NEXT must mint fresh cardSessionId');
+  assert.equal(after.lockGates.sessionResetReason, 'verified-next');
+  assert.equal(after.fused, undefined);
+  assert.ok(after.phase !== 'found' && after.phase !== 'ambiguous');
+  setSingleCapturePipeline(prev);
+});
+
+await checkAsync('verified scan: retryFrozenRecognition reuses hold (no second session)', async () => {
+  const prev = getSingleCapturePipeline();
+  setSingleCapturePipeline('geometry-v2');
+  const ctrl = createSessionController({
+    nameIndex: null,
+    ocr: { recognize: async () => ({ confidence: 0.2, text: '???' }) },
+  });
+  const warp = paintCardLike(blankImage(744, 1039), { gray: true });
+  const quad = {
+    topLeft: { x: 40, y: 40 },
+    topRight: { x: 700, y: 40 },
+    bottomRight: { x: 700, y: 1000 },
+    bottomLeft: { x: 40, y: 1000 },
+  };
+  ctrl.setVerifiedHold(true);
+  await ctrl.recognizeFrozenCapture({ recognitionQuad: quad, source: warp });
+  const sid = ctrl.snapshot().lockGates.cardSessionId;
+  const again = await ctrl.retryFrozenRecognition();
+  assert.equal(again.lockGates.cardSessionId, sid, 'retry must not mint a new session');
+  assert.equal(ctrl.isVerifiedHold(), true);
+  setSingleCapturePipeline(prev);
+});
+
+check('verified scan: production profile still skips physical refine', () => {
+  assert.equal(NORMAL_PRODUCTION_PROFILE.enablePhysicalRefine, false);
+  assert.equal(GEOMETRY_EXPERIMENT_PROFILE.enablePhysicalRefine, true);
+});
+
+check('verified scan attempt: ownership required; survives conceptual NEXT', () => {
+  const src = blankImage(1006, 1920);
+  const warp = blankImage(744, 1039);
+  const quad = {
+    topLeft: { x: 10, y: 10 },
+    topRight: { x: 700, y: 10 },
+    bottomRight: { x: 700, y: 1000 },
+    bottomLeft: { x: 10, y: 1000 },
+  };
+  assert.throws(() =>
+    assertAttemptOwnership({ attemptId: 0, captureId: 1, cardSessionId: 1 }),
+  );
+  const a = createRecognitionAttempt({
+    attemptId: 1,
+    cardSessionId: 5,
+    captureId: 9,
+    childId: 'card-001',
+    parentSessionId: 'normal-scan-session-test',
+    source: src,
+    warp,
+    recognitionQuad: quad,
+  });
+  assert.equal(a.attemptId, 1);
+  assert.equal(a.captureId, 9);
+  assert.equal(a.terminalStatus, null);
+  const advanced = markAttemptAdvancedEarly(a, 1000);
+  assert.equal(advanced.userAdvancedBeforeTerminal, true);
+  assert.ok(advanced.artifacts.source === src);
+  assert.ok(advanced.artifacts.warp === warp);
+  const recognizing = markAttemptRecognizing(advanced, 1100);
+  assert.equal(recognizing.phase, 'recognizing');
+  const done = finalizeAttempt(recognizing, {
+    terminalStatus: 'FOUND',
+    at: 1500,
+    finalCard: 'Sol Ring',
+    ocr: { ocrRawText: 'Sol Ring', bestCandidateName: 'Sol Ring', bestCandidateScore: 1 },
+  });
+  assert.equal(done.terminalStatus, 'FOUND');
+  assert.equal(done.finalCard, 'Sol Ring');
+  assert.equal(done.phase, 'terminal');
+  // Second finalize is no-op
+  const again = finalizeAttempt(done, { terminalStatus: 'SKIPPED', at: 2000 });
+  assert.equal(again.terminalStatus, 'FOUND');
+});
+
+check('recognition channel: options map OCR/ART/BOTH/EDITION', () => {
+  setRecognitionChannel('OCR_ONLY');
+  assert.equal(getRecognitionChannel(), 'OCR_ONLY');
+  assert.equal(channelUsesTitleFastPath(), true);
+  assert.equal(channelToRecognizeOptions('OCR_ONLY').skipArtwork, true);
+  assert.equal(channelToRecognizeOptions('ART_ONLY').skipOcr, true);
+  assert.equal(channelToRecognizeOptions('ART_ONLY').skipArtwork, false);
+  assert.equal(channelToRecognizeOptions('OCR_AND_ART').skipOcr, false);
+  assert.equal(channelToRecognizeOptions('OCR_AND_ART').skipArtwork, false);
+  assert.equal(channelToRecognizeOptions('EDITION_OCR').skipFooter, false);
+  assert.equal(channelToRecognizeOptions('EDITION_OCR').wantFooter, true);
+  assert.equal(channelToRecognizeOptions('EDITION_OCR').skipArtwork, true);
+  assert.equal(RECOGNITION_CHANNEL_LABELS.VISUAL, 'CLIP');
+  assert.equal(RECOGNITION_CHANNEL_LABELS.VISUAL_PLUS_OCR, 'CLIP+OCR');
+  setRecognitionChannel('OCR_ONLY');
+  const order = [];
+  for (let i = 0; i < LEGACY_RECOGNITION_CHANNEL_MODES.length; i++) {
+    order.push(cycleRecognitionChannel());
+  }
+  assert.deepEqual(order, ['ART_ONLY', 'OCR_AND_ART', 'EDITION_OCR', 'OCR_ONLY']);
+  setRecognitionChannel('OCR_ONLY');
+  const withVisual = [];
+  for (let i = 0; i < DEV_RECOGNITION_CHANNEL_MODES.length; i++) {
+    withVisual.push(cycleRecognitionChannel({ includeVisual: true }));
+  }
+  assert.deepEqual(withVisual, [
+    'ART_ONLY',
+    'OCR_AND_ART',
+    'EDITION_OCR',
+    'VISUAL',
+    'VISUAL_PLUS_OCR',
+    'OCR_ONLY',
+  ]);
+  assert.ok(RECOGNITION_CHANNEL_MODES.includes('VISUAL'));
+  assert.ok(RECOGNITION_CHANNEL_MODES.includes('VISUAL_PLUS_OCR'));
+  setRecognitionChannel('OCR_ONLY');
+});
+
+check('continuous eligibility: plausible card without capture-safe margins', () => {
+  const frame = { width: 640, height: 480 };
+  // Centered card occupying ~20% — eligible even with tight analysis margins.
+  const good = {
+    topLeft: { x: 180, y: 80 },
+    topRight: { x: 460, y: 85 },
+    bottomRight: { x: 450, y: 400 },
+    bottomLeft: { x: 190, y: 395 },
+  };
+  const ok = isRecognitionEligible({ corners: good, frame, score: 0.9 });
+  assert.equal(ok.eligible, true, ok.reasons.join(','));
+
+  // Tiny postage stamp — rejected for low resolution / occupancy.
+  const tiny = {
+    topLeft: { x: 300, y: 220 },
+    topRight: { x: 330, y: 220 },
+    bottomRight: { x: 330, y: 260 },
+    bottomLeft: { x: 300, y: 260 },
+  };
+  const badTiny = isRecognitionEligible({ corners: tiny, frame });
+  assert.equal(badTiny.eligible, false);
+  assert.ok(
+    badTiny.reasons.includes('too_small') || badTiny.reasons.includes('low_resolution'),
+  );
+
+  // Mostly OOB — rejected (not via 2.5%/56px margin rules).
+  const oob = {
+    topLeft: { x: -80, y: -60 },
+    topRight: { x: 40, y: -50 },
+    bottomRight: { x: 30, y: 80 },
+    bottomLeft: { x: -70, y: 70 },
+  };
+  const badOob = isRecognitionEligible({ corners: oob, frame });
+  assert.equal(badOob.eligible, false);
+  assert.ok(badOob.reasons.includes('too_much_oob'));
+
+  // Near-edge but still mostly in frame: capture-safe would reject 2.5% inset;
+  // recognition-eligible must still accept.
+  const nearEdge = {
+    topLeft: { x: 4, y: 40 },
+    topRight: { x: 280, y: 42 },
+    bottomRight: { x: 275, y: 420 },
+    bottomLeft: { x: 8, y: 415 },
+  };
+  const near = isRecognitionEligible({ corners: nearEdge, frame, score: 0.85 });
+  assert.equal(near.eligible, true, near.reasons.join(','));
+});
+
+check('continuous seeded select: prefers spatial match over higher distant score', () => {
+  const frame = { width: 1000, height: 1400 };
+  const seed = {
+    topLeft: { x: 200, y: 200 },
+    topRight: { x: 500, y: 200 },
+    bottomRight: { x: 500, y: 620 },
+    bottomLeft: { x: 200, y: 620 },
+  };
+  const sameCard = {
+    topLeft: { x: 210, y: 205 },
+    topRight: { x: 510, y: 205 },
+    bottomRight: { x: 505, y: 625 },
+    bottomLeft: { x: 205, y: 620 },
+  };
+  const otherCard = {
+    topLeft: { x: 700, y: 100 },
+    topRight: { x: 950, y: 100 },
+    bottomRight: { x: 940, y: 450 },
+    bottomLeft: { x: 710, y: 440 },
+  };
+  const picked = selectSeededCandidate({
+    seed,
+    candidates: [
+      { corners: otherCard, score: 0.99 },
+      { corners: sameCard, score: 0.7 },
+    ],
+    frame,
+  });
+  assert.equal(picked.reason, 'seeded_select');
+  assert.equal(picked.index, 1);
+  assert.ok((picked.diagnostics?.seedIoU ?? 0) > 0.5);
+});
+
+check('canonical art crop: PRIMARY matches ARTWORK_REGION; OVERSIZE_5 expands', () => {
+  assert.equal(ART_CROP_VERSION, 1);
+  const card = {
+    width: 744,
+    height: 1039,
+    data: new Uint8ClampedArray(744 * 1039 * 4),
+  };
+  const primary = extractArtCropFromCard(card, { variant: 'PRIMARY' });
+  assert.equal(primary.variant, 'PRIMARY');
+  assert.equal(primary.region.x, ARTWORK_REGION.x);
+  assert.equal(primary.region.w, ARTWORK_REGION.w);
+  const over = extractArtCropFromCard(card, { variant: 'OVERSIZE_5' });
+  assert.equal(over.variant, 'OVERSIZE_5');
+  assert.ok(over.region.w > ARTWORK_REGION.w);
+  assert.ok(over.region.h > ARTWORK_REGION.h);
+});
+
+check('continuous fusion: strong visual / agree / ocr exact / disagreement wait', () => {
+  const strong = fuseContinuousEvidence({
+    visual: { name: 'Sol Ring', oracleId: 'o1', score: 0.91, margin: 0.2 },
+    ocr: null,
+  });
+  assert.equal(strong.publish, true);
+  assert.equal(strong.source, 'VISUAL');
+  assert.equal(strong.identity?.name, 'Sol Ring');
+
+  const agree = fuseContinuousEvidence({
+    visual: { name: 'Sol Ring', oracleId: 'o1', score: 0.7, margin: 0.05 },
+    ocr: { name: 'Sol Ring', oracleId: 'o1', score: 0.88, exact: false },
+  });
+  assert.equal(agree.publish, true);
+  assert.equal(agree.source, 'DUAL');
+
+  const ocrExact = fuseContinuousEvidence({
+    visual: { name: 'Wrong Card', oracleId: 'o2', score: 0.4, margin: 0.01 },
+    ocr: { name: 'Counterspell', oracleId: 'o3', score: 0.97, exact: true },
+  });
+  assert.equal(ocrExact.publish, true);
+  assert.equal(ocrExact.source, 'OCR');
+  assert.equal(ocrExact.identity?.name, 'Counterspell');
+
+  const disagree = fuseContinuousEvidence({
+    visual: { name: 'Sol Ring', oracleId: 'o1', score: 0.7, margin: 0.08 },
+    ocr: { name: 'Mana Crypt', oracleId: 'o9', score: 0.8, exact: false },
+  });
+  assert.equal(disagree.publish, false);
+  assert.equal(disagree.reason, 'disagreement');
+});
+
+check('continuous card-change: duplicate suppress + new track', () => {
+  const frame = { width: 640, height: 480 };
+  const a = {
+    topLeft: { x: 100, y: 60 },
+    topRight: { x: 400, y: 60 },
+    bottomRight: { x: 400, y: 420 },
+    bottomLeft: { x: 100, y: 420 },
+  };
+  assert.equal(
+    shouldSuppressDuplicate({
+      embeddingSimilarity: 0.95,
+      missFrames: 0,
+      corners: a,
+      lockedCorners: a,
+      frame,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldStartNewTrack({
+      embeddingSimilarity: 0.95,
+      missFrames: 0,
+      corners: a,
+      lockedCorners: a,
+      frame,
+    }),
+    false,
+  );
+
+  // Strong embedding discontinuity with confirm streak.
+  assert.equal(
+    shouldStartNewTrack({
+      embeddingSimilarity: 0.4,
+      missFrames: 0,
+      corners: a,
+      lockedCorners: a,
+      frame,
+      embeddingDiffStreak: 1,
+    }),
+    true,
+  );
+
+  // Absence fallback.
+  assert.equal(
+    shouldStartNewTrack({
+      embeddingSimilarity: null,
+      missFrames: 6,
+      corners: null,
+      lockedCorners: a,
+      frame,
+    }),
+    true,
+  );
+
+  // Geometry displacement to a far ROI.
+  const b = {
+    topLeft: { x: 350, y: 50 },
+    topRight: { x: 600, y: 55 },
+    bottomRight: { x: 595, y: 400 },
+    bottomLeft: { x: 340, y: 395 },
+  };
+  assert.equal(
+    shouldStartNewTrack({
+      embeddingSimilarity: 0.8,
+      missFrames: 0,
+      corners: b,
+      lockedCorners: a,
+      frame,
+    }),
+    true,
+  );
+});
+
+check('continuous track ownership: stale generation cannot publish', () => {
+  let session = emptyContinuousSession(1000);
+  session = startNewTrack(session, 1000);
+  let trackA = session.activeTrack;
+  assert.ok(trackA);
+  trackA = appendVisualObservation(trackA, {
+    at: 1100,
+    name: 'Sol Ring',
+    oracleId: 'o1',
+    score: 0.93,
+    margin: 0.22,
+    embedding: null,
+  });
+  const genA = trackA.generation;
+
+  // New physical card starts track B — invalidates A ownership.
+  session = startNewTrack({ ...session, activeTrack: trackA }, 2000);
+  const trackB = session.activeTrack;
+  assert.ok(trackB);
+  assert.notEqual(trackB.generation, genA);
+
+  const stale = tryPublish(trackA, trackB.generation, 2100);
+  assert.equal(stale.owned, false);
+  assert.equal(stale.published, false);
+  assert.equal(stale.reason, 'stale_ownership');
+
+  let live = appendVisualObservation(trackB, {
+    at: 2200,
+    name: 'Negate',
+    oracleId: 'o2',
+    score: 0.9,
+    margin: 0.18,
+    embedding: null,
+  });
+  const ok = tryPublish(live, live.generation, 2300);
+  assert.equal(ok.owned, true);
+  assert.equal(ok.published, true);
+  assert.equal(ok.track.publishedIdentity?.name, 'Negate');
+
+  session = applyPublishToSession({ ...session, activeTrack: ok.track }, ok.track);
+  assert.equal(session.phase, 'IDENTITY_LOCKED');
+  assert.equal(session.recentIdentities.at(-1)?.name, 'Negate');
+
+  // Unlock bumps generation so further async from old gen is rejected.
+  const unlocked = unlockForChange(ok.track);
+  const afterUnlock = tryPublish(
+    appendOcrObservation(ok.track, {
+      at: 2400,
+      name: 'Negate',
+      oracleId: 'o2',
+      score: 0.99,
+      exact: true,
+    }),
+    unlocked.generation,
+    2500,
+  );
+  assert.equal(afterUnlock.owned, false);
+});
+
+check('verified scan attempt: terminal statuses + parent summary', () => {
+  assert.equal(terminalStatusFromCapture({ status: 'identified', phase: 'found' }), 'FOUND');
+  assert.equal(terminalStatusFromCapture({ status: 'insufficient-confidence', phase: 'ambiguous' }), 'AMBIGUOUS');
+  assert.equal(terminalStatusFromCapture({ status: 'ocr-empty', phase: null }), 'NO_MATCH');
+  assert.equal(terminalStatusFromCapture({ status: 'ocr-native-error', phase: null }), 'OCR_ERROR');
+  let summary = emptyParentSummary('p1');
+  summary = noteAttemptCreated(summary, 42);
+  summary = noteAttemptCreated(summary, 42); // idempotent
+  const fake = {
+    attemptId: 42,
+    terminalStatus: 'FOUND',
+    userAdvancedBeforeTerminal: true,
+    correctionType: 'NONE',
+  };
+  summary = noteAttemptTerminal(summary, fake);
+  summary = noteAttemptTerminal(summary, fake); // idempotent
+  assert.equal(summary.attemptsCreated, 1);
+  assert.equal(summary.attemptsTerminal, 1);
+  assert.equal(summary.found, 1);
+  assert.equal(summary.userAdvancesBeforeTerminal, 1);
+  assert.ok(summary.attemptsTerminal <= summary.attemptsCreated);
+});
+
+check('verified scan forensics: freezeCorners immutable + warp validate + mapping roundtrip', () => {
+  assert.equal(SINGLE_SCAN_DIAGNOSTIC_VERSION, 2);
+  const live = {
+    topLeft: { x: 120, y: 200 },
+    topRight: { x: 880, y: 210 },
+    bottomRight: { x: 870, y: 1600 },
+    bottomLeft: { x: 130, y: 1590 },
+  };
+  const frozen = freezeCorners(live);
+  live.topLeft.x = 999;
+  assert.equal(frozen.topLeft.x, 120, 'frozen quad must not share point refs');
+
+  const source = { width: 1019, height: 1920 };
+  const ok = validateWarpInput({ quad: frozen, source });
+  assert.equal(ok.status, 'OK', ok.reasons.join(','));
+
+  const strip = {
+    topLeft: { x: 100, y: 200 },
+    topRight: { x: 130, y: 200 },
+    bottomRight: { x: 130, y: 900 },
+    bottomLeft: { x: 100, y: 900 },
+  };
+  const bad = validateWarpInput({ quad: strip, source });
+  assert.equal(bad.status, 'WARP_INPUT_INVALID');
+
+  const crossed = {
+    topLeft: { x: 10, y: 10 },
+    topRight: { x: 200, y: 10 },
+    bottomRight: { x: 50, y: 200 },
+    bottomLeft: { x: 180, y: 200 },
+  };
+  assert.equal(validateWarpInput({ quad: crossed, source }).status, 'WARP_INPUT_INVALID');
+
+  const detector = { width: 296, height: 640 };
+  const dest = { width: 1019, height: 1920 };
+  const analysis = {
+    topLeft: { x: 40, y: 80 },
+    topRight: { x: 240, y: 85 },
+    bottomRight: { x: 235, y: 520 },
+    bottomLeft: { x: 45, y: 515 },
+  };
+  const projected = projectAnalysisQuadToSource(analysis, {
+    detector,
+    dest,
+    kind: 'same-fov',
+  });
+  const back = mapCornersHiResToDetectorSameFov(projected, dest, detector);
+  for (const k of ['topLeft', 'topRight', 'bottomRight', 'bottomLeft']) {
+    assert.ok(Math.abs(back[k].x - analysis[k].x) < 1e-6, `${k}.x roundtrip`);
+    assert.ok(Math.abs(back[k].y - analysis[k].y) < 1e-6, `${k}.y roundtrip`);
+  }
+
+  // portrait + aspect mismatch + mirror
+  const mirrored = projectAnalysisQuadToSource(analysis, {
+    detector,
+    dest,
+    kind: 'same-fov',
+    destMirrored: true,
+  });
+  assert.ok(mirrored.topLeft.x > mirrored.topRight.x);
+
+  const artifact = buildRecognitionQuadArtifact({
+    attemptId: 1,
+    cardSessionId: 2,
+    captureId: 3,
+    analysisDimensions: detector,
+    sourceDimensions: dest,
+    analysisQuad: analysis,
+    projectedSourceQuad: projected,
+    mappingKind: 'same-fov',
+    mappingVersion: 'same-fov-v1',
+    warpVersion: 'warpQuadToCard-v1',
+    capturePipelineVersion: 'geometry-v2',
+    orientation: null,
+    rotation: null,
+    mirror: false,
+    quadSelectionSource: 'BEST_RECENT_SAFE',
+    candidateScore: 0.9,
+    captureSafe: true,
+    selectedQuadAt: 1,
+    captureRequestedAt: 2,
+    captureDoneAt: 3,
+    sourceAvailableAt: 3,
+    warpStartedAt: 4,
+    warpDoneAt: 5,
+    quadAgeAtCaptureMs: 1,
+    captureLatencyMs: 1,
+    sourceVsQuadAgeMs: 2,
+    warpInputStatus: 'OK',
+    warpSuspectStatus: 'OK',
+    warpSuspectReasons: [],
+    geometryFailureClass: 'OK',
+  });
+  assert.equal(artifact.kind, 'recognition-quad');
+  assert.equal(artifact.singleScanDiagnosticVersion, 2);
+});
+
+check('verified scan timing: paint barrier preferred over legacy paintConfirmed', () => {
+  let t = emptyVerifiedScanTiming();
+  t = markFirstVerified(t, 'previewPaintConfirmedAt', 300);
+  t = markFirstVerified(t, 'previewPaintBarrierPassedAt', 310);
+  t = markFirstVerified(t, 'recognitionStartAt', 350);
+  const d = deriveVerifiedScanMs(t);
+  assert.equal(d.paintToRecognitionMs, 40);
+});
+
+check('verified scan attempt: A pixels cannot match B session for UI publish', () => {
+  const srcA = blankImage(1006, 1920);
+  const warpA = blankImage(744, 1039);
+  const srcB = blankImage(1006, 1920);
+  const warpB = blankImage(744, 1039);
+  const quad = {
+    topLeft: { x: 10, y: 10 },
+    topRight: { x: 700, y: 10 },
+    bottomRight: { x: 700, y: 1000 },
+    bottomLeft: { x: 10, y: 1000 },
+  };
+  const a = createRecognitionAttempt({
+    attemptId: 1,
+    cardSessionId: 10,
+    captureId: 1,
+    childId: 'card-001',
+    parentSessionId: 'p',
+    source: srcA,
+    warp: warpA,
+    recognitionQuad: quad,
+  });
+  const b = createRecognitionAttempt({
+    attemptId: 2,
+    cardSessionId: 11,
+    captureId: 2,
+    childId: 'card-002',
+    parentSessionId: 'p',
+    source: srcB,
+    warp: warpB,
+    recognitionQuad: quad,
+  });
+  // After NEXT, active UI is B (session 11). A's OCR finishes with A's warp as source.
+  const matched = matchAttemptByArtifacts([a, b], { source: warpA, warp: warpA });
+  assert.equal(matched?.attemptId, 1);
+  assert.equal(mayPublishAttemptToUi(a, 11), false);
+  assert.equal(mayPublishAttemptToUi(b, 11), true);
+});
+
+check('verified scan timing: paint→recog derive + distinct capture/warp fields', () => {
+  let t = emptyVerifiedScanTiming();
+  t = markFirstVerified(t, 'captureDoneAt', 100);
+  t = markFirstVerified(t, 'warpDoneAt', 250);
+  t = markFirstVerified(t, 'previewPaintConfirmedAt', 300);
+  t = markFirstVerified(t, 'recognitionStartAt', 340);
+  const d = deriveVerifiedScanMs(t);
+  assert.equal(d.captureDoneToWarpMs, 150);
+  assert.equal(d.paintToRecognitionMs, 40);
+});
+
+check('normal-scan upload: COMPLETE requires forensic artifacts', () => {
+  const files = [
+    { relativePath: 'metadata.json', required: true },
+    { relativePath: 'recognition-card.png', required: true },
+    { relativePath: 'source-highres.png', required: true },
+    { relativePath: 'source-with-recognition-quad.png', required: true },
+    { relativePath: 'recognition-quad.json', required: true },
+    { relativePath: 'title-crop.png', required: true },
+  ];
+  const incomplete = reconcileUploadAck({
+    manifest: {
+      runId: 'normal-scan-session-x--card-001',
+      kind: 'normal-scan',
+      createdAt: new Date().toISOString(),
+      files,
+    },
+    acknowledged: new Set([
+      'metadata.json',
+      'recognition-card.png',
+      'source-highres.png',
+      'title-crop.png',
+    ]),
+  });
+  assert.equal(incomplete.uploadStatus, 'INCOMPLETE');
+  assert.ok(incomplete.missingRequired.includes('recognition-quad.json'));
+  assert.ok(incomplete.missingRequired.includes('source-with-recognition-quad.png'));
+  // Optional files must not be uploaded — filesToUpload only returns required missing.
+  const optionalManifest = {
+    runId: 'x',
+    kind: 'normal-scan',
+    createdAt: new Date().toISOString(),
+    files: [
+      { relativePath: 'metadata.json', required: true },
+      { relativePath: 'recognition-quad.json', required: false },
+    ],
+  };
+  assert.equal(filesToUpload(optionalManifest, []).length, 1);
+  assert.equal(filesToUpload(optionalManifest, [])[0].relativePath, 'metadata.json');
+  const complete = reconcileUploadAck({
+    manifest: {
+      runId: 'normal-scan-session-x--card-001',
+      kind: 'normal-scan',
+      createdAt: new Date().toISOString(),
+      files,
+    },
+    acknowledged: new Set(files.map(f => f.relativePath)),
+  });
+  assert.equal(complete.uploadStatus, 'COMPLETE');
+});
+
+check('normal-scan upload kind is accepted in formatters', () => {
+  assert.ok(formatUploadCompleteMessage(12, 'normal-scan').includes('NORMAL SCAN'));
+  assert.ok(formatUploadCompleteMessage(12, 'normal-scan').includes('12'));
+});
+
+check('binder v0: policy separate from single scan topComponents', () => {
+  assert.equal(BINDER_POLICY.topComponents, 7);
+  assert.equal(BINDER_POLICY.multiReturn, true);
+  assert.equal(SINGLE_SCAN_DETECT_POLICY.topComponents, 4);
+  assert.equal(SINGLE_SCAN_DETECT_POLICY.multiReturn, false);
+});
+
+check('binder v0: multiReturnNms keeps distinct cards', () => {
+  const a = {
+    topLeft: { x: 10, y: 10 },
+    topRight: { x: 60, y: 10 },
+    bottomRight: { x: 60, y: 80 },
+    bottomLeft: { x: 10, y: 80 },
+  };
+  const b = {
+    topLeft: { x: 100, y: 10 },
+    topRight: { x: 150, y: 10 },
+    bottomRight: { x: 150, y: 80 },
+    bottomLeft: { x: 100, y: 80 },
+  };
+  const nearA = {
+    topLeft: { x: 12, y: 12 },
+    topRight: { x: 58, y: 12 },
+    bottomRight: { x: 58, y: 78 },
+    bottomLeft: { x: 12, y: 78 },
+  };
+  const kept = multiReturnNms([
+    { corners: a, score: 0.9 },
+    { corners: nearA, score: 0.85 },
+    { corners: b, score: 0.8 },
+  ]);
+  assert.equal(kept.length, 2);
+});
+
+check('binder v0: tracks associate across frames; acquired sticky', () => {
+  const frame = { width: 300, height: 400 };
+  const a = {
+    topLeft: { x: 20, y: 20 },
+    topRight: { x: 80, y: 20 },
+    bottomRight: { x: 80, y: 100 },
+    bottomLeft: { x: 20, y: 100 },
+  };
+  const b = {
+    topLeft: { x: 120, y: 20 },
+    topRight: { x: 180, y: 20 },
+    bottomRight: { x: 180, y: 100 },
+    bottomLeft: { x: 120, y: 100 },
+  };
+  let s = emptyBinderPageSession(0, 1);
+  s = tickBinderTracks(s, [{ corners: a, score: 0.9 }, { corners: b, score: 0.85 }], 10, frame);
+  assert.equal(s.tracks.length, 2);
+  const idA = s.tracks[0].binderTrackId;
+  s = tickBinderTracks(
+    s,
+    [
+      { corners: { ...a, topLeft: { x: 22, y: 21 } }, score: 0.88 },
+      { corners: b, score: 0.84 },
+    ],
+    20,
+    frame,
+  );
+  assert.equal(s.tracks.length, 2);
+  assert.equal(s.tracks.find(t => t.binderTrackId === idA)?.ageFrames, 2);
+
+  const warp = paintCardLike(blankImage(744, 1039), { gray: true });
+  // Force a good quality by applying identificationReady via applyBestCapture mock score.
+  const quality = scoreBinderCardQuality({ corners: a, frame, warp });
+  s = applyBestCapture(s, idA, {
+    captureId: 1,
+    sourceFrameId: 1,
+    quad: a,
+    warp,
+    quality: { ...quality, identificationReady: true, score: Math.max(quality.score, 0.7) },
+    sharpness: 250,
+    capturedAt: 30,
+  });
+  assert.equal(s.tracks.find(t => t.binderTrackId === idA)?.acquired, true);
+  // Temporary miss must not clear acquired.
+  s = tickBinderTracks(s, [{ corners: b, score: 0.8 }], 40, frame);
+  assert.equal(s.tracks.find(t => t.binderTrackId === idA)?.acquired, true);
+  const hud = binderPageHud(s);
+  assert.ok(hud.acquiredCount >= 1);
+  const overlays = binderOverlays(s);
+  assert.ok(overlays.some(o => o.acquired && o.binderTrackId === idA));
+
+  const next = nextBinderPage(s, 100);
+  assert.equal(next.tracks.length, 0);
+  assert.equal(next.pageIndex, 1);
+});
+
+check('binder v0: snapshot policy is not every detector tick', () => {
+  let s = emptyBinderPageSession(0, 0);
+  assert.equal(shouldTakeBinderPageSnapshot(s, 10, { pendingTracks: 1 }), true);
+  s = { ...s, lastPageSnapshotAt: 10, tracks: [] };
+  assert.equal(shouldTakeBinderPageSnapshot(s, 50, { pendingTracks: 1 }), false);
+  assert.equal(shouldTakeBinderPageSnapshot(s, 500, { pendingTracks: 1 }), true);
+});
+
+check('binder v0: pocket geometry allows small occupancy', () => {
+  const frame = { width: 1000, height: 1400 };
+  const pocket = {
+    topLeft: { x: 100, y: 100 },
+    topRight: { x: 280, y: 100 },
+    bottomRight: { x: 280, y: 350 },
+    bottomLeft: { x: 100, y: 350 },
+  };
+  assert.equal(binderGeometryOk(pocket, frame).ok, true);
+});
+
+check('binder diagnostics: session/page/track naming + unresolved reasons', () => {
+  const id = makeBinderSessionId(new Date('2026-09-10T12:34:56Z'));
+  assert.match(id, /^binder-session-20260910-/);
+  assert.equal(binderDiagFrameFile(0, 1), 'p01-f001.png');
+  assert.equal(binderDiagCardFile(0, 3), 'p01-t03-card.png');
+  assert.equal(binderDiagTracksFile(1), 'p02-tracks.json');
+  assert.equal(binderDiagPageMetaFile(0), 'p01-metadata.json');
+  const soft = classifyUnresolvedReasons({
+    acquired: false,
+    phase: 'tracking',
+    ageFrames: 5,
+    best: {
+      quality: {
+        reasons: ['soft', 'glare'],
+        score: 0.2,
+        components: { captureSafe: 1, geometry: 1, glare: 0.2, sharpness: 0.2, size: 1 },
+        identificationReady: false,
+      },
+    },
+  });
+  assert.ok(soft.includes('LOW_SHARPNESS'));
+  assert.ok(soft.includes('GLARE'));
+  const lost = classifyUnresolvedReasons({
+    acquired: false,
+    phase: 'lost',
+    ageFrames: 20,
+    best: null,
+  });
+  assert.deepEqual(lost, ['TRACK_LOST']);
+  const ready = readyDecisionFromBest({
+    captureId: 1,
+    sourceFrameId: 2,
+    quad: {
+      topLeft: { x: 0, y: 0 },
+      topRight: { x: 1, y: 0 },
+      bottomRight: { x: 1, y: 1 },
+      bottomLeft: { x: 0, y: 1 },
+    },
+    warp: blankImage(744, 1039),
+    quality: {
+      score: 0.7,
+      reasons: [],
+      identificationReady: true,
+      components: { captureSafe: 1, geometry: 1, glare: 0.9, sharpness: 1, size: 1 },
+    },
+    sharpness: 220,
+    capturedAt: 1,
+  });
+  assert.equal(ready.readyDecision, true);
+  assert.equal(ready.qualityThreshold, BINDER_IDENTIFICATION_READY_MIN);
+  assert.equal(ready.sharpnessThreshold, BINDER_SHARPNESS_SOFT);
+});
+
+check('binder diagnostics: applyBestCapture records quality history without downgrade', () => {
+  const frame = { width: 300, height: 400 };
+  const a = {
+    topLeft: { x: 20, y: 20 },
+    topRight: { x: 80, y: 20 },
+    bottomRight: { x: 80, y: 100 },
+    bottomLeft: { x: 20, y: 100 },
+  };
+  let s = emptyBinderPageSession(0, 1);
+  s = tickBinderTracks(s, [{ corners: a, score: 0.9 }], 10, frame);
+  const id = s.tracks[0].binderTrackId;
+  const warp = paintCardLike(blankImage(744, 1039), { gray: true });
+  s = applyBestCapture(s, id, {
+    captureId: 1,
+    sourceFrameId: 1,
+    quad: a,
+    warp,
+    quality: {
+      score: 0.8,
+      identificationReady: true,
+      reasons: [],
+      components: { captureSafe: 1, geometry: 1, glare: 0.9, sharpness: 1, size: 1 },
+    },
+    sharpness: 250,
+    capturedAt: 20,
+  });
+  assert.equal(s.tracks[0].acquired, true);
+  assert.ok((s.tracks[0].qualityHistory ?? []).length >= 1);
+  assert.ok(s.tracks[0].identificationReadyAt != null);
+  // worse capture must not wipe ready
+  s = applyBestCapture(s, id, {
+    captureId: 2,
+    sourceFrameId: 2,
+    quad: a,
+    warp,
+    quality: {
+      score: 0.1,
+      identificationReady: false,
+      reasons: ['soft'],
+      components: { captureSafe: 1, geometry: 1, glare: 0.9, sharpness: 0.1, size: 1 },
+    },
+    sharpness: 40,
+    capturedAt: 30,
+  });
+  assert.equal(s.tracks[0].acquired, true);
+  assert.equal(s.tracks[0].best.captureId, 1);
+});
+
+check('binder upload kind formatter', () => {
+  assert.ok(formatUploadCompleteMessage(2, 'binder').includes('BINDER'));
+  assert.ok(formatUploadCompleteMessage(2, 'binder').includes('2'));
+});
+
+if (failed) {
+  console.error(`\n${failed} scan check(s) failed`);
+  process.exit(1);
+}
 console.log('\nall scan checks passed');

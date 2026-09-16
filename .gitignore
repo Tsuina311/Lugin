@@ -58,3 +58,9 @@ mobile/.eas-decide.json
 # Geometry benchmark corpus + run snapshots (card imagery / local paths).
 .geometry-corpus/
 .geometry-benchmarks/
+
+# Generated on-device visual index (pack via scripts/recognition/pack-visual-assets.mjs).
+# Weights are large and rebuilt locally — never commit the binaries.
+mobile/modules/lugin-visual-recognizer/**/assets/lugin-visual/*.onnx
+mobile/modules/lugin-visual-recognizer/**/assets/lugin-visual/*.bin
+mobile/modules/lugin-visual-recognizer/**/assets/lugin-visual/oracle-map.json

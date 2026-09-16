@@ -16,15 +16,15 @@ import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import jpeg from 'jpeg-js';
 
-import { inferBinderGrid } from './geometry/lib/binder-mode/grid.mjs';
-import { recoverMissingSlot } from './geometry/lib/binder-mode/local-recovery.mjs';
-import { multiReturnNms } from './geometry/lib/binder-mode/multi-return.mjs';
-import { BINDER_MODE_V0_POLICY } from './geometry/lib/binder-mode/policy.mjs';
-import { loadDetectScan } from './geometry/lib/detect-host.mjs';
-import { runNativeDetectorBatch } from './geometry/lib/detect-native.mjs';
-import { matchQuadsByIoU } from './geometry/lib/metrics.mjs';
-import { CORPUS_ROOT, rootDir } from './geometry/lib/paths.mjs';
-import { createMultiCardTracker } from './geometry/lib/temporal/tracker.mjs';
+import { inferBinderGrid } from './lib/binder-mode/grid.mjs';
+import { recoverMissingSlot } from './lib/binder-mode/local-recovery.mjs';
+import { multiReturnNms } from './lib/binder-mode/multi-return.mjs';
+import { BINDER_MODE_V0_POLICY } from './lib/binder-mode/policy.mjs';
+import { loadDetectScan } from './lib/detect-host.mjs';
+import { runNativeDetectorBatch } from './lib/detect-native.mjs';
+import { matchQuadsByIoU } from './lib/metrics.mjs';
+import { CORPUS_ROOT, rootDir } from './lib/paths.mjs';
+import { createMultiCardTracker } from './lib/temporal/tracker.mjs';
 
 const inboxRoot = join(rootDir, '.scan-inbox/sessions');
 const outRoot = join(CORPUS_ROOT, 'synthetic/binder-real');
@@ -42,7 +42,7 @@ const findBundles = () => {
       if (!existsSync(summaryPath)) continue;
       try {
         const bundle = JSON.parse(readFileSync(summaryPath, 'utf8'));
-        if (bundle?.kind !== 'binder-benchmark') continue;
+        if (bundle?.kind !== 'binder-benchmark' && bundle?.kind !== 'binder') continue;
         out.push({ bundle, dir: join(sessionDir, trace.name) });
       } catch {
         /* skip */
@@ -84,19 +84,73 @@ const frameToPngFixture = (absFrame, outPng, id) => {
 };
 
 const main = async () => {
-  console.log('BINDER REAL REPORT (host replay)');
+  console.log('BINDER REAL REPORT (host replay · REAL MULTI-VIEW BINDER CAPTURE)');
   console.log('─'.repeat(56));
   console.log('Policy: topComponents=7 dedupe=12 (diag only). Production unchanged.');
-  console.log('Input: real camera PNG/JPEG → host Y-from-RGBA (not byte-identical to live Y).');
+  console.log('Input: real multi-view camera PNGs (not video-rate; ~seconds between frames).');
+  console.log('Host Y-from-RGBA ≠ live phone Y plane.');
   console.log('');
 
   const entries = findBundles();
   if (!entries.length) {
-    console.log('No binder-benchmark bundles found. Capture on phone → yarn scan:inbox.');
+    console.log('No binder / binder-benchmark bundles found. Capture on phone → yarn scan:inbox.');
     process.exit(1);
   }
   const { bundle, dir } = entries[0];
-  console.log(`Bundle ${bundle.fixtureId} · ${bundle.pages?.length ?? 0} pages`);
+  console.log(`Bundle ${bundle.fixtureId} · kind=${bundle.kind} · ${bundle.pages?.length ?? 0} pages`);
+
+  // Product Binder diagnostics: summarize acquisition tracks without requiring frames[].
+  if (bundle.kind === 'binder') {
+    console.log('PRODUCT BINDER DIAGNOSTICS');
+    console.log(`Upload: ${bundle.uploadStatus ?? '—'} missing=${(bundle.missingFiles ?? []).length}`);
+    let tracks = 0;
+    let acquired = 0;
+    let unresolved = 0;
+    let artifactBad = 0;
+    for (const page of bundle.pages || []) {
+      const pageTracks = page.tracks ?? [];
+      tracks += pageTracks.length;
+      acquired += pageTracks.filter(t => t.acquired || t.identificationReady).length;
+      unresolved += pageTracks.filter(t => !(t.acquired || t.identificationReady)).length;
+      console.log(
+        `  page ${page.pageIndex} status=${page.status} tracks=${page.trackCount ?? pageTracks.length} acquired=${page.acquiredTrackCount ?? '—'} unresolved=${page.unresolvedTrackCount ?? '—'} snapshots=${page.snapshotsCompleted ?? page.snapshots?.length ?? 0}`,
+      );
+      console.log(
+        `    timings firstCand=${page.firstCandidateAt ?? 'null'} firstAcquired=${page.firstAcquiredAt ?? 'null'} pageDone=${page.pageDoneAt ?? 'null'}`,
+      );
+      for (const tr of pageTracks) {
+        const art =
+          tr.artifactOk === false ? 'ARTIFACT_BAD' : tr.bestCardFile ? 'ARTIFACT_OK' : 'no-card';
+        if (tr.artifactOk === false) artifactBad += 1;
+        console.log(
+          `    track ${tr.binderTrackId} ${tr.phase} ready=${tr.identificationReady} q=${tr.bestQualityScore?.toFixed?.(2) ?? '—'} sharp=${tr.bestSharpness ?? '—'} glare=${tr.bestGlareScore?.toFixed?.(2) ?? '—'} ${art} fail=${(tr.qualityFailures ?? []).join(',') || '—'}`,
+        );
+        if (tr.readyDecision) {
+          console.log(
+            `      readyDecision score=${tr.readyDecision.qualityScore?.toFixed?.(3)} thr=${tr.readyDecision.qualityThreshold} sharp=${tr.readyDecision.sharpness}/${tr.readyDecision.sharpnessThreshold} glarePass=${tr.readyDecision.glarePass} geom=${tr.readyDecision.geometryReady}`,
+          );
+        }
+      }
+      // Map snapshots → frames for optional host replay below.
+      page.frames = (page.snapshots ?? []).map((s, i) => ({
+        pageIndex: page.pageIndex,
+        frameIndex: i + 1,
+        file: s.file,
+        width: s.width,
+        height: s.height,
+      }));
+    }
+    console.log(
+      `SESSION totals tracks=${tracks} acquired=${acquired} unresolved=${unresolved} artifactBad=${artifactBad}`,
+    );
+    console.log('Human review labels (host): GOOD BAD_CROP BLURRY GLARE WRONG_TRACK DUPLICATE EMPTY_FALSE_POSITIVE OTHER');
+    console.log('');
+  }
+
+  if (bundle.captureNote) console.log(`Note: ${bundle.captureNote}`);
+  console.log(
+    `Capture policy: targetFrames=${bundle.targetFramesPerPage ?? 'n/a'} minOk=${bundle.minFramesOk ?? '—'} maxPageMs=${bundle.maxPageMs ?? bundle.captureDurationMs ?? '—'}`,
+  );
 
   const { scan } = await loadDetectScan();
   const polygonIoU = scan.polygonIoU;
@@ -106,6 +160,31 @@ const main = async () => {
 
   const pageReports = [];
   for (const page of bundle.pages || []) {
+    const pageStatus = page.status ?? (page.frames?.length ? 'LEGACY' : 'FAILED');
+    const requested = page.requestedFrames ?? page.targetFrameCount ?? null;
+    const saved = page.savedFrames ?? page.frames?.length ?? 0;
+    const failed = page.failedFrames ?? 0;
+    console.log(
+      `  page ${page.pageIndex} capture: status=${pageStatus} saved=${saved}/${requested ?? '?'} failed=${failed} stop=${page.stopReason ?? '—'}`,
+    );
+    if (pageStatus === 'SPARSE') {
+      console.log(
+        `    ⚠ SPARSE capture — do not treat low detector coverage as geometry failure alone.`,
+      );
+    }
+    if (pageStatus === 'FAILED') {
+      pageReports.push({
+        pageIndex: page.pageIndex,
+        captureStatus: 'FAILED',
+        requestedFrames: requested,
+        savedFrames: saved,
+        failedFrames: failed,
+        error: 'capture-failed',
+        note: 'Phone captured too few frames; not a detector failure.',
+      });
+      continue;
+    }
+
     const fixtures = [];
     for (const fr of page.frames || []) {
       const abs = join(dir, fr.file);
@@ -119,7 +198,14 @@ const main = async () => {
       fixtures.push(fix);
     }
     if (!fixtures.length) {
-      pageReports.push({ pageIndex: page.pageIndex, error: 'no-frames' });
+      pageReports.push({
+        pageIndex: page.pageIndex,
+        captureStatus: pageStatus,
+        requestedFrames: requested,
+        savedFrames: saved,
+        failedFrames: failed,
+        error: 'no-frames',
+      });
       continue;
     }
 
@@ -167,7 +253,7 @@ const main = async () => {
     const lastAbs = join(rootDir, lastFix.image);
     let image = null;
     if (existsSync(lastAbs)) {
-      const { decodeImageFile } = await import('./geometry/lib/detect-host.mjs');
+      const { decodeImageFile } = await import('./lib/detect-host.mjs');
       image = await decodeImageFile(lastAbs);
     }
     if (image && lastGrid?.missing?.length) {
@@ -191,6 +277,11 @@ const main = async () => {
     const tracks = tracker.getTracks();
     pageReports.push({
       pageIndex: page.pageIndex,
+      captureStatus: pageStatus,
+      requestedFrames: requested,
+      savedFrames: saved,
+      failedFrames: failed,
+      stopReason: page.stopReason ?? null,
       frames: fixtures.length,
       timeline,
       eventualTracks: tracks.filter(t => t.best).length,
@@ -199,10 +290,13 @@ const main = async () => {
       recoveries,
       acceptedRecoveries: recoveries.filter(r => r.accepted).length,
       rejectedRecoveries: recoveries.filter(r => !r.accepted).length,
-      note: 'No GT yet — run binder GT review HTML to score IoU.',
+      note:
+        pageStatus === 'SPARSE'
+          ? 'SPARSE capture — geometry results may be underpowered; not necessarily detector failure.'
+          : 'No GT yet — run binder GT review HTML to score IoU.',
     });
     console.log(
-      `  page ${page.pageIndex}: frames=${fixtures.length} eventualTracks=${pageReports.at(-1).eventualTracks} gridConf=${(lastGrid?.confidence ?? 0).toFixed(2)} recoveries=${recoveries.filter(r => r.accepted).length}/${recoveries.length}`,
+      `  page ${page.pageIndex}: capture=${pageStatus} frames=${fixtures.length} eventualTracks=${pageReports.at(-1).eventualTracks} gridConf=${(lastGrid?.confidence ?? 0).toFixed(2)} recoveries=${recoveries.filter(r => r.accepted).length}/${recoveries.length}`,
     );
   }
 

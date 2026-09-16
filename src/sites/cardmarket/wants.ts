@@ -1223,6 +1223,11 @@ export interface AddWantParams {
   amount?: number;
   /** Identifies the card. Without it the site has nothing to add. */
   idMetacard: string;
+  /**
+   * Restrict the want to this printing. Omitted / empty means any edition
+   * (the site's `idProduct=[]`). A specific product id is sent as `[id]`.
+   */
+  idProduct?: string;
   idWantsList: string;
   isAltered?: boolean;
   isFoil?: boolean;
@@ -1248,13 +1253,14 @@ export const addWant = async (params: AddWantParams, token: string): Promise<Del
   // the site's own form offers. They pass through now; the defaults are unchanged
   // when a caller says nothing.
   const languages = [...(params.languages ?? [])].filter(id => Number.isInteger(id) && id > 0);
+  const productId = params.idProduct?.trim();
   const body = new URLSearchParams([
     ['__cmtkn', token],
     ['idWantsList', params.idWantsList],
     ['idGame', ID_GAME_MAGIC],
     ['idMetacard', params.idMetacard],
     ['amount', String(params.amount ?? 1)],
-    ['idProduct', '[]'],
+    ['idProduct', productId && /^\d+$/.test(productId) ? JSON.stringify([productId]) : '[]'],
     ['idLanguage', languages.length ? JSON.stringify(languages) : '[]'],
     ['minCondition', String(params.minCondition ?? 5)],
     ['isFoil', flag(params.isFoil)],

@@ -3,20 +3,33 @@ import { Vibration } from 'react-native';
 import type { CameraRef } from 'react-native-vision-camera';
 
 import {
+  BINDER_AUTO_ADVANCE_PAGES,
+  BINDER_MAX_PAGE_MS,
+  BINDER_MIN_FRAMES_OK,
   BINDER_PAGE_COUNTS,
+  BINDER_TARGET_FRAMES,
+  binderAfterSaveAction,
+  binderCanStartNextPageCapture,
   binderFrameFile,
+  classifyBinderPageStatus,
+  shouldStopBinderCapture,
   type BinderBenchmarkBundle,
   type BinderFrameMeta,
   type BinderPageCount,
   type BinderPageRecord,
   type BinderBenchmarkPhase,
+  type BinderPageStatus,
 } from '@/lib/scan/binderBenchmark';
 import { monoNow } from '@/lib/scan/timing';
 import type { LockGates } from '@/lib/scan/session/controller';
 import { isBenchmarkToolsEnabled } from '../benchmark/isBenchmarkEnabled';
 import { HIRES_MAX_LONG_EDGE } from '../hiresCapture';
 import { imageToScanImage } from '../imageToScanImage';
+import { claimScannerMode, releaseScannerMode } from '../scannerMode';
 import { enqueueBinderBenchmark } from './enqueue';
+import {
+  formatUploadIncompleteMessage,
+} from '@/lib/scan/benchmarkUpload';
 import {
   loadBinderActiveMeta,
   loadBinderBundle,
@@ -26,29 +39,42 @@ import {
   writeBinderFramePng,
 } from './persist';
 
-/** ~3.5 snapshots/sec × ~2.7s ≈ 9–10 frames; avoids hammering AF. */
-export const BINDER_CAPTURE_MS = 2700;
-export const BINDER_CADENCE_MS = 280;
-export const BINDER_TURN_AUTO_MS = 1600;
+export {
+  BINDER_AUTO_ADVANCE_PAGES,
+  BINDER_MAX_PAGE_MS,
+  BINDER_MIN_FRAMES_OK,
+  BINDER_TARGET_FRAMES,
+};
 
 export type BinderBenchmarkUi = {
   fixtureId: string | null;
   framesCollected: number;
+  framesTarget: number;
+  /** Brief cue after takeSnapshot, before encode finishes. */
+  captureCue: string | null;
   message: string;
   pageIndex: number;
+  pageStatus: BinderPageStatus | null;
   phase: BinderBenchmarkPhase;
   targetPages: number;
   interrupted: boolean;
+  uploadIncomplete?: boolean;
+  retryUpload?: boolean;
 };
 
 const idleUi = (): BinderBenchmarkUi => ({
   fixtureId: null,
   framesCollected: 0,
+  framesTarget: BINDER_TARGET_FRAMES,
+  captureCue: null,
   message: '',
   pageIndex: 0,
+  pageStatus: null,
   phase: 'idle',
   targetPages: 5,
   interrupted: false,
+  uploadIncomplete: false,
+  retryUpload: false,
 });
 
 const makeFixtureId = (): string => {
@@ -91,6 +117,7 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
 
   const runRef = useRef<RunState | null>(null);
   const cancelledRef = useRef(false);
+  const captureLockRef = useRef(false);
   const argsRef = useRef(args);
   argsRef.current = args;
 
@@ -105,7 +132,9 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
   const cancel = useCallback(() => {
     cancelledRef.current = true;
     runRef.current = null;
+    captureLockRef.current = false;
     argsRef.current.setLabHold(false);
+    releaseScannerMode('binder-benchmark');
     void persistBinderActiveMeta(null);
     setConfigOpen(false);
     setResumeOffer(null);
@@ -116,109 +145,231 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
     run.phase = 'complete';
     run.bundle.phase = 'complete';
     run.bundle.completedAt = new Date().toISOString();
+    run.bundle.uploadStatus = 'PENDING';
     const dir = await saveBinderBundle(run.bundle);
     setUi(u => ({
       ...u,
       phase: 'complete',
       message: `Uploading ${run.bundle.pages.length} pages…`,
+      uploadIncomplete: false,
+      retryUpload: false,
     }));
     try {
-      const queued = await enqueueBinderBenchmark({ dirUri: dir, bundle: run.bundle });
-      await persistBinderActiveMeta(null);
+      const outcome = await enqueueBinderBenchmark({
+        dirUri: dir,
+        bundle: run.bundle,
+        onProgress: (acked, total) => {
+          setUi(u => ({
+            ...u,
+            message: `Uploading ${acked} / ${total} files…`,
+          }));
+        },
+      });
+      await persistBinderActiveMeta(
+        outcome.uploadStatus === 'COMPLETE' ? null : run.bundle.fixtureId,
+      );
       setUi(u => ({
         ...u,
         phase: 'complete',
-        message: queued.queued
-          ? `BINDER TEST COMPLETE · ${run.bundle.pages.length} pages · uploaded`
-          : `BINDER TEST COMPLETE · ${run.bundle.pages.length} pages · saved`,
+        message: outcome.message,
+        uploadIncomplete: outcome.uploadStatus !== 'COMPLETE',
+        retryUpload: outcome.uploadStatus !== 'COMPLETE',
+        fixtureId: run.bundle.fixtureId,
       }));
+      if (outcome.uploadStatus === 'COMPLETE') {
+        runRef.current = null;
+      }
+      captureLockRef.current = false;
+      argsRef.current.setLabHold(false);
+      releaseScannerMode('binder-benchmark');
     } catch (err) {
       setUi(u => ({
         ...u,
         phase: 'complete',
         message: err instanceof Error ? err.message : String(err),
+        uploadIncomplete: true,
+        retryUpload: true,
       }));
-    } finally {
-      runRef.current = null;
+      captureLockRef.current = false;
       argsRef.current.setLabHold(false);
+      releaseScannerMode('binder-benchmark');
     }
   }, []);
 
+  const retryMissingUpload = useCallback(async () => {
+    const run = runRef.current;
+    const fixtureId = run?.bundle.fixtureId ?? ui.fixtureId;
+    if (!fixtureId) return;
+    const bundle = run?.bundle ?? (await loadBinderBundle(fixtureId));
+    if (!bundle) return;
+    const dir = await saveBinderBundle(bundle);
+    setUi(u => ({
+      ...u,
+      phase: 'complete',
+      message: 'Retrying missing uploads…',
+      retryUpload: false,
+    }));
+    const outcome = await enqueueBinderBenchmark({
+      dirUri: dir,
+      bundle,
+      onProgress: (acked, total) => {
+        setUi(u => ({ ...u, message: `Uploading ${acked} / ${total} files…` }));
+      },
+    });
+    if (run) run.bundle = bundle;
+    await persistBinderActiveMeta(
+      outcome.uploadStatus === 'COMPLETE' ? null : fixtureId,
+    );
+    setUi(u => ({
+      ...u,
+      phase: 'complete',
+      message: outcome.message,
+      uploadIncomplete: outcome.uploadStatus !== 'COMPLETE',
+      retryUpload: outcome.uploadStatus !== 'COMPLETE',
+    }));
+    if (outcome.uploadStatus === 'COMPLETE') {
+      runRef.current = null;
+    }
+    captureLockRef.current = false;
+    argsRef.current.setLabHold(false);
+    releaseScannerMode('binder-benchmark');
+  }, [ui.fixtureId]);
+
+  const upsertPage = (run: RunState, page: BinderPageRecord) => {
+    run.bundle.pages = run.bundle.pages.filter(p => p.pageIndex !== page.pageIndex);
+    run.bundle.pages.push(page);
+    run.bundle.pages.sort((a, b) => a.pageIndex - b.pageIndex);
+  };
+
   const capturePage = useCallback(async (run: RunState, pageIndex: number) => {
+    if (captureLockRef.current || run.capturing) {
+      throw new Error('Binder capture already in progress — overlapping snapshots forbidden');
+    }
     const cam = argsRef.current.cameraRef.current;
     if (!cam?.takeSnapshot) throw new Error('takeSnapshot unavailable');
+
+    captureLockRef.current = true;
     run.capturing = true;
     run.phase = 'capturing';
     const startedAt = new Date().toISOString();
     const t0 = monoNow();
     const frames: BinderFrameMeta[] = [];
+    let failedFrames = 0;
     let frameIndex = 0;
+    const targetFrames = run.bundle.targetFramesPerPage || BINDER_TARGET_FRAMES;
+    const maxPageMs = run.bundle.maxPageMs || BINDER_MAX_PAGE_MS;
+    const minOk = run.bundle.minFramesOk || BINDER_MIN_FRAMES_OK;
+    let stopReason: BinderPageRecord['stopReason'] = null;
 
     setUi(u => ({
       ...u,
       phase: 'capturing',
       pageIndex,
       framesCollected: 0,
-      message: 'MOVE PHONE SLOWLY OVER PAGE',
+      framesTarget: targetFrames,
+      pageStatus: null,
+      message: 'MOVE PHONE SLOWLY',
     }));
 
-    while (monoNow() - t0 < run.bundle.captureDurationMs && !cancelledRef.current) {
-      const loopStart = monoNow();
-      let snap: Awaited<ReturnType<NonNullable<CameraRef['takeSnapshot']>>> | null = null;
-      try {
-        const live = argsRef.current.peekLive();
-        snap = await cam.takeSnapshot();
-        // VisionCamera snapshot is a nitro Image — not a {path} file.
-        const source = await imageToScanImage(snap, HIRES_MAX_LONG_EDGE);
-        frameIndex += 1;
-        const file = binderFrameFile(pageIndex, frameIndex);
-        await writeBinderFramePng(run.bundle.fixtureId, file, source);
-        frames.push({
-          pageIndex,
-          frameIndex,
-          timestamp: new Date().toISOString(),
-          monoMs: monoNow() - t0,
-          width: source.width,
-          height: source.height,
-          orientation: null,
-          captureSource: 'snapshot',
-          geometryTrackId:
-            live.gates?.geometryTrackId ?? live.gates?.currentTrackId ?? null,
-          detectorScore: null,
-          selectedQuad: null,
-          focusState: live.focusState,
-          file,
+    try {
+      // Strictly sequential: snapshot → encode → verify write → register → next.
+      while (!cancelledRef.current) {
+        const stop = shouldStopBinderCapture({
+          savedFrames: frames.length,
+          failedFrames,
+          elapsedMs: monoNow() - t0,
+          targetFrames,
+          maxPageMs,
         });
-        setUi(u => ({
-          ...u,
-          framesCollected: frames.length,
-          message: `CAPTURING… ${frames.length} frames`,
-        }));
-      } catch (err) {
-        const why = err instanceof Error ? err.message : String(err);
-        setUi(u => ({
-          ...u,
-          message: `snapshot fail · ${why.slice(0, 48)}`,
-        }));
-      } finally {
+        if (stop.stop) {
+          stopReason = stop.reason;
+          break;
+        }
+
+        const loopStart = monoNow();
+        let snap: Awaited<ReturnType<NonNullable<CameraRef['takeSnapshot']>>> | null = null;
         try {
-          (snap as { dispose?: () => void } | null)?.dispose?.();
-        } catch {
-          /* ignore */
+          const live = argsRef.current.peekLive();
+          const snapT0 = monoNow();
+          snap = await cam.takeSnapshot();
+          const snapshotMs = monoNow() - snapT0;
+          const nextIndex = frameIndex + 1;
+          setUi(u => ({
+            ...u,
+            captureCue: `FRAME ${nextIndex} / ${targetFrames} · CAPTURE ✓`,
+            message: `MOVE PHONE SLOWLY\nFrames: ${frames.length} / ${targetFrames}`,
+          }));
+
+          const encodeT0 = monoNow();
+          // VisionCamera snapshot is a nitro Image — not a {path} file.
+          const source = await imageToScanImage(snap, HIRES_MAX_LONG_EDGE);
+          frameIndex = nextIndex;
+          const file = binderFrameFile(pageIndex, frameIndex);
+          const written = await writeBinderFramePng(run.bundle.fixtureId, file, source);
+          const encodeWriteMs = monoNow() - encodeT0;
+          const totalFrameMs = monoNow() - loopStart;
+
+          if (!written.bytes || written.bytes <= 0) {
+            failedFrames += 1;
+            setUi(u => ({
+              ...u,
+              message: `write empty · Frames ${frames.length} / ${targetFrames}`,
+            }));
+            continue;
+          }
+
+          frames.push({
+            pageIndex,
+            frameIndex,
+            timestamp: new Date().toISOString(),
+            monoMs: monoNow() - t0,
+            width: source.width,
+            height: source.height,
+            orientation: null,
+            captureSource: 'snapshot',
+            geometryTrackId:
+              live.gates?.geometryTrackId ?? live.gates?.currentTrackId ?? null,
+            detectorScore: null,
+            selectedQuad: null,
+            focusState: live.focusState,
+            file,
+            snapshotMs,
+            encodeWriteMs,
+            totalFrameMs,
+            fileBytes: written.bytes,
+          });
+          setUi(u => ({
+            ...u,
+            framesCollected: frames.length,
+            framesTarget: targetFrames,
+            captureCue: null,
+            message: `MOVE PHONE SLOWLY\nFrames: ${frames.length} / ${targetFrames}`,
+          }));
+        } catch (err) {
+          failedFrames += 1;
+          const why = err instanceof Error ? err.message : String(err);
+          setUi(u => ({
+            ...u,
+            message: `snapshot fail · ${why.slice(0, 40)}\nFrames: ${frames.length} / ${targetFrames}`,
+          }));
+        } finally {
+          try {
+            (snap as { dispose?: () => void } | null)?.dispose?.();
+          } catch {
+            /* ignore */
+          }
         }
       }
-      const spent = monoNow() - loopStart;
-      const wait = Math.max(0, run.bundle.frameCadenceMs - spent);
-      if (wait > 0) await new Promise(r => setTimeout(r, wait));
-    }
-
-    if (frames.length === 0) {
+    } finally {
       run.capturing = false;
-      throw new Error(
-        `Binder page ${pageIndex}: 0 frames captured — takeSnapshot produced no images`,
-      );
+      captureLockRef.current = false;
     }
 
+    if (cancelledRef.current) {
+      stopReason = 'cancelled';
+    }
+
+    const status = classifyBinderPageStatus(frames.length, targetFrames, minOk);
     const page: BinderPageRecord = {
       pageIndex,
       layout: run.bundle.layout,
@@ -226,17 +377,54 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
       startedAt,
       endedAt: new Date().toISOString(),
       captureDurationMs: monoNow() - t0,
-      targetFrameCount: Math.round(run.bundle.captureDurationMs / run.bundle.frameCadenceMs),
+      targetFrameCount: targetFrames,
+      requestedFrames: targetFrames,
+      savedFrames: frames.length,
+      failedFrames,
+      status,
+      stopReason,
+      maxPageMs,
     };
-    run.bundle.pages.push(page);
+    upsertPage(run, page);
     await saveBinderPage(run.bundle.fixtureId, page);
     await saveBinderBundle(run.bundle);
     await persistBinderActiveMeta(run.bundle.fixtureId);
-    run.capturing = false;
-    beepTurn();
 
-    if (run.bundle.pages.length >= run.bundle.targetPages) {
-      await finish(run);
+    if (status === 'FAILED') {
+      run.phase = 'retry-page';
+      setUi(u => ({
+        ...u,
+        phase: 'retry-page',
+        pageIndex,
+        framesCollected: frames.length,
+        framesTarget: targetFrames,
+        pageStatus: status,
+        message: `CAPTURE FAILED · ${frames.length} frames (need ≥${minOk})`,
+      }));
+      return;
+    }
+
+    // All writes finished — never auto-start the next page.
+    beepTurn();
+    const nonFailed = run.bundle.pages.filter(p => p.status !== 'FAILED').length;
+    const after = binderAfterSaveAction({
+      status,
+      savedNonFailedPages: nonFailed,
+      targetPages: run.bundle.targetPages,
+    });
+
+    if (after === 'await-finish') {
+      run.phase = 'page-saved';
+      run.turnAt = null;
+      setUi(u => ({
+        ...u,
+        phase: 'page-saved',
+        pageIndex,
+        framesCollected: frames.length,
+        framesTarget: targetFrames,
+        pageStatus: status,
+        message: `PAGE SAVED · ${frames.length} frames${status === 'SPARSE' ? ' · SPARSE' : ''}`,
+      }));
       return;
     }
 
@@ -247,13 +435,16 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
       phase: 'turn-page',
       pageIndex: pageIndex + 1,
       framesCollected: frames.length,
-      message: 'TURN PAGE',
+      framesTarget: targetFrames,
+      pageStatus: status,
+      message: `PAGE SAVED · ${frames.length} frames${status === 'SPARSE' ? ' · SPARSE' : ''}`,
     }));
-  }, [finish]);
+  }, []);
 
   const start = useCallback(
     async (opts?: { pages?: BinderPageCount }) => {
       if (!isBenchmarkToolsEnabled()) return;
+      if (!claimScannerMode('binder-benchmark')) return;
       cancelledRef.current = false;
       const pages = Math.max(1, Math.floor(opts?.pages ?? Number(draftPages) ?? 5));
       const fixtureId = makeFixtureId();
@@ -264,11 +455,14 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
         completedAt: null,
         targetPages: pages,
         layout: { rows: 3, cols: 3 },
-        captureDurationMs: BINDER_CAPTURE_MS,
-        frameCadenceMs: BINDER_CADENCE_MS,
+        captureDurationMs: BINDER_MAX_PAGE_MS,
+        frameCadenceMs: 0,
+        targetFramesPerPage: BINDER_TARGET_FRAMES,
+        minFramesOk: BINDER_MIN_FRAMES_OK,
+        maxPageMs: BINDER_MAX_PAGE_MS,
         captureSource: 'snapshot',
         captureNote:
-          'JS takeSnapshot → PNG ~280ms cadence × ~2.7s ≈ 8–12 frames/page. Not live Y-plane; host replays from PNG RGBA.',
+          'Frame-driven JS takeSnapshot → PNG (sequential). Not live Y-plane; host replays from PNG RGBA. No overlapping snapshot/encode/write.',
         pages: [],
         phase: 'capturing',
         note: 'REAL binder capture — geometry replay on Mac only. Phone does not claim 9/9.',
@@ -278,14 +472,18 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
       try {
         await saveBinderBundle(bundle);
         await persistBinderActiveMeta(fixtureId);
-        argsRef.current.setLabHold(true);
+        // Mode suspends recognition — do not use labHold for exclusivity.
+        argsRef.current.setLabHold(false);
         setConfigOpen(false);
         setResumeOffer(null);
         setUi({
           fixtureId,
           framesCollected: 0,
-          message: 'MOVE PHONE SLOWLY OVER PAGE',
+          framesTarget: BINDER_TARGET_FRAMES,
+          captureCue: null,
+          message: 'MOVE PHONE SLOWLY',
           pageIndex: 1,
+          pageStatus: null,
           phase: 'capturing',
           targetPages: pages,
           interrupted: false,
@@ -293,7 +491,9 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
         await capturePage(run, 1);
       } catch (err) {
         argsRef.current.setLabHold(false);
+        releaseScannerMode('binder-benchmark');
         runRef.current = null;
+        captureLockRef.current = false;
         await persistBinderActiveMeta(null);
         setUi(u => ({
           ...u,
@@ -307,31 +507,57 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
 
   const nextPage = useCallback(async () => {
     const run = runRef.current;
-    if (!run || run.capturing) return;
-    if (run.phase !== 'turn-page' && run.phase !== 'waiting-next') return;
-    const next = run.bundle.pages.length + 1;
+    if (!run) return;
+    if (
+      !binderCanStartNextPageCapture({
+        phase: run.phase,
+        capturing: run.capturing || captureLockRef.current,
+        explicitNextTap: true,
+      })
+    ) {
+      return;
+    }
+    const next = run.bundle.pages.filter(p => p.status !== 'FAILED').length + 1;
     await capturePage(run, next);
   }, [capturePage]);
+
+  const retryPage = useCallback(async () => {
+    const run = runRef.current;
+    if (!run || run.capturing || captureLockRef.current) return;
+    if (run.phase !== 'retry-page') return;
+    const pageIndex = ui.pageIndex || run.bundle.pages.length || 1;
+    await capturePage(run, pageIndex);
+  }, [capturePage, ui.pageIndex]);
 
   const resume = useCallback(async () => {
     const offer = resumeOffer;
     if (!offer) return;
+    if (!claimScannerMode('binder-benchmark')) return;
     cancelledRef.current = false;
     const run: RunState = {
-      bundle: { ...offer, phase: 'turn-page' },
+      bundle: {
+        ...offer,
+        targetFramesPerPage: offer.targetFramesPerPage ?? BINDER_TARGET_FRAMES,
+        minFramesOk: offer.minFramesOk ?? BINDER_MIN_FRAMES_OK,
+        maxPageMs: offer.maxPageMs ?? BINDER_MAX_PAGE_MS,
+        phase: 'turn-page',
+      },
       capturing: false,
       phase: 'turn-page',
       turnAt: monoNow(),
     };
     runRef.current = run;
     await persistBinderActiveMeta(offer.fixtureId);
-    argsRef.current.setLabHold(true);
+    argsRef.current.setLabHold(false);
     setResumeOffer(null);
     setUi({
       fixtureId: offer.fixtureId,
       framesCollected: 0,
+      framesTarget: run.bundle.targetFramesPerPage,
+      captureCue: null,
       message: `Resumed · ${offer.pages.length}/${offer.targetPages} · TURN PAGE or tap NEXT`,
       pageIndex: offer.pages.length + 1,
+      pageStatus: null,
       phase: 'turn-page',
       targetPages: offer.targetPages,
       interrupted: false,
@@ -339,8 +565,14 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
   }, [resumeOffer]);
 
   const discardInterrupted = useCallback(async () => {
-    if (resumeOffer) await persistBinderActiveMeta(null);
+    if (resumeOffer && resumeOffer.phase !== 'complete') {
+      await persistBinderActiveMeta(null);
+    }
     setResumeOffer(null);
+    runRef.current = null;
+    captureLockRef.current = false;
+    argsRef.current.setLabHold(false);
+    releaseScannerMode('binder-benchmark');
     setUi(idleUi());
   }, [resumeOffer]);
 
@@ -368,7 +600,44 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
       const meta = await loadBinderActiveMeta();
       if (!meta?.fixtureId) return;
       const bundle = await loadBinderBundle(meta.fixtureId);
-      if (!bundle || bundle.phase === 'complete') {
+      if (!bundle) {
+        await persistBinderActiveMeta(null);
+        return;
+      }
+      if (bundle.phase === 'complete' && bundle.uploadStatus === 'COMPLETE') {
+        await persistBinderActiveMeta(null);
+        return;
+      }
+      if (bundle.phase === 'complete' && bundle.uploadStatus === 'INCOMPLETE') {
+        runRef.current = {
+          bundle,
+          capturing: false,
+          phase: 'complete',
+          turnAt: null,
+        };
+        setUi({
+          ...idleUi(),
+          fixtureId: bundle.fixtureId,
+          pageIndex: bundle.pages.length,
+          targetPages: bundle.targetPages,
+          framesTarget: bundle.targetFramesPerPage ?? BINDER_TARGET_FRAMES,
+          phase: 'complete',
+          uploadIncomplete: true,
+          retryUpload: true,
+          message: formatUploadIncompleteMessage({
+            runId: bundle.fixtureId,
+            kind: 'binder-benchmark',
+            endpointUrl: null,
+            acknowledged: bundle.uploadManifest?.uploadedFiles ?? [],
+            failed: [],
+            uploadStatus: 'INCOMPLETE',
+            missingRequired: bundle.missingFiles ?? bundle.uploadManifest?.missingFiles ?? [],
+            updatedAt: new Date().toISOString(),
+          }),
+        });
+        return;
+      }
+      if (bundle.phase === 'complete') {
         await persistBinderActiveMeta(null);
         return;
       }
@@ -378,6 +647,7 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
         fixtureId: bundle.fixtureId,
         pageIndex: bundle.pages.length,
         targetPages: bundle.targetPages,
+        framesTarget: bundle.targetFramesPerPage ?? BINDER_TARGET_FRAMES,
         phase: 'interrupted',
         interrupted: true,
         message: `Interrupted ${bundle.pages.length}/${bundle.targetPages} pages`,
@@ -385,14 +655,7 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
     })();
   }, []);
 
-  // Auto-advance after TURN PAGE pause
-  useEffect(() => {
-    if (ui.phase !== 'turn-page') return;
-    const id = setTimeout(() => {
-      void nextPage();
-    }, BINDER_TURN_AUTO_MS);
-    return () => clearTimeout(id);
-  }, [ui.phase, ui.pageIndex, nextPage]);
+  // No automatic next-page capture — user must tap NEXT PAGE / FINISH.
 
   return {
     ui,
@@ -405,14 +668,16 @@ export const useBinderBenchmark = (args: UseBinderBenchmarkArgs) => {
     start,
     cancel,
     nextPage,
+    retryPage,
     resumeOffer,
     resume,
     discardInterrupted,
     finishEarly,
+    retryMissingUpload,
     active:
       ui.phase !== 'idle' &&
       ui.phase !== 'config' &&
-      ui.phase !== 'complete' &&
-      ui.phase !== 'cancelled',
+      ui.phase !== 'cancelled' &&
+      ui.phase !== 'complete',
   };
 };

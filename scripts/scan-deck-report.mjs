@@ -113,6 +113,37 @@ const main = async () => {
   const recon = scan.reconcileDeckMultiset(bundle.cards, bundle.expectedMultiset);
   console.log('DECK BENCHMARK REPORT');
   console.log('─'.repeat(48));
+  console.log(`fixture: ${summary.fixtureId}`);
+  console.log(`slots: ${summary.total} / target ${summary.target}`);
+  console.log(`fresh identified: ${summary.freshIdentified}  (owned by cardSessionId)`);
+  console.log(`stale identity rejected: ${summary.staleIdentityRejected}`);
+  console.log(`timeouts: ${summary.timeouts}`);
+  console.log(
+    `fresh recognition attempts/card: ${
+      summary.freshRecognitionAttemptsPerCard == null
+        ? '—'
+        : summary.freshRecognitionAttemptsPerCard.toFixed(2)
+    }`,
+  );
+  console.log(`zero-fresh-evidence terminals: ${summary.zeroFreshEvidenceTerminals}`);
+  console.log(`suspicious reused pixels: ${summary.suspiciousReusedPixels ?? 0}`);
+  if (summary.suspiciousReusedPixelSlots?.length) {
+    for (const row of summary.suspiciousReusedPixelSlots) {
+      console.log(
+        `  SUSPICIOUS_REUSED_PIXELS slots ${row.fromIndex}→${row.toIndex}: ${row.shared.join(',')}`,
+      );
+    }
+  }
+  console.log(
+    `(legacy identified count ${summary.identified} — do not treat as accuracy if stale)`,
+  );
+  if (bundle.uploadManifest) {
+    console.log('\nUpload manifest:');
+    console.log(`  expected: ${bundle.uploadManifest.expectedFiles?.length ?? 0}`);
+    console.log(`  uploaded: ${bundle.uploadManifest.uploadedFiles?.length ?? 0}`);
+    console.log(`  missing: ${(bundle.uploadManifest.missingFiles ?? []).join(', ') || 'none'}`);
+  }
+  console.log('\nFull summary JSON:');
   console.log(JSON.stringify(summary, null, 2));
   console.log('\nReconciliation:', recon.mode, 'paired', recon.paired?.length ?? 0, 'unresolved', recon.unresolved?.length ?? 0);
   mkdirSync(outRoot, { recursive: true });

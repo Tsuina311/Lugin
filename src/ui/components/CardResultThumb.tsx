@@ -59,7 +59,7 @@ export const CardResultThumb = ({
               loaded ? 'opacity-100' : 'opacity-0'
             } ${flippable ? 'cursor-flip' : 'cursor-zoom-in'}`}
             decoding="async"
-            loading="eager"
+            loading="lazy"
             onError={() => {
               setLoaded(false);
               setIndex(i => i + 1);

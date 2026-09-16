@@ -46,7 +46,8 @@ try {
     },
   });
 
-  const { scanImageToPngDataUri } = await import(pathToFileURL(outfile).href);
+  const { scanImageToPngDataUri, scanImageToArtifactPngBytes, scanImageToThumbnailPngBytes, pngIhdrDimensions } =
+    await import(pathToFileURL(outfile).href);
 
   /** Minimal independent PNG reader: validates chunk CRCs and inflates IDAT. */
   const decodePng = (bytes) => {
@@ -176,6 +177,30 @@ try {
     check('1×1 encodes', png.width === 1 && png.height === 1);
   }
 
+  // 6. Artifact vs thumbnail: Geometry card warp must stay 744×1039.
+  {
+    const card = makeImage(744, 1039);
+    const artifact = scanImageToArtifactPngBytes(card);
+    const thumb = scanImageToThumbnailPngBytes(card, 120);
+    const a = pngIhdrDimensions(artifact);
+    const t = pngIhdrDimensions(thumb);
+    check('artifact IHDR 744×1039', a?.width === 744 && a?.height === 1039, `${a?.width}×${a?.height}`);
+    check('thumbnail IHDR 120 wide', t?.width === 120 && t?.height === 168, `${t?.width}×${t?.height}`);
+    check('artifact bytes > thumbnail', artifact.length > thumb.length);
+  }
+
+  // 7. Source artifact keeps full resolution (e.g. 1022×1920).
+  {
+    const source = makeImage(1022, 1920);
+    const artifact = scanImageToArtifactPngBytes(source);
+    const ihdr = pngIhdrDimensions(artifact);
+    check(
+      'source artifact full res',
+      ihdr?.width === 1022 && ihdr?.height === 1920,
+      `${ihdr?.width}×${ihdr?.height}`,
+    );
+  }
+
   if (failures > 0) {
     console.error(`png-preview smoke: ${failures} check(s) failed`);
     process.exit(1);
@@ -183,6 +208,7 @@ try {
 
   console.log('png-preview smoke ok');
   console.log('  CRC + zlib/adler validated by node:zlib, pixels byte-exact, multi-block split');
+  console.log('  artifact encoder preserves 744×1039 / full source; thumbnail stays 120px');
 } finally {
   await rm(bundleDir, { force: true, recursive: true });
 }

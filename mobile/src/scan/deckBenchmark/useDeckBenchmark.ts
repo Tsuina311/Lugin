@@ -4,6 +4,8 @@ import { Vibration } from 'react-native';
 import {
   DECK_BENCHMARK_COUNTS,
   classifyDeckFailure,
+  decideDeckAdvance,
+  decideDeckCardSave,
   type DeckBenchmarkBundle,
   type DeckBenchmarkCardRecord,
   type DeckBenchmarkCount,
@@ -17,14 +19,17 @@ import { monoNow } from '@/lib/scan/timing';
 import type { LockGates } from '@/lib/scan/session/controller';
 import type { CardCorners, ScanImage } from '../sharedCore';
 import { isBenchmarkToolsEnabled } from '../benchmark/isBenchmarkEnabled';
+import { claimScannerMode, releaseScannerMode } from '../scannerMode';
 import { enqueueDeckBenchmark } from './enqueue';
 import {
   loadDeckActiveMeta,
   loadDeckBundle,
+  listDeckRuns,
   persistDeckActiveMeta,
   saveDeckBundle,
   saveDeckCardArtifacts,
 } from './persist';
+import { formatUploadIncompleteMessage } from '@/lib/scan/benchmarkUpload';
 
 export { classifyDeckFailure } from '@/lib/scan/deckBenchmark';
 export type { DeckFailureClass } from '@/lib/scan/deckBenchmark';
@@ -43,6 +48,10 @@ export type DeckBenchmarkUi = {
   showManualNext: boolean;
   targetCount: number;
   interrupted: boolean;
+  /** True once this slot is claimed — user may physically swap immediately. */
+  canSwapNow: boolean;
+  uploadIncomplete: boolean;
+  retryUpload: boolean;
 };
 
 const idleUi = (): DeckBenchmarkUi => ({
@@ -56,6 +65,9 @@ const idleUi = (): DeckBenchmarkUi => ({
   showManualNext: false,
   targetCount: 60,
   interrupted: false,
+  canSwapNow: false,
+  uploadIncomplete: false,
+  retryUpload: false,
 });
 
 const makeFixtureId = (): string => {
@@ -66,11 +78,20 @@ const makeFixtureId = (): string => {
 
 const beepNext = () => {
   try {
-    Vibration.vibrate([0, 140, 70, 140, 70, 240]);
+    // Short single pulse — long patterns felt like the UI lag behind the buzz.
+    Vibration.vibrate(80);
   } catch {
     /* ignore */
   }
 };
+
+/** Let React paint SWAP NOW / name before PNG encode blocks the JS thread. */
+const yieldForUiPaint = () =>
+  new Promise<void>(resolve => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
 
 export type DeckLivePeek = {
   gates: LockGates | null;
@@ -81,10 +102,24 @@ export type DeckLivePeek = {
   recognizeAttempts: number | null;
   matchScore: number | null;
   ocrTexts: string[];
+  /** How identity was obtained when OCR texts are empty (telemetry). */
+  recognitionSourceChannel?: 'TITLE' | 'ART' | 'HYBRID' | 'OTHER' | null;
   detectorScore: number | null;
   recognitionSource: string | null;
   lockedAt: number | null;
   finalIdentityAt: number | null;
+  resultCardSessionId: number | null;
+  resultAttemptId?: number | null;
+  resultPublishedAt?: number | null;
+  identityOwnedByCurrentSession?: boolean;
+  freshEvidenceCountForSession?: number | null;
+  recognitionAttemptIdsForSession?: number[];
+  captureCardSessionId?: number | null;
+  captureId?: number | null;
+  sourceHash?: string | null;
+  warpHash?: string | null;
+  titleHash?: string | null;
+  attemptCardSessionId?: number | null;
   cardWarp: ScanImage | null;
   title: ScanImage | null;
   source: ScanImage | null;
@@ -100,6 +135,13 @@ export type DeckLivePeek = {
 export type UseDeckBenchmarkArgs = {
   markDebugCardSwapped: () => void;
   peekLive: () => DeckLivePeek;
+  /** Heavy pixels — only call when committing a slot (PNG encode path). */
+  peekArtifacts?: () => {
+    cardWarp: ScanImage | null;
+    title: ScanImage | null;
+    source: ScanImage | null;
+    detector: ScanImage | null;
+  };
   setLabHold: (held: boolean) => void;
 };
 
@@ -109,20 +151,13 @@ type RunState = {
   cardStartedAt: number;
   /** One save per physical card slot — session id or timeout attempt key. */
   recordedSlots: Set<string>;
+  /** Slots that already counted a staleIdentityRejected observation. */
+  staleRejectedSlots: Set<string>;
   manualArmed: boolean;
   nextPromptAt: number | null;
   phase: DeckBenchmarkPhase;
   swapKindForNext: DeckSwapKind;
-};
-
-const classifyTerminal = (live: DeckLivePeek): DeckCardTerminal | null => {
-  const status = (live.recognitionStatus || live.phase || '').toLowerCase();
-  if (status === 'found' || status === 'identified') return 'identified';
-  if (status === 'ambiguous') return 'ambiguous';
-  if (status.includes('empty') || live.recognitionDecision === 'empty') return 'ocr-empty';
-  if (status.includes('exhausted') || status.includes('budget')) return 'budget-exhausted';
-  if (status === 'failed' || status === 'error') return 'failed';
-  return null;
+  staleIdentityRejected: number;
 };
 
 const matchMethodOf = (
@@ -156,14 +191,11 @@ const evidenceOf = (live: DeckLivePeek): DeckBenchmarkEvidence => ({
   recognitionCorners: live.recognitionCorners,
 });
 
-const slotKeyFor = (sessionId: number | null, cardStartedAt: number): string =>
-  sessionId != null ? `s:${sessionId}` : `t:${cardStartedAt}`;
-
 
 export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
   const [ui, setUi] = useState<DeckBenchmarkUi>(idleUi);
   const [configOpen, setConfigOpen] = useState(false);
-  const [draftCount, setDraftCount] = useState<DeckBenchmarkCount>(60);
+  const [draftCount, setDraftCount] = useState<DeckBenchmarkCount>(10);
   const [resumeOffer, setResumeOffer] = useState<DeckBenchmarkBundle | null>(null);
 
   const runRef = useRef<RunState | null>(null);
@@ -185,6 +217,7 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
     runRef.current = null;
     savingRef.current = false;
     argsRef.current.setLabHold(false);
+    releaseScannerMode('deck-benchmark');
     void persistDeckActiveMeta(null);
     setConfigOpen(false);
     setResumeOffer(null);
@@ -200,12 +233,17 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
     run.phase = 'complete';
     run.bundle.phase = 'complete';
     run.bundle.completedAt = new Date().toISOString();
+    run.bundle.uploadStatus = 'PENDING';
     await persistRun(run);
     setUi(u => ({
       ...u,
       phase: 'complete',
       message: `Uploading ${run.bundle.cards.length} cards…`,
       showManualNext: false,
+      canSwapNow: false,
+      uploadIncomplete: false,
+      retryUpload: false,
+      fixtureId: run.bundle.fixtureId,
     }));
     try {
       const dir = await saveDeckBundle(run.bundle);
@@ -213,25 +251,104 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
         dirUri: dir,
         bundle: run.bundle,
       });
-      await persistDeckActiveMeta(null);
+      run.bundle.uploadStatus = queued.uploadStatus;
+      await saveDeckBundle(run.bundle);
+      // Keep active meta when incomplete so Settings → Scan remount can restore retry UI.
+      await persistDeckActiveMeta(
+        queued.uploadStatus === 'COMPLETE' ? null : run.bundle.fixtureId,
+      );
       setUi(u => ({
         ...u,
         phase: 'complete',
-        message: queued.queued
-          ? `DECK TEST COMPLETE · ${run.bundle.cards.length} cards · uploaded`
-          : `DECK TEST COMPLETE · ${run.bundle.cards.length} cards · saved locally`,
+        message: queued.message,
+        uploadIncomplete: queued.uploadStatus !== 'COMPLETE',
+        retryUpload: queued.uploadStatus !== 'COMPLETE',
+        fixtureId: run.bundle.fixtureId,
       }));
+      // Always release exclusive mode after a finished run — incomplete upload
+      // must not keep blocking the rest of the UI.
+      runRef.current =
+        queued.uploadStatus === 'COMPLETE'
+          ? null
+          : {
+              ...run,
+              phase: 'complete',
+            };
+      argsRef.current.setLabHold(false);
+      releaseScannerMode('deck-benchmark');
     } catch (err) {
+      run.bundle.uploadStatus = 'INCOMPLETE';
+      await saveDeckBundle(run.bundle);
+      await persistDeckActiveMeta(run.bundle.fixtureId);
       setUi(u => ({
         ...u,
         phase: 'complete',
         message: err instanceof Error ? err.message : String(err),
+        uploadIncomplete: true,
+        retryUpload: true,
+        fixtureId: run.bundle.fixtureId,
       }));
-    } finally {
-      runRef.current = null;
       argsRef.current.setLabHold(false);
+      releaseScannerMode('deck-benchmark');
     }
   }, [persistRun]);
+
+  const retryMissingUpload = useCallback(async () => {
+    const run = runRef.current;
+    const fixtureId = run?.bundle.fixtureId ?? ui.fixtureId;
+    if (!fixtureId) return;
+    const bundle = run?.bundle ?? (await loadDeckBundle(fixtureId));
+    if (!bundle) return;
+    const dir = await saveDeckBundle(bundle);
+    setUi(u => ({
+      ...u,
+      phase: 'complete',
+      message: 'Retrying missing uploads…',
+      retryUpload: false,
+      fixtureId,
+    }));
+    try {
+      const outcome = await enqueueDeckBenchmark({
+        dirUri: dir,
+        bundle,
+      });
+      if (run) {
+        run.bundle = bundle;
+        run.bundle.uploadStatus = outcome.uploadStatus;
+      } else {
+        bundle.uploadStatus = outcome.uploadStatus;
+      }
+      await saveDeckBundle(bundle);
+      await persistDeckActiveMeta(
+        outcome.uploadStatus === 'COMPLETE' ? null : fixtureId,
+      );
+      setUi(u => ({
+        ...u,
+        phase: 'complete',
+        message: outcome.message,
+        uploadIncomplete: outcome.uploadStatus !== 'COMPLETE',
+        retryUpload: outcome.uploadStatus !== 'COMPLETE',
+        fixtureId,
+      }));
+      if (outcome.uploadStatus === 'COMPLETE') {
+        runRef.current = null;
+      }
+      argsRef.current.setLabHold(false);
+      releaseScannerMode('deck-benchmark');
+    } catch (err) {
+      await persistDeckActiveMeta(fixtureId);
+      setUi(u => ({
+        ...u,
+        phase: 'complete',
+        message: err instanceof Error ? err.message : String(err),
+        uploadIncomplete: true,
+        retryUpload: true,
+        fixtureId,
+      }));
+      argsRef.current.setLabHold(false);
+      releaseScannerMode('deck-benchmark');
+    }
+  }, [ui.fixtureId]);
 
   const start = useCallback(
     async (opts?: {
@@ -241,6 +358,7 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
       expectedDeckName?: string | null;
     }) => {
       if (!isBenchmarkToolsEnabled()) return;
+      if (!claimScannerMode('deck-benchmark')) return;
       cancelledRef.current = false;
       savingRef.current = false;
       const count = Math.max(1, Math.floor(opts?.count ?? Number(draftCount) ?? 60));
@@ -263,13 +381,16 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
         bundle,
         cardStartedAt: monoNow(),
         recordedSlots: new Set(),
+        staleRejectedSlots: new Set(),
         manualArmed: false,
         nextPromptAt: null,
         phase: 'detecting',
         swapKindForNext: 'automatic',
+        staleIdentityRejected: 0,
       };
       await persistRun(runRef.current);
-      argsRef.current.setLabHold(true);
+      // Deck exclusivity is scanner-mode ownership, not labHold (keeps recognition live).
+      argsRef.current.setLabHold(false);
       setConfigOpen(false);
       setResumeOffer(null);
       setUi({
@@ -283,6 +404,9 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
         showManualNext: false,
         targetCount: count,
         interrupted: false,
+        canSwapNow: false,
+        uploadIncomplete: false,
+        retryUpload: false,
       });
     },
     [draftCount, persistRun],
@@ -291,6 +415,7 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
   const resume = useCallback(async () => {
     const offer = resumeOffer;
     if (!offer) return;
+    if (!claimScannerMode('deck-benchmark')) return;
     cancelledRef.current = false;
     const recorded = new Set(
       offer.cards.map(c =>
@@ -302,13 +427,15 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
       bundle: { ...offer, phase: 'detecting' },
       cardStartedAt: monoNow(),
       recordedSlots: recorded,
+      staleRejectedSlots: new Set(),
       manualArmed: false,
       nextPromptAt: null,
       phase: 'detecting',
       swapKindForNext: 'automatic',
+      staleIdentityRejected: offer.cards.filter(c => c.staleIdentityRejected).length,
     };
     await persistDeckActiveMeta(offer.fixtureId);
-    argsRef.current.setLabHold(true);
+    argsRef.current.setLabHold(false);
     setResumeOffer(null);
     setUi({
       cardSessionId: null,
@@ -321,12 +448,21 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
       showManualNext: false,
       targetCount: offer.targetCount,
       interrupted: false,
+      canSwapNow: false,
+      uploadIncomplete: false,
+      retryUpload: false,
     });
   }, [resumeOffer]);
 
   const discardInterrupted = useCallback(async () => {
-    if (resumeOffer) await persistDeckActiveMeta(null);
+    // Dismiss UI only — keep incomplete upload on disk / active-meta so remount can restore.
+    if (resumeOffer && resumeOffer.phase !== 'complete') {
+      await persistDeckActiveMeta(null);
+    }
     setResumeOffer(null);
+    runRef.current = null;
+    argsRef.current.setLabHold(false);
+    releaseScannerMode('deck-benchmark');
     setUi(idleUi());
   }, [resumeOffer]);
 
@@ -339,10 +475,12 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
           bundle: resumeOffer,
           cardStartedAt: monoNow(),
           recordedSlots: new Set(),
+          staleRejectedSlots: new Set(),
           manualArmed: false,
           nextPromptAt: null,
           phase: 'complete',
           swapKindForNext: 'automatic',
+          staleIdentityRejected: resumeOffer.cards.filter(c => c.staleIdentityRejected).length,
         };
         setResumeOffer(null);
         await finish(runRef.current);
@@ -368,27 +506,100 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
     }));
   }, []);
 
-  // Restore interrupted run on mount
+  // Restore interrupted / incomplete-upload run on mount (survives Settings tab unmount).
   useEffect(() => {
     if (!isBenchmarkToolsEnabled()) return;
     void (async () => {
+      const restoreIncomplete = async (bundle: DeckBenchmarkBundle) => {
+        runRef.current = {
+          armedSessionId: null,
+          bundle,
+          cardStartedAt: monoNow(),
+          recordedSlots: new Set(
+            bundle.cards.map(c =>
+              c.cardSessionId != null ? `s:${c.cardSessionId}` : `i:${c.benchmarkIndex}`,
+            ),
+          ),
+          staleRejectedSlots: new Set(),
+          manualArmed: false,
+          nextPromptAt: null,
+          phase: 'complete',
+          swapKindForNext: 'automatic',
+          staleIdentityRejected: bundle.cards.filter(c => c.staleIdentityRejected).length,
+        };
+        await persistDeckActiveMeta(bundle.fixtureId);
+        setUi({
+          ...idleUi(),
+          fixtureId: bundle.fixtureId,
+          index: bundle.cards.length,
+          targetCount: bundle.targetCount,
+          phase: 'complete',
+          uploadIncomplete: true,
+          retryUpload: true,
+          message: formatUploadIncompleteMessage({
+            runId: bundle.fixtureId,
+            kind: 'deck-benchmark',
+            endpointUrl: null,
+            acknowledged: bundle.uploadManifest?.uploadedFiles ?? [],
+            failed: [],
+            uploadStatus: 'INCOMPLETE',
+            missingRequired: bundle.missingFiles ?? bundle.uploadManifest?.missingFiles ?? [],
+            updatedAt: new Date().toISOString(),
+          }),
+        });
+      };
+
       const meta = await loadDeckActiveMeta();
-      if (!meta?.fixtureId) return;
-      const bundle = await loadDeckBundle(meta.fixtureId);
-      if (!bundle || bundle.phase === 'complete') {
-        await persistDeckActiveMeta(null);
-        return;
+      if (meta?.fixtureId) {
+        const bundle = await loadDeckBundle(meta.fixtureId);
+        if (!bundle) {
+          await persistDeckActiveMeta(null);
+        } else if (bundle.phase === 'complete' && bundle.uploadStatus === 'COMPLETE') {
+          await persistDeckActiveMeta(null);
+        } else if (
+          bundle.phase === 'complete' &&
+          (bundle.uploadStatus === 'INCOMPLETE' ||
+            (bundle.uploadManifest?.missingFiles?.length ?? 0) > 0)
+        ) {
+          if (!bundle.uploadStatus) {
+            bundle.uploadStatus = 'INCOMPLETE';
+            await saveDeckBundle(bundle);
+          }
+          await restoreIncomplete(bundle);
+          return;
+        } else if (bundle.phase === 'complete') {
+          await persistDeckActiveMeta(null);
+        } else {
+          setResumeOffer(bundle);
+          setUi({
+            ...idleUi(),
+            fixtureId: bundle.fixtureId,
+            index: bundle.cards.length,
+            targetCount: bundle.targetCount,
+            phase: 'interrupted',
+            interrupted: true,
+            message: `Interrupted ${bundle.cards.length}/${bundle.targetCount}`,
+          });
+          return;
+        }
       }
-      setResumeOffer(bundle);
-      setUi({
-        ...idleUi(),
-        fixtureId: bundle.fixtureId,
-        index: bundle.cards.length,
-        targetCount: bundle.targetCount,
-        phase: 'interrupted',
-        interrupted: true,
-        message: `Interrupted ${bundle.cards.length}/${bundle.targetCount}`,
-      });
+
+      // Fallback: previous builds cleared active-meta on incomplete upload. Recover latest.
+      const runs = await listDeckRuns();
+      for (const entry of runs) {
+        if (entry.phase !== 'complete') continue;
+        const bundle = await loadDeckBundle(entry.fixtureId);
+        if (!bundle) continue;
+        const missing = bundle.uploadManifest?.missingFiles?.length ?? 0;
+        if (bundle.uploadStatus === 'INCOMPLETE' || missing > 0) {
+          if (bundle.uploadStatus !== 'INCOMPLETE') {
+            bundle.uploadStatus = 'INCOMPLETE';
+            await saveDeckBundle(bundle);
+          }
+          await restoreIncomplete(bundle);
+          return;
+        }
+      }
     })();
   }, []);
 
@@ -420,88 +631,190 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
         run.phase = phaseLabel;
       }
 
-      setUi(u => ({
-        ...u,
-        cardSessionId: gates?.cardSessionId ?? u.cardSessionId,
-        geometryTrackId: gates?.geometryTrackId ?? gates?.currentTrackId ?? u.geometryTrackId,
-        index: Math.min(idx + 1, run.bundle.targetCount),
-        phase: run.phase,
-        recognitionName: live.identity,
-        message:
-          run.phase === 'next-card'
-            ? 'NEXT CARD'
-            : run.phase === 'waiting-next'
-              ? 'Waiting for new card session'
-              : live.identity
-                ? live.identity
-                : u.message,
-      }));
+      if (run.phase === 'next-card' || run.phase === 'waiting-next') {
+        setUi(u => ({
+          ...u,
+          cardSessionId: gates?.cardSessionId ?? u.cardSessionId,
+          geometryTrackId: gates?.geometryTrackId ?? gates?.currentTrackId ?? u.geometryTrackId,
+          index: Math.min(idx + 1, run.bundle.targetCount),
+          phase: run.phase,
+          canSwapNow: true,
+          // Keep saved name + SWAP NOW copy — do not replace with live peek.
+        }));
+      } else {
+        setUi(u => ({
+          ...u,
+          cardSessionId: gates?.cardSessionId ?? u.cardSessionId,
+          geometryTrackId: gates?.geometryTrackId ?? gates?.currentTrackId ?? u.geometryTrackId,
+          index: Math.min(idx + 1, run.bundle.targetCount),
+          phase: run.phase,
+          canSwapNow: false,
+          recognitionName: live.identity,
+          message: live.identity
+            ? live.identity
+            : u.message,
+        }));
+      }
 
       // Wait for new session after NEXT CARD
       if (run.phase === 'next-card' || run.phase === 'waiting-next') {
         const elapsed = run.nextPromptAt != null ? monoNow() - run.nextPromptAt : 0;
-        if (elapsed >= DECK_NEXT_TIMEOUT_MS && !run.manualArmed) {
-          setUi(u => ({ ...u, showManualNext: true, message: 'NEXT CARD MANUALLY' }));
+        const adv = decideDeckAdvance({
+          armedSessionId: run.armedSessionId,
+          cardSessionId: gates?.cardSessionId ?? null,
+          geometryDetected: gates?.geometryDetected ?? null,
+          elapsedSinceNextPromptMs: elapsed,
+          manualArmed: run.manualArmed,
+          nextTimeoutMs: DECK_NEXT_TIMEOUT_MS,
+        });
+        if (adv.showManualNext) {
+          setUi(u => ({
+            ...u,
+            showManualNext: true,
+            canSwapNow: true,
+            message: 'SWAP NOW · tap if session did not advance',
+          }));
         }
-        if (gates) {
-          const sessionChanged =
-            run.armedSessionId != null && gates.cardSessionId !== run.armedSessionId;
-          // After a no-session timeout, any new session (or geometry return) arms next card.
-          const firstSessionAfterTimeout =
-            run.armedSessionId == null &&
-            gates.cardSessionId != null &&
-            elapsed > 350;
-          const gone = !gates.geometryDetected;
-          if (
-            run.manualArmed ||
-            sessionChanged ||
-            firstSessionAfterTimeout ||
-            (gone && elapsed > 400)
-          ) {
-            if (run.manualArmed || sessionChanged || firstSessionAfterTimeout) {
-              run.phase = 'detecting';
-              run.cardStartedAt = monoNow();
-              run.manualArmed = false;
-              run.nextPromptAt = null;
-              run.armedSessionId = gates.cardSessionId;
-              setUi(u => ({
-                ...u,
-                phase: 'detecting',
-                showManualNext: false,
-                message: 'Place next card',
-                recognitionName: null,
-              }));
-            }
-          }
+        if (adv.advance) {
+          run.phase = 'detecting';
+          run.cardStartedAt = monoNow();
+          run.manualArmed = false;
+          run.nextPromptAt = null;
+          run.armedSessionId = gates?.cardSessionId ?? null;
+          setUi(u => ({
+            ...u,
+            phase: 'detecting',
+            showManualNext: false,
+            canSwapNow: false,
+            message: 'Place next card',
+            recognitionName: null,
+          }));
         }
         return;
       }
 
       // Capture terminal recognition OR wall-clock timeout — never hang.
-      // One physical card/session → one benchmark item (recordedSlots).
-      const terminal = classifyTerminal(live);
+      // Defense-in-depth: IDENTIFIED only with owned result + fresh evidence.
       const sessionId = gates?.cardSessionId ?? null;
-      const timedOut = monoNow() - run.cardStartedAt >= DECK_CARD_TIMEOUT_MS;
-      const slotKey = slotKeyFor(sessionId, run.cardStartedAt);
-      const shouldSave =
-        !run.recordedSlots.has(slotKey) &&
-        (Boolean(terminal) || timedOut) &&
-        // Success path needs a session; timeout always saves even with no geometry.
-        (Boolean(terminal) ? sessionId != null : true);
+      const decision = decideDeckCardSave({
+        recordedSlots: run.recordedSlots,
+        cardStartedAt: run.cardStartedAt,
+        now: monoNow(),
+        timeoutMs: DECK_CARD_TIMEOUT_MS,
+        live: {
+          phase: live.phase,
+          recognitionStatus: live.recognitionStatus,
+          recognitionDecision: live.recognitionDecision,
+          identity: live.identity,
+          cardSessionId: sessionId,
+          resultCardSessionId: live.resultCardSessionId ?? null,
+          resultAttemptId: live.resultAttemptId ?? null,
+          resultPublishedAt: live.resultPublishedAt ?? null,
+          identityOwnedByCurrentSession: live.identityOwnedByCurrentSession,
+          freshEvidenceCountForSession:
+            live.freshEvidenceCountForSession ?? live.recognizeAttempts ?? null,
+          geometryDetected: gates?.geometryDetected ?? null,
+          geometryTrackId: gates?.geometryTrackId ?? gates?.currentTrackId ?? null,
+          focusAttemptId: gates?.focusAttemptId ?? null,
+          titlePresent: Boolean(live.title || live.titleHash || live.warpHash),
+          recognizeAttempts: live.recognizeAttempts,
+          recognitionAttemptIdsForSession: live.recognitionAttemptIdsForSession,
+        },
+      });
+      if (decision.staleIdentityRejected) {
+        if (!run.staleRejectedSlots.has(decision.slotKey)) {
+          run.staleRejectedSlots.add(decision.slotKey);
+          run.staleIdentityRejected += 1;
+        }
+        setUi(u => ({
+          ...u,
+          message: 'Waiting for fresh recognition…',
+          recognitionName: null,
+        }));
+        return;
+      }
 
-      if (shouldSave) {
+      if (decision.shouldSave) {
         savingRef.current = true;
-        const term: DeckCardTerminal = terminal ?? 'timeout';
+        const term: DeckCardTerminal = decision.terminal ?? 'timeout';
         const failureClass =
           term === 'identified' || term === 'ambiguous' ? null : classifyDeckFailure(live);
+        const owned =
+          live.identityOwnedByCurrentSession === true ||
+          (sessionId != null &&
+            live.resultCardSessionId != null &&
+            sessionId === live.resultCardSessionId);
+        const freshCount =
+          live.freshEvidenceCountForSession ?? live.recognizeAttempts ?? null;
+        const swapKind = run.swapKindForNext;
+        const savedName = live.identity;
+
+        // Claim slot + prompt swap BEFORE PNG encode (that was the multi-second lag).
+        run.recordedSlots.add(decision.slotKey);
+        if (sessionId != null) run.recordedSlots.add(`s:${sessionId}`);
+        run.armedSessionId = sessionId;
+        run.swapKindForNext = 'automatic';
+        run.phase = 'next-card';
+        run.nextPromptAt = monoNow();
+        setUi(u => ({
+          ...u,
+          phase: 'next-card',
+          canSwapNow: true,
+          message:
+            term === 'timeout'
+              ? `SWAP NOW · ${failureClass ?? 'timeout'}`
+              : 'SWAP NOW · you can change the card',
+          recognitionName: savedName,
+          showManualNext: false,
+          index: Math.min(idx + 1, run.bundle.targetCount),
+        }));
+        // Paint name + SWAP NOW first; vibrate after so buzz matches visible UI.
+        await yieldForUiPaint();
+        beepNext();
+
+        const artifacts = argsRef.current.peekArtifacts?.() ?? {
+          cardWarp: live.cardWarp,
+          title: live.title,
+          source: live.source,
+          detector: live.detector,
+        };
+        const warpImg = artifacts.cardWarp;
+        const isAnalysisSized = Boolean(warpImg && warpImg.width < 400);
+        const hasHires = live.captureId != null && !isAnalysisSized;
+
         const record: DeckBenchmarkCardRecord = {
           benchmarkIndex: idx + 1,
           cardSessionId: sessionId,
+          resultCardSessionId: live.resultCardSessionId ?? null,
+          resultAttemptId: live.resultAttemptId ?? null,
+          resultPublishedAt: live.resultPublishedAt ?? null,
+          identityOwnedByCurrentSession: owned,
+          recognitionAttemptIdsForSession: live.recognitionAttemptIdsForSession ?? [],
+          freshEvidenceCountForSession: freshCount,
+          terminalSource: decision.terminalSource,
+          captureCardSessionId: live.captureCardSessionId ?? null,
+          captureId: live.captureId ?? null,
+          sourceHash: live.sourceHash ?? null,
+          warpHash: live.warpHash ?? null,
+          titleHash: live.titleHash ?? null,
+          analysisWarpHash: isAnalysisSized ? live.warpHash ?? null : null,
+          analysisWarpSize: isAnalysisSized && warpImg
+            ? { width: warpImg.width, height: warpImg.height }
+            : null,
+          recognitionWarpHash: !isAnalysisSized ? live.warpHash ?? null : null,
+          recognitionWarpSize:
+            !isAnalysisSized && warpImg
+              ? { width: warpImg.width, height: warpImg.height }
+              : null,
+          hasTrueHiresCapture: hasHires,
+          recognitionSourceChannel: live.recognitionSourceChannel ?? null,
+          attemptCardSessionId: live.attemptCardSessionId ?? sessionId,
           geometryTrackId: gates?.geometryTrackId ?? gates?.currentTrackId ?? null,
           focusAttemptId: gates?.focusAttemptId ?? null,
           recognizeAttempts: live.recognizeAttempts,
           terminal: term,
           failureClass,
+          staleIdentityRejected: false,
           status: live.recognitionStatus,
           matchName: live.identity,
           matchScore: live.matchScore,
@@ -509,7 +822,7 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
           ocrTexts: live.ocrTexts ?? [],
           detectorScore: live.detectorScore,
           recognitionSource: live.recognitionSource,
-          swapKind: run.swapKindForNext,
+          swapKind,
           timings: {
             totalMs: monoNow() - run.cardStartedAt,
             lockToIdentityMs:
@@ -526,27 +839,18 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
           const saved = await saveDeckCardArtifacts({
             fixtureId: run.bundle.fixtureId,
             record,
-            source: live.source,
-            cardWarp: live.cardWarp,
-            title: live.title,
-            detector: live.detector,
+            source: artifacts.source,
+            cardWarp: artifacts.cardWarp,
+            title: artifacts.title,
+            detector: artifacts.detector,
           });
           run.bundle.cards.push(saved);
-          run.recordedSlots.add(slotKey);
-          if (sessionId != null) run.recordedSlots.add(`s:${sessionId}`);
-          run.armedSessionId = sessionId;
-          run.swapKindForNext = 'automatic';
           await persistRun(run);
-          beepNext();
-          run.phase = 'next-card';
-          run.nextPromptAt = monoNow();
           setUi(u => ({
             ...u,
             phase: 'next-card',
-            message:
-              term === 'timeout'
-                ? `NEXT CARD · ${failureClass ?? 'timeout'}`
-                : 'NEXT CARD',
+            canSwapNow: true,
+            message: 'SWAP NOW · replace the card',
             recognitionName: saved.matchName,
             showManualNext: false,
             index: Math.min(run.bundle.cards.length + 1, run.bundle.targetCount),
@@ -554,6 +858,13 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
           if (run.bundle.cards.length >= run.bundle.targetCount) {
             await finish(run);
           }
+        } catch (err) {
+          setUi(u => ({
+            ...u,
+            phase: 'next-card',
+            canSwapNow: true,
+            message: err instanceof Error ? err.message : String(err),
+          }));
         } finally {
           savingRef.current = false;
         }
@@ -562,7 +873,7 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
 
     const id = setInterval(() => {
       void tick();
-    }, 200);
+    }, 100);
     void tick();
     return () => {
       alive = false;
@@ -585,6 +896,11 @@ export const useDeckBenchmark = (args: UseDeckBenchmarkArgs) => {
     resume,
     discardInterrupted,
     finishEarly,
-    active: ui.phase !== 'idle' && ui.phase !== 'config' && ui.phase !== 'complete' && ui.phase !== 'cancelled',
+    retryMissingUpload,
+    active:
+      ui.phase !== 'idle' &&
+      ui.phase !== 'config' &&
+      ui.phase !== 'cancelled' &&
+      ui.phase !== 'complete',
   };
 };

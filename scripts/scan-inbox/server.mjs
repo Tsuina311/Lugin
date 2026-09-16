@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
 import {
@@ -76,19 +76,27 @@ const writeAtomic = async (path, data) => {
 const promoteTrace = async (root, parsed) => {
   const dest = join(root, 'sessions', parsed.sessionId, parsed.traceId);
   const marker = join(dest, '.complete');
-  if (existsSync(marker)) {
-    let wrote = 0;
-    for (const [name, file] of Object.entries(parsed.files)) {
-      await writeFile(join(dest, name), file.bytes);
-      wrote += 1;
+  const receivedFiles = [];
+  const writeVerified = async (dir, name, bytes) => {
+    const path = join(dir, name);
+    await writeFile(path, bytes);
+    const st = await stat(path);
+    if (st.size !== bytes.length) {
+      throw new Error(`ack verify failed for ${name}: wrote ${bytes.length} read ${st.size}`);
     }
-    return { already: true, dest, merged: wrote > 0 };
+    receivedFiles.push({ name, bytes: st.size });
+  };
+  if (existsSync(marker)) {
+    for (const [name, file] of Object.entries(parsed.files)) {
+      await writeVerified(dest, name, file.bytes);
+    }
+    return { already: true, dest, merged: receivedFiles.length > 0, receivedFiles };
   }
   const tmp = join(root, '.tmp', `${parsed.sessionId}-${parsed.traceId}-${randomBytes(4).toString('hex')}`);
   await mkdir(tmp, { recursive: true });
   try {
     for (const [name, file] of Object.entries(parsed.files)) {
-      await writeFile(join(tmp, name), file.bytes);
+      await writeVerified(tmp, name, file.bytes);
     }
     await writeFile(
       join(tmp, 'meta.json'),
@@ -111,11 +119,32 @@ const promoteTrace = async (root, parsed) => {
     if (existsSync(dest)) await rm(dest, { recursive: true, force: true });
     await rename(tmp, dest);
     await writeFile(marker, `${parsed.createdAt}\n`);
-    return { already: false, dest };
+    return { already: false, dest, receivedFiles };
   } catch (err) {
     await rm(tmp, { recursive: true, force: true }).catch(() => undefined);
     throw err;
   }
+};
+
+const listSessionFiles = async (root, sessionId) => {
+  const sessionDir = join(root, 'sessions', sessionId);
+  if (!existsSync(sessionDir)) return [];
+  const out = [];
+  const traces = await readdir(sessionDir);
+  for (const traceId of traces) {
+    const traceDir = join(sessionDir, traceId);
+    const st = await stat(traceDir).catch(() => null);
+    if (!st?.isDirectory()) continue;
+    const names = await readdir(traceDir);
+    for (const name of names) {
+      if (name === '.complete' || name === 'meta.json') continue;
+      const fp = join(traceDir, name);
+      const fst = await stat(fp).catch(() => null);
+      if (!fst?.isFile()) continue;
+      out.push({ name, bytes: fst.size, traceId });
+    }
+  }
+  return out;
 };
 
 export const startInboxServer = async ({
@@ -184,7 +213,7 @@ export const startInboxServer = async ({
           return;
         }
         const sampleCount = sampleCountFromFiles(parsed.files);
-        const { already, dest, merged } = await promoteTrace(root, parsed);
+        const { already, dest, merged, receivedFiles } = await promoteTrace(root, parsed);
         const pointer = latestPointer(
           { ...parsed, sampleCount },
           `.scan-inbox/sessions/${parsed.sessionId}/${parsed.traceId}`,
@@ -202,9 +231,25 @@ export const startInboxServer = async ({
           merged: Boolean(merged),
           ok: true,
           path: pointer.path,
+          receivedFiles: (receivedFiles ?? []).map(f => f.name),
           sessionId: parsed.sessionId,
           traceId: parsed.traceId,
         });
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname.startsWith('/api/sessions/')) {
+        if (!authorize(req)) {
+          send(res, 401, { ok: false, reason: 'unauthorized' });
+          return;
+        }
+        const sessionId = sanitizeId(decodeURIComponent(url.pathname.slice('/api/sessions/'.length)));
+        if (!sessionId) {
+          send(res, 400, { ok: false, reason: 'invalid sessionId' });
+          return;
+        }
+        const files = await listSessionFiles(root, sessionId);
+        send(res, 200, { ok: true, sessionId, files });
         return;
       }
 

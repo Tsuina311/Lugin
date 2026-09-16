@@ -12,6 +12,7 @@ import {
   type GestureResponderEvent,
   type LayoutChangeEvent,
 } from 'react-native';
+import { useKeepAwake } from 'expo-keep-awake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Camera,
@@ -38,9 +39,12 @@ import {
   subscribeBenchmark,
 } from '../scan/benchmark';
 import { collectionAddFromPrinting } from '../scan/collectionCommand';
+import { extractTitleCrop } from '@/lib/scan/ocrInput';
 import { tickOverlay } from '../scan/overlayEase';
 import { ScanDebugPanel } from '../scan/ScanDebugPanel';
 import { ScanResultCard } from '../scan/ScanResultCard';
+import { VerifiedScanPanel } from '../scan/VerifiedScanPanel';
+import { isGeometryV2Pipeline } from '@/lib/scan/singleCardCapture';
 import { mapCornersToOverlay, type CardCorners, type Point2D } from '../scan/sharedCore';
 import { RECOGNITION_SOURCES, type PreferredSource } from '../scan/hiresCapture';
 import {
@@ -73,6 +77,21 @@ import {
   setPerfBaseline,
 } from '../scan/perfBaseline';
 import {
+  cycleRecognitionChannel,
+  getRecognitionChannel,
+  RECOGNITION_CHANNEL_LABELS,
+  setRecognitionChannel,
+} from '@/lib/scan/recognitionChannel';
+import { ContinuousHud } from '../scan/continuous/ContinuousHud';
+import { useContinuousScan } from '../scan/continuous/useContinuousScan';
+import {
+  cycleSingleScanWorkflow,
+  getContinuousFlags,
+  getSingleScanWorkflow,
+  type SingleScanWorkflow,
+} from '../scan/singleScanWorkflow';
+import type { HiResSpaces } from '../scan/hiresCapture';
+import {
   startJsLagProbe,
   stopJsLagProbe,
   subscribeJsLag,
@@ -90,8 +109,24 @@ import { useDeckBenchmark } from '../scan/deckBenchmark/useDeckBenchmark';
 import { DeckBenchmarkHud } from '../scan/deckBenchmark/DeckBenchmarkHud';
 import { useBinderBenchmark } from '../scan/binderBenchmark/useBinderBenchmark';
 import { BinderBenchmarkHud } from '../scan/binderBenchmark/BinderBenchmarkHud';
+import { useGeometryTest } from '../scan/geometryTest/useGeometryTest';
+import { GeometryTestHud } from '../scan/geometryTest/GeometryTestHud';
 import { listDeckRuns } from '../scan/deckBenchmark/persist';
 import { listBinderRuns } from '../scan/binderBenchmark/persist';
+import { BinderHud } from '../scan/binder/BinderHud';
+import { useBinder } from '../scan/binder/useBinder';
+import { isBinderMode } from '@/lib/scan/scannerMode';
+import {
+  allowsNormalResultPresentation,
+  claimScannerMode,
+  isExclusiveScannerOwner,
+  releaseScannerMode,
+  shouldDismissNormalResultOnModeEnter,
+  shouldResetSessionOnModeExit,
+  showsDiagnosticPolygonsByDefault,
+  usesLiveRawPolygon,
+  useScannerMode,
+} from '../scan/scannerMode';
 import { ScannerLabScreen, type LabOpenCapture } from './ScannerLabScreen';
 import { getScannerDataStatus } from '../scan/scannerDataStore';
 import {
@@ -128,7 +163,20 @@ const LINE_THICKNESS = 3;
  * the *processing* cost only — the frame output stays configured on the
  * session, so it is not the same as a camera with no frame output at all.
  */
-export function CameraScanScreen() {
+export function CameraScanScreen(props?: {
+  surface?: 'scan' | 'binder' | 'geometry';
+  onOpenBinder?: () => void;
+  onOpenGeometry?: () => void;
+  onOpenScan?: () => void;
+}) {
+  const surface = props?.surface ?? 'scan';
+  const scannerMode = useScannerMode();
+  const exclusiveOwner = isExclusiveScannerOwner(scannerMode);
+  const showNormalResultUi = allowsNormalResultPresentation(scannerMode);
+  const [forceDebugOverlay, setForceDebugOverlay] = useState(false);
+  const showDiagPolygons = showsDiagnosticPolygonsByDefault(scannerMode) || forceDebugOverlay;
+  const liveRawPolygon = usesLiveRawPolygon(scannerMode);
+
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraRef>(null);
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -136,6 +184,8 @@ export function CameraScanScreen() {
   const rearDevices = useMemo(() => devices.filter(d => d.position === 'back'), [devices]);
 
   const preferred = useMemo(() => selectMainRearDevice(rearDevices), [rearDevices]);
+  // Keep display on while the camera screen is mounted (scan + binder + geometry).
+  useKeepAwake('lugin-camera-scan');
   const [overrideId, setOverrideId] = useState<string | null>(null);
   const device: CameraDevice | undefined = useMemo(() => {
     if (overrideId) return rearDevices.find(d => d.id === overrideId) ?? preferred;
@@ -149,6 +199,8 @@ export function CameraScanScreen() {
   const [detectorOn, setDetectorOn] = useState(true);
   const [panel, setPanel] = useState<Panel>('none');
   const [labOpen, setLabOpen] = useState(false);
+  const showGeometryLanding =
+    isBenchmarkToolsEnabled() && surface === 'geometry' && !exclusiveOwner && !labOpen;
   const [labOpening, setLabOpening] = useState(false);
   const [labFrozen, setLabFrozen] = useState<LabOpenCapture | null>(null);
   const [qualityBusy, setQualityBusy] = useState(false);
@@ -254,6 +306,20 @@ export function CameraScanScreen() {
     takeHiResFrame: hiResFrame.take,
   });
 
+  const prevModeRef = useRef(scannerMode);
+  useEffect(() => {
+    const prev = prevModeRef.current;
+    if (prev === scannerMode) return;
+    prevModeRef.current = scannerMode;
+    if (
+      shouldDismissNormalResultOnModeEnter(prev, scannerMode) ||
+      shouldResetSessionOnModeExit(prev, scannerMode)
+    ) {
+      setPendingAdd(null);
+      session.reset();
+    }
+  }, [scannerMode, session]);
+
   const swapTest = useCardSwapTest({
     cameraRef,
     getNameIndex: () => session.indexes.names?.index ?? null,
@@ -271,39 +337,100 @@ export function CameraScanScreen() {
   const deckBench = useDeckBenchmark({
     markDebugCardSwapped: () => session.markDebugCardSwapped(),
     setLabHold: session.setLabHold,
+    // Lightweight peek every tick — no title crop / PNG-sized copies on the hot path.
     peekLive: () => {
       const live = session.peekSwapLive();
       const snap = session.snapshot;
-      const readings = snap?.recognition?.readings ?? [];
+      const readings =
+        live.identityOwnedByCurrentSession ? snap?.recognition?.readings ?? [] : [];
       const evidence = session.peekDeckEvidence();
       const adapter = getOcrAdapterSnapshot();
       return {
         gates: live.gates,
         identity: live.identity,
-        phase: snap?.phase ?? null,
+        // CRITICAL: never use React snapshot.phase here — it lags beginCardSession and
+        // was the real-run sticky FOUND source (classifyTerminal fell back to phase).
+        phase: live.phase,
         recognitionDecision: live.recognitionDecision,
         recognitionStatus: live.recognitionStatus,
         recognizeAttempts: live.recognizeAttempts,
-        matchScore: snap?.fused?.card?.confidence ?? null,
-        ocrTexts: Array.isArray(readings)
-          ? readings
-              .map((r: { text?: string }) => r?.text)
-              .filter((t): t is string => Boolean(t))
-          : [],
+        matchScore: live.identityOwnedByCurrentSession
+          ? snap?.fused?.card?.confidence ?? null
+          : null,
+        ocrTexts: (() => {
+          const fromReadings = Array.isArray(readings)
+            ? readings
+                .map((r: { text?: string }) => r?.text)
+                .filter((t): t is string => Boolean(t && t.trim()))
+            : [];
+          // Fallback: titleRawText is often present when readings were cleared
+          // from the owned snapshot after identity publish.
+          const raw = live.identityOwnedByCurrentSession
+            ? snap?.postLock?.titleRawText ?? null
+            : null;
+          if (fromReadings.length) return fromReadings;
+          if (typeof raw === 'string' && raw.trim()) return [raw.trim()];
+          return [];
+        })(),
+        recognitionSourceChannel: live.identityOwnedByCurrentSession
+          ? snap?.fused?.status != null
+            ? 'TITLE'
+            : 'OTHER'
+          : null,
         detectorScore: live.gates?.detectorScore ?? null,
         recognitionSource: session.debug.recognitionSource ?? null,
-        lockedAt: snap?.lockedAt ?? null,
-        finalIdentityAt: snap?.finalIdentityAt ?? null,
-        cardWarp: session.lastNormalized(),
+        lockedAt: live.identityOwnedByCurrentSession ? snap?.lockedAt ?? null : null,
+        finalIdentityAt: live.identityOwnedByCurrentSession
+          ? snap?.finalIdentityAt ?? null
+          : null,
+        resultCardSessionId: live.resultCardSessionId ?? null,
+        resultPublishedAt: live.resultPublishedAt ?? null,
+        resultAttemptId: live.resultAttemptId ?? null,
+        identityOwnedByCurrentSession: live.identityOwnedByCurrentSession,
+        freshEvidenceCountForSession: live.identityOwnedByCurrentSession
+          ? Math.max(1, live.recognizeAttempts ?? 1)
+          : 0,
+        recognitionAttemptIdsForSession: live.identityOwnedByCurrentSession
+          ? live.resultAttemptId != null
+            ? [live.resultAttemptId]
+            : []
+          : [],
+        captureCardSessionId: session.lastCaptureProvenance?.()?.captureCardSessionId ?? null,
+        captureId: session.lastCaptureProvenance?.()?.captureId ?? null,
+        sourceHash: session.lastCaptureProvenance?.()?.sourceImageHash ?? null,
+        warpHash: session.lastCaptureProvenance?.()?.warpedCardHash ?? null,
+        titleHash: session.lastCaptureProvenance?.()?.titleCropHash ?? null,
+        attemptCardSessionId: live.identityOwnedByCurrentSession
+          ? live.gates?.cardSessionId ?? null
+          : null,
+        cardWarp: null,
         title: null,
-        source: evidence.source,
-        detector: evidence.detector,
+        source: null,
+        detector: null,
         rawCorners: evidence.rawCorners,
         trackedCorners: evidence.trackedCorners,
         presentedCorners: evidence.presentedCorners,
         recognitionCorners: evidence.recognitionCorners,
         ocrAvailable: adapter.textRecognizerCreated,
         ocrTransport: adapter.transport,
+      };
+    },
+    peekArtifacts: () => {
+      const evidence = session.peekDeckEvidence();
+      const cardWarp = session.lastNormalized();
+      let title = null as ReturnType<typeof extractTitleCrop>['image'] | null;
+      if (cardWarp) {
+        try {
+          title = extractTitleCrop(cardWarp).image;
+        } catch {
+          title = null;
+        }
+      }
+      return {
+        cardWarp,
+        title,
+        source: evidence.source,
+        detector: evidence.detector,
       };
     },
   });
@@ -370,11 +497,16 @@ export function CameraScanScreen() {
 
   const openScannerLab = useCallback(async () => {
     if (labOpening || labOpen) return;
+    if (!claimScannerMode('scanner-lab')) return;
     setLabOpening(true);
     try {
       const frozen = await session.acquireLabCapture();
       setLabFrozen(frozen);
       setLabOpen(true);
+    } catch (err) {
+      session.releaseLabHold();
+      releaseScannerMode('scanner-lab');
+      setSaveStatus(err instanceof Error ? err.message : String(err));
     } finally {
       setLabOpening(false);
     }
@@ -401,6 +533,7 @@ export function CameraScanScreen() {
 
   const onCaptureFocusSeries = useCallback(() => {
     if (seriesBusy) return;
+    if (!claimScannerMode('focus-series')) return;
     setSeriesBusy(true);
     setSaveStatus('Focus series… keep the card in the preview');
     void session
@@ -416,7 +549,10 @@ export function CameraScanScreen() {
       .catch(err => {
         setSaveStatus(err instanceof Error ? err.message : String(err));
       })
-      .finally(() => setSeriesBusy(false));
+      .finally(() => {
+        setSeriesBusy(false);
+        releaseScannerMode('focus-series');
+      });
   }, [seriesBusy, session]);
 
   const onSaveFocusSeries = useCallback(() => {
@@ -483,6 +619,7 @@ export function CameraScanScreen() {
   // above permission early-returns.
   useEffect(() => {
     if (!isBenchmarkToolsEnabled() || !benchHud.active) return;
+    if (!allowsNormalResultPresentation(scannerMode)) return;
     const snap = session.snapshot;
     if (!snap || (snap.phase !== 'found' && snap.phase !== 'ambiguous')) return;
     if (!snap.fused) return;
@@ -536,6 +673,7 @@ export function CameraScanScreen() {
     }).then(() => setBenchHud(peekBenchmarkHud()));
   }, [
     benchHud.active,
+    scannerMode,
     session.snapshot?.phase,
     session.snapshot?.lockedAt,
     session.snapshot?.earlyShownAt,
@@ -588,6 +726,33 @@ export function CameraScanScreen() {
     }
   }, []);
 
+  const geometryTest = useGeometryTest({
+    cameraRef,
+    peekLive: () => session.peekGeometryLive(),
+    requestInitialFocus: () => {
+      if (layout.width <= 0 || layout.height <= 0) return;
+      void focusAt(layout.width / 2, layout.height / 2);
+    },
+  });
+
+  useEffect(() => {
+    if (!showGeometryLanding) return;
+    if (geometryTest.ui.phase !== 'idle') return;
+    geometryTest.enter();
+  }, [showGeometryLanding, geometryTest.ui.phase, geometryTest.enter]);
+
+  useEffect(() => {
+    if (scannerMode !== 'geometry-test') return;
+    setForceDebugOverlay(geometryTest.ui.debugOverlay);
+  }, [scannerMode, geometryTest.ui.debugOverlay]);
+
+  // Leaving Geometry for Scan releases exclusive ownership.
+  useEffect(() => {
+    if (surface === 'scan' && scannerMode === 'geometry-test') {
+      geometryTest.cancel();
+    }
+  }, [surface, scannerMode, geometryTest.cancel]);
+
   const onTap = useCallback(
     (e: GestureResponderEvent) => {
       const { locationX, locationY } = e.nativeEvent;
@@ -621,10 +786,134 @@ export function CameraScanScreen() {
   // overlay is a uniform scale of analysis → dest. Using the same cover mapper
   // as web keeps the math in one place if rounding leaves a sliver of mismatch.
   const analysisSize = overlay?.analysis ?? result?.analysis;
+
+  const [workflow, setWorkflow] = useState<SingleScanWorkflow>(getSingleScanWorkflow());
+  const continuousEnabled =
+    scannerMode === 'normal' && surface !== 'binder' && workflow === 'continuous';
+
+  // Continuous default: CLIP+OCR channel, no Verified NEXT panel.
+  useEffect(() => {
+    if (!continuousEnabled) return;
+    setRecognitionChannel('VISUAL_PLUS_OCR');
+  }, [continuousEnabled]);
+
+  const continuousSpaces: HiResSpaces | null = useMemo(() => {
+    const s = result?.spaces;
+    if (!s?.detector) return null;
+    return {
+      detector: s.detector,
+      oriented: s.oriented,
+      overlay: s.overlay,
+      visible: s.visible,
+    };
+  }, [result?.spaces]);
+
+  const continuous = useContinuousScan({
+    cameraRef,
+    enabled: continuousEnabled,
+    flags: getContinuousFlags(),
+    liveCorners: overlay?.rawCorners ?? overlay?.corners ?? null,
+    liveScore: overlay?.score ?? result?.score ?? null,
+    analysisSize: analysisSize ?? null,
+    spaces: continuousSpaces,
+    nameIndex: session.indexes.names?.index ?? null,
+    runOcr: true,
+  });
+
+  useEffect(() => {
+    if (!continuousEnabled) return;
+    continuous.tick();
+  }, [
+    continuousEnabled,
+    continuous.tick,
+    overlay?.corners,
+    overlay?.rawCorners,
+    overlay?.score,
+    analysisSize?.width,
+    analysisSize?.height,
+  ]);
+
+  const binder = useBinder({
+    cameraRef,
+    enabled: surface === 'binder',
+    liveCorners: overlay?.rawCorners ?? overlay?.corners ?? null,
+    liveScore: overlay?.score ?? 0,
+    analysisSize: analysisSize ?? null,
+  });
+
+  // Capture-flash hooks MUST stay above permission/device early returns — otherwise
+  // the first device-ready render adds hooks and React aborts (instant app close).
+  const [captureFlash, setCaptureFlash] = useState(false);
+  const prevGeomPhase = useRef(geometryTest.ui.phase);
+  useEffect(() => {
+    const prev = prevGeomPhase.current;
+    prevGeomPhase.current = geometryTest.ui.phase;
+    if (
+      scannerMode === 'geometry-test' &&
+      (geometryTest.ui.phase === 'capturing' || geometryTest.ui.phase === 'captured') &&
+      prev !== 'capturing' &&
+      prev !== 'captured'
+    ) {
+      setCaptureFlash(true);
+      const id = setTimeout(() => setCaptureFlash(false), 180);
+      return () => clearTimeout(id);
+    }
+    return undefined;
+  }, [geometryTest.ui.phase, scannerMode]);
+
+  const sessionPhaseForFlash =
+    session.snapshot?.phase ??
+    (overlay?.detected || result?.detected ? 'detected' : 'searching');
+  const prevSessionPhase = useRef(sessionPhaseForFlash);
+  useEffect(() => {
+    const prev = prevSessionPhase.current;
+    prevSessionPhase.current = sessionPhaseForFlash;
+    if (
+      scannerMode === 'normal' &&
+      session.snapshot?.singleCardCapture?.pipeline === 'geometry-v2' &&
+      (sessionPhaseForFlash === 'recognizing' || sessionPhaseForFlash === 'found') &&
+      prev !== 'recognizing' &&
+      prev !== 'found' &&
+      prev !== 'ambiguous'
+    ) {
+      setCaptureFlash(true);
+      const id = setTimeout(() => setCaptureFlash(false), 180);
+      return () => clearTimeout(id);
+    }
+    return undefined;
+  }, [sessionPhaseForFlash, scannerMode, session.snapshot?.singleCardCapture?.pipeline]);
+
+  // Geometry Test: prefer refined physical-card estimate from the exclusive owner.
+  const geometryLiveCorners =
+    scannerMode === 'geometry-test' &&
+    (geometryTest.ui.phase === 'acquiring' ||
+      geometryTest.ui.phase === 'capturing' ||
+      geometryTest.ui.phase === 'captured')
+      ? geometryTest.ui.lockedQuad ?? geometryTest.ui.liveQuad
+      : null;
+  const geometryOriginalCorners =
+    scannerMode === 'geometry-test' && geometryTest.ui.debugOverlay
+      ? geometryTest.ui.sleeveLiveQuad ?? geometryTest.ui.originalLiveQuad
+      : null;
+  // Diagnostic mode: draw live corners (no ease) so raw/tracked/presented stay honest.
+  // Geometry Test: always follow latest refined/plausible — no presentation easing.
+  // Normal consumer: ease the green presented quad toward the detector cadence.
+  const presentedCorners = geometryLiveCorners
+    ? geometryLiveCorners
+    : liveRawPolygon
+      ? overlay?.rawCorners ?? overlay?.corners ?? displayCorners
+      : showDiagPolygons
+        ? overlay?.corners ?? displayCorners
+        : displayCorners;
   const mappedCorners = useMemo(() => {
-    if (!displayCorners || !analysisSize || layout.width === 0) return null;
-    return mapCornersToOverlay(displayCorners, analysisSize, analysisSize, layout);
-  }, [analysisSize, displayCorners, layout]);
+    if (!presentedCorners || !analysisSize || layout.width === 0) return null;
+    return mapCornersToOverlay(presentedCorners, analysisSize, analysisSize, layout);
+  }, [analysisSize, presentedCorners, layout]);
+
+  const mappedGeometryOriginal = useMemo(() => {
+    if (!geometryOriginalCorners || !analysisSize || layout.width === 0) return null;
+    return mapCornersToOverlay(geometryOriginalCorners, analysisSize, analysisSize, layout);
+  }, [analysisSize, geometryOriginalCorners, layout]);
 
   const mappedRawCorners = useMemo(() => {
     if (!overlay?.rawCorners || !analysisSize || layout.width === 0) return null;
@@ -671,6 +960,16 @@ export function CameraScanScreen() {
     ] as const;
   }, [mappedRecognitionCorners]);
 
+  const geometryOriginalQuad = useMemo(() => {
+    if (!mappedGeometryOriginal) return null;
+    return [
+      [mappedGeometryOriginal.topLeft, mappedGeometryOriginal.topRight],
+      [mappedGeometryOriginal.topRight, mappedGeometryOriginal.bottomRight],
+      [mappedGeometryOriginal.bottomRight, mappedGeometryOriginal.bottomLeft],
+      [mappedGeometryOriginal.bottomLeft, mappedGeometryOriginal.topLeft],
+    ] as const;
+  }, [mappedGeometryOriginal]);
+
   const quad = useMemo(() => {
     if (!mappedCorners) return null;
     return [
@@ -710,6 +1009,50 @@ export function CameraScanScreen() {
   const phase = session.snapshot?.phase ?? (detected ? 'detected' : 'searching');
   const cardRecognized =
     session.snapshot?.phase === 'found' || session.snapshot?.phase === 'ambiguous';
+
+  /**
+   * Capture-readiness polygon colors (Geometry + Normal geometry-v2):
+   *   amber  = detected, not capture-safe
+   *   green  = capture-safe / confirming / capturing
+   *   flash  = just captured
+   */
+  type PolyReady = 'none' | 'detected' | 'safe' | 'captured';
+  const polygonReady: PolyReady = (() => {
+    if (scannerMode === 'geometry-test') {
+      const g = geometryTest.ui;
+      if (g.phase === 'captured' || g.phase === 'complete') return 'captured';
+      if (g.phase === 'capturing') return 'safe';
+      if (g.phase === 'acquiring' || g.phase === 'ready') {
+        if (!g.liveQuad && !g.lockedQuad) return 'none';
+        if (g.acquisitionPhase === 'searching') return 'none';
+        if (g.captureSafe || g.acquisitionPhase === 'confirming' || g.lockedQuad) return 'safe';
+        return 'detected';
+      }
+      return 'none';
+    }
+    if (scannerMode === 'normal' && session.snapshot?.singleCardCapture?.pipeline === 'geometry-v2') {
+      // Verified result open — no live acquisition polygon.
+      if (
+        session.verified.phase === 'captured' ||
+        session.verified.phase === 'identifying' ||
+        session.verified.phase === 'result' ||
+        session.verified.phase === 'failed'
+      ) {
+        return 'none';
+      }
+      // Snapshot/warp in flight — keep green like Geometry "capturing".
+      if (session.verified.phase === 'acquiring') return 'safe';
+      const sc = session.snapshot.singleCardCapture;
+      if (phase === 'found' || phase === 'ambiguous' || phase === 'recognizing') return 'safe';
+      if (phase === 'locking' || sc?.captureSafe) return 'safe';
+      if (detected || sc?.phase === 'detected_not_safe' || overlay?.corners) return 'detected';
+      return 'none';
+    }
+    // Legacy / other modes: keep prior green-when-detected behavior.
+    if (detected || liveRawPolygon) return 'safe';
+    return 'none';
+  })();
+
   const lockWait = session.snapshot?.lockGates?.waiting ?? session.debug.lockGates?.waiting ?? null;
   const badgeText = !detectorOn
     ? 'DETECTOR OFF'
@@ -1024,9 +1367,12 @@ export function CameraScanScreen() {
         zoom={1}
       />
 
-      <Pressable onPress={onTap} style={StyleSheet.absoluteFill} />
+      {/* Tap-to-focus must not cover exclusive HUDs — it eats START/Retry presses. */}
+      {exclusiveOwner ? null : (
+        <Pressable onPress={onTap} style={StyleSheet.absoluteFill} />
+      )}
 
-      {benchHud.active ? (
+      {benchHud.active && showNormalResultUi ? (
         <View style={{ paddingTop: insets.top }}>
           <BenchmarkHud
             count={benchHud.count}
@@ -1043,49 +1389,52 @@ export function CameraScanScreen() {
         </View>
       ) : null}
 
-      <View style={{ paddingTop: insets.top }} pointerEvents="box-none">
-        <DeckBenchmarkHud
-          ui={deckBench.ui}
-          onCancel={deckBench.cancel}
-          onManualNext={deckBench.markManualNext}
-          onResume={() => void deckBench.resume()}
-          onDiscard={() => void deckBench.discardInterrupted()}
-          onFinish={() => void deckBench.finishEarly()}
-        />
-        <BinderBenchmarkHud
-          ui={binderBench.ui}
-          onCancel={binderBench.cancel}
-          onNextPage={() => void binderBench.nextPage()}
-          onResume={() => void binderBench.resume()}
-          onDiscard={() => void binderBench.discardInterrupted()}
-          onFinish={() => void binderBench.finishEarly()}
-        />
-      </View>
-
-      {quad ? (
+      {quad || rawQuad || trackedQuad || recognitionQuad || geometryOriginalQuad ? (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          {panel === 'scan' && rawQuad
+          {geometryOriginalQuad
+            ? geometryOriginalQuad.map(([a, b], i) => (
+                <View
+                  key={`gorig-${i}`}
+                  style={[styles.edge, edgeStyle(a, b), styles.edgeGeometryOriginal]}
+                />
+              ))
+            : null}
+          {showDiagPolygons && rawQuad
             ? rawQuad.map(([a, b], i) => (
                 <View key={`raw-${i}`} style={[styles.edge, edgeStyle(a, b), styles.edgeRaw]} />
               ))
             : null}
-          {panel === 'scan' && trackedQuad
+          {showDiagPolygons && trackedQuad
             ? trackedQuad.map(([a, b], i) => (
                 <View key={`trk-${i}`} style={[styles.edge, edgeStyle(a, b), styles.edgeTracked]} />
               ))
             : null}
-          {panel === 'scan' && recognitionQuad
+          {showDiagPolygons && recognitionQuad
             ? recognitionQuad.map(([a, b], i) => (
                 <View key={`rec-${i}`} style={[styles.edge, edgeStyle(a, b), styles.edgeRecognition]} />
               ))
             : null}
-          {quad.map(([a, b], i) => (
-            <View
-              key={i}
-              style={[styles.edge, edgeStyle(a, b), detected ? styles.edgeOn : styles.edgeWeak]}
-            />
-          ))}
-          {showNumbers && mappedCorners
+          {(!isBinderMode(scannerMode) && surface !== 'binder') || forceDebugOverlay
+            ? quad
+              ? quad.map(([a, b], i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.edge,
+                      edgeStyle(a, b),
+                      polygonReady === 'safe' || polygonReady === 'captured'
+                        ? styles.edgeOn
+                        : polygonReady === 'detected'
+                          ? styles.edgeDetected
+                          : styles.edgeWeak,
+                      captureFlash && styles.edgeCaptureFlash,
+                    ]}
+                  />
+                ))
+              : null
+            : null}
+          {captureFlash ? <View pointerEvents="none" style={styles.captureFlashVeil} /> : null}
+          {showDiagPolygons && showNumbers && mappedCorners
             ? (
                 [
                   ['1', mappedCorners.topLeft],
@@ -1147,63 +1496,44 @@ export function CameraScanScreen() {
           <Text numberOfLines={2} style={styles.deviceLine}>
             {describeDevice(device)}
           </Text>
+          {forceDebugOverlay &&
+          scannerMode === 'normal' &&
+          session.snapshot?.singleCardCapture?.pipeline === 'geometry-v2' ? (
+            <Text style={styles.saveStatus} numberOfLines={3}>
+              {(() => {
+                const d = session.snapshot.singleCardCapture?.derivedMs;
+                const fmt = (ms: number | null | undefined) =>
+                  ms == null || !Number.isFinite(ms) ? '—' : `${Math.round(ms)}ms`;
+                return `v2 QUAD ${fmt(d?.sessionToFirstQuadMs)} · SAFE ${fmt(
+                  d?.firstQuadToSafeMs != null && d?.sessionToFirstQuadMs != null
+                    ? d.sessionToFirstQuadMs + d.firstQuadToSafeMs
+                    : null,
+                )} · LOCK ${fmt(
+                  d?.sessionToFirstQuadMs != null &&
+                    d?.firstQuadToSafeMs != null &&
+                    d?.safeToLockMs != null
+                    ? d.sessionToFirstQuadMs + d.firstQuadToSafeMs + d.safeToLockMs
+                    : null,
+                )} · CAP ${fmt(d?.lockToCaptureDoneMs)} · OCR→ID ${fmt(d?.recognitionStartToIdentityMs)}`;
+              })()}
+            </Text>
+          ) : null}
           {saveStatus ? (
             <Text style={styles.saveStatus} numberOfLines={2}>
               {saveStatus}
             </Text>
           ) : null}
           {isBenchmarkToolsEnabled() && !labOpen ? (
-            <>
-            <Pressable
-              disabled={qualityBusy || seriesBusy || swapActive || deckBench.active || binderBench.active}
-              onPress={onCaptureQualityAb}
-              style={[styles.abButton, qualityBusy && styles.reportButtonBusy]}
-            >
-              <Text style={styles.abButtonLabel}>
-                {qualityBusy ? 'A/B… keep card in view' : 'Capture A/B'}
-              </Text>
-            </Pressable>
-            <Pressable
-              disabled={qualityBusy || seriesBusy || swapActive || deckBench.active || binderBench.active}
-              onPress={onCaptureFocusSeries}
-              style={[styles.abButton, seriesBusy && styles.reportButtonBusy]}
-            >
-              <Text style={styles.abButtonLabel}>
-                {seriesBusy ? 'Focus series… keep card in view' : 'Focus series'}
-              </Text>
-            </Pressable>
-            <Pressable
-              disabled={qualityBusy || seriesBusy || swapActive || deckBench.active || binderBench.active}
-              onPress={swapTest.openConfig}
-              style={[styles.abButton, swapActive && styles.reportButtonBusy]}
-            >
-              <Text style={styles.abButtonLabel}>
-                {swapActive ? `Swap ${swapTest.ui.index}/${swapTest.ui.targetCount}` : 'Card Swap Test'}
-              </Text>
-            </Pressable>
-            <Pressable
-              disabled={qualityBusy || seriesBusy || swapActive || deckBench.active || binderBench.active}
-              onPress={deckBench.openConfig}
-              style={[styles.abButton, deckBench.active && styles.reportButtonBusy]}
-            >
-              <Text style={styles.abButtonLabel}>
-                {deckBench.active
-                  ? `Deck ${deckBench.ui.index}/${deckBench.ui.targetCount}`
-                  : 'Deck Benchmark'}
-              </Text>
-            </Pressable>
-            <Pressable
-              disabled={qualityBusy || seriesBusy || swapActive || deckBench.active || binderBench.active}
-              onPress={binderBench.openConfig}
-              style={[styles.abButton, binderBench.active && styles.reportButtonBusy]}
-            >
-              <Text style={styles.abButtonLabel}>
-                {binderBench.active
-                  ? `Binder ${binderBench.ui.pageIndex}/${binderBench.ui.targetPages}`
-                  : 'Binder Benchmark'}
-              </Text>
-            </Pressable>
-            </>
+            exclusiveOwner ? (
+              <Pressable
+                onPress={() => setForceDebugOverlay(v => !v)}
+                style={[styles.abButton, forceDebugOverlay && styles.chipOn]}
+              >
+                <Text style={styles.abButtonLabel}>
+                  Debug overlay {forceDebugOverlay ? 'on' : 'off'}
+                </Text>
+              </Pressable>
+            ) : null
           ) : null}
         </View>
 
@@ -1260,13 +1590,60 @@ export function CameraScanScreen() {
           </View>
         ) : null}
 
-        {session.snapshot &&
-        (session.snapshot.phase === 'found' || session.snapshot.phase === 'ambiguous') ? (
+        {showNormalResultUi &&
+        surface !== 'binder' &&
+        workflow !== 'continuous' &&
+        isGeometryV2Pipeline() &&
+        session.verified.phase === 'acquiring' ? (
+          <View pointerEvents="none" style={styles.verifiedCaptureBanner}>
+            <Text style={styles.verifiedCaptureBannerLabel}>CAPTURE</Text>
+          </View>
+        ) : null}
+
+        {showNormalResultUi &&
+        surface !== 'binder' &&
+        workflow !== 'continuous' &&
+        isGeometryV2Pipeline() &&
+        session.verified.phase !== 'ready' &&
+        session.verified.phase !== 'acquiring' &&
+        (session.verified.warpUri ||
+          session.verified.phase === 'captured' ||
+          session.verified.phase === 'identifying' ||
+          session.verified.phase === 'result' ||
+          session.verified.phase === 'failed') ? (
+          <View style={styles.resultWrap}>
+            <VerifiedScanPanel
+              inboxPaired={Boolean(isBenchmarkToolsEnabled())}
+              onRetake={() => {
+                setPendingAdd(null);
+                session.verified.retake();
+              }}
+              onRetryRecognition={() => {
+                void session.verified.retryRecognition();
+              }}
+              onUploadNext={() => {
+                // Clear status immediately — uploadNext advances UI before encode.
+                setPendingAdd('Skipping… diagnostics continue');
+                void session.verified.uploadNext().then(msg => {
+                  setPendingAdd(msg);
+                });
+              }}
+              onWarpLoaded={() => session.verified.armRecognize()}
+              snapshot={session.snapshot}
+              verifiedPhase={session.verified.phase}
+              warpUri={session.verified.warpUri}
+            />
+          </View>
+        ) : showNormalResultUi &&
+          !isGeometryV2Pipeline() &&
+          session.snapshot &&
+          (session.snapshot.phase === 'found' || session.snapshot.phase === 'ambiguous') ? (
           <View style={styles.resultWrap}>
             <ScanResultCard
               nameIndex={session.indexes.names?.index ?? null}
               printingIndex={session.indexes.printing?.index ?? null}
               onAction={(action, extra) => {
+                if (!showNormalResultUi) return;
                 if (action === 'scan-again') {
                   session.reset();
                   return;
@@ -1291,7 +1668,6 @@ export function CameraScanScreen() {
               }}
               snapshot={session.snapshot}
             />
-            {pendingAdd ? <Text style={styles.pendingAdd}>{pendingAdd}</Text> : null}
             <View style={styles.resultActions}>
               <Pressable
                 disabled={reportBusy}
@@ -1318,6 +1694,10 @@ export function CameraScanScreen() {
               </Pressable>
             </View>
           </View>
+        ) : null}
+
+        {showNormalResultUi && pendingAdd ? (
+          <Text style={styles.pendingAdd}>{pendingAdd}</Text>
         ) : null}
 
         {/* Prominent save when we have a card in view but no identity yet */}
@@ -1396,12 +1776,23 @@ export function CameraScanScreen() {
               ) : null}
               {isBenchmarkToolsEnabled() ? (
                 <Pressable
-                  disabled={labOpening}
+                  disabled={labOpening || qualityBusy || seriesBusy || exclusiveOwner}
                   onPress={() => void openScannerLab()}
                   style={[styles.trainButtonLarge, labOpening && styles.reportButtonBusy]}
                 >
                   <Text style={styles.reportButtonLabel}>
                     {labOpening ? 'Opening…' : 'Scanner Lab'}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {isBenchmarkToolsEnabled() && showAllTools ? (
+                <Pressable
+                  disabled={qualityBusy || seriesBusy || exclusiveOwner}
+                  onPress={onCaptureQualityAb}
+                  style={[styles.trainButtonLarge, qualityBusy && styles.reportButtonBusy]}
+                >
+                  <Text style={styles.reportButtonLabel}>
+                    {qualityBusy ? 'A/B… keep card in view' : 'Capture A/B'}
                   </Text>
                 </Pressable>
               ) : null}
@@ -1562,9 +1953,28 @@ export function CameraScanScreen() {
           </View>
         ) : null}
 
+        {continuousEnabled ? <ContinuousHud ui={continuous.ui} /> : null}
+
+        {scannerMode === 'geometry-test' ? null : (
         <View style={styles.bottomBar}>
           <Pressable onPress={cycleDevice} style={styles.chip}>
             <Text style={styles.chipLabel}>Lens ({rearDevices.length})</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              const next = cycleSingleScanWorkflow();
+              setWorkflow(next);
+              if (next === 'continuous') {
+                setRecognitionChannel('VISUAL_PLUS_OCR');
+                continuous.reset();
+              }
+              setPerfTick(t => t + 1);
+            }}
+            style={[styles.chip, workflow === 'continuous' && styles.chipOn]}
+          >
+            <Text style={styles.chipLabel}>
+              {workflow === 'continuous' ? 'Continuous' : 'Verified'}
+            </Text>
           </Pressable>
           <Pressable
             onPress={() => setDetectorOn(v => !v)}
@@ -1587,6 +1997,27 @@ export function CameraScanScreen() {
             style={[styles.chip, showAllTools && styles.chipOn]}
           >
             <Text style={styles.chipLabel}>{showAllTools ? 'All tools ON' : 'All tools'}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              cycleRecognitionChannel({ includeVisual: true });
+              const mode = getRecognitionChannel();
+              // Edition needs PrintingIndex; art needs matcher (usually already loaded).
+              if (mode === 'EDITION_OCR') {
+                setPerfBaseline({ heavyIndexesWhileScanning: true, footerOcr: true });
+              } else if (mode === 'ART_ONLY' || mode === 'OCR_AND_ART') {
+                setPerfBaseline({ artwork: true });
+              }
+              setPerfTick(t => t + 1);
+            }}
+            style={[
+              styles.chip,
+              getRecognitionChannel() !== 'OCR_ONLY' && styles.chipOn,
+            ]}
+          >
+            <Text style={styles.chipLabel}>
+              Rec {RECOGNITION_CHANNEL_LABELS[getRecognitionChannel()]}
+            </Text>
           </Pressable>
           {showAllTools ? (
           <>
@@ -1753,6 +2184,45 @@ export function CameraScanScreen() {
           </>
           ) : null}
         </View>
+        )}
+      </View>
+
+      {/* Exclusive HUDs above overlay/chrome so START / Retry / NEXT actually receive presses. */}
+      <View
+        style={[StyleSheet.absoluteFill, { paddingTop: insets.top, zIndex: 200, elevation: 200 }]}
+        pointerEvents="box-none"
+      >
+        <DeckBenchmarkHud
+          ui={deckBench.ui}
+          onCancel={deckBench.cancel}
+          onManualNext={deckBench.markManualNext}
+          onResume={() => void deckBench.resume()}
+          onDiscard={() => void deckBench.discardInterrupted()}
+          onFinish={() => void deckBench.finishEarly()}
+          onRetryUpload={() => void deckBench.retryMissingUpload()}
+        />
+        <BinderBenchmarkHud
+          ui={binderBench.ui}
+          onCancel={binderBench.cancel}
+          onNextPage={() => void binderBench.nextPage()}
+          onResume={() => void binderBench.resume()}
+          onDiscard={() => void binderBench.discardInterrupted()}
+          onFinish={() => void binderBench.finishEarly()}
+          onRetryUpload={() => void binderBench.retryMissingUpload()}
+        />
+        <GeometryTestHud
+          ui={geometryTest.ui}
+          onStart={geometryTest.start}
+          onNext={geometryTest.next}
+          onCancel={geometryTest.cancel}
+          onFinish={geometryTest.finish}
+          onCaptureCurrent={geometryTest.captureCurrent}
+          onRetryUpload={() => void geometryTest.retryMissingUpload()}
+          onToggleDebug={() => geometryTest.setDebugOverlay(!geometryTest.ui.debugOverlay)}
+          onFocusMode={geometryTest.setFocusMode}
+          onPreviewKind={geometryTest.setPreviewKind}
+          onPreviewDisplayed={geometryTest.markPreviewDisplayed}
+        />
       </View>
 
       <Modal
@@ -2132,9 +2602,58 @@ export function CameraScanScreen() {
             }}
             onClose={() => {
               session.releaseLabHold();
+              releaseScannerMode('scanner-lab');
               setLabOpen(false);
               setLabFrozen(null);
             }}
+          />
+        </View>
+      ) : null}
+      {surface === 'binder' && binder.ui.active ? (
+        <View
+          pointerEvents="box-none"
+          style={[StyleSheet.absoluteFill, { paddingTop: insets.top, zIndex: 40 }]}
+        >
+          <BinderHud
+            candidateSource={binder.ui.candidateSource}
+            hud={binder.ui.hud}
+            inspectTrack={binder.getInspectTrack()}
+            layout={
+              analysisSize && layout.width > 0
+                ? {
+                    width: layout.width,
+                    height: layout.height,
+                    mapQuad: q => {
+                      const mapped = mapCornersToOverlay(q, analysisSize, analysisSize, layout);
+                      return [
+                        mapped.topLeft,
+                        mapped.topRight,
+                        mapped.bottomRight,
+                        mapped.bottomLeft,
+                      ];
+                    },
+                  }
+                : null
+            }
+            message={binder.ui.message}
+            onCloseInspect={() => binder.setInspect(null)}
+            onFinishPage={binder.finishPage}
+            onNextPage={binder.nextPage}
+            onTapTrack={id => binder.setInspect(id)}
+            overlays={binder.ui.overlays}
+            pageIndex={binder.ui.pageIndex}
+            showDebug={forceDebugOverlay}
+            showUpload={isBenchmarkToolsEnabled()}
+            uploadBusy={binder.ui.uploadBusy}
+            uploadIncomplete={binder.ui.uploadIncomplete}
+            uploadMessage={binder.ui.uploadMessage}
+            autoUploadOnPageDone={binder.ui.autoUploadOnPageDone}
+            onUploadDiagnostics={() => void binder.uploadDiagnostics()}
+            onRetryUpload={() => void binder.retryUpload()}
+            onToggleAutoUpload={() =>
+              binder.setAutoUploadOnPageDone(!binder.ui.autoUploadOnPageDone)
+            }
+            snapshotInFlight={binder.ui.snapshotInFlight}
           />
         </View>
       ) : null}
@@ -2339,10 +2858,28 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   edgeOn: {
+    // Capture-safe / confirming / capturing
     backgroundColor: '#7CFFB2',
+  },
+  edgeDetected: {
+    // Card detected, not capture-safe yet
+    backgroundColor: '#F5C542',
+  },
+  edgeCaptureFlash: {
+    backgroundColor: '#FFFFFF',
+    opacity: 1,
+  },
+  captureFlashVeil: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
   edgeRaw: {
     backgroundColor: '#2878FF',
+  },
+  edgeGeometryOriginal: {
+    // OUTER SLEEVE / detector seed (debug)
+    backgroundColor: '#FF9F43',
+    opacity: 0.75,
   },
   edgeTracked: {
     backgroundColor: '#F5C542',
@@ -2353,7 +2890,7 @@ const styles = StyleSheet.create({
     opacity: 0.95,
   },
   edgeWeak: {
-    backgroundColor: 'rgba(245,197,66,0.75)',
+    backgroundColor: 'rgba(245,197,66,0.55)',
   },
   pendingAdd: {
     color: '#7CFFB2',
@@ -2428,6 +2965,20 @@ const styles = StyleSheet.create({
   },
   resultWrap: {
     marginBottom: 8,
+  },
+  verifiedCaptureBanner: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(12,18,28,0.72)',
+    borderRadius: 12,
+    marginBottom: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  verifiedCaptureBannerLabel: {
+    color: '#E8F0FF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
   reportAction: {
     flex: 1,

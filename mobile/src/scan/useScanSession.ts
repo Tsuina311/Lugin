@@ -9,11 +9,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CameraPhotoOutput, CameraRef } from 'react-native-vision-camera';
 
-import { scanImageToPngDataUri } from './debug/scanImagePng';
+import { evaluateMtgFastAccept, perspectiveAspect } from '@/lib/scan/detection/mtgFastPath';
+import { quadArea } from '@/lib/scan/recognitionQuad';
+import { scanImageToPngDataUri, scanImageToThumbnailPngDataUri } from './debug/scanImagePng';
+import { isBenchmarkToolsEnabled } from './benchmark/isBenchmarkEnabled';
 import {
   HIRES_WAIT_MS,
   RECOGNITION_SOURCES,
   emptyHiResStore,
+  invalidateHiResCache,
   isTrueHiRes,
   planLabAcquire,
   type HiResCache,
@@ -41,14 +45,18 @@ import {
   cloneScanImage,
   createSessionController,
   describeArtwork,
+  recognizeCapturedCard,
+  sharpnessScore,
+  type CapturedRecognitionResult,
   type DetectResult,
   type FrameHelpers,
   type RecognizeDeps,
   type ScanImage,
   type ScannerPhase,
+  type ScryfallPrinting,
   type SessionSnapshot,
 } from './sharedCore';
-import { isBenchmarkToolsEnabled } from './benchmark/isBenchmarkEnabled';
+import { getScannerMode, suspendsNormalRecognition } from './scannerMode';
 import {
   getOcrAdapterSnapshot,
   getOrCreateLegacyOcrRecognizer,
@@ -58,10 +66,78 @@ import {
 import { saveRecognitionOcrDebug } from './saveOcrDebugAttempt';
 import { saveLastLiveAttempt } from './scannerLab/lastLive';
 import { createHiResCapturer, runPreferredCapture } from './useHiResCapture';
+import { isGeometryV2Pipeline } from '@/lib/scan/singleCardCapture';
+import {
+  createRecognitionAttempt,
+  emptyVerifiedScanTiming,
+  finalizeAttempt,
+  markAttemptAdvancedEarly,
+  markAttemptAwaitingPaint,
+  markAttemptRecognizing,
+  markAttemptRecognitionStarted,
+  markFirstVerified,
+  matchAttemptByArtifacts,
+  mayPublishAttemptToUi,
+  terminalStatusFromCapture,
+  assessWarpSuspect,
+  validateWarpInput,
+  classifyGeometryFailure,
+  freezeCorners,
+  msDelta,
+  MAPPING_VERSION,
+  WARP_VERSION,
+  CAPTURE_PIPELINE_VERSION,
+  type FrozenCaptureProvenance,
+  type RecognitionAttempt,
+  type VerifiedScanPhase,
+  type VerifiedScanTiming,
+} from '@/lib/scan/verifiedScan';
 import { getPerfBaseline } from './perfBaseline';
+import {
+  channelIsNewVisual,
+  channelToRecognizeOptions,
+  channelUsesTitleFastPath,
+  getRecognitionChannel,
+} from '@/lib/scan/recognitionChannel';
+import { fuseContinuousEvidence } from '@/lib/scan/continuous';
+import { extractArtCropFromCard } from '@/lib/scan/regions';
+import {
+  initializeVisualRecognizer,
+  recognizeArtCropRgba,
+  getVisualRecognizerState,
+} from './visualRecognizer';
+import { getSingleScanWorkflow } from './singleScanWorkflow';
 import { setGeometryTraceContext } from './geometryTrace';
 import type { LabQuadSet } from '@/lib/scan/scannerLab/types';
 import { durationMs, monoNow } from '@/lib/scan/timing';
+import { foldName } from '@/lib/scan/matchName';
+import {
+  correctionTypeFor,
+  createNormalScanParentSession,
+  nextNormalScanChildId,
+  printingRef,
+  recordAttemptCreated,
+  recordAttemptTerminal,
+  recordRetake,
+  telemetryFromAttempt,
+  type NormalScanParentSession,
+} from './verifiedScan/diagnostics';
+import {
+  enqueueNormalScanDiagnostic,
+  finalizeNormalScanDiagnostic,
+} from './verifiedScan/enqueue';
+import {
+  applyCapturedToAttempt,
+  applyRecognizeResultToAttempt,
+  ocrEvidenceFromCaptured,
+} from './verifiedScan/lifecycle';
+import * as attemptRegistry from './verifiedScan/registry';
+import { getScanBackgroundQueue } from '@/lib/scan/backgroundQueue';
+import { recognizeCard } from './sharedCore';
+
+/** Verified result UI max width — readable on phone, not a debug thumb. */
+/** Display-only preview width — keep lean so encode doesn't block first paint. */
+const VERIFIED_WARP_MAX = 280;
 
 const DEBUG_MS = 1200;
 /** Debug thumbs only — full-res PNG encode on device freezes the JS thread. */
@@ -222,8 +298,41 @@ export const useScanSession = (opts: {
     type: TypeIndexLoad | null;
   }>({ art: null, artError: null, names: null, printing: null, type: null });
 
+  /** Verified Scan — one card at a time; NEXT is the session boundary. */
+  const [verifiedPhase, setVerifiedPhase] = useState<VerifiedScanPhase>('ready');
+  const [verifiedWarpUri, setVerifiedWarpUri] = useState<string | null>(null);
+  const [verifiedSelectedPrinting, setVerifiedSelectedPrinting] =
+    useState<ScryfallPrinting | null>(null);
+  const [addedCount, setAddedCount] = useState(0);
+  const [autoUploadDiagnostics, setAutoUploadDiagnostics] = useState(true);
+  const verifiedTiming = useRef<VerifiedScanTiming>(emptyVerifiedScanTiming());
+  const verifiedHoldActive = useRef(false);
+  const parentSessionRef = useRef<NormalScanParentSession | null>(null);
+  const proposedCardRef = useRef<string | null>(null);
+  const proposedPrintingRef = useRef<ReturnType<typeof printingRef>>(null);
+  const nextPressedAtRef = useRef<number | null>(null);
+  /** Diagnostic attempt ids — independent of controller attemptIdSeq, always >= 1. */
+  const verifiedAttemptIdSeq = useRef(0);
+  const activeAttemptIdRef = useRef<number | null>(null);
+  const paintArmedForAttemptRef = useRef<number | null>(null);
+  /** Frozen at capture request — never replaced by live detector after snapshot starts. */
+  const pendingCaptureMetaRef = useRef<{
+    analysisQuad: import('./sharedCore').CardCorners;
+    analysisDimensions: { width: number; height: number };
+    quadSelectionSource: import('@/lib/scan/verifiedScan').QuadSelectionSource;
+    quadSelectionScore: number | null;
+    selectedQuadAt: number;
+  } | null>(null);
+
   const store = useRef(emptyHiResStore());
-  const helperState = useRef(createNativeHelperState(store.current));
+  const controllerRef = useRef<ReturnType<typeof createSessionController> | null>(null);
+  const captureIdSeq = useRef(0);
+  const helperState = useRef(
+    createNativeHelperState(
+      store.current,
+      () => controllerRef.current?.snapshot().lockGates?.cardSessionId ?? null,
+    ),
+  );
   helperState.current.preview = previewSize;
   const preferredRef = useRef(preferredSource);
   preferredRef.current = preferredSource;
@@ -485,7 +594,6 @@ export const useScanSession = (opts: {
   }, [enabled]);
 
   const earlyIdentityRef = useRef<((snap: SessionSnapshot) => void) | null>(null);
-  const controllerRef = useRef<ReturnType<typeof createSessionController> | null>(null);
   const indexesRef = useRef(indexes);
   indexesRef.current = indexes;
 
@@ -503,10 +611,15 @@ export const useScanSession = (opts: {
     textIndex: indexes.art?.text ?? null,
     recognizeOptions: () => {
       const b = getPerfBaseline();
+      const channel = getRecognitionChannel();
+      const channelOpts = channelToRecognizeOptions(channel);
       return {
-        skipArtwork: !b.artwork,
-        skipFooter: !b.footerOcr,
-        skipTypeLine: !b.typeOcr,
+        // Channel mode wins for skipArtwork / skipFooter / skipOcr.
+        skipArtwork: channelOpts.skipArtwork ?? !b.artwork,
+        skipFooter: channelOpts.skipFooter ?? !b.footerOcr,
+        skipOcr: channelOpts.skipOcr,
+        skipTypeLine: channelOpts.skipTypeLine ?? !b.typeOcr,
+        wantFooter: channelOpts.wantFooter,
         wantTypeLine: false,
         runOcrDebugMatrix: isBenchmarkToolsEnabled(),
         legacyOcr: isBenchmarkToolsEnabled() ? getOrCreateLegacyOcrRecognizer() : null,
@@ -577,6 +690,68 @@ export const useScanSession = (opts: {
           rejectReason: info.rejectReason,
           result: info.result,
           source: info.source,
+        });
+        // Pin OCR evidence onto the attempt that owned these pixels — survives NEXT.
+        // Match by pinned artifacts only. Never use active UI cardSessionId (that is B after NEXT).
+        const match = matchAttemptByArtifacts(attemptRegistry.listPendingAttempts(), {
+          source: info.source,
+          warp: info.result.warp,
+        });
+        const attemptId =
+          match?.attemptId ??
+          (activeAttemptIdRef.current != null &&
+          attemptRegistry.getAttempt(activeAttemptIdRef.current)?.terminalStatus == null
+            ? activeAttemptIdRef.current
+            : null);
+        if (attemptId == null) return;
+        // Printing from controller snap is only trustworthy when this attempt still owns the UI.
+        const snap = controllerRef.current?.snapshot() ?? null;
+        const activeSession = snap?.lockGates?.cardSessionId ?? null;
+        const attemptForPublish = attemptRegistry.getAttempt(attemptId);
+        const mayPublish =
+          attemptForPublish != null &&
+          mayPublishAttemptToUi(attemptForPublish, activeSession) &&
+          info.published;
+        const phase =
+          mayPublish && (snap?.phase === 'found' || snap?.phase === 'ambiguous')
+            ? snap.phase
+            : null;
+        const printing = mayPublish ? snap?.fused?.printing ?? null : null;
+        const updated = attemptRegistry.updateAttempt(attemptId, a =>
+          applyCapturedToAttempt(a, info.result, {
+            phase,
+            printing: printing
+              ? {
+                  setCode: printing.setCode,
+                  collectorNumber: printing.collectorNumber,
+                  lang: printing.lang,
+                }
+              : null,
+          }),
+        );
+        if (!updated || updated.terminalStatus == null) return;
+        const parent = parentSessionRef.current;
+        if (parent) recordAttemptTerminal(parent, updated);
+        // Finalize via bounded encode queue — never pile concurrent PNG work on Skip.
+        getScanBackgroundQueue().enqueue({
+          id: `encode-${attemptId}-final`,
+          kind: 'encode',
+          priority: 3,
+          attemptId,
+          enqueuedAt: monoNow(),
+          run: async () => {
+            const latest = attemptRegistry.getAttempt(attemptId) ?? updated;
+            await finalizeNormalScanDiagnostic({
+              source: latest.artifacts.source,
+              warp: latest.artifacts.warp,
+              titleCrop: latest.artifacts.titleCrop,
+              recognitionQuad: latest.artifacts.recognitionQuad,
+              provenance: latest.provenance,
+              telemetry: telemetryFromAttempt(latest),
+              parentSummary: parentSessionRef.current?.summary ?? null,
+            });
+            attemptRegistry.releaseAttempt(attemptId);
+          },
         });
       },
     };
@@ -720,59 +895,511 @@ export const useScanSession = (opts: {
     [controller],
   );
 
+  const ensureParentSession = useCallback(() => {
+    if (!parentSessionRef.current) {
+      parentSessionRef.current = createNormalScanParentSession();
+    }
+    return parentSessionRef.current;
+  }, []);
+
+  const syncVerifiedPhaseFromSnap = useCallback((snap: SessionSnapshot) => {
+    if (!verifiedHoldActive.current) return;
+    const now = monoNow();
+    if (snap.phase === 'recognizing') {
+      verifiedTiming.current = markFirstVerified(verifiedTiming.current, 'recognitionStartAt', now);
+      setVerifiedPhase(prev => (prev === 'result' || prev === 'failed' ? prev : 'identifying'));
+      return;
+    }
+    if (snap.phase === 'found' || snap.phase === 'ambiguous') {
+      verifiedTiming.current = markFirstVerified(
+        markFirstVerified(verifiedTiming.current, 'identityAt', now),
+        'resultShownAt',
+        now,
+      );
+      if (snap.fused?.printing && snap.printingShownAt != null) {
+        verifiedTiming.current = markFirstVerified(
+          verifiedTiming.current,
+          'printingResolvedAt',
+          now,
+        );
+      }
+      const name = snap.fused?.card?.name ?? null;
+      if (name && proposedCardRef.current == null) {
+        proposedCardRef.current = name;
+        proposedPrintingRef.current = printingRef(snap.fused?.printing ?? null);
+      }
+      const failed =
+        snap.phase === 'ambiguous' &&
+        (!snap.fused ||
+          snap.fused.status === 'insufficient-confidence' ||
+          Boolean(snap.message?.includes("Couldn't identify")));
+      setVerifiedPhase(failed ? 'failed' : 'result');
+    }
+  }, []);
+
+  const enterVerifiedCaptured = useCallback(
+    (cache: HiResCache) => {
+      if (!isGeometryV2Pipeline()) return;
+      if (getScannerMode() !== 'normal') return;
+      if (!isTrueHiRes(cache.attempt.mode) || !cache.prepared?.image || !cache.source) return;
+      if (cache.captureId == null || cache.cardSessionId == null) {
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          throw new Error(
+            `verified capture missing ownership captureId=${cache.captureId} cardSessionId=${cache.cardSessionId}`,
+          );
+        }
+        return;
+      }
+      const parent = ensureParentSession();
+      const childId = nextNormalScanChildId(parent);
+      const attemptId = (verifiedAttemptIdSeq.current += 1);
+      const now = monoNow();
+      const warpMs = cache.attempt.warpMs ?? 0;
+      // Honest stage stamps: warp finished at resolve; capture/convert before warp.
+      verifiedTiming.current = markFirstVerified(
+        markFirstVerified(
+          markFirstVerified(
+            markFirstVerified(verifiedTiming.current, 'warpDoneAt', now),
+            'captureDoneAt',
+            now - Math.max(0, warpMs),
+          ),
+          'warpStartedAt',
+          now - Math.max(0, warpMs),
+        ),
+        'cardSessionStartedAt',
+        verifiedTiming.current.cardSessionStartedAt ?? now,
+      );
+      if (verifiedTiming.current.lockAt != null) {
+        verifiedTiming.current = markFirstVerified(
+          verifiedTiming.current,
+          'captureLockedAt',
+          verifiedTiming.current.lockAt,
+        );
+      }
+      if (nextPressedAtRef.current != null) {
+        verifiedTiming.current = markFirstVerified(
+          verifiedTiming.current,
+          'nextFirstQuadAt',
+          verifiedTiming.current.nextFirstQuadAt ?? now,
+        );
+      }
+
+      const analysisQuad = freezeCorners(
+        pendingCaptureMetaRef.current?.analysisQuad ?? cache.corners,
+      );
+      const projectedSourceQuad = freezeCorners(cache.mapped);
+      const warpInput = validateWarpInput({
+        quad: projectedSourceQuad,
+        source: { width: cache.source.width, height: cache.source.height },
+      });
+      const warpSuspect = assessWarpSuspect({
+        warp: cache.prepared.image,
+        sourceQuad: projectedSourceQuad,
+        source: { width: cache.source.width, height: cache.source.height },
+      });
+      const meta = pendingCaptureMetaRef.current;
+      pendingCaptureMetaRef.current = null;
+      const selectedQuadAt =
+        meta?.selectedQuadAt ??
+        verifiedTiming.current.captureLockedAt ??
+        verifiedTiming.current.lockAt ??
+        now - Math.max(0, warpMs);
+      const captureRequestedAt = verifiedTiming.current.captureRequestedAt;
+      const captureDoneAt = verifiedTiming.current.captureDoneAt ?? now - Math.max(0, warpMs);
+      const analysisDims =
+        meta?.analysisDimensions ??
+        (helperState.current.analysis
+          ? {
+              width: helperState.current.analysis.width,
+              height: helperState.current.analysis.height,
+            }
+          : null);
+      const analysisMinMarginNorm = (() => {
+        if (!analysisQuad || !analysisDims) return null;
+        const pts = [
+          analysisQuad.topLeft,
+          analysisQuad.topRight,
+          analysisQuad.bottomRight,
+          analysisQuad.bottomLeft,
+        ];
+        let m = Infinity;
+        for (const p of pts) {
+          m = Math.min(
+            m,
+            p.x / analysisDims.width,
+            p.y / analysisDims.height,
+            (analysisDims.width - p.x) / analysisDims.width,
+            (analysisDims.height - p.y) / analysisDims.height,
+          );
+        }
+        return Number.isFinite(m) ? m : null;
+      })();
+      const sourceMinMarginPx = (() => {
+        const pts = [
+          projectedSourceQuad.topLeft,
+          projectedSourceQuad.topRight,
+          projectedSourceQuad.bottomRight,
+          projectedSourceQuad.bottomLeft,
+        ];
+        let m = Infinity;
+        for (const p of pts) {
+          m = Math.min(
+            m,
+            p.x,
+            p.y,
+            cache.source.width - p.x,
+            cache.source.height - p.y,
+          );
+        }
+        return Number.isFinite(m) ? m : null;
+      })();
+      const provenance: FrozenCaptureProvenance = {
+        attemptId,
+        cardSessionId: cache.cardSessionId,
+        captureId: cache.captureId,
+        analysisDimensions: analysisDims,
+        sourceDimensions: { width: cache.source.width, height: cache.source.height },
+        analysisQuad,
+        projectedSourceQuad,
+        mappingKind: 'same-fov',
+        mappingVersion: MAPPING_VERSION,
+        warpVersion: WARP_VERSION,
+        capturePipelineVersion: CAPTURE_PIPELINE_VERSION,
+        orientation: null,
+        rotation: null,
+        mirror: false,
+        quadSelectionSource: meta?.quadSelectionSource ?? 'OTHER',
+        candidateScore: meta?.quadSelectionScore ?? cache.prepared.score ?? null,
+        captureSafe: true,
+        selectedQuadAt,
+        captureRequestedAt,
+        captureDoneAt,
+        sourceAvailableAt: captureDoneAt,
+        warpStartedAt: verifiedTiming.current.warpStartedAt,
+        warpDoneAt: verifiedTiming.current.warpDoneAt ?? now,
+        quadAgeAtCaptureMs: msDelta(selectedQuadAt, captureRequestedAt),
+        captureLatencyMs: msDelta(captureRequestedAt, captureDoneAt),
+        sourceVsQuadAgeMs: msDelta(selectedQuadAt, captureDoneAt),
+        warpInputStatus: warpInput.status,
+        warpSuspectStatus: warpSuspect.status,
+        warpSuspectReasons: warpSuspect.reasons,
+        geometryFailureClass: classifyGeometryFailure({
+          warpInput: warpInput.status,
+          warpSuspect: warpSuspect.status,
+          analysisMinMarginNorm,
+          sourceMinMarginPx,
+          sourceVsQuadAgeMs: msDelta(selectedQuadAt, captureDoneAt),
+        }),
+        analysisMinMarginNorm,
+        sourceMinMarginPx,
+      };
+
+      const attempt = createRecognitionAttempt({
+        attemptId,
+        cardSessionId: cache.cardSessionId,
+        captureId: cache.captureId,
+        childId,
+        parentSessionId: parent.id,
+        source: cache.source,
+        warp: cache.prepared.image,
+        recognitionQuad: projectedSourceQuad,
+        analysisQuad,
+        provenance,
+        timing: { ...verifiedTiming.current },
+        // Observe-only quality telemetry — not a hard gate.
+        sharpness: sharpnessScore(cache.prepared.image),
+      });
+      attemptRegistry.putAttempt(attempt);
+      recordAttemptCreated(parent, attemptId);
+      activeAttemptIdRef.current = attemptId;
+      paintArmedForAttemptRef.current = null;
+
+      verifiedHoldActive.current = true;
+      controller.setVerifiedRecognizeReady(false);
+      controller.setVerifiedHold(true);
+      setVerifiedWarpUri(null);
+      setVerifiedPhase(prev =>
+        prev === 'result' || prev === 'failed' ? prev : 'captured',
+      );
+      setVerifiedSelectedPrinting(null);
+      proposedCardRef.current = null;
+      proposedPrintingRef.current = null;
+
+      const card = cache.prepared.image;
+      // Paint handshake: commit preview state, then double-rAF before OCR (no 400ms sleep).
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (activeAttemptIdRef.current !== attemptId) return;
+          const encStart = monoNow();
+          verifiedTiming.current = markFirstVerified(
+            verifiedTiming.current,
+            'previewEncodeStartAt',
+            encStart,
+          );
+          attemptRegistry.updateAttempt(attemptId, a => ({
+            ...a,
+            timing: markFirstVerified(a.timing, 'previewEncodeStartAt', encStart),
+          }));
+          try {
+            const uri = scanImageToThumbnailPngDataUri(card, VERIFIED_WARP_MAX);
+            const encDone = monoNow();
+            verifiedTiming.current = markFirstVerified(
+              markFirstVerified(verifiedTiming.current, 'previewEncodeDoneAt', encDone),
+              'previewStateCommittedAt',
+              encDone,
+            );
+            attemptRegistry.updateAttempt(attemptId, a =>
+              markAttemptAwaitingPaint(
+                {
+                  ...a,
+                  timing: markFirstVerified(a.timing, 'previewEncodeDoneAt', encDone),
+                },
+                encDone,
+              ),
+            );
+            setVerifiedWarpUri(uri);
+            // Double-rAF ≈ one committed paint after setState.
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                if (activeAttemptIdRef.current !== attemptId) return;
+                if (paintArmedForAttemptRef.current === attemptId) return;
+                paintArmedForAttemptRef.current = attemptId;
+                const paintAt = monoNow();
+                verifiedTiming.current = markFirstVerified(
+                  markFirstVerified(
+                    markFirstVerified(
+                      verifiedTiming.current,
+                      'previewPaintBarrierPassedAt',
+                      paintAt,
+                    ),
+                    'previewPaintConfirmedAt',
+                    paintAt,
+                  ),
+                  'previewDisplayedAt',
+                  paintAt,
+                );
+                attemptRegistry.updateAttempt(attemptId, a =>
+                  markAttemptRecognizing(
+                    {
+                      ...a,
+                      timing: markFirstVerified(
+                        markFirstVerified(
+                          markFirstVerified(a.timing, 'previewPaintBarrierPassedAt', paintAt),
+                          'previewPaintConfirmedAt',
+                          paintAt,
+                        ),
+                        'previewDisplayedAt',
+                        paintAt,
+                      ),
+                    },
+                    paintAt,
+                  ),
+                );
+                if (verifiedHoldActive.current) {
+                  const recogAt = monoNow();
+                  attemptRegistry.updateAttempt(attemptId, a =>
+                    markAttemptRecognitionStarted(a, recogAt),
+                  );
+                  verifiedTiming.current = markFirstVerified(
+                    verifiedTiming.current,
+                    'recognitionStartAt',
+                    recogAt,
+                  );
+                  controller.setVerifiedRecognizeReady(true);
+                }
+              });
+            });
+          } catch {
+            setVerifiedWarpUri(null);
+            paintArmedForAttemptRef.current = attemptId;
+            controller.setVerifiedRecognizeReady(true);
+          }
+          // Bounded fallback only if rAF/onLoad path never armed (~250ms).
+          setTimeout(() => {
+            if (activeAttemptIdRef.current !== attemptId) return;
+            if (paintArmedForAttemptRef.current === attemptId) return;
+            paintArmedForAttemptRef.current = attemptId;
+            const paintAt = monoNow();
+            verifiedTiming.current = markFirstVerified(
+              markFirstVerified(
+                markFirstVerified(
+                  verifiedTiming.current,
+                  'previewPaintBarrierPassedAt',
+                  paintAt,
+                ),
+                'previewPaintConfirmedAt',
+                paintAt,
+              ),
+              'previewDisplayedAt',
+              paintAt,
+            );
+            attemptRegistry.updateAttempt(attemptId, a => markAttemptRecognizing(a, paintAt));
+            if (verifiedHoldActive.current) {
+              const recogAt = monoNow();
+              attemptRegistry.updateAttempt(attemptId, a =>
+                markAttemptRecognitionStarted(a, recogAt),
+              );
+              verifiedTiming.current = markFirstVerified(
+                verifiedTiming.current,
+                'recognitionStartAt',
+                recogAt,
+              );
+              controller.setVerifiedRecognizeReady(true);
+            }
+          }, 250);
+        }, 0);
+      });
+    },
+    [controller, ensureParentSession],
+  );
+
+  const armVerifiedRecognize = useCallback(() => {
+    // Image.onLoad is telemetry only — rAF handshake arms recognition.
+    if (!verifiedHoldActive.current) return;
+    const attemptId = activeAttemptIdRef.current;
+    if (attemptId == null) return;
+    const at = monoNow();
+    verifiedTiming.current = markFirstVerified(verifiedTiming.current, 'previewDisplayedAt', at);
+    attemptRegistry.updateAttempt(attemptId, a => ({
+      ...a,
+      timing: markFirstVerified(a.timing, 'previewDisplayedAt', at),
+    }));
+  }, []);
+
   // Publish provisional found/ambiguous as soon as title (or strong art) wins the race.
   earlyIdentityRef.current = snap => {
     lastPhase.current = snap.phase;
     setSnapshot(snap);
     lastDebugAt.current = Date.now();
     publishDebug(snap);
+    if (verifiedHoldActive.current && isGeometryV2Pipeline()) {
+      syncVerifiedPhaseFromSnap(snap);
+    }
   };
 
   const startCapture = useCallback(
     (frame: AnalyzedFrame) => {
+      // Continuous owns identity — do not run Verified capture / NEXT panel.
+      if (getSingleScanWorkflow() === 'continuous') return;
+      const snap = controllerRef.current?.snapshot();
+      const scc = isGeometryV2Pipeline() ? snap?.singleCardCapture ?? null : null;
+      const v2Frozen =
+        scc?.frozenQuad ?? null;
       const lock =
-        frame.detection.trackedCorners ?? frame.detection.lockCorners ?? frame.detection.corners;
-      const recognition = frame.detection.recognitionCorners ?? lock;
+        v2Frozen ??
+        (isGeometryV2Pipeline() ? snap?.corners : null) ??
+        frame.detection.trackedCorners ??
+        frame.detection.lockCorners ??
+        frame.detection.corners;
+      const recognition =
+        v2Frozen ??
+        (isGeometryV2Pipeline() ? snap?.corners : null) ??
+        frame.detection.recognitionCorners ??
+        lock;
       if (!lock || !recognition) return;
       if (labHoldRef.current) return;
+      if (suspendsNormalRecognition(getScannerMode())) return;
       if (store.current.inFlight) return;
-      if (store.current.cache && isTrueHiRes(store.current.cache.attempt.mode)) return;
-      const key = `${Math.round(recognition.topLeft.x)}:${Math.round(recognition.topLeft.y)}`;
-      if (key === lastCaptureKey.current && store.current.cache) return;
+      // geometry-v2: only capture after short confirmation lock (not on focusing).
+      if (isGeometryV2Pipeline()) {
+        const phase = snap?.phase;
+        if (phase !== 'locking' && phase !== 'recognizing') return;
+      }
+      const sessionId = snap?.lockGates?.cardSessionId ?? null;
+      const existing = store.current.cache;
+      if (existing && isTrueHiRes(existing.attempt.mode)) {
+        if (sessionId != null && existing.cardSessionId === sessionId) return;
+        // Prior-session / untagged cache must not block a fresh capture.
+        invalidateHiResCache(store.current, 'stale-capture-before-request');
+        lastCaptureKey.current = '';
+      }
+      // Freeze the selected analysis quad BEFORE snapshot — never re-read live detector.
+      const frozenAnalysisQuad = freezeCorners(recognition);
+      const key = `${Math.round(frozenAnalysisQuad.topLeft.x)}:${Math.round(frozenAnalysisQuad.topLeft.y)}:s${sessionId ?? 'x'}`;
+      if (key === lastCaptureKey.current && store.current.cache?.cardSessionId === sessionId) {
+        return;
+      }
       lastCaptureKey.current = key;
+      const captureId = (captureIdSeq.current += 1);
+      const requestSessionId = sessionId ?? 0;
       store.current.inFlight = true;
       store.current.waitStartedAt = store.current.waitStartedAt ?? Date.now();
       store.current.phase = 'requested';
+      const lockAt = monoNow();
+      pendingCaptureMetaRef.current = {
+        analysisQuad: frozenAnalysisQuad,
+        quadSelectionSource:
+          (scc?.quadSelectionSource as import('@/lib/scan/verifiedScan').QuadSelectionSource | null) ??
+          (v2Frozen ? 'BEST_RECENT_SAFE' : 'RAW_SELECTED'),
+        quadSelectionScore: scc?.quadSelectionScore ?? null,
+        selectedQuadAt: scc?.captureLockedAt ?? lockAt,
+        analysisDimensions: {
+          width: frame.image.width,
+          height: frame.image.height,
+        },
+      };
+      // Geometry-style feedback: show CAPTURE while snapshot+warp run (~0.6–0.9s).
+      if (isGeometryV2Pipeline() && getScannerMode() === 'normal') {
+        verifiedTiming.current = markFirstVerified(
+          markFirstVerified(
+            markFirstVerified(verifiedTiming.current, 'captureLockedAt', lockAt),
+            'lockAt',
+            lockAt,
+          ),
+          'captureRequestedAt',
+          lockAt,
+        );
+        setVerifiedPhase(prev =>
+          prev === 'result' || prev === 'failed' || prev === 'captured' || prev === 'identifying'
+            ? prev
+            : 'acquiring',
+        );
+      }
       void runPreferredCapture(
         preferredRef.current,
         capturer,
         {
           analysis: frame.image,
-          corners: recognition,
+          cardSessionId: requestSessionId,
+          captureId,
+          corners: frozenAnalysisQuad,
           score: frame.detection.score,
           spaces: frame.spaces,
         },
         store.current,
         takeFrameRef.current,
       )
-        .then(cache => {
-          store.current.cache = cache;
-          store.current.lastAttempt = cache.attempt;
+        .then(next => {
+          const current = controllerRef.current?.snapshot().lockGates?.cardSessionId ?? null;
+          // Late resolve from a previous session must not overwrite current-session pixels.
+          if (
+            current != null &&
+            next.cardSessionId != null &&
+            next.cardSessionId !== current
+          ) {
+            return;
+          }
+          store.current.cache = next;
+          store.current.lastAttempt = next.attempt;
           // Do not replace a locked Lab frame with a snapshot that finished after tap.
-          if (!labHoldRef.current && isTrueHiRes(cache.attempt.mode)) {
+          if (!labHoldRef.current && isTrueHiRes(next.attempt.mode)) {
             lastGoodLab.current = {
               detector: helperState.current.analysis,
-              detectorCorners: cache.corners,
+              detectorCorners: next.corners,
               orientation: null,
               quads: {
-                raw: cache.mapped,
-                recognition: cache.mapped,
-                tracked: cache.mapped,
+                raw: next.mapped,
+                recognition: next.mapped,
+                tracked: next.mapped,
               },
               recognitionResult: controller.snapshot().fused?.card?.name ?? null,
-              source: cache.source,
+              source: next.source,
               spaces: helperState.current.spaces,
             };
+            // Verified Scan: freeze UI on warp immediately (before OCR).
+            if (isGeometryV2Pipeline() && getScannerMode() === 'normal') {
+              enterVerifiedCaptured(next);
+            }
           }
         })
         .catch(err => {
@@ -787,13 +1414,16 @@ export const useScanSession = (opts: {
             warpMs: 0,
           };
           store.current.phase = 'failed';
+          if (isGeometryV2Pipeline() && getScannerMode() === 'normal') {
+            setVerifiedPhase(prev => (prev === 'acquiring' ? 'ready' : prev));
+          }
         })
         .finally(() => {
           store.current.inFlight = false;
           if (!store.current.cache) lastCaptureKey.current = '';
         });
     },
-    [capturer],
+    [capturer, controller, enterVerifiedCaptured],
   );
 
   // Controller may call allowRecognize before our phase-based kick; wire it.
@@ -824,11 +1454,27 @@ export const useScanSession = (opts: {
       helperState.current.spaces = frame.spaces;
       // Lab / series hold pauses live recognize + hi-res, not detector latch.
       if (labHoldRef.current) return;
+      // Binder / Lab / Focus Series: keep detection latch, skip controller.
+      if (suspendsNormalRecognition(getScannerMode())) return;
 
-      // Kick hi-res once we are focusing/locking so capture is not raced
-      // by an immediate analysis-fallback recognize on the first lock frame.
+      // Verified result open: keep camera mounted, pause new captures; onFrame holds.
+      if (verifiedHoldActive.current) {
+        const snap = await controller.onFrame(frame.image, helpers);
+        syncVerifiedPhaseFromSnap(snap);
+        setSnapshot(snap);
+        if (Date.now() - lastDebugAt.current >= DEBUG_MS) {
+          lastDebugAt.current = Date.now();
+          publishDebug(snap);
+        }
+        return;
+      }
+
+      // Kick hi-res: legacy on focusing/locking; geometry-v2 only once locking.
+      const kickPhases = isGeometryV2Pipeline()
+        ? lastPhase.current === 'locking'
+        : lastPhase.current === 'focusing' || lastPhase.current === 'locking';
       if (
-        (lastPhase.current === 'focusing' || lastPhase.current === 'locking') &&
+        kickPhases &&
         (frame.detection.lockCorners ?? frame.detection.trackedCorners ?? frame.detection.corners)
       ) {
         if (store.current.waitStartedAt == null) store.current.waitStartedAt = Date.now();
@@ -876,10 +1522,53 @@ export const useScanSession = (opts: {
         // Keep lastGoodLab — Lab must reuse the locked frame if the track
         // drops while reaching for the button.
       }
-      if (snap.phase === 'focusing' || snap.phase === 'locking') {
+      if (snap.phase === 'locking' || (!isGeometryV2Pipeline() && snap.phase === 'focusing')) {
         if (store.current.waitStartedAt == null) store.current.waitStartedAt = Date.now();
         startCapture(frame);
       }
+      // Verified: if hi-res already ready and controller hasn't held yet, enter capture UI.
+      if (
+        isGeometryV2Pipeline() &&
+        getScannerMode() === 'normal' &&
+        !verifiedHoldActive.current &&
+        store.current.cache &&
+        isTrueHiRes(store.current.cache.attempt.mode) &&
+        (snap.phase === 'locking' || snap.phase === 'recognizing' || snap.phase === 'found')
+      ) {
+        enterVerifiedCaptured(store.current.cache);
+      }
+      if (verifiedHoldActive.current) {
+        syncVerifiedPhaseFromSnap(snap);
+        // Timing: first quad after NEXT
+        if (
+          nextPressedAtRef.current != null &&
+          snap.corners &&
+          verifiedTiming.current.nextFirstQuadAt == null
+        ) {
+          verifiedTiming.current = markFirstVerified(
+            verifiedTiming.current,
+            'nextFirstQuadAt',
+            monoNow(),
+          );
+        }
+      } else if (snap.corners && verifiedTiming.current.firstQuadAt == null) {
+        verifiedTiming.current = markFirstVerified(
+          verifiedTiming.current,
+          'firstQuadAt',
+          monoNow(),
+        );
+      }
+      if (snap.singleCardCapture?.captureSafe && verifiedTiming.current.firstCaptureSafeAt == null) {
+        verifiedTiming.current = markFirstVerified(
+          verifiedTiming.current,
+          'firstCaptureSafeAt',
+          monoNow(),
+        );
+      }
+      if (snap.phase === 'locking' && verifiedTiming.current.lockAt == null) {
+        verifiedTiming.current = markFirstVerified(verifiedTiming.current, 'lockAt', monoNow());
+      }
+
       const phaseChanged = snap.phase !== lastPhase.current;
       lastPhase.current = snap.phase;
       const t = Date.now();
@@ -898,10 +1587,13 @@ export const useScanSession = (opts: {
       lastDebugAt.current = t;
       publishDebug(snap);
     },
-    [controller, helpers, publishDebug, startCapture],
+    [controller, enterVerifiedCaptured, helpers, publishDebug, startCapture, syncVerifiedPhaseFromSnap],
   );
 
   const reset = useCallback(() => {
+    controller.setVerifiedRecognizeReady(false);
+    controller.setVerifiedHold(false);
+    verifiedHoldActive.current = false;
     controller.reset();
     store.current.cache = null;
     store.current.inFlight = false;
@@ -915,9 +1607,354 @@ export const useScanSession = (opts: {
     helperState.current.detection = null;
     helperState.current.spaces = null;
     temporalMeta.current = { resetAt: Date.now(), resetReason: 'scan again' };
+    verifiedTiming.current = emptyVerifiedScanTiming();
+    nextPressedAtRef.current = null;
+    setVerifiedPhase('ready');
+    setVerifiedWarpUri(null);
+    setVerifiedSelectedPrinting(null);
+    setAddedCount(0);
+    parentSessionRef.current = null;
     setSnapshot(controller.snapshot());
     setDebug(emptyDebug());
   }, [controller]);
+
+  const clearVerifiedForNext = useCallback(
+    (reason: 'verified-next' | 'verified-add-next' | 'verified-retake') => {
+      const now = monoNow();
+      verifiedHoldActive.current = false;
+      setVerifiedWarpUri(null);
+      setVerifiedSelectedPrinting(null);
+      proposedCardRef.current = null;
+      proposedPrintingRef.current = null;
+      nextPressedAtRef.current = reason === 'verified-retake' ? null : now;
+      verifiedTiming.current = {
+        ...emptyVerifiedScanTiming(),
+        nextPressedAt: reason === 'verified-retake' ? null : now,
+        cardSessionStartedAt: now,
+      };
+      store.current.cache = null;
+      store.current.inFlight = false;
+      store.current.waitStartedAt = null;
+      store.current.phase = 'idle';
+      lastCaptureKey.current = '';
+      const snap = controller.verifiedAdvance(reason);
+      setVerifiedPhase(reason === 'verified-retake' ? 'acquiring' : 'ready');
+      setSnapshot(snap);
+      publishDebug(snap);
+    },
+    [controller, publishDebug],
+  );
+
+  const scheduleAttemptEncode = useCallback(
+    (attempt: RecognitionAttempt, uploadNow: boolean) => {
+      const q = getScanBackgroundQueue();
+      const snap = attemptRegistry.getAttempt(attempt.attemptId) ?? attempt;
+      q.enqueue({
+        id: `encode-${snap.attemptId}-${uploadNow ? 'final' : 'early'}`,
+        kind: 'encode',
+        priority: 3,
+        attemptId: snap.attemptId,
+        enqueuedAt: monoNow(),
+        run: async () => {
+          const latest = attemptRegistry.getAttempt(snap.attemptId) ?? snap;
+          const parent = parentSessionRef.current;
+          if (uploadNow || latest.terminalStatus != null) {
+            await finalizeNormalScanDiagnostic({
+              source: latest.artifacts.source,
+              warp: latest.artifacts.warp,
+              titleCrop: latest.artifacts.titleCrop,
+              recognitionQuad: latest.artifacts.recognitionQuad,
+              provenance: latest.provenance,
+              telemetry: telemetryFromAttempt(latest),
+              parentSummary: parent?.summary ?? null,
+            });
+            attemptRegistry.releaseAttempt(latest.attemptId);
+          } else {
+            await enqueueNormalScanDiagnostic({
+              source: latest.artifacts.source,
+              warp: latest.artifacts.warp,
+              titleCrop: latest.artifacts.titleCrop,
+              recognitionQuad: latest.artifacts.recognitionQuad,
+              provenance: latest.provenance,
+              telemetry: telemetryFromAttempt(latest),
+              parentSummary: parent?.summary ?? null,
+              uploadNow: false,
+            });
+          }
+        },
+      });
+    },
+    [],
+  );
+
+  const runBackgroundRecognize = useCallback(
+    async (attempt: RecognitionAttempt): Promise<void> => {
+      if (attempt.terminalStatus != null) return;
+      const ocr = getOrCreateOcrRecognizer();
+      const nameIndex = indexesRef.current.names?.index ?? null;
+      const art = indexesRef.current.art;
+      const printing = indexesRef.current.printing;
+      attemptRegistry.updateAttempt(attempt.attemptId, a =>
+        markAttemptRecognizing(a, monoNow()),
+      );
+      try {
+        const channel = getRecognitionChannel();
+        let updated: RecognitionAttempt | null = null;
+        if (channelIsNewVisual(channel)) {
+          // Verified CLIP / CLIP+OCR — native visual retrieval + optional title OCR.
+          if (getVisualRecognizerState() !== 'READY') {
+            await initializeVisualRecognizer();
+          }
+          const warp = attempt.artifacts.warp;
+          const artCrop = extractArtCropFromCard(warp, { variant: 'PRIMARY' });
+          const rgba = new Uint8Array(
+            artCrop.crop.data.buffer,
+            artCrop.crop.data.byteOffset,
+            artCrop.crop.data.byteLength,
+          );
+          const tVis0 = monoNow();
+          const clipP = recognizeArtCropRgba(rgba, artCrop.crop.width, artCrop.crop.height, 5);
+          const ocrP =
+            channel === 'VISUAL_PLUS_OCR' && ocr
+              ? recognizeCapturedCard({
+                  alreadyWarped: true,
+                  attemptId: attempt.attemptId,
+                  captureAt: attempt.timing.captureDoneAt,
+                  nameIndex,
+                  ocr,
+                  recognitionQuad: attempt.artifacts.recognitionQuad,
+                  source: warp,
+                  trackId: null,
+                })
+              : Promise.resolve(null);
+          const [clip, captured] = await Promise.all([clipP, ocrP]);
+          const visual = clip.hits[0]
+            ? {
+                name: clip.hits[0].name,
+                oracleId: clip.hits[0].oracleId,
+                score: clip.hits[0].score,
+                margin: clip.hits[0].margin,
+              }
+            : null;
+          const ocrEv = captured?.matchName
+            ? {
+                name: captured.matchName,
+                oracleId: captured.oracleId,
+                score: captured.matchScore ?? 0,
+                exact: captured.status === 'identified',
+              }
+            : null;
+          const fused = fuseContinuousEvidence({ visual, ocr: ocrEv });
+          const at = monoNow();
+          const titleMs = captured?.timings.ocrMs ?? null;
+          const artworkMs = clip.latencyMs ?? at - tVis0;
+          updated = attemptRegistry.updateAttempt(attempt.attemptId, a =>
+            finalizeAttempt(
+              {
+                ...a,
+                channelTiming: {
+                  mode: channel,
+                  titleMs,
+                  artworkMs,
+                  artworkDescriptorMs: clip.encoderMs,
+                  artworkMatcherMs: clip.searchMs,
+                  footerMs: null,
+                  footerLookupMs: null,
+                  totalMs: Math.max(artworkMs ?? 0, titleMs ?? 0),
+                  earlyReason: fused.reason,
+                  artMode: 'CLIP_VIT_B32',
+                },
+              },
+              {
+                terminalStatus: fused.publish
+                  ? 'FOUND'
+                  : visual || ocrEv
+                    ? 'AMBIGUOUS'
+                    : 'NO_MATCH',
+                at,
+                finalCard: fused.identity?.name ?? visual?.name ?? ocrEv?.name ?? null,
+                proposedCard: fused.identity?.name ?? visual?.name ?? ocrEv?.name ?? null,
+                ocr: captured
+                  ? ocrEvidenceFromCaptured(captured)
+                  : {
+                      titleCropDimensions: null,
+                      ocrRawText: null,
+                      ocrNormalizedText: null,
+                      ocrVariants: [],
+                      bestCandidateName: visual?.name ?? null,
+                      bestCandidateScore: visual?.score ?? null,
+                      runnerUpName: clip.hits[1]?.name ?? null,
+                      runnerUpScore: clip.hits[1]?.score ?? null,
+                      candidateMargin: visual?.margin ?? null,
+                      recognitionStatus: fused.publish ? 'identified' : 'insufficient',
+                    },
+                printing: {
+                  printingStatus: 'NOT_RESOLVED',
+                  proposedSet: null,
+                  proposedCollectorNumber: null,
+                  proposedLanguage: null,
+                  printingConfidence: null,
+                },
+                titleCrop: captured?.titleRaw ?? null,
+              },
+            ),
+          );
+        } else if (channelUsesTitleFastPath(channel)) {
+          const captured = await recognizeCapturedCard({
+            alreadyWarped: true,
+            attemptId: attempt.attemptId,
+            captureAt: attempt.timing.captureDoneAt,
+            nameIndex,
+            ocr,
+            recognitionQuad: attempt.artifacts.recognitionQuad,
+            source: attempt.artifacts.warp,
+            trackId: null,
+          });
+          updated = attemptRegistry.updateAttempt(attempt.attemptId, a =>
+            applyCapturedToAttempt(a, captured),
+          );
+        } else {
+          const { result } = await recognizeCard(
+            attempt.artifacts.warp,
+            {
+              artwork: art?.matcher ?? null,
+              artworkIndex: art?.data ?? null,
+              nameIndex,
+              printingIndex: printing?.index ?? null,
+              ocr,
+              resolveOcr: () => getOrCreateOcrRecognizer(),
+              textIndex: art?.text ?? null,
+            },
+            channelToRecognizeOptions(channel),
+          );
+          updated = attemptRegistry.updateAttempt(attempt.attemptId, a =>
+            applyRecognizeResultToAttempt(a, result),
+          );
+        }
+        if (!updated || updated.terminalStatus == null) return;
+        const parent = parentSessionRef.current;
+        if (parent) recordAttemptTerminal(parent, updated);
+        // Encode/upload via bounded queue — do not hold recognize slot for PNG work.
+        scheduleAttemptEncode(updated, true);
+      } catch (err) {
+        const at = monoNow();
+        const updated = attemptRegistry.updateAttempt(attempt.attemptId, a =>
+          finalizeAttempt(a, {
+            terminalStatus: 'OCR_ERROR',
+            at,
+            ocr: {
+              recognitionStatus: 'ocr-native-error',
+              ocrRawText: err instanceof Error ? err.message : String(err),
+            },
+          }),
+        );
+        if (updated) {
+          const parent = parentSessionRef.current;
+          if (parent) recordAttemptTerminal(parent, updated);
+          scheduleAttemptEncode(updated, true);
+        }
+      }
+    },
+    [scheduleAttemptEncode],
+  );
+
+  const scheduleBackgroundRecognize = useCallback(
+    (attempt: RecognitionAttempt) => {
+      getScanBackgroundQueue().enqueue({
+        id: `recog-${attempt.attemptId}`,
+        kind: 'recognize',
+        priority: 2,
+        attemptId: attempt.attemptId,
+        enqueuedAt: monoNow(),
+        run: async () => {
+          await runBackgroundRecognize(attempt);
+        },
+      });
+    },
+    [runBackgroundRecognize],
+  );
+
+  const verifiedUploadNext = useCallback(async (): Promise<string> => {
+    const attemptId = activeAttemptIdRef.current;
+    const attempt = attemptId != null ? attemptRegistry.getAttempt(attemptId) : null;
+    if (!attempt) {
+      clearVerifiedForNext('verified-next');
+      return 'Upload failed: no frozen attempt';
+    }
+    const at = monoNow();
+    attemptRegistry.updateAttempt(attemptId!, a => markAttemptAdvancedEarly(a, at));
+    const advanced = attemptRegistry.getAttempt(attemptId!)!;
+
+    // Advance UI FIRST — never block Skip on PNG encode / upload / OCR.
+    clearVerifiedForNext('verified-next');
+    activeAttemptIdRef.current = null;
+
+    const q = getScanBackgroundQueue();
+    const depth = q.snapshot();
+
+    if (advanced.terminalStatus == null) {
+      if (advanced.phase === 'captured' || advanced.phase === 'awaiting-paint') {
+        scheduleBackgroundRecognize(advanced);
+      }
+      // Pin warp early at low priority; source encode shares this job.
+      // Final metadata waits for terminal (controller OCR or background recog).
+      scheduleAttemptEncode(advanced, false);
+    } else {
+      scheduleAttemptEncode(advanced, true);
+    }
+
+    const after = q.snapshot();
+    return (
+      `Queued attempt ${advanced.attemptId}` +
+      ` · bg recog ${after.activeRecognitionJobs}/${after.pendingRecognitionJobs}` +
+      ` enc ${after.activeEncodeJobs}/${after.pendingEncodeJobs}` +
+      (depth.backgroundDeferredCount || after.backgroundDeferredCount
+        ? ` deferred=${after.backgroundDeferredCount}`
+        : '')
+    );
+  }, [clearVerifiedForNext, scheduleAttemptEncode, scheduleBackgroundRecognize]);
+
+  const verifiedNextCard = useCallback(async () => {
+    return verifiedUploadNext();
+  }, [verifiedUploadNext]);
+
+  const verifiedAddNext = useCallback(
+    async (_printing: ScryfallPrinting | null) => {
+      return verifiedUploadNext();
+    },
+    [verifiedUploadNext],
+  );
+
+  const verifiedRetake = useCallback(() => {
+    const attemptId = activeAttemptIdRef.current;
+    if (attemptId != null) {
+      const at = monoNow();
+      const updated = attemptRegistry.updateAttempt(attemptId, a =>
+        finalizeAttempt(markAttemptAdvancedEarly(a, at), {
+          terminalStatus: 'SKIPPED',
+          at,
+        }),
+      );
+      if (updated) {
+        const parent = parentSessionRef.current;
+        if (parent) {
+          recordRetake(parent);
+          recordAttemptTerminal(parent, updated);
+        }
+        attemptRegistry.releaseAttempt(attemptId);
+      }
+    }
+    activeAttemptIdRef.current = null;
+    clearVerifiedForNext('verified-retake');
+  }, [clearVerifiedForNext]);
+
+  const verifiedRetryRecognition = useCallback(async () => {
+    setVerifiedPhase('identifying');
+    const snap = await controller.retryFrozenRecognition(helpers);
+    setSnapshot(snap);
+    syncVerifiedPhaseFromSnap(snap);
+    publishDebug(snap);
+  }, [controller, helpers, publishDebug, syncVerifiedPhaseFromSnap]);
 
   const markTap = useCallback(() => {
     rememberTap(helperState.current);
@@ -1091,13 +2128,47 @@ export const useScanSession = (opts: {
             trackId: det.debug.trackId ?? gates?.currentTrackId ?? null,
           }
         : null;
+    const cardSessionId = gates?.cardSessionId ?? null;
+    const resultCardSessionId = snap.resultCardSessionId ?? gates?.resultCardSessionId ?? null;
+    const identityOwnedByCurrentSession =
+      cardSessionId != null &&
+      resultCardSessionId != null &&
+      cardSessionId === resultCardSessionId;
+    const ownedIdentity = identityOwnedByCurrentSession
+      ? snap.fused?.card?.name ?? null
+      : null;
+    // Never fall back to titleTopCandidate / React caches for CURRENT identity.
+    const rawStatus = identityOwnedByCurrentSession
+      ? snap.postLock?.recognitionStatus ?? snap.phase
+      : snap.phase === 'found' || snap.phase === 'ambiguous' || snap.phase === 'identified'
+        ? 'focusing'
+        : snap.postLock?.recognitionStatus &&
+            snap.postLock.recognitionStatus !== 'found' &&
+            snap.postLock.recognitionStatus !== 'ambiguous' &&
+            snap.postLock.recognitionStatus !== 'identified'
+          ? snap.postLock.recognitionStatus
+          : snap.phase;
     return {
       gates,
-      identity: snap.fused?.card?.name ?? snap.postLock?.titleTopCandidate ?? null,
+      identity: ownedIdentity,
+      identityOwnedByCurrentSession,
       latch,
-      recognitionDecision: snap.postLock?.recognitionStatus ?? null,
-      recognitionStatus: snap.postLock?.recognitionStatus ?? snap.phase,
+      recognitionDecision: identityOwnedByCurrentSession
+        ? snap.postLock?.recognitionStatus ?? null
+        : null,
+      recognitionStatus: rawStatus,
       recognizeAttempts: snap.postLock?.recognizeAttemptsForTrack ?? null,
+      resultCardSessionId,
+      resultPublishedAt: identityOwnedByCurrentSession
+        ? snap.postLock?.resultPublishedAt ?? null
+        : null,
+      resultAttemptId: identityOwnedByCurrentSession
+        ? snap.postLock?.recognitionAttemptId ?? null
+        : null,
+      // Diagnostics only — never treat as current.
+      diagnosticLastIdentity: snap.lockGates?.previousSessionIdentity ?? null,
+      diagnosticLastResultCardSessionId: resultCardSessionId,
+      phase: snap.phase,
     };
   }, [controller]);
 
@@ -1114,6 +2185,72 @@ export const useScanSession = (opts: {
       trackedCorners: det?.trackedCorners ?? det?.lockCorners ?? null,
     };
   }, []);
+
+  /** Geometry Test peek — raw/plausible + spaces; no recognition identity. */
+  const peekGeometryLive = useCallback(() => {
+    const det = helperState.current.detection;
+    const spaces = helperState.current.spaces;
+    const analysis = helperState.current.analysis;
+    const snap = controller.snapshot();
+    const gates = snap.lockGates ?? null;
+    const raw = det?.rawCorners ?? null;
+    const plausible =
+      det?.rawCorners ??
+      (det?.recognitionQuadValid !== false ? det?.recognitionCorners ?? null : null) ??
+      det?.corners ??
+      null;
+    const scoreRaw = det?.score ?? gates?.detectorScore ?? det?.debug?.score ?? 0;
+    const score = typeof scoreRaw === 'number' && Number.isFinite(scoreRaw) ? scoreRaw : 0;
+    const frame = analysis
+      ? { width: analysis.width, height: analysis.height }
+      : spaces?.detector ?? { width: 1, height: 1 };
+    let aspect: number | null = null;
+    let occupancy: number | null = null;
+    let fastAccept = false;
+    if (plausible) {
+      aspect = perspectiveAspect(plausible);
+      occupancy = quadArea(plausible) / Math.max(1, frame.width * frame.height);
+      // Geometry Test must not depend on SessionController gates (often 0 while
+      // recognition is suspended). Prefer detection score; if corners exist, treat
+      // as at least lock-eligible for the experiment.
+      const lockScore = Math.max(score, 0.75);
+      fastAccept = evaluateMtgFastAccept({
+        corners: plausible,
+        score: lockScore,
+        frame,
+        runnerUpScore: 0,
+      }).accept;
+    }
+    return {
+      detectorScore: plausible ? Math.max(score, 0.75) : score,
+      rawCorners: raw,
+      plausibleCorners: plausible,
+      spaces,
+      frame,
+      analysisImage: analysis,
+      aspect,
+      occupancy,
+      focusReportedSuccess:
+        gates == null ? null : gates.focusSuccesses > 0 || gates.focusOk === true,
+      focusTimedOut: gates?.focusTimedOut ?? null,
+      fastAccept,
+      rawCandidateCount:
+        typeof det?.debug?.candidates?.length === 'number'
+          ? det.debug.candidates.length
+          : typeof det?.debug?.selectedIndex === 'number' && det.debug.selectedIndex >= 0
+            ? Math.max(1, det.debug.candidates?.length ?? 1)
+            : null,
+      selectedCandidateScore:
+        typeof det?.debug?.selectedIndex === 'number' &&
+        det.debug.selectedIndex >= 0 &&
+        det.debug.candidates?.[det.debug.selectedIndex]
+          ? det.debug.candidates[det.debug.selectedIndex]!.score
+          : plausible
+            ? Math.max(score, 0.75)
+            : null,
+      selectedRole: det?.debug?.selectedRole ?? det?.recognitionQuadSource ?? null,
+    };
+  }, [controller]);
 
   const captureQualityPair = useCallback(
     async (focusPoint: { x: number; y: number } | null = null) => {
@@ -1268,6 +2405,9 @@ export const useScanSession = (opts: {
     persistFocusSeries,
     peekSwapLive,
     peekDeckEvidence,
+    peekGeometryLive,
+    lastCaptureProvenance: () => controller.lastCaptureProvenance(),
+    lastNormalizedCardSessionId: () => controller.lastNormalizedCardSessionId(),
     setLabHold,
     markDebugCardSwapped: () => {
       controller.markDebugCardSwapped();
@@ -1278,5 +2418,22 @@ export const useScanSession = (opts: {
     preferredSources: RECOGNITION_SOURCES,
     reset,
     snapshot,
+    verified: {
+      addedCount,
+      autoUploadDiagnostics,
+      phase: verifiedPhase,
+      selectedPrinting: verifiedSelectedPrinting,
+      setAutoUploadDiagnostics,
+      setSelectedPrinting: setVerifiedSelectedPrinting,
+      timing: verifiedTiming.current,
+      warpUri: verifiedWarpUri,
+      addNext: verifiedAddNext,
+      armRecognize: armVerifiedRecognize,
+      nextCard: verifiedNextCard,
+      uploadNext: verifiedUploadNext,
+      retake: verifiedRetake,
+      retryRecognition: verifiedRetryRecognition,
+      parentSessionId: parentSessionRef.current?.id ?? null,
+    },
   };
 };

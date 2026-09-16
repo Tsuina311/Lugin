@@ -88,15 +88,22 @@ export const writeBinderFramePng = async (
   fixtureId: string,
   destName: string,
   image: import('@/lib/scan/types').ScanImage,
-): Promise<string> => {
+): Promise<{ file: string; bytes: number }> => {
   const FileSystem = await fs();
   const { bytesToBase64, scanImageToPngBytes } = await import('../debug/scanImagePng');
   const dir = await binderRunDir(fixtureId);
+  const uri = `${dir}${destName}`;
   const png = scanImageToPngBytes(image, image.width);
-  await FileSystem.writeAsStringAsync(`${dir}${destName}`, bytesToBase64(png), {
+  await FileSystem.writeAsStringAsync(uri, bytesToBase64(png), {
     encoding: FileSystem.EncodingType.Base64,
   });
-  return destName;
+  const info = await FileSystem.getInfoAsync(uri);
+  const bytes =
+    info.exists && 'size' in info && typeof info.size === 'number' ? info.size : png.byteLength;
+  if (!bytes || bytes <= 0) {
+    throw new Error(`Binder frame write produced empty file: ${destName}`);
+  }
+  return { file: destName, bytes };
 };
 
 /** @deprecated snapshot is a nitro Image — use writeBinderFramePng */

@@ -36,10 +36,22 @@ const now = () =>
 
 export interface CaptureRequest {
   analysis: ScanImage;
+  /** Session that requested this capture — stamped onto the cache, never retagged. */
+  cardSessionId: number;
+  captureId: number;
   corners: CardCorners;
   score: number;
   spaces: HiResSpaces;
 }
+
+const withOwnership = (
+  cache: Omit<HiResCache, 'cardSessionId' | 'captureId'>,
+  req: CaptureRequest,
+): HiResCache => ({
+  ...cache,
+  cardSessionId: req.cardSessionId,
+  captureId: req.captureId,
+});
 
 export const createHiResCapturer = (deps: {
   cameraRef: { current: CameraRef | null };
@@ -79,7 +91,10 @@ export const createHiResCapturer = (deps: {
         sourceSize: size,
         warpMs,
       };
-      return { attempt, corners: req.corners, mapped, prepared, source };
+      return withOwnership(
+        { attempt, corners: req.corners, mapped, prepared, source },
+        req,
+      );
     } finally {
       snap.dispose();
     }
@@ -123,13 +138,16 @@ export const createHiResCapturer = (deps: {
         sourceSize: dest,
         warpMs: remapped.warpMs,
       };
-      return {
-        attempt,
-        corners: req.corners,
-        mapped: remapped.mapped,
-        prepared: remapped.prepared,
-        source,
-      };
+      return withOwnership(
+        {
+          attempt,
+          corners: req.corners,
+          mapped: remapped.mapped,
+          prepared: remapped.prepared,
+          source,
+        },
+        req,
+      );
     } finally {
       photo?.dispose();
     }
@@ -183,20 +201,23 @@ export const runPreferredCapture = async (
         );
         const size = { height: source.height, width: source.width };
         markSourceSuccess(store, 'high-res-frame', size);
-        return {
-          attempt: {
-            acquireMs,
-            convertMs: 0,
-            mode: 'high-res-frame',
-            previewInterrupted: false,
-            sourceSize: size,
-            warpMs,
+        return withOwnership(
+          {
+            attempt: {
+              acquireMs,
+              convertMs: 0,
+              mode: 'high-res-frame',
+              previewInterrupted: false,
+              sourceSize: size,
+              warpMs,
+            },
+            corners: req.corners,
+            mapped,
+            prepared,
+            source,
           },
-          corners: req.corners,
-          mapped,
-          prepared,
-          source,
-        };
+          req,
+        );
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -206,14 +227,24 @@ export const runPreferredCapture = async (
     }
   }
   const reason = errors.join(' · ') || 'all high-res sources failed';
-  const fallback = putFallback(store, req.analysis, req.corners, req.score, reason);
-  return store.cache ?? {
-    attempt: store.lastAttempt!,
-    corners: req.corners,
-    mapped: req.corners,
-    prepared: fallback,
-    source: req.analysis,
-  };
+  const fallback = putFallback(
+    store,
+    req.analysis,
+    req.corners,
+    req.score,
+    reason,
+    { cardSessionId: req.cardSessionId, captureId: req.captureId },
+  );
+  return store.cache ?? withOwnership(
+    {
+      attempt: store.lastAttempt!,
+      corners: req.corners,
+      mapped: req.corners,
+      prepared: fallback,
+      source: req.analysis,
+    },
+    req,
+  );
 };
 
 export type { RecognitionSource };

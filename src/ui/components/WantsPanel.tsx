@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseE
 import { compareFavouriteFirst, useFavouriteSellers } from '../useFavouriteSellers';
 import { useWideLayout } from '../useWideLayout';
 
+import { AddCardToWant, wantListOptionsFrom } from './AddCardToWant';
 import { Badge } from './Badge';
+import { BestSellersForList } from './BestSellersForList';
 import { Button } from './Button';
 import { CardSearch } from './CardSearch';
 import { EditionFilter } from './EditionFilter';
@@ -76,9 +78,7 @@ import {
   sellerStockUrls,
   fetchPriceGuide,
   fetchProductIds,
-  fetchSellerListOffers,
   fetchSellerStockSummary,
-  fetchSellersWithMostWants,
   getLastGuideHtml,
   parseOffers,
   scanSeller,
@@ -88,7 +88,6 @@ import {
   type ScanProgress,
   type ScanStrategy,
   type SellerStockSummary,
-  type SellerWants,
   type WantListMeta,
   type WantPlacement,
   type WantsIndex,
@@ -727,14 +726,18 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
   }, [seller]);
 
   const runScan = async () => {
-    if (!index || !seller) return;
+    const target =
+      seller ??
+      (scanSubject ? { baseUrl: scanSubject.baseUrl, name: scanSubject.name } : null);
+    if (!index || !target) return;
+    // Browse mode shows full stock; a want-list scan replaces that with matches.
     setScanSubject(null);
     const controller = new AbortController();
     abortRef.current = controller;
     setScan({ ...initialScan, status: 'scanning' });
     try {
       const result = await scanSeller(
-        seller.baseUrl,
+        target.baseUrl,
         index,
         p => setScan(s => ({ ...s, progress: p })),
         controller.signal,
@@ -753,7 +756,7 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
         totalScanned: result.totalScanned,
       };
       setScan(done);
-      void chrome.storage.local.set({ [scanStorageKey(seller.baseUrl)]: done });
+      void chrome.storage.local.set({ [scanStorageKey(target.baseUrl)]: done });
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         setScan(s => ({ ...s, progress: null, status: 'idle' }));
@@ -819,13 +822,10 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
   const stockSeller = seller ?? (scanSubject ? { baseUrl: scanSubject.baseUrl, name: scanSubject.name } : null);
 
   // ---- Best sellers for the current want list ------------------------------
-  // On `/Wants/<id>` Cardmarket can rank sellers by how many of the list's cards
-  // they stock. We fetch that ranking, then price each seller by scanning their
-  // want-list-filtered offers so they can be compared on real cost + which cards
-  // are missing (the native "add all to cart" hides both).
+  // Ranking UI lives in BestSellersForList; here we only know which list the
+  // Cardmarket page is showing and which cards the synced index says it holds.
   const wantListId = useMemo(() => location.pathname.match(/\/Wants\/(\d+)/)?.[1] ?? null, []);
   const wantListName = index?.lists.find(l => l.id === wantListId)?.name;
-  // Cards in this list: normalized key -> display name (any-printing match).
   const listCards = useMemo(() => {
     const m = new Map<string, string>();
     if (index && wantListName) {
@@ -835,85 +835,6 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
     }
     return m;
   }, [index, wantListName]);
-
-  interface SellerPrice {
-    error?: string;
-    matched?: number;
-    missing?: string[];
-    status: 'loading' | 'done' | 'error';
-    total?: number;
-  }
-  const [sellers, setSellers] = useState<{
-    error: string | null;
-    rows: SellerWants[];
-    status: 'idle' | 'loading' | 'done' | 'error';
-  }>({ error: null, rows: [], status: 'idle' });
-  const [priced, setPriced] = useState<Record<string, SellerPrice>>({});
-  const priceAborts = useRef<Map<string, AbortController>>(new Map());
-
-  const loadSellers = async () => {
-    if (!wantListId) return;
-    const token = findCmToken();
-    if (!token) {
-      setSellers({ error: 'No session token found on this page.', rows: [], status: 'error' });
-      return;
-    }
-    setSellers({ error: null, rows: [], status: 'loading' });
-    setPriced({});
-    try {
-      const rows = await fetchSellersWithMostWants(wantListId, token);
-      setSellers({ error: null, rows, status: 'done' });
-    } catch (err) {
-      setSellers({
-        error: err instanceof Error ? err.message : String(err),
-        rows: [],
-        status: 'error',
-      });
-    }
-  };
-
-  const priceSeller = async (row: SellerWants) => {
-    if (!wantListId) return;
-    priceAborts.current.get(row.idSeller)?.abort();
-    const controller = new AbortController();
-    priceAborts.current.set(row.idSeller, controller);
-    setPriced(p => ({ ...p, [row.idSeller]: { status: 'loading' } }));
-    try {
-      const { offers } = await fetchSellerListOffers(
-        row.url,
-        wantListId,
-        () => {},
-        controller.signal,
-      );
-      // Cheapest offer per card (any printing collapses to one key).
-      const cheapest = new Map<string, number>();
-      for (const o of offers) {
-        const key = stripVersion(cardKey(o.name));
-        const v = o.priceValue ?? Infinity;
-        if (v < (cheapest.get(key) ?? Infinity)) cheapest.set(key, v);
-      }
-      const total = [...cheapest.values()].reduce((s, v) => s + (Number.isFinite(v) ? v : 0), 0);
-      const missing =
-        listCards.size > 0
-          ? [...listCards.entries()].filter(([k]) => !cheapest.has(k)).map(([, name]) => name)
-          : [];
-      setPriced(p => ({
-        ...p,
-        [row.idSeller]: { matched: cheapest.size, missing, status: 'done', total },
-      }));
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      setPriced(p => ({
-        ...p,
-        [row.idSeller]: {
-          error: err instanceof Error ? err.message : String(err),
-          status: 'error',
-        },
-      }));
-    } finally {
-      priceAborts.current.delete(row.idSeller);
-    }
-  };
 
   // ---- Remove a purchase from all want lists (order page) ------------------
   // On `/Orders/<idShipment>` the site can clear everything bought in the order
@@ -995,6 +916,12 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
       setListsLoading(false);
     }
   };
+
+  // Add-to-want on this tab needs the list picker even before the user opens a menu.
+  useEffect(() => {
+    if (!index?.lists?.length) void ensureWantLists();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index?.lists?.length]);
 
   const addToWantList = async (o: ScanMatch, list: { id: string; name: string }) => {
     const url = o.productUrl;
@@ -1831,16 +1758,6 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
     if (!seller || shipping.toCountry == null || sellerCountryIdVal == null) return;
     void shippingStore.ensureMatrix(sellerCountryIdVal);
   }, [seller, shipping.toCountry, sellerCountryIdVal]);
-
-  // Prefetch each ranked seller's route so the "+ ship" column is ready without
-  // clicking anything (deduped/cached by the store).
-  useEffect(() => {
-    if (shipping.toCountry == null) return;
-    for (const row of sellers.rows) {
-      const id = countryId(row.location);
-      if (id != null) void shippingStore.ensureMatrix(id);
-    }
-  }, [sellers.rows, shipping.toCountry]);
 
   // Prefetch each product-offer seller's shipping route so entry ship shows
   // without waiting for a click.
@@ -3059,6 +2976,22 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
         onSearch={term => void runCatalogueSearch(term)}
         seed={searchSeed}
       />
+      <AddCardToWant
+        lists={wantListOptionsFrom(index?.lists ?? fetchedLists)}
+        onAdded={() => {
+          // Index refresh is optional here — Search doesn't show list contents.
+          // Kick a quiet re-read so the Wants tab sees the new card next open.
+          if (!index) return;
+          void (async () => {
+            try {
+              const lists = await fetchAllWantLists();
+              setFetchedLists(lists);
+            } catch {
+              // ignore
+            }
+          })();
+        }}
+      />
 
       {/* Breadcrumb for catalogue → printing offers. */}
       {showingSearch && (
@@ -3410,23 +3343,34 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
             </div>
           )}
 
-          {/* Seller scan controls — this tab's other headline action, so it is
-              always in view when there is a seller to scan. */}
-          {index && seller && (
+          {/* Seller scan — live page seller *or* one opened via SellerNameButton
+              (scanSubject). Browse-only sellers used to hide this control. */}
+          {index && stockSeller && (
             <div className="border-b border-slate-800 p-2 text-[11px]">
               <div className="mb-1.5 flex items-center gap-1.5">
                 <FavouriteSellerControl
-                  active={isFavourite(seller.baseUrl, seller.name)}
-                  name={seller.name}
-                  onToggle={() => void toggleFavourite(seller.baseUrl, seller.name)}
+                  active={isFavourite(
+                    scanSubject?.profile ?? stockSeller.baseUrl,
+                    stockSeller.name,
+                  )}
+                  name={stockSeller.name}
+                  onToggle={() =>
+                    void toggleFavourite(
+                      scanSubject?.profile ?? stockSeller.baseUrl,
+                      stockSeller.name,
+                    )
+                  }
                 />
-                <span className="font-medium text-slate-200">{seller.name}</span>
-                {isFavourite(seller.baseUrl, seller.name) ? <FavouriteSellerBadge /> : null}
+                <span className="font-medium text-slate-200">{stockSeller.name}</span>
+                {isFavourite(scanSubject?.profile ?? stockSeller.baseUrl, stockSeller.name) ? (
+                  <FavouriteSellerBadge />
+                ) : null}
               </div>
-              {scan.status === 'scanning' ? (
+              {scan.status === 'scanning' && !scanSubject ? (
                 <div className="flex items-center gap-2">
                   <span className="text-slate-300">
-                    {scan.progress?.phase === 'wantlists' ? 'Filtering' : 'Scanning'} {seller.name}
+                    {scan.progress?.phase === 'wantlists' ? 'Filtering' : 'Scanning'}{' '}
+                    {stockSeller.name}
                     {scan.progress
                       ? scan.progress.phase === 'wantlists'
                         ? ` — list ${scan.progress.current}/${scan.progress.total}`
@@ -3449,10 +3393,10 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button onClick={runScan} size="md" variant="success">
-                    {scan.status === 'done'
-                      ? `Re-scan ${seller.name}`
-                      : `Scan ${seller.name}'s offers`}
+                  <Button onClick={() => void runScan()} size="md" variant="success">
+                    {scan.status === 'done' && !scanSubject
+                      ? `Re-scan ${stockSeller.name}`
+                      : `Scan ${stockSeller.name}'s offers`}
                   </Button>
                   <select
                     className="rounded border border-slate-700 bg-slate-800 px-1 py-1 text-slate-300"
@@ -3464,7 +3408,7 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                     <option value="wantlists">By want lists</option>
                     <option value="pages">By pages</option>
                   </select>
-                  {scan.status === 'done' && (
+                  {scan.status === 'done' && !scanSubject && (
                     <span className="text-slate-500">
                       {scan.strategy === 'wantlists' ? 'want-list filter' : 'page scan'} ·{' '}
                       {scan.requests} request{scan.requests === 1 ? '' : 's'}
@@ -3473,16 +3417,21 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                   )}
                 </div>
               )}
-              {scan.status === 'scanning' && scan.progress && scan.progress.total > 0 && (
-                <div className="mt-2 h-1 w-full overflow-hidden rounded bg-slate-800">
-                  <div
-                    className="h-full bg-emerald-500 transition-all"
-                    style={{ width: `${(scan.progress.current / scan.progress.total) * 100}%` }}
-                  />
-                </div>
+              {scan.status === 'scanning' &&
+                !scanSubject &&
+                scan.progress &&
+                scan.progress.total > 0 && (
+                  <div className="mt-2 h-1 w-full overflow-hidden rounded bg-slate-800">
+                    <div
+                      className="h-full bg-emerald-500 transition-all"
+                      style={{ width: `${(scan.progress.current / scan.progress.total) * 100}%` }}
+                    />
+                  </div>
+                )}
+              {scan.error && !scanSubject && (
+                <div className="mt-1 text-red-400">{scan.error}</div>
               )}
-              {scan.error && <div className="mt-1 text-red-400">{scan.error}</div>}
-              {scan.diagnostics.length > 0 && (
+              {scan.diagnostics.length > 0 && !scanSubject && (
                 <details className="mt-1 text-[10px] text-slate-400">
                   <summary className="cursor-pointer select-none">Scan diagnostics</summary>
                   <div className="mt-1 space-y-0.5">
@@ -3498,145 +3447,8 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
 
         {/* Main column: what this page is about, then the cards themselves. */}
         <div className="flex min-h-0 flex-1 flex-col">
-          {/* Want-list page: rank sellers by coverage, priced + with missing cards */}
           {onWantListPage && wantListId && (
-            <div className="border-b border-slate-800 p-2 text-[11px]">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  disabled={sellers.status === 'loading'}
-                  onClick={loadSellers}
-                  size="md"
-                  variant="primary"
-                >
-                  {sellers.status === 'loading'
-                    ? 'Finding sellers…'
-                    : sellers.status === 'done'
-                      ? 'Refresh best sellers'
-                      : 'Find best sellers for this list'}
-                </Button>
-                {listCards.size > 0 && (
-                  <span className="text-slate-500">
-                    {listCards.size} card{listCards.size === 1 ? '' : 's'} in this list
-                  </span>
-                )}
-                {index && listCards.size === 0 && (
-                  <span className="text-amber-400">
-                    Read your want lists in the Wants tab to price sellers &amp; find missing cards.
-                  </span>
-                )}
-              </div>
-              {sellers.error && <div className="mt-1 text-red-400">{sellers.error}</div>}
-
-              {sellers.rows.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  {[...sellers.rows]
-                    .sort((a, b) =>
-                      compareFavouriteFirst(
-                        favourites,
-                        a,
-                        b,
-                        row => ({ name: row.name, url: row.url }),
-                        (x, y) => y.count - x.count || x.name.localeCompare(y.name),
-                      ),
-                    )
-                    .map(row => {
-                    const p = priced[row.idSeller];
-                    const fav = isFavourite(row.url, row.name);
-                    return (
-                      <div
-                        key={row.idSeller}
-                        className={`rounded border p-1.5 ${
-                          fav
-                            ? 'border-amber-500/40 bg-amber-500/5'
-                            : 'border-slate-800 bg-slate-900/40'
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <FavouriteSellerControl
-                            active={fav}
-                            name={row.name}
-                            onToggle={() => void toggleFavourite(row.url, row.name)}
-                          />
-                          <SellerNameButton
-                            className="font-semibold text-sky-300 hover:underline"
-                            name={row.name}
-                            url={row.url}
-                          />
-                          {fav ? <FavouriteSellerBadge /> : null}
-                          <span className="text-slate-400">
-                            {row.count}
-                            {listCards.size > 0 ? `/${listCards.size}` : ''} · {row.pct}%
-                          </span>
-                          {row.sales && <span className="text-slate-600">{row.sales} sales</span>}
-                          {row.location && <span className="text-slate-600">{row.location}</span>}
-                          {p?.status === 'done' && p.total != null && (
-                            <span className="font-semibold text-emerald-300">
-                              {fmtEuro(p.total)}
-                              <span className="ml-1 font-normal text-slate-500">
-                                ({p.matched} card{p.matched === 1 ? '' : 's'})
-                              </span>
-                            </span>
-                          )}
-                          {p?.status === 'done' &&
-                            p.total != null &&
-                            (() => {
-                              const est = shipEstimate(
-                                countryId(row.location),
-                                p.matched ?? 0,
-                                p.total ?? 0,
-                              );
-                              if (!est) return null;
-                              return (
-                                <span
-                                  className="text-amber-300"
-                                  title={`${est.method.name} from ${row.location} · ≈${est.weight} g`}
-                                >
-                                  + ship ≈{fmtEuro(est.method.price)}
-                                  <span className="ml-1 font-semibold text-emerald-200">
-                                    = {fmtEuro((p.total ?? 0) + est.method.price)}
-                                  </span>
-                                </span>
-                              );
-                            })()}
-                          <Button
-                            className="ml-auto"
-                            disabled={p?.status === 'loading'}
-                            onClick={() => priceSeller(row)}
-                            size="xs"
-                            variant="neutral"
-                          >
-                            {p?.status === 'loading'
-                              ? 'Pricing…'
-                              : p?.status === 'done'
-                                ? 'Re-price'
-                                : 'Price it'}
-                          </Button>
-                        </div>
-                        {p?.status === 'error' && (
-                          <div className="mt-1 text-red-400">{p.error}</div>
-                        )}
-                        {p?.status === 'done' && p.missing && p.missing.length > 0 && (
-                          <details className="mt-1 text-[10px] text-amber-300/90">
-                            <summary className="cursor-pointer select-none">
-                              Missing {p.missing.length} card{p.missing.length === 1 ? '' : 's'}
-                            </summary>
-                            <div className="mt-0.5 text-slate-400">{p.missing.join(', ')}</div>
-                          </details>
-                        )}
-                        {p?.status === 'done' &&
-                          p.missing &&
-                          p.missing.length === 0 &&
-                          listCards.size > 0 && (
-                            <div className="mt-0.5 text-[10px] text-emerald-400">
-                              Has every card in the list.
-                            </div>
-                          )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <BestSellersForList listCards={listCards} wantListId={wantListId} />
           )}
 
           {/* Order page: remove the purchase from all want lists */}

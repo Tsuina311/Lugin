@@ -10,7 +10,14 @@
 // prints the spread. Standard frames land at 0.043–0.101; borderless and
 // full-art sit a little higher, which is what the wide framing is for.
 
-import type { RelativeRegion } from './types';
+import { cropImage, type RelativeRegion, type ScanImage } from './types';
+
+/**
+ * Canonical art-crop semantics shared by host bakeoff, native CLIP, Continuous,
+ * and Verified. Bump when fractions change — must stay in lockstep with
+ * pack-visual-assets manifest `artCrop.version`.
+ */
+export const ART_CROP_VERSION = 1;
 
 /**
  * Regions are fractions of the *normalized* card, so they survive any camera
@@ -148,3 +155,39 @@ export const NAMED_REGIONS: readonly NamedRegion[] = [
 /** Pick a profile from a warped card's aspect (battle ≈ landscape). */
 export const profileForCard = (width: number, height: number): ScanProfile =>
   width > height * 1.15 ? BATTLE_PROFILE : STANDARD_PROFILE;
+
+export type ArtCropVariant = 'PRIMARY' | 'OVERSIZE_5';
+
+/** Expand a relative region about its center; clamp to the unit square. */
+export const expandRelativeRegion = (r: RelativeRegion, frac: number): RelativeRegion => {
+  const w = Math.min(1, r.w * (1 + frac));
+  const h = Math.min(1, r.h * (1 + frac));
+  const cx = r.x + r.w / 2;
+  const cy = r.y + r.h / 2;
+  return {
+    x: Math.max(0, Math.min(1 - w, cx - w / 2)),
+    y: Math.max(0, Math.min(1 - h, cy - h / 2)),
+    w,
+    h,
+  };
+};
+
+/**
+ * Extract the canonical artwork ROI from a perspective-corrected card.
+ * Use PRIMARY for the first CLIP pass; OVERSIZE_5 (+5%) only as a weak-confidence fallback.
+ * Do NOT use +10% — bakeoff A.3 showed heavy top1 degradation.
+ */
+export const extractArtCropFromCard = (
+  card: ScanImage,
+  opts?: { variant?: ArtCropVariant },
+): { crop: ScanImage; region: RelativeRegion; variant: ArtCropVariant; version: number } => {
+  const variant: ArtCropVariant = opts?.variant ?? 'PRIMARY';
+  const base = profileForCard(card.width, card.height).artwork;
+  const region = variant === 'OVERSIZE_5' ? expandRelativeRegion(base, 0.05) : base;
+  return {
+    crop: cropImage(card, region),
+    region,
+    variant,
+    version: ART_CROP_VERSION,
+  };
+};

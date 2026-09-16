@@ -8,10 +8,61 @@ const percentile = (xs: number[], p: number) => {
   return s[Math.min(s.length - 1, Math.max(0, Math.ceil((p / 100) * s.length) - 1))];
 };
 
+const isFreshIdentified = (c: DeckBenchmarkCardRecord) =>
+  c.terminal === 'identified' &&
+  c.cardSessionId != null &&
+  c.resultCardSessionId != null &&
+  c.cardSessionId === c.resultCardSessionId;
+
+/**
+ * Flag consecutive slots that share identical recognition input hashes across
+ * different cardSessionIds. Does not assert wrongness for legitimate repeats —
+ * surfaces SUSPICIOUS_REUSED_PIXELS evidence for host review.
+ */
+export const flagSuspiciousReusedPixels = (
+  cards: DeckBenchmarkCardRecord[],
+): Array<{
+  fromIndex: number;
+  toIndex: number;
+  shared: Array<'sourceHash' | 'warpHash' | 'titleHash' | 'captureId'>;
+}> => {
+  const out: Array<{
+    fromIndex: number;
+    toIndex: number;
+    shared: Array<'sourceHash' | 'warpHash' | 'titleHash' | 'captureId'>;
+  }> = [];
+  for (let i = 1; i < cards.length; i++) {
+    const a = cards[i - 1]!;
+    const b = cards[i]!;
+    if (
+      a.cardSessionId == null ||
+      b.cardSessionId == null ||
+      a.cardSessionId === b.cardSessionId
+    ) {
+      continue;
+    }
+    const shared: Array<'sourceHash' | 'warpHash' | 'titleHash' | 'captureId'> = [];
+    if (a.sourceHash && a.sourceHash === b.sourceHash) shared.push('sourceHash');
+    if (a.warpHash && a.warpHash === b.warpHash) shared.push('warpHash');
+    if (a.titleHash && a.titleHash === b.titleHash) shared.push('titleHash');
+    if (a.captureId != null && a.captureId === b.captureId) shared.push('captureId');
+    if (shared.length) {
+      out.push({
+        fromIndex: a.benchmarkIndex,
+        toIndex: b.benchmarkIndex,
+        shared,
+      });
+    }
+  }
+  return out;
+};
+
 export const summarizeDeckBenchmark = (bundle: DeckBenchmarkBundle) => {
   const cards = bundle.cards;
   const identified = cards.filter(c => c.terminal === 'identified');
+  const freshIdentified = cards.filter(isFreshIdentified);
   const ambiguous = cards.filter(c => c.terminal === 'ambiguous');
+  const timeouts = cards.filter(c => c.terminal === 'timeout');
   const unidentified = cards.filter(
     c => c.terminal === 'ocr-empty' || c.terminal === 'budget-exhausted' || c.terminal === 'timeout',
   );
@@ -19,6 +70,17 @@ export const summarizeDeckBenchmark = (bundle: DeckBenchmarkBundle) => {
   const fuzzy = cards.filter(c => c.matchMethod === 'strong-fuzzy');
   const manual = cards.filter(c => c.swapKind === 'manual');
   const auto = cards.filter(c => c.swapKind === 'automatic');
+  const staleRejected = cards.filter(c => c.staleIdentityRejected).length;
+  const zeroFreshEvidence = cards.filter(
+    c =>
+      (c.terminal === 'identified' || c.terminal === 'ambiguous') &&
+      (c.recognizeAttempts == null || c.recognizeAttempts === 0) &&
+      !(c.ocrTexts?.length),
+  ).length;
+  const suspiciousReusedPixels = flagSuspiciousReusedPixels(cards);
+  const attemptCounts = cards
+    .map(c => c.recognizeAttempts)
+    .filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
   const totals = cards
     .map(c => c.timings.totalMs)
     .filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
@@ -30,9 +92,19 @@ export const summarizeDeckBenchmark = (bundle: DeckBenchmarkBundle) => {
     fixtureId: bundle.fixtureId,
     total: cards.length,
     target: bundle.targetCount,
+    /** @deprecated Prefer freshIdentified — includes sticky/unowned identity. */
     identified: identified.length,
+    freshIdentified: freshIdentified.length,
+    staleIdentityRejected: staleRejected,
+    zeroFreshEvidenceTerminals: zeroFreshEvidence,
+    suspiciousReusedPixels: suspiciousReusedPixels.length,
+    suspiciousReusedPixelSlots: suspiciousReusedPixels,
     ambiguous: ambiguous.length,
+    timeouts: timeouts.length,
     unidentified: unidentified.length,
+    freshRecognitionAttemptsPerCard: attemptCounts.length
+      ? attemptCounts.reduce((a, b) => a + b, 0) / attemptCounts.length
+      : null,
     firstPass: {
       exact: exact.length,
       strongFuzzy: fuzzy.length,
@@ -85,12 +157,18 @@ export const reconcileDeckMultiset = (
 
   for (const c of cards) {
     const name = c.matchName?.trim();
-    if (!name || c.terminal !== 'identified') {
+    const fresh = isFreshIdentified(c);
+    if (!name || !fresh) {
       unresolved.push({
         index: c.benchmarkIndex,
         predicted: c.matchName,
         terminal: c.terminal,
-        reason: c.terminal === 'identified' ? 'missing-name' : c.terminal,
+        reason:
+          c.terminal === 'identified' && !fresh
+            ? 'stale-or-unowned-identity'
+            : c.terminal === 'identified'
+              ? 'missing-name'
+              : c.terminal,
       });
       continue;
     }

@@ -17,6 +17,15 @@ export const STABILITY_MAX_AREA_CHANGE = 0.1;
 /** How many recent detections must agree before we lock. */
 export const STABILITY_WINDOW = 3;
 
+/**
+ * High-confidence FAST_ACCEPT may lock after this many agreeing samples
+ * (still ≥1). Does not weaken low-confidence scenes.
+ */
+export const STABILITY_WINDOW_FAST = 2;
+
+/** Detector score at/above which FAST stability window applies. */
+export const STABILITY_FAST_MIN_SCORE = 0.88;
+
 /** Robust lock: AABB IoU vs previous tracked quad (same physical card). */
 export const STABILITY_MIN_IOU = 0.78;
 

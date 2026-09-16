@@ -1,0 +1,21 @@
+{
+  "name": "lugin-visual-recognizer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native on-device CLIP ViT-B/32 + F16 full-gallery visual retrieval for Lugin (Expo Modules). Identity only — no printing.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "keywords": [
+    "expo",
+    "react-native",
+    "lugin",
+    "clip",
+    "onnx"
+  ],
+  "license": "UNLICENSED",
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

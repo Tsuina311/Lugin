@@ -6,6 +6,16 @@ import type { DetectionDebug } from '../detection/types';
 import { emptyDetectionDebug } from '../detection/types';
 import { foldName } from '../matchName';
 import {
+  emptySingleCardCaptureState,
+  isGeometryV2Pipeline,
+  markFirstCaptureField,
+  NORMAL_PRODUCTION_PROFILE,
+  tickSingleCardCapture,
+  type SingleCardCaptureState,
+  type SingleCardCaptureDerivedMs,
+  deriveSingleCardCaptureMs,
+} from '../singleCardCapture';
+import {
   CAPTURE_REPLACE_MAX,
   DETECT_MIN_SCORE,
   DETECT_STALE_MS,
@@ -22,6 +32,11 @@ import {
   STABILITY_MAX_CORNER_MOVE,
   STABILITY_WINDOW,
 } from '../params';
+import {
+  channelToRecognizeOptions,
+  channelUsesTitleFastPath,
+  getRecognitionChannel,
+} from '../recognitionChannel';
 import {
   CARD_HEIGHT,
   CARD_WIDTH,
@@ -284,12 +299,22 @@ export interface FrameHelpers {
   } | null;
   /** Drop a frozen hi-res cache so the next refine uses a newer tracked quad. */
   invalidateCapture?: (reason: string) => void;
+  /**
+   * Soft-reset continuity geometry for a new cardSession while keeping
+   * geometryTrackId (force-adopt next raw corners).
+   */
+  softResetGeometry?: (reason: string) => void;
   /** Debug/trace: every attempt crop, including failures. */
   /** Frozen hi-res source + source-space recognition quad. Lab/live parity. */
   getFrozenRecognitionInput?: () => {
     captureAt: number | null;
+    /** Session that owned the capture request — never retagged at read time. */
+    captureCardSessionId?: number | null;
+    captureId?: number | null;
     recognitionQuad: CardCorners;
     source: ScanImage;
+    /** Pre-warped card from capture — skip a second warp in recognize. */
+    warped?: ScanImage | null;
   } | null;
   /** Persist last live attempt for Lab replay (source + hashes + live result). */
   onCanonicalRecognition?: (info: {
@@ -364,11 +389,38 @@ export interface SessionSnapshot {
   userLatency?: SessionUserLatency;
   /** Lock → hi-res → recognize → retry counters (trace 0016). */
   postLock?: PostLockDebug;
+  /** geometry-v2 shared capture controller state (null when legacy pipeline). */
+  singleCardCapture?: {
+    phase: string;
+    captureSafe: boolean;
+    userMessage: string;
+    frozenQuad: CardCorners | null;
+    agreeingStreak: number;
+    pipeline: 'legacy' | 'geometry-v2';
+    derivedMs: SingleCardCaptureDerivedMs | null;
+    lastResetReason?: string | null;
+    candidateSwitchCount?: number;
+    longestStableCandidateRunFrames?: number;
+    incumbentHeld?: boolean;
+    quadSelectionSource?: string | null;
+    quadSelectionScore?: number | null;
+    captureLockedAt?: number | null;
+  } | null;
 }
 
 export interface SessionController {
-  /** Last locked/recognized normalized card, if any (for corpus / debug). */
+  /** Last locked/recognized normalized card owned by the CURRENT card session. */
   lastNormalized(): ScanImage | null;
+  /** Session id that owns lastNormalized, or null if cleared. */
+  lastNormalizedCardSessionId(): number | null;
+  /** Provenance of the last capture/recognition input hashes. */
+  lastCaptureProvenance(): {
+    captureCardSessionId: number | null;
+    captureId: number | null;
+    sourceImageHash: string | null;
+    warpedCardHash: string | null;
+    titleCropHash: string | null;
+  };
   onFrame(frame: ScanImage, helpers?: FrameHelpers): Promise<SessionSnapshot>;
   recognizeStill(frame: ScanImage): Promise<SessionSnapshot>;
   /**
@@ -396,6 +448,26 @@ export interface SessionController {
    * geometryTrackId sticky. Resets focus + recognition budget.
    */
   markDebugCardSwapped(): void;
+  /**
+   * Verified Scan: while true, pause acquisition + Card Change Watch advancement.
+   * Recognition already in flight may finish; no new capture/session from watch.
+   */
+  setVerifiedHold(hold: boolean): void;
+  isVerifiedHold(): boolean;
+  /**
+   * Arm recognition only after the captured warp is on-screen (Geometry-style).
+   * Hold alone freezes acquisition; recognize waits for this flag.
+   */
+  setVerifiedRecognizeReady(ready: boolean): void;
+  /**
+   * Explicit NEXT / ADD+NEXT / RETAKE session boundary for Verified Scan.
+   * Mints a fresh cardSessionId and clears hold so acquisition resumes.
+   */
+  verifiedAdvance(
+    reason: 'verified-next' | 'verified-add-next' | 'verified-retake',
+  ): SessionSnapshot;
+  /** Re-run canonical recognition from the current frozen warp (no new snapshot). */
+  retryFrozenRecognition(helpers?: FrameHelpers): Promise<SessionSnapshot>;
   reset(): void;
   snapshot(): SessionSnapshot;
 }
@@ -533,6 +605,13 @@ export const createSessionController = (
   let recognizing = false;
   let message = 'Place a card in view';
   let lastNormalized: ScanImage | null = null;
+  /** Session that last wrote lastNormalized — null when cleared. */
+  let lastNormalizedCardSessionId: number | null = null;
+  /** Most recent FrameHelpers — used to invalidate hi-res on beginCardSession. */
+  let activeHelpers: FrameHelpers | undefined;
+  let captureIdSeq = 0;
+  let lastCaptureId: number | null = null;
+  let lastCaptureCardSessionId: number | null = null;
   let lastFrame: ScanImage | null = null;
   let lastLockGates: LockGates = emptyLockGates();
   let phaseTimeline: PhaseTransition[] = [];
@@ -566,6 +645,14 @@ export const createSessionController = (
   let changeWatchProbePending = false;
   let lastSessionIdentity: string | null = null;
   let previousSessionIdentity: string | null = null;
+  /** geometry-v2 shared acquisition (null-op when legacy). */
+  let v2Capture: SingleCardCaptureState = emptySingleCardCaptureState();
+  /**
+   * Verified Scan hold — set after a successful warp while CAPTURED/RESULT is open.
+   * Blocks Card Change Watch beginSession and further geometry-v2 acquisition.
+   */
+  let verifiedHold = false;
+  let verifiedRecognizeReady = false;
   let highResRequests = 0;
   let highResSuccess = 0;
   let highResFailure = 0;
@@ -656,29 +743,40 @@ export const createSessionController = (
     phase = next;
   };
 
-  const snap = (): SessionSnapshot => ({
+  const snap = (): SessionSnapshot => {
+    const ownsPublishedResult =
+      resultCardSessionId != null && resultCardSessionId === cardSessionId;
+    // Failure/OCR diagnostics for the current session only when nothing is published yet.
+    // Never expose prior-session FOUND/AMBIGUOUS as the live phase.
+    const showRecognitionSurfaces = ownsPublishedResult || resultCardSessionId == null;
+    const publicPhase: ScannerPhase =
+      !ownsPublishedResult && (phase === 'found' || phase === 'ambiguous')
+        ? isGeometryV2Pipeline()
+          ? 'detected'
+          : 'focusing'
+        : phase;
+    const v2Active = isGeometryV2Pipeline();
+    return {
     analysisSize,
     cardChangeWatch: snapshotCardChangeWatch(changeWatch),
-    corners: latestCorners(track) ?? foundCorners,
+    corners: (v2Active ? v2Capture.frozenQuad : null) ?? latestCorners(track) ?? foundCorners,
     detection: lastDetection,
-    earlyShownAt,
-    finalIdentityAt,
-    fused:
-      resultCardSessionId != null && resultCardSessionId !== cardSessionId
-        ? undefined
-        : lastFused,
+    earlyShownAt: ownsPublishedResult ? earlyShownAt : null,
+    finalIdentityAt: ownsPublishedResult ? finalIdentityAt : null,
+    fused: ownsPublishedResult ? lastFused : undefined,
     lockGates: lastLockGates,
-    lockedAt,
-    message,
+    lockedAt: ownsPublishedResult ? lockedAt : null,
+    message: ownsPublishedResult
+      ? message
+      : publicPhase === 'focusing' && (phase === 'found' || phase === 'ambiguous' || !ownsPublishedResult)
+        ? 'New card…'
+        : message,
     motion: trackMotion(track),
-    phase,
+    phase: publicPhase,
     phaseTimeline,
-    printingShownAt,
+    printingShownAt: ownsPublishedResult ? printingShownAt : null,
     quality: lastQuality,
-    recognition:
-      resultCardSessionId != null && resultCardSessionId !== cardSessionId
-        ? undefined
-        : lastRecognition,
+    recognition: ownsPublishedResult ? lastRecognition : undefined,
     recognizeInvocations,
     recognizingStartedAt,
     resultCardSessionId,
@@ -688,14 +786,46 @@ export const createSessionController = (
     temporal,
     trackFrames: track.history.length,
     userLatency: userLatency(),
-    postLock: buildPostLock(),
-  });
+    postLock: buildPostLock(showRecognitionSurfaces, ownsPublishedResult),
+    singleCardCapture: v2Active
+      ? {
+          phase: v2Capture.phase,
+          captureSafe: v2Capture.captureSafe,
+          userMessage: v2Capture.userMessage,
+          frozenQuad: v2Capture.frozenQuad,
+          agreeingStreak: v2Capture.lock.agreeingStreak,
+          pipeline: 'geometry-v2' as const,
+          derivedMs: deriveSingleCardCaptureMs(v2Capture.timing),
+          lastResetReason: v2Capture.lastResetReason,
+          candidateSwitchCount: v2Capture.incumbent.candidateSwitchCount,
+          longestStableCandidateRunFrames: v2Capture.incumbent.longestStableRun,
+          incumbentHeld: v2Capture.lastTelemetry?.incumbentHeld ?? false,
+          quadSelectionSource: v2Capture.quadSelectionSource,
+          quadSelectionScore: v2Capture.quadSelectionScore,
+          captureLockedAt: v2Capture.timing.captureLockedAt,
+        }
+      : {
+          phase: 'legacy',
+          captureSafe: false,
+          userMessage: '',
+          frozenQuad: null,
+          agreeingStreak: 0,
+          pipeline: 'legacy' as const,
+          derivedMs: null,
+        },
+  };
+  };
 
-  const buildPostLock = (): PostLockDebug => {
+  const buildPostLock = (
+    showRecognitionSurfaces = true,
+    ownsPublishedResult = true,
+  ): PostLockDebug => {
     const latest = latestCorners(track);
     const used = quadActuallyUsedForWarp ?? quadUsedForHighRes;
     const iou =
       used && latest ? compareQuads(used, latest).iou : used && quadAtLock ? compareQuads(used, quadAtLock).iou : null;
+    const ownedTitle = ownsPublishedResult;
+    const showStatus = showRecognitionSurfaces;
     return {
       ...emptyPostLock(),
       attemptNumber: attemptNumberForTrack,
@@ -710,7 +840,7 @@ export const createSessionController = (
       latestTrackedQuadAtCapture: latest ?? latestTrackedQuadAtCapture,
       lockCommittedAt,
       lockEligibleAt,
-      phaseAfterRecognition,
+      phaseAfterRecognition: ownedTitle ? phaseAfterRecognition : null,
       postLockStall,
       quadAtCaptureRequest,
       quadAtLock,
@@ -725,23 +855,23 @@ export const createSessionController = (
       recognitionCropCreatedAt,
       recognitionCropHeight,
       recognitionCropWidth,
-      recognitionStatus,
+      recognitionStatus: showStatus ? recognitionStatus : null,
       recognizeCompletedAt,
       recognizeInvocations,
       recognizeStartedAt: recognizingStartedAt,
-      resultPublishedAt,
+      resultPublishedAt: ownedTitle ? resultPublishedAt : null,
       retryReason,
       retryScheduledAt,
       titleOcrCompletedAt,
       titleOcrSubmittedAt,
-      titleDecode: lastTitleDecode,
-      titleMargin: lastTitleDecode?.titleMargin ?? null,
-      titleRawText,
-      titleScore,
-      titleSecondScore: lastTitleDecode?.titleSecondScore ?? null,
-      titleTopCandidate,
-      titleTopScore: lastTitleDecode?.titleTopScore ?? null,
-      variantConsensusCount: lastTitleDecode?.consensusCount ?? null,
+      titleDecode: ownedTitle ? lastTitleDecode : null,
+      titleMargin: ownedTitle ? lastTitleDecode?.titleMargin ?? null : null,
+      titleRawText: showStatus ? titleRawText : null,
+      titleScore: ownedTitle ? titleScore : null,
+      titleSecondScore: ownedTitle ? lastTitleDecode?.titleSecondScore ?? null : null,
+      titleTopCandidate: ownedTitle ? titleTopCandidate : null,
+      titleTopScore: ownedTitle ? lastTitleDecode?.titleTopScore ?? null : null,
+      variantConsensusCount: ownedTitle ? lastTitleDecode?.consensusCount ?? null : null,
       trackHoldReason: lastDetection.trackHoldReason ?? null,
       trackUpdateReason: lastDetection.trackUpdateReason ?? lastDetection.continuityReason ?? null,
       trackedQuadUpdatedAt: lastDetection.trackedQuadUpdatedAt ?? null,
@@ -763,8 +893,8 @@ export const createSessionController = (
       duplicateUploadsSuppressed,
       activeRecognitionAttemptId,
       recognitionResolvedAt,
-      recognitionReturnedName,
-      recognitionReturnedStatus,
+      recognitionReturnedName: showStatus ? recognitionReturnedName : null,
+      recognitionReturnedStatus: showStatus ? recognitionReturnedStatus : null,
       resultAccepted,
       resultApplicationPending,
       resultRejectReason,
@@ -842,7 +972,15 @@ export const createSessionController = (
       lockCommittedAt,
       lockEligibleAt,
       postLockStall,
-      recognitionStatus,
+      // Never advertise FOUND/AMBIGUOUS via gates without ownership.
+      recognitionStatus:
+        resultCardSessionId != null && resultCardSessionId === cardSessionId
+          ? recognitionStatus
+          : recognitionStatus === 'found' ||
+              recognitionStatus === 'ambiguous' ||
+              recognitionStatus === 'identified'
+            ? null
+            : recognitionStatus,
       retryReason,
       retryScheduledAt,
       ...partial,
@@ -865,6 +1003,8 @@ export const createSessionController = (
   /**
    * New physical card session. Keeps geometryTrackId / continuity sticky.
    * Resets focus lifecycle + recognize retry budget owned by the card session.
+   * Clears CURRENT-session published identity surfaces so session B cannot
+   * inherit FOUND/ambiguous from session A (same geometry track is allowed).
    */
   const beginCardSession = (
     reason: CardSessionResetReason,
@@ -895,7 +1035,19 @@ export const createSessionController = (
     foundDescriptor = null;
     foundCorners = null;
     lastNormalized = null;
+    lastNormalizedCardSessionId = null;
+    lastCaptureId = null;
+    lastCaptureCardSessionId = null;
+    // GeometryTrackId may stay sticky across physical cards, but SessionController
+    // stability history must not mix A and B samples (DETECTED_NEVER_STABLE cause).
+    track = emptyTrack();
+    // Drop frozen hi-res / analysis pixels owned by the previous session.
+    // Geometry track may stay sticky; recognition pixels must not.
+    activeHelpers?.invalidateCapture?.(`card session reset (${reason})`);
+    // Continuity soft-reset: keep track.id, force-adopt next raw corners.
+    activeHelpers?.softResetGeometry?.(`card session reset (${reason})`);
     resetFocusAttempt();
+    v2Capture = emptySingleCardCaptureState(performance.now());
     recognizingStartedAt = null;
     earlyShownAt = null;
     lockedAt = null;
@@ -926,6 +1078,22 @@ export const createSessionController = (
     resultRejectReason = null;
     postLockStall = false;
     lastForwardProgressAt = null;
+    // Identity surfaces that peekLive / UI might otherwise treat as live.
+    titleRawText = null;
+    titleTopCandidate = null;
+    titleScore = null;
+    lastTitleDecode = null;
+    recognitionReturnedName = null;
+    recognitionReturnedStatus = null;
+    activeRecognitionAttemptId = null;
+    recognitionResolvedAt = null;
+    // Leave FOUND/AMBIGUOUS so B is not terminal until fresh evidence owns it.
+    if (phase === 'found' || phase === 'ambiguous') {
+      setPhase(isGeometryV2Pipeline() ? 'detected' : 'focusing', `card session reset (${reason})`);
+      message = 'New card…';
+    }
+    // Publish new cardSessionId / cleared ownership immediately (do not wait for next frame).
+    lastLockGates = fillGates({ waiting: `card session reset (${reason})` });
   };
 
   const clearLock = () => {
@@ -936,6 +1104,7 @@ export const createSessionController = (
     lastFused = undefined;
     lastRecognition = undefined;
     lastNormalized = null;
+    lastNormalizedCardSessionId = null;
     resetFocusAttempt();
     recognizingStartedAt = null;
     earlyShownAt = null;
@@ -1045,9 +1214,29 @@ export const createSessionController = (
   const applyIdentity = (
     result: RecognizeResult,
     card: PreparedCard,
-    opts: { provisional?: boolean } = {},
+    opts: { provisional?: boolean; owningSessionId?: number } = {},
   ) => {
+    const owning = opts.owningSessionId ?? cardSessionId;
+    if (owning !== cardSessionId) {
+      resultAccepted = false;
+      resultRejectReason = 'stale-session';
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn(
+          `[session] refused FOUND/AMBIGUOUS for session ${owning}; current is ${cardSessionId}`,
+        );
+      }
+      return;
+    }
     const status = result.fused.status;
+    if (
+      (status === 'identified' || status === 'printing-ambiguous' || status === 'card-ambiguous') &&
+      cardSessionId == null
+    ) {
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn('[session] refused terminal publish without cardSessionId');
+      }
+      return;
+    }
     const nowMs = performance.now();
     recordTitleFromResult(result);
     if (status === 'identified' || status === 'printing-ambiguous') {
@@ -1072,6 +1261,12 @@ export const createSessionController = (
       finishAttempt(status === 'identified' ? 'identified' : 'printing-ambiguous');
       setPhase('found', opts.provisional ? 'early identity' : 'final identity');
       phaseAfterRecognition = 'found';
+      if (isGeometryV2Pipeline()) {
+        v2Capture = {
+          ...v2Capture,
+          timing: markFirstCaptureField(v2Capture.timing, 'foundAt', performance.now()),
+        };
+      }
       message = result.fused.card?.name ?? 'Identified';
       foundCorners = card.corners;
       foundDescriptor = artDescriptor(card);
@@ -1100,6 +1295,8 @@ export const createSessionController = (
         ocrDebug: result.ocrDebug ? titleOcrDebugWithoutImages(result.ocrDebug) : undefined,
       };
       lastFused = result.fused;
+      resultCardSessionId = cardSessionId;
+      resultPossiblyStale = false;
       finishAttempt('card-ambiguous');
       setPhase('ambiguous', 'card-ambiguous');
       phaseAfterRecognition = 'ambiguous';
@@ -1172,10 +1369,12 @@ export const createSessionController = (
 
   /** Live: empty track means the card left. Frozen one-shot: keep hashes. */
   const settleFailedRecognition = (retryLabel?: string) => {
-    if (frozenCaptureActive) {
-      const why = retryLabel ?? 'frozen capture';
-      setPhase('locking', why);
-      phaseAfterRecognition = 'locking';
+    // Verified Scan / frozen capture: keep pixels; do not auto-recapture.
+    if (verifiedHold || frozenCaptureActive) {
+      const why = retryLabel ?? (frozenCaptureActive ? 'frozen capture' : 'verified recognition failed');
+      setPhase('ambiguous', why);
+      phaseAfterRecognition = 'ambiguous';
+      message = "Couldn't identify automatically";
       retryScheduledAt = null;
       retryReason = why;
       lastLockGates = fillGates({
@@ -1216,6 +1415,7 @@ export const createSessionController = (
   };
 
   const strongTitleAlreadyPublished = (): boolean => {
+    if (resultCardSessionId == null || resultCardSessionId !== cardSessionId) return false;
     if (resultPublishedAt == null || !lastFused?.card) return false;
     if (lastFused.status !== 'identified' && lastFused.status !== 'printing-ambiguous') {
       return false;
@@ -1238,15 +1438,67 @@ export const createSessionController = (
     helpers?: FrameHelpers,
     opts: { changeWatchProbe?: boolean; force?: boolean; titleOnly?: boolean } = {},
   ): Promise<void> => {
+    if (helpers) activeHelpers = helpers;
     if (recognizing) return;
     const changeWatchProbe = opts.changeWatchProbe === true;
     const bypassPublished = changeWatchProbe || opts.force === true;
     if (!bypassPublished && strongTitleAlreadyPublished()) return;
 
-    const frozen = helpers?.getFrozenRecognitionInput?.() ?? null;
-    const source = frozen?.source ?? card.image;
+    /** Session that owns this in-flight attempt — reject apply if cardSessionId advances. */
+    const owningSessionId = cardSessionId;
+    const owningAttemptId = attemptIdSeq + 1;
+
+    const rejectStaleSession = (where: string): boolean => {
+      if (cardSessionId === owningSessionId) return false;
+      resultAccepted = false;
+      resultRejectReason = 'stale-session';
+      resultApplicationPending = false;
+      // Late result for session A must NOT wipe session B's published surfaces.
+      // Only retire this in-flight attempt if it is still the active one.
+      if (currentAttempt?.id === owningAttemptId) {
+        finishAttempt('insufficient-confidence');
+      }
+      lastLockGates = fillGates({
+        waiting: `stale-session · dropped attempt ${owningAttemptId} owned ${owningSessionId} now ${cardSessionId} (${where})`,
+      });
+      return true;
+    };
+
+    // Capture ownership: never recognize with pixels from another card session.
+    const frozenRaw = helpers?.getFrozenRecognitionInput?.() ?? null;
+    let frozen = frozenRaw;
+    if (frozen) {
+      const capSession = frozen.captureCardSessionId;
+      if (capSession != null && capSession !== owningSessionId) {
+        helpers?.invalidateCapture?.('stale-capture-session');
+        frozen = null;
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.warn(
+            `[session] rejected frozen capture owned by ${capSession}; current ${owningSessionId}`,
+          );
+        }
+      }
+    }
+    if (frozen) {
+      if (frozen.captureId != null) lastCaptureId = frozen.captureId;
+      lastCaptureCardSessionId = frozen.captureCardSessionId ?? owningSessionId;
+    } else {
+      // already-warped / refine path: owned by the current session only.
+      // Never inherit a rejected capture's id into B's provenance.
+      lastCaptureCardSessionId = owningSessionId;
+      if (
+        frozenRaw != null &&
+        frozenRaw.captureCardSessionId != null &&
+        frozenRaw.captureCardSessionId !== owningSessionId
+      ) {
+        lastCaptureId = null;
+      }
+    }
+
+    const warped = frozen?.warped ?? null;
+    const source = warped ?? frozen?.source ?? card.image;
     const recognitionQuad = frozen?.recognitionQuad ?? card.corners ?? null;
-    const alreadyWarped = frozen == null;
+    const alreadyWarped = warped != null || frozen == null;
     const recognitionHash = hashScanImage(source);
     const titleCropHash = alreadyWarped
       ? hashScanImage(extractTitleCrop(source).image)
@@ -1315,6 +1567,7 @@ export const createSessionController = (
     setPhase('recognizing', changeWatchProbe ? 'change-watch identity probe' : 'recognizeCapturedCard');
     message = changeWatchProbe ? 'Checking new card…' : 'Recognizing…';
     lastNormalized = alreadyWarped ? card.image : lastNormalized;
+    if (alreadyWarped) lastNormalizedCardSessionId = owningSessionId;
     focusingSince = null;
     lastLockGates = fillGates({
       blocker: 'recognizing',
@@ -1324,7 +1577,63 @@ export const createSessionController = (
     const titleOnly = opts.titleOnly === true;
     let attemptOcrDebug: TitleOcrDebug | null = null;
     let captured: CapturedRecognitionResult | null = null;
+    const channel = getRecognitionChannel();
+    const useTitleFastPath = channelUsesTitleFastPath(channel) || titleOnly;
     try {
+      // ART / BOTH / EDITION: primary multi-channel path (skip title-only fast path).
+      if (!useTitleFastPath) {
+        const warp =
+          alreadyWarped
+            ? source
+            : recognitionQuad
+              ? warpQuadToCard(source, cornersToQuad(recognitionQuad))
+              : card.image;
+        lastNormalized = warp;
+        lastNormalizedCardSessionId = owningSessionId;
+        recognitionCropWidth = warp.width;
+        recognitionCropHeight = warp.height;
+        if (recognitionQuad) quadActuallyUsedForWarp = recognitionQuad;
+        warpedCardHash = hashScanImage(warp);
+        titleOcrSubmittedAt = performance.now();
+        const recOpts: RecognizeOptions = {
+          preferSets: context.preferSets,
+          ...deps.recognizeOptions?.(),
+          ...channelToRecognizeOptions(channel),
+        };
+        const { result, temporal: nextTemp } = await recognizeCard(
+          warp,
+          {
+            ...deps,
+            onEarlyIdentity: provisional => {
+              if (rejectStaleSession('early-identity-channel')) return;
+              if (!bypassPublished && strongTitleAlreadyPublished()) return;
+              earlyApplied = true;
+              earlyShownAt = performance.now();
+              applyIdentity(provisional, { ...card, image: warp }, {
+                provisional: true,
+                owningSessionId,
+              });
+              deps.onEarlyIdentity?.(provisional);
+            },
+          },
+          recOpts,
+          temporal,
+        );
+        temporal = nextTemp;
+        attemptOcrDebug = result.ocrDebug ?? null;
+        recognitionResolvedAt = performance.now();
+        recognitionReturnedStatus = result.fused.status;
+        recognitionReturnedName = result.fused.card?.name ?? null;
+        titleOcrCompletedAt = recognitionResolvedAt;
+        recordTitleFromResult(result);
+        resultAccepted = true;
+        resultRejectReason = null;
+        if (rejectStaleSession('after-channel-recognize')) return;
+        if (!bypassPublished && strongTitleAlreadyPublished()) return;
+        applyIdentity(result, { ...card, image: warp }, { owningSessionId });
+        return;
+      }
+
       titleOcrSubmittedAt = performance.now();
       captured = await recognizeCapturedCard({
         alreadyWarped,
@@ -1345,11 +1654,14 @@ export const createSessionController = (
       warpedCardHash = captured.hashes.warpedCardHash;
       titleCropHashLive = captured.hashes.titleCropHash;
       titleOcrCompletedAt = recognitionResolvedAt;
-      titleRawText = captured.ocrText || null;
-      titleTopCandidate = captured.matchName;
-      titleScore = captured.matchScore;
-      lastTitleDecode = captured.titleDecode;
-      if (captured.warp) lastNormalized = captured.warp;
+      // Do not write identity surfaces until ownership is confirmed (rejectStaleSession).
+      const pendingTitleRaw = captured.ocrText || null;
+      const pendingTitleTop = captured.matchName;
+      const pendingTitleScore = captured.matchScore;
+      if (captured.warp) {
+        lastNormalized = captured.warp;
+        lastNormalizedCardSessionId = owningSessionId;
+      }
       if (captured.warpQuad) quadActuallyUsedForWarp = captured.warpQuad;
       recognitionCropWidth = captured.warp?.width ?? recognitionCropWidth;
       recognitionCropHeight = captured.warp?.height ?? recognitionCropHeight;
@@ -1375,6 +1687,11 @@ export const createSessionController = (
         });
         return;
       }
+      if (rejectStaleSession('after-accept')) return;
+      titleRawText = pendingTitleRaw;
+      titleTopCandidate = pendingTitleTop;
+      titleScore = pendingTitleScore;
+      lastTitleDecode = captured.titleDecode;
 
       if (
         captured.status === 'ocr-unavailable' ||
@@ -1394,6 +1711,7 @@ export const createSessionController = (
       }
 
       if (captured.status === 'identified') {
+        if (rejectStaleSession('identified')) return;
         const rec = capturedToRecognizeResult(captured);
         const prepared = {
           ...card,
@@ -1402,79 +1720,13 @@ export const createSessionController = (
         };
         earlyApplied = true;
         earlyShownAt = performance.now();
-        applyIdentity(rec, prepared, { provisional: false });
+        applyIdentity(rec, prepared, { provisional: false, owningSessionId });
         deps.onEarlyIdentity?.(rec);
         return;
       }
 
-      const canFallback =
-        !titleOnly &&
-        Boolean(deps.artwork || deps.artworkIndex || deps.printingIndex);
-      if (canFallback) {
-        const warp = captured.warp ?? card.image;
-        const recOpts: RecognizeOptions = {
-          preferSets: context.preferSets,
-          ...deps.recognizeOptions?.(),
-        };
-        const { result, temporal: nextTemp } = await recognizeCard(
-          warp,
-          {
-            ...deps,
-            onEarlyIdentity: provisional => {
-              if (!bypassPublished && strongTitleAlreadyPublished()) return;
-              earlyApplied = true;
-              earlyShownAt = performance.now();
-              applyIdentity(provisional, { ...card, image: warp }, { provisional: true });
-              deps.onEarlyIdentity?.(provisional);
-            },
-          },
-          recOpts,
-          temporal,
-        );
-        temporal = nextTemp;
-        attemptOcrDebug = result.ocrDebug ?? null;
-        if (attemptOcrDebug) {
-          attemptOcrDebug.sameInputAsPreviousAttempt = false;
-          attemptOcrDebug.sourceAttemptId = currentAttempt?.id ?? null;
-        }
-        if (!bypassPublished && strongTitleAlreadyPublished()) return;
-        if (earlyApplied && lastFused) {
-          const same =
-            (lastFused.card?.oracleId &&
-              lastFused.card.oracleId === result.fused.card?.oracleId) ||
-            (lastFused.card?.name && lastFused.card.name === result.fused.card?.name);
-          if (!same && stronglyContradictsEarly(lastFused, result.fused)) {
-            if (isStrongTitleOnly(lastFused) && !isStrongTitleOnly(result.fused)) {
-              finishAttempt(
-                lastFused.status === 'identified' ? 'identified' : 'printing-ambiguous',
-              );
-            } else {
-              applyIdentity(result, { ...card, image: warp });
-            }
-          } else if (!same) {
-            lastRecognition = {
-              ...result,
-              earlyIdentity: true,
-              earlyReason: lastRecognition?.earlyReason ?? result.earlyReason ?? null,
-              fused: lastFused,
-            };
-            if (finalIdentityAt == null) finalIdentityAt = performance.now();
-            finishAttempt(
-              lastFused.status === 'identified'
-                ? 'identified'
-                : lastFused.status === 'printing-ambiguous'
-                  ? 'printing-ambiguous'
-                  : 'insufficient-confidence',
-            );
-          } else {
-            applyIdentity(result, { ...card, image: warp });
-          }
-        } else {
-          applyIdentity(result, { ...card, image: warp });
-        }
-      } else {
-        applyCapturedFailure(captured, card);
-      }
+      // OCR_ONLY: no art/footer fallback — switch channel to BOTH/ART/EDITION for those.
+      applyCapturedFailure(captured, card);
       if (recognitionStatus === 'ocr-empty') {
         lastEmptyRecognitionHash = recognitionHash;
         lastEmptyTitleCropHash = titleCropHash;
@@ -1570,9 +1822,21 @@ export const createSessionController = (
   };
 
   return {
-    lastNormalized: () => lastNormalized,
+    lastNormalized: () =>
+      lastNormalizedCardSessionId != null && lastNormalizedCardSessionId === cardSessionId
+        ? lastNormalized
+        : null,
+    lastNormalizedCardSessionId: () => lastNormalizedCardSessionId,
+    lastCaptureProvenance: () => ({
+      captureCardSessionId: lastCaptureCardSessionId,
+      captureId: lastCaptureId,
+      sourceImageHash,
+      warpedCardHash,
+      titleCropHash: titleCropHashLive,
+    }),
 
     async onFrame(frame, helpers) {
+      if (helpers) activeHelpers = helpers;
       lastFrame = frame;
       analysisSize = { height: frame.height, width: frame.width };
       detectorAttempts += 1;
@@ -1584,6 +1848,53 @@ export const createSessionController = (
         cornerOrderCorrections += 1;
       }
       const cornerOrderValid = !rawCorners || !corners || sameNamedCorners(rawCorners, corners);
+
+      // Verified Scan: after capture, pause acquisition + change-watch advancement.
+      // Recognition kicks only after the warp preview is painted (Geometry-style).
+      if (verifiedHold) {
+        if (
+          verifiedRecognizeReady &&
+          !recognizing &&
+          phase !== 'found' &&
+          phase !== 'ambiguous' &&
+          attemptNumberForTrack < RECOGNIZE_MAX_ATTEMPTS
+        ) {
+          const frozen = helpers?.getFrozenRecognitionInput?.() ?? null;
+          const warp = lastNormalized;
+          const quad =
+            frozen?.recognitionQuad ??
+            foundCorners ??
+            v2Capture.frozenQuad ??
+            (corners && prepared.detected ? corners : null);
+          if (frozen || (warp && quad)) {
+            setPhase('recognizing', 'verified hold — start recognition');
+            message = 'Identifying…';
+            const card: PreparedCard = {
+              corners: quad!,
+              detected: true,
+              detection: lastDetection,
+              image: frozen?.warped ?? frozen?.source ?? warp!,
+              score: prepared.score || 1,
+              source: 'detected',
+            };
+            void runRecognize(card, helpers, { force: true });
+          }
+        }
+        lastLockGates = fillGates({
+          cornerOrderValid,
+          detectorScore: prepared.score,
+          geometryDetected: Boolean(prepared.detected && corners),
+          recognitionPending: recognizing,
+          waiting: recognizing
+            ? 'verified hold — identifying'
+            : phase === 'found' || phase === 'ambiguous'
+              ? 'verified hold — result'
+              : verifiedRecognizeReady
+                ? 'verified hold'
+                : 'verified hold — showing capture',
+        });
+        return snap();
+      }
 
       if (!prepared.detected || !corners || prepared.score < DETECT_MIN_SCORE) {
         detectorMisses += 1;
@@ -1792,6 +2103,162 @@ export const createSessionController = (
           recognitionPending: true,
           sharpness: lastQuality.sharpness,
           waiting: 'recognition running',
+        });
+        return snap();
+      }
+
+      // ——— geometry-v2: Geometry-style capture (no per-card AF / stability wait) ———
+      if (isGeometryV2Pipeline()) {
+        const nowV2 = performance.now();
+        if (v2Capture.timing.cardSessionStartedAt == null) {
+          v2Capture = {
+            ...v2Capture,
+            timing: { ...v2Capture.timing, cardSessionStartedAt: nowV2 },
+          };
+        }
+        const tick = tickSingleCardCapture(
+          v2Capture,
+          {
+            now: nowV2,
+            score: prepared.score,
+            corners,
+            frame: analysisSize,
+          },
+          NORMAL_PRODUCTION_PROFILE,
+        );
+        v2Capture = tick.state;
+        message = tick.state.userMessage || message;
+
+        if (tick.decision === 'locked' && tick.state.frozenQuad) {
+          const lockQuad = tick.state.frozenQuad;
+          if (lockEligibleAt == null) lockEligibleAt = nowV2;
+          if (lockedAt == null) {
+            lockedAt = nowV2;
+            lockCommittedAt = nowV2;
+            quadAtLock = lockQuad;
+            highResRequests += 1;
+            lastForwardProgressAt = nowV2;
+            v2Capture = {
+              ...v2Capture,
+              snapshotRequested: true,
+              timing: markFirstCaptureField(v2Capture.timing, 'captureRequestedAt', nowV2),
+            };
+          }
+          setPhase('locking', 'geometry-v2 capture locked');
+          const report = helpers?.captureReport?.();
+          if (report) {
+            if (report.success > highResSuccess || report.failure > highResFailure) {
+              lastForwardProgressAt = nowV2;
+            }
+            highResSuccess = report.success;
+            highResFailure = report.failure;
+            lastHighResError = report.error;
+            highResCaptureStartedAt = report.startedAt ?? highResCaptureStartedAt;
+            highResCaptureCompletedAt = report.completedAt ?? highResCaptureCompletedAt;
+            if (report.completedAt != null) {
+              v2Capture = {
+                ...v2Capture,
+                snapshotDone: true,
+                timing: markFirstCaptureField(v2Capture.timing, 'captureDoneAt', report.completedAt),
+              };
+            }
+            if (report.corners) {
+              quadUsedForHighRes = report.corners;
+              if (quadAtCaptureRequest == null) quadAtCaptureRequest = report.corners;
+            }
+          } else if (captureReady) {
+            highResSuccess = Math.max(highResSuccess, 1);
+          }
+
+          const recognitionQuad =
+            selectRecognitionQuad({
+              frame: analysisSize,
+              rawQuad: lastDetection.rawCorners ?? prepared.corners,
+              trackingQuad: lockQuad,
+            }).recognitionQuad ?? lockQuad;
+          const mayStart =
+            !recognizing &&
+            attemptNumberForTrack < RECOGNIZE_MAX_ATTEMPTS &&
+            (captureReady || (helpers?.allowRecognize?.() ?? false));
+
+          if (mayStart && helpers?.allowRecognize && !helpers.allowRecognize()) {
+            message = 'CAPTURING';
+            lastLockGates = fillGates({
+              blocker: 'awaiting-hires',
+              cornerOrderValid,
+              detectorScore: prepared.score,
+              focusOk: true,
+              focusKind: 'ready',
+              geometryDetected: true,
+              highResEligible: true,
+              qualityGating: false,
+              qualityInput,
+              qualityOk: true,
+              qualityScore: lastQuality.score,
+              sharpness: lastQuality.sharpness,
+              waiting: 'geometry-v2 requesting snapshot',
+            });
+            return snap();
+          }
+
+          if (mayStart) {
+            const bestCard =
+              captureReady && refined
+                ? refined
+                : {
+                    ...prepared,
+                    corners: recognitionQuad ?? lockQuad,
+                  };
+            v2Capture = {
+              ...v2Capture,
+              timing: markFirstCaptureField(v2Capture.timing, 'recognitionStartedAt', nowV2),
+            };
+            setPhase('recognizing', 'geometry-v2 pixels ready');
+            message = 'Reading…';
+            void runRecognize(bestCard, helpers, { force: true });
+            lastLockGates = fillGates({
+              blocker: 'recognizing',
+              geometryDetected: true,
+              highResEligible: true,
+              recognitionPending: true,
+              waiting: 'geometry-v2 recognition',
+            });
+            return snap();
+          }
+
+          lastLockGates = fillGates({
+            blocker: 'awaiting-hires',
+            cornerOrderValid,
+            detectorScore: prepared.score,
+            focusOk: true,
+            focusKind: 'ready',
+            geometryDetected: true,
+            highResEligible: true,
+            waiting: 'geometry-v2 capture',
+          });
+          return snap();
+        }
+
+        // Not locked yet — live polygon via corners; wait for CAPTURE_SAFE + confirm.
+        setPhase(
+          tick.state.phase === 'confirming' ? 'locking' : 'detected',
+          tick.state.captureSafe ? 'geometry-v2 confirming' : 'geometry-v2 not capture-safe',
+        );
+        lastLockGates = fillGates({
+          blocker: tick.state.captureSafe ? 'stability' : 'clipped',
+          consecutiveStable: tick.state.lock.agreeingStreak,
+          cornerOrderValid,
+          detectorScore: prepared.score,
+          focusOk: true,
+          focusKind: 'ready',
+          geometryDetected: true,
+          highResEligible: tick.state.captureSafe,
+          qualityGating: false,
+          qualityInput: 'none',
+          qualityOk: true,
+          qualityScore: lastQuality.score,
+          sharpness: lastQuality.sharpness,
+          waiting: tick.state.userMessage || 'geometry-v2',
         });
         return snap();
       }
@@ -2210,6 +2677,7 @@ export const createSessionController = (
                 };
           quadActuallyUsedForWarp = card.corners ?? recognitionQuad;
           lastNormalized = card.image;
+          lastNormalizedCardSessionId = cardSessionId;
           lastLockGates = fillGates({
             bestFrame: pool.length > 0,
             bestFrameSource: qualityInput,
@@ -2273,6 +2741,7 @@ export const createSessionController = (
             };
       quadActuallyUsedForWarp = card.corners ?? corners;
       lastNormalized = card.image;
+      lastNormalizedCardSessionId = cardSessionId;
       await runRecognize(card, helpers, { force: true });
       return snap();
     },
@@ -2285,6 +2754,7 @@ export const createSessionController = (
       lastDetection = prepared.detection;
       lastQuality = frameQualityScore(prepared.image, prepared.score);
       lastNormalized = prepared.image;
+      lastNormalizedCardSessionId = cardSessionId;
       if (prepared.corners) {
         track = pushTrack(track, sampleFromQuad(prepared.corners, prepared.score));
         track = { ...track, stable: true };
@@ -2321,6 +2791,8 @@ export const createSessionController = (
           ...input.helpers,
           getFrozenRecognitionInput: () => ({
             captureAt: input.captureAt ?? null,
+            captureCardSessionId: cardSessionId,
+            captureId: null,
             recognitionQuad: input.recognitionQuad,
             source: input.source,
           }),
@@ -2362,6 +2834,8 @@ export const createSessionController = (
       resultCardSessionId = null;
       resultPossiblyStale = false;
       changeWatchProbePending = false;
+      verifiedHold = false;
+      verifiedRecognizeReady = false;
     },
 
     mintDebugFocusAttempt() {
@@ -2397,6 +2871,61 @@ export const createSessionController = (
       message = 'New card (manual)…';
       resultPossiblyStale = false;
       lastLockGates = fillGates({ waiting: 'manual-swap-test' });
+    },
+
+    setVerifiedHold(hold) {
+      verifiedHold = hold;
+      if (!hold) verifiedRecognizeReady = false;
+    },
+
+    isVerifiedHold() {
+      return verifiedHold;
+    },
+
+    setVerifiedRecognizeReady(ready) {
+      verifiedRecognizeReady = ready;
+    },
+
+    verifiedAdvance(reason) {
+      verifiedHold = false;
+      verifiedRecognizeReady = false;
+      beginCardSession(reason);
+      setPhase(isGeometryV2Pipeline() ? 'detected' : 'focusing', `verified advance (${reason})`);
+      message = 'Place a card in view';
+      lastLockGates = fillGates({ waiting: `verified advance (${reason})` });
+      return snap();
+    },
+
+    async retryFrozenRecognition(helpers) {
+      const warp = lastNormalized;
+      const corners = foundCorners ?? v2Capture.frozenQuad ?? lastDetection.corners;
+      if (!warp || !corners) {
+        message = 'No frozen capture to retry';
+        return snap();
+      }
+      verifiedHold = true;
+      verifiedRecognizeReady = true;
+      setPhase('recognizing', 'verified retry recognition');
+      message = 'Identifying…';
+      const card: PreparedCard = {
+        corners,
+        detected: true,
+        detection: lastDetection,
+        image: warp,
+        score: 1,
+        source: 'detected',
+      };
+      await runRecognize(card, {
+        ...helpers,
+        getFrozenRecognitionInput: () => ({
+          captureAt: highResCaptureCompletedAt,
+          captureCardSessionId: lastCaptureCardSessionId ?? cardSessionId,
+          captureId: lastCaptureId,
+          recognitionQuad: corners,
+          source: warp,
+        }),
+      }, { force: true });
+      return snap();
     },
 
     snapshot: snap,

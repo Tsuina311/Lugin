@@ -1469,6 +1469,9 @@ const AddCardBox = ({
 
   const add = (name: string): void => {
     onPick(name);
+    // Keep filter / Scryfall-syntax searches open so you can click through many
+    // hits (t:god, type chips, …). Plain name lookups still clear for the next card.
+    if (keepSearchOpen(text)) return;
     setText('');
     setResp(null);
   };
@@ -1491,6 +1494,8 @@ const AddCardBox = ({
   const addSelected = (): void => {
     const byId = new Map(hits.map(c => [c.id, c.name] as const));
     onPickMany?.(selection.ids.map(id => byId.get(id) ?? '').filter(Boolean));
+    selection.clear();
+    if (keepSearchOpen(text)) return;
     setText('');
     setResp(null);
   };
@@ -1520,6 +1525,13 @@ const AddCardBox = ({
     (subtype.trim() ? 1 : 0) +
     (cmcMin ? 1 : 0) +
     (cmcMax ? 1 : 0);
+
+  /** True when the box is a filter/syntax harvest, not a one-off name add. */
+  function keepSearchOpen(q: string): boolean {
+    if (!filters) return false;
+    if (looksLikeSyntax(q.trim())) return true;
+    return types.size > 0 || !!subtype.trim() || !!cmcMin || !!cmcMax;
+  }
 
   const showImages = results.cards.length > 0 && results.total <= IMAGE_THRESHOLD;
 

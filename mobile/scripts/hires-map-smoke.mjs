@@ -128,6 +128,50 @@ try {
   );
   check('same-fov TR lands at dest TR', same.topRight.x === 592 && same.topRight.y === 0);
 
+  const {
+    mapCornersHiResToDetectorSameFov,
+    projectAnalysisQuadToSource,
+  } = await import(pathToFileURL(outfile).href);
+
+  const portraitDet = { width: 296, height: 640 };
+  const portraitSrc = { width: 1019, height: 1920 };
+  const edgeCard = {
+    topLeft: { x: 2, y: 4 },
+    topRight: { x: 290, y: 6 },
+    bottomRight: { x: 288, y: 630 },
+    bottomLeft: { x: 4, y: 628 },
+  };
+  const fwd = projectAnalysisQuadToSource(edgeCard, {
+    detector: portraitDet,
+    dest: portraitSrc,
+    kind: 'same-fov',
+  });
+  const roundEdge = mapCornersHiResToDetectorSameFov(fwd, portraitSrc, portraitDet);
+  check(
+    'analysis→source→analysis roundtrip (edge)',
+    ['topLeft', 'topRight', 'bottomRight', 'bottomLeft'].every(
+      k =>
+        Math.abs(roundEdge[k].x - edgeCard[k].x) < 1e-6 &&
+        Math.abs(roundEdge[k].y - edgeCard[k].y) < 1e-6,
+    ),
+  );
+  const centerCard = {
+    topLeft: { x: 80, y: 120 },
+    topRight: { x: 220, y: 120 },
+    bottomRight: { x: 220, y: 480 },
+    bottomLeft: { x: 80, y: 480 },
+  };
+  const fwdC = projectAnalysisQuadToSource(centerCard, {
+    detector: portraitDet,
+    dest: portraitSrc,
+    kind: 'same-fov',
+  });
+  const backC = mapCornersHiResToDetectorSameFov(fwdC, portraitSrc, portraitDet);
+  check(
+    'analysis→source→analysis roundtrip (center)',
+    Math.abs(backC.topLeft.x - centerCard.topLeft.x) < 1e-6,
+  );
+
   if (failures > 0) {
     console.error(`hires-map smoke: ${failures} check(s) failed`);
     process.exit(1);

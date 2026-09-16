@@ -48,6 +48,7 @@ export type {
 export {
   emptyContinuity,
   measureContinuity,
+  softResetContinuityForNewCardSession,
   stepContinuity,
 } from '@/lib/scan/detection/continuity';
 export type { CardSource, PreparedCard } from '@/lib/scan/prepareCard';
