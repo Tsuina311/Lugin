@@ -2,10 +2,18 @@
 //
 //   yarn scan:art-index
 //   node scripts/build-art-index.mjs --out dist-web/art-index.json --limit 500
+//   node scripts/build-art-index.mjs --out dist-web/art-index.json \
+//     --base .art-index-cache/art-index.json \
+//     --fallback-url https://tsuina311.github.io/Lugin/art-index.json
 //
 // Downloads art_crop images temporarily, computes descriptors, and writes ONLY
 // the compact index (no card imagery). Source images are never committed.
+//
+// A previous index (--base, then --fallback-url) supplies descriptors for
+// illustration ids that already exist. Only new art is downloaded. A change to
+// ARTWORK_DESCRIPTOR_VERSION ignores the previous index and rebuilds it.
 
+import { loadReusableArt } from './art-index-incremental.mjs';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -52,9 +60,13 @@ await build({
   platform: 'neutral',
   tsconfigRaw: { compilerOptions: { paths: { '@/*': [`${root}src/*`] } } },
 });
-const { describeArtwork, tokenizeScanText, ARTWORK_REGION, cropImage } = await import(
-  pathToFileURL(bundle).href,
-);
+const {
+  describeArtwork,
+  tokenizeScanText,
+  ARTWORK_REGION,
+  cropImage,
+  ARTWORK_DESCRIPTOR_VERSION,
+} = await import(pathToFileURL(bundle).href);
 
 // pngjs + jpeg-js: Scryfall art_crop URLs are JPEG; local fixture caches may be PNG.
 const { PNG } = require('pngjs');
@@ -117,6 +129,56 @@ const seenArt = new Set();
 const entries = [];
 const textEntries = [];
 
+const pushText = card => {
+  const text = card.printed_text || card.oracle_text || card._text || '';
+  const oracleId = card.oracle_id ?? card._oracle;
+  if (!text || !oracleId) return;
+  textEntries.push({
+    name: card.name?.split(' // ')[0] ?? card.expectedName ?? card.name,
+    oracleId,
+    tokens: [...new Set(tokenizeScanText(text))].slice(0, 40),
+  });
+};
+
+/** Previous production index. A file that fails the reuse check falls through to the URL. */
+const previousArt = async () => {
+  const candidates = [];
+  const base = arg('base');
+  if (base) candidates.push({ from: base, kind: 'file' });
+  const fallback = arg('fallback-url');
+  if (fallback) candidates.push({ from: fallback, kind: 'url' });
+  for (const candidate of candidates) {
+    let payload = null;
+    try {
+      if (candidate.kind === 'file') {
+        if (!existsSync(candidate.from)) continue;
+        payload = JSON.parse(await readFile(candidate.from, 'utf8'));
+      } else {
+        const res = await fetch(candidate.from, { headers: { 'User-Agent': AGENT } });
+        if (!res.ok) {
+          console.warn(`previous index ${candidate.from}: ${res.status}`);
+          continue;
+        }
+        payload = await res.json();
+      }
+    } catch (err) {
+      console.warn(
+        `previous index ${candidate.from}: ${err instanceof Error ? err.message : err}`,
+      );
+      continue;
+    }
+    const loaded = loadReusableArt(payload, ARTWORK_DESCRIPTOR_VERSION);
+    if (loaded.reason) {
+      console.warn(`skip ${candidate.from}: ${loaded.reason}`);
+      continue;
+    }
+    console.log(`reusing ${loaded.entries.size} artwork descriptors from ${candidate.from}`);
+    return loaded.entries;
+  }
+  if (candidates.length) console.log('no reusable artwork index; downloading every image');
+  return new Map();
+};
+
 /** Fixture-scoped index: prefer local PNGs, else Scryfall art_crop (JPEG). */
 const buildFromFixtures = async () => {
   const manifest = JSON.parse(await readFile(MANIFEST, 'utf8'));
@@ -167,6 +229,9 @@ const buildFromFixtures = async () => {
 if (fromFixtures) {
   await buildFromFixtures();
 } else {
+const previous = await previousArt();
+let reused = 0;
+let downloaded = 0;
 const uri = await defaultCardsUri();
 const res = await fetch(uri, { headers: { 'User-Agent': AGENT } });
 if (!res.ok || !res.body) throw new Error(`dump: ${res.status}`);
@@ -175,7 +240,6 @@ const lines = createInterface({
   input: Readable.fromWeb(res.body).pipe(createGunzip()),
 });
 
-let considered = 0;
 for await (const line of lines) {
   if (!line.trim()) continue;
   let card;
@@ -193,8 +257,16 @@ for await (const line of lines) {
   const key = illustrationId || card.id;
   if (seenArt.has(key)) continue;
   seenArt.add(key);
-  considered += 1;
   if (limit && entries.length >= limit) break;
+
+  const cached = previous.get(key);
+  if (cached) {
+    entries.push(cached);
+    pushText(card);
+    reused += 1;
+    if (reused % 5000 === 0) console.log(`… reused ${reused}, downloaded ${downloaded}`);
+    continue;
+  }
 
   try {
     const scanImg = await loadRemoteImage(artUrl);
@@ -208,27 +280,27 @@ for await (const line of lines) {
       scryfallId: card.id,
       setCode: card.set,
     });
-    const text = card.printed_text || card.oracle_text || '';
-    if (text && card.oracle_id) {
-      textEntries.push({
-        name: card.name?.split(' // ')[0] ?? card.name,
-        oracleId: card.oracle_id,
-        tokens: [...new Set(tokenizeScanText(text))].slice(0, 40),
-      });
-    }
-    if (entries.length % 50 === 0) {
-      console.log(`… ${entries.length} art entries`);
+    pushText(card);
+    downloaded += 1;
+    if (downloaded % 50 === 0) {
+      console.log(`… reused ${reused}, downloaded ${downloaded}`);
       await new Promise(r => setTimeout(r, 80)); // polite to CDN
     }
   } catch (err) {
     console.warn(`skip ${card.id}: ${err instanceof Error ? err.message : err}`);
   }
 }
+console.log(`artwork index reused ${reused}, downloaded ${downloaded}`);
 } // end bulk path
 
 await mkdir(dirname(out), { recursive: true });
 const payload = {
-  art: { entries, generated: new Date().toISOString(), version: 1 },
+  art: {
+    descriptorVersion: ARTWORK_DESCRIPTOR_VERSION,
+    entries,
+    generated: new Date().toISOString(),
+    version: 1,
+  },
   text: { entries: textEntries, version: 1 },
 };
 await writeFile(out, JSON.stringify(payload));

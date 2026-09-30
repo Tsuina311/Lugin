@@ -20,6 +20,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: read
   id-token: write
   pages: write
@@ -52,7 +53,7 @@ jobs:
         run: yarn typecheck
 
       - name: Shared tests (import, prices, scan unit, corpus unit, sync)
-        run: yarn test:import && yarn test:prices && yarn test:scan && yarn test:corpus && yarn test:sync
+        run: yarn test:import && yarn test:prices && yarn test:art-index && yarn test:scan && yarn test:corpus && yarn test:sync
 
       - name: Web smoke
         run: yarn test:web
@@ -127,9 +128,37 @@ jobs:
       # Production art index — unique illustrations from Scryfall (~20–30k).
       # NEVER ship --from-fixtures here: native/web scanners load this URL and a
       # 20-entry fixture index produces confident wrong identities.
-      - name: Artwork index (full)
+      # Saved descriptors are copied. Only illustration ids missing from the
+      # previous index download an image. The cache is the last successful
+      # index; the live site is the fallback when Actions has no cache yet.
+      - name: Restore artwork index
+        id: art-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .art-index-cache/art-index.json
+          key: art-index-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            art-index-
+
+      - name: Artwork index (incremental)
+        id: art-index
         continue-on-error: true
-        run: node scripts/build-art-index.mjs --out dist-web/art-index.json
+        run: >
+          node scripts/build-art-index.mjs
+          --out dist-web/art-index.json
+          --base .art-index-cache/art-index.json
+          --fallback-url https://tsuina311.github.io/${{ github.event.repository.name }}/art-index.json
+
+      - name: Keep artwork index for the next deploy
+        if: steps.art-index.outcome == 'success'
+        run: mkdir -p .art-index-cache && cp dist-web/art-index.json .art-index-cache/art-index.json
+
+      - name: Save artwork index
+        if: steps.art-index.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: .art-index-cache/art-index.json
+          key: art-index-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Printing index (full)
         continue-on-error: true

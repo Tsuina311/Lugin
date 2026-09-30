@@ -10,6 +10,13 @@ import type { ScanImage } from '../types';
 /** Fixed artwork analysis size — keeps descriptors comparable across sources. */
 export const ART_SIZE = 32;
 
+/**
+ * Bump when `describeArtwork` changes. The art-index build re-downloads every
+ * image only when this no longer matches the saved index. Same number means
+ * a stored descriptor is still what a live scan would compute.
+ */
+export const ARTWORK_DESCRIPTOR_VERSION = 1;
+
 export interface ArtworkDescriptor {
   /** 64-bit difference hash as two uint32s (portable JSON). */
   dhash: [number, number];

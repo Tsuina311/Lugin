@@ -12,9 +12,14 @@ export interface ArtworkIndexEntry {
 }
 
 export interface ArtworkIndexData {
+  /**
+   * Algorithm stamp from `ARTWORK_DESCRIPTOR_VERSION`. Absent on indexes built
+   * before incremental reuse; those match version 1.
+   */
+  descriptorVersion?: number;
   entries: ArtworkIndexEntry[];
   generated?: string;
-  /** Schema version — bump when descriptor layout changes. */
+  /** Schema version — bump when the entry shape changes. */
   version: number;
 }
 
