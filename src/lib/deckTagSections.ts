@@ -52,18 +52,31 @@ export interface TagSectionBucket {
 /**
  * Partition main-deck cards into ordered tag buckets, then leftover main.
  * Commander / sideboard are left to the caller.
+ *
+ * `overrides` (cardKey → tag id, or `""` for Main) wins over Scryfall matching.
  */
 export const bucketMainByTagSections = async (
   mainCards: readonly DeckCard[],
   tagSectionIds: readonly string[],
   signal?: AbortSignal,
+  overrides?: Readonly<Record<string, string>>,
 ): Promise<{ buckets: TagSectionBucket[]; rest: DeckCard[] }> => {
   const ids = tagSectionIds.filter(id => deckTagById(id));
   if (ids.length === 0) return { buckets: [], rest: [...mainCards] };
 
   const names = mainCards.map(c => c.name);
-  /** cardKey -> first matching tag id */
+  /** cardKey -> tag id, or '' for forced Main */
   const assigned = new Map<string, string>();
+
+  if (overrides) {
+    for (const card of mainCards) {
+      const key = cardKey(card.name);
+      if (!Object.prototype.hasOwnProperty.call(overrides, key)) continue;
+      const ov = overrides[key];
+      if (ov === '' || !ids.includes(ov)) assigned.set(key, '');
+      else assigned.set(key, ov);
+    }
+  }
 
   for (const tagId of ids) {
     if (signal?.aborted) break;

@@ -5,6 +5,7 @@ import { useWideLayout } from '../useWideLayout';
 
 import { Badge } from './Badge';
 import { Button } from './Button';
+import { CartConsolidation } from './CartConsolidation';
 import { EmptyState } from './EmptyState';
 import { FavouriteSellerBadge, FavouriteSellerControl } from './FavouriteSellerControl';
 import { IconButton } from './IconButton';
@@ -26,6 +27,7 @@ import {
   cmToken,
   rememberWriteToken,
 } from '@/content/session';
+import { sellerShipPrefsStore } from '@/content/sellerShipPrefsStore';
 import { shippingStore } from '@/content/shippingStore';
 import { cardKey } from '@/lib/cardName';
 import { removeArticleFromCart } from '@/sites/cardmarket/cart';
@@ -105,7 +107,10 @@ const shippingEstimate = (
   if (fromId == null || shipping.toCountry == null) return null;
   const matrix = shipping.matrices[fromId];
   if (!matrix?.length) return null;
-  return estimateShipping(matrix, cardCount, goodsValue)?.method.price ?? null;
+  const requireTracked = sellerShipPrefsStore.get(bucket.seller)?.requireTracked === true;
+  return (
+    estimateShipping(matrix, cardCount, goodsValue, { requireTracked })?.method.price ?? null
+  );
 };
 
 /** How much shipping drops if this line is removed (null if unknown or unchanged). */
@@ -202,8 +207,12 @@ const bucketForItem = (bySeller: SellerBucket[], item: CartItem): SellerBucket |
   bySeller.find(b => b.lines.some(l => l.articleId === item.articleId));
 
 /** Current estimated shipping € for a seller bucket, or null if unknown. */
-const useSellerShipPrice = (bucket: SellerBucket): number | null => {
+const useSellerShipPrice = (
+  bucket: SellerBucket,
+  actualShip?: number | null,
+): number | null => {
   const shipping = useSyncExternalStore(shippingStore.subscribe, shippingStore.getSnapshot);
+  if (actualShip != null) return actualShip;
   return shippingEstimate(bucket, bucket.count, bucket.total, shipping);
 };
 
@@ -227,14 +236,47 @@ const ShippingSaveHint = ({
 );
 
 /** Current shipping as a single amount — next tier only in the hover title. */
-const SellerShipStrip = ({ bucket }: { bucket: SellerBucket }) => {
+const SellerShipStrip = ({
+  bucket,
+  actualShip,
+}: {
+  bucket: SellerBucket;
+  /** Cardmarket-implied postage when we can peel it from the header total. */
+  actualShip?: number | null;
+}) => {
   const shipping = useSyncExternalStore(shippingStore.subscribe, shippingStore.getSnapshot);
+  const prefs = useSyncExternalStore(
+    sellerShipPrefsStore.subscribe,
+    sellerShipPrefsStore.getSnapshot,
+  );
   const fromId = countryId(bucket.sellerCountry) ?? null;
   const matrix = fromId != null ? shipping.matrices[fromId] : undefined;
-  const tiers = useMemo(() => (matrix ? shippingTiers(matrix) : []), [matrix]);
+  const requireTracked = prefs[bucket.seller.toLowerCase()]?.requireTracked === true;
+  const estimate =
+    matrix && matrix.length > 0
+      ? estimateShipping(matrix, bucket.count, bucket.total, { requireTracked })
+      : null;
+  const tiers = useMemo(
+    () => (matrix ? shippingTiers(requireTracked ? matrix.filter(m => m.isTracked) : matrix) : []),
+    [matrix, requireTracked],
+  );
   const { current, next } = adjacentTiers(tiers, bucket.count);
   const pending = fromId != null && shipping.pending.includes(fromId);
   const error = fromId != null ? shipping.errors[fromId] : undefined;
+
+  // If CM's total implies much more postage than the untracked estimate, remember
+  // tracked-only so future estimates match.
+  useEffect(() => {
+    if (actualShip == null || !matrix?.length || requireTracked) return;
+    const cheap = estimateShipping(matrix, bucket.count, bucket.total)?.method.price;
+    const tracked = estimateShipping(matrix, bucket.count, bucket.total, {
+      requireTracked: true,
+    })?.method.price;
+    if (cheap == null || tracked == null) return;
+    if (actualShip > cheap + 1.5 && actualShip >= tracked - 1) {
+      void sellerShipPrefsStore.note(bucket.seller, { requireTracked: true });
+    }
+  }, [actualShip, bucket.count, bucket.seller, bucket.total, matrix, requireTracked]);
 
   const route =
     fromId != null && shipping.toCountry != null
@@ -247,7 +289,9 @@ const SellerShipStrip = ({ bucket }: { bucket: SellerBucket }) => {
   if (fromId == null) {
     return <span className="text-[10px] text-ink-faint">—</span>;
   }
-  if (!current) {
+
+  const displayPrice = actualShip ?? estimate?.method.price ?? current?.price;
+  if (displayPrice == null) {
     return (
       <span className="text-[10px] text-ink-faint" title={route}>
         {error ? <span className="text-neg">{error}</span> : pending ? (
@@ -259,9 +303,15 @@ const SellerShipStrip = ({ bucket }: { bucket: SellerBucket }) => {
     );
   }
 
+  const methodLabel = estimate?.method.name ?? current?.name;
+  const tracked = requireTracked || estimate?.method.isTracked || current?.isTracked;
   const title = [
     route,
-    `Tier up to ${current.maxCards} cards`,
+    actualShip != null ? `Cardmarket cart implies ${formatEuro(actualShip)}` : null,
+    methodLabel
+      ? `${methodLabel}${tracked ? ' (tracked)' : ''}${actualShip == null ? ' ≈' : ''}`
+      : null,
+    current ? `Tier up to ${current.maxCards} cards` : null,
     next
       ? `Next: ${formatEuro(next.price)} up to ${next.maxCards} cards` +
         (next.isTracked ? ' (tracked)' : '')
@@ -272,14 +322,24 @@ const SellerShipStrip = ({ bucket }: { bucket: SellerBucket }) => {
 
   return (
     <span className="tabular-nums text-ink" title={title}>
-      {formatEuro(current.price)}
+      {formatEuro(displayPrice)}
+      {tracked ? <span className="ml-0.5 text-[8px] text-ink-faint">tracked</span> : null}
+      {actualShip == null && estimate ? (
+        <span className="text-[8px] text-ink-faint"> ≈</span>
+      ) : null}
     </span>
   );
 };
 
 /** Goods+shipping for the overview total column. */
-const SellerTotalCell = ({ bucket }: { bucket: SellerBucket }) => {
-  const ship = useSellerShipPrice(bucket);
+const SellerTotalCell = ({
+  bucket,
+  actualShip,
+}: {
+  bucket: SellerBucket;
+  actualShip?: number | null;
+}) => {
+  const ship = useSellerShipPrice(bucket, actualShip);
   const combined = ship != null ? bucket.total + ship : bucket.total;
   const title =
     ship != null
@@ -527,6 +587,19 @@ export const CartPanel = () => {
       ),
     [cart.items, favourites],
   );
+
+  /**
+   * When the cart is a single seller, Cardmarket's header total − goods is the
+   * real postage (often tracked-only, higher than our untracked estimate).
+   */
+  const actualShipBySeller = useMemo(() => {
+    const out = new Map<string, number>();
+    if (bySeller.length !== 1 || cart.totalValue == null) return out;
+    const only = bySeller[0];
+    const implied = Math.round((cart.totalValue - only.total) * 100) / 100;
+    if (implied > 0.05) out.set(only.seller, implied);
+    return out;
+  }, [bySeller, cart.totalValue]);
   /** Same card added more than once — any seller, any duplicate lines. */
   const duplicates = useMemo(() => byCard.filter(g => g.lines.length > 1), [byCard]);
 
@@ -619,6 +692,20 @@ export const CartPanel = () => {
     if (!keep) return;
     const extras = group.lines.filter(l => l.articleId !== keep.articleId);
     void removeMany(extras);
+  };
+
+  const emptyCart = () => {
+    const lines = [...cart.items];
+    if (lines.length === 0) return;
+    if (
+      !window.confirm(
+        `Empty the cart? This removes ${lines.length} line${lines.length === 1 ? '' : 's'} on Cardmarket.`,
+      )
+    ) {
+      return;
+    }
+    setTab(OVERVIEW);
+    void removeMany(lines);
   };
 
   const removeSeller = async (bucket: SellerBucket) => {
@@ -737,6 +824,15 @@ export const CartPanel = () => {
           onClick={() => void cartStore.refresh()}
           size="sm"
         />
+        {cart.items.length > 0 && (
+          <IconButton
+            icon={Trash2}
+            label="Empty cart"
+            onClick={emptyCart}
+            size="sm"
+            tone="danger"
+          />
+        )}
       </div>
 
       {cart.items.length === 0 ? (
@@ -758,6 +854,8 @@ export const CartPanel = () => {
           <div className="min-h-0 flex-1 overflow-auto">
             {tab === OVERVIEW ? (
               <>
+                <CartConsolidation />
+
                 {duplicates.length > 0 ? (
                   <>
                     <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b border-line bg-panel px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
@@ -797,6 +895,7 @@ export const CartPanel = () => {
                 {bySeller.map(bucket => {
                   const fav = isFavourite(undefined, bucket.seller);
                   const shipSave = bestRemoveSaving(bucket, shipping);
+                  const actualShip = actualShipBySeller.get(bucket.seller) ?? null;
                   return (
                     <div
                       key={bucket.seller}
@@ -837,7 +936,7 @@ export const CartPanel = () => {
                         </span>
                       )}
                       <span className="text-right tabular-nums">
-                        <SellerShipStrip bucket={bucket} />
+                        <SellerShipStrip actualShip={actualShip} bucket={bucket} />
                         {shipSave ? (
                           <span
                             className="ml-0.5 block text-[9px] font-medium text-pos"
@@ -854,7 +953,7 @@ export const CartPanel = () => {
                       <span className="text-right tabular-nums text-ink-faint">
                         {bucket.count} · {formatEuro(bucket.total)}
                       </span>
-                      <SellerTotalCell bucket={bucket} />
+                      <SellerTotalCell actualShip={actualShip} bucket={bucket} />
                       <IconButton
                         icon={Trash2}
                         label={`Remove all cards from ${bucket.seller}`}
@@ -890,7 +989,10 @@ export const CartPanel = () => {
                     ) : null}
                   </span>
                   <span className="flex-none text-[10px] tabular-nums text-ink-faint">
-                    <SellerShipStrip bucket={activeSeller} />
+                    <SellerShipStrip
+                      actualShip={actualShipBySeller.get(activeSeller.seller) ?? null}
+                      bucket={activeSeller}
+                    />
                   </span>
                   <span className="flex-none text-[10px] tabular-nums text-ink-faint">
                     {activeSeller.count} · {formatEuro(activeSeller.total)}

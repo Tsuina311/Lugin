@@ -12,25 +12,45 @@ export const MIN_SEARCH_LENGTH = 3;
 
 const ACTION = 'Product_Search';
 const SEPARATOR = '***';
-/** The XOR counter's first value. */
-const XOR_SEED = 0x58;
+/** The XOR counter's first value for Product_Search. */
+export const SEARCH_XOR_SEED = 0x58;
+/**
+ * Shopping Wizard `StartCalculation` uses a different seed than search — captured
+ * 2026-09 against Wantslist_ShoppingWizard_StartCalculation.
+ */
+export const WIZARD_XOR_SEED = 0x73;
 
 /** RFC 3986 unreserved set — everything else goes out as %XX. */
 const UNRESERVED = /[A-Za-z0-9\-._~]/;
 
 /**
  * Scramble the action + token half of `args`: each character XORed with a
- * counter starting at 0x58 and stepping by one.
+ * counter starting at `seed` and stepping by one.
  *
  * Involutive, so running the output back through it returns the input — which
  * is how the format was read in the first place.
  */
-export const obfuscate = (plain: string): string => {
+export const obfuscate = (plain: string, seed: number = SEARCH_XOR_SEED): string => {
   let out = '';
   for (let i = 0; i < plain.length; i++) {
-    out += String.fromCharCode((plain.charCodeAt(i) ^ ((XOR_SEED + i) & 0xff)) & 0xff);
+    out += String.fromCharCode((plain.charCodeAt(i) ^ ((seed + i) & 0xff)) & 0xff);
   }
   return out;
+};
+
+/**
+ * Build a percent-encoded `args` body: obfuscate(`action***token`) + `***` +
+ * base64(JSON). Field order in `json` is load-bearing — pass an object literal
+ * in the order Cardmarket sends.
+ */
+export const buildAjaxArgs = (
+  action: string,
+  token: string,
+  json: string,
+  seed: number = SEARCH_XOR_SEED,
+): string => {
+  const scrambled = obfuscate(`${action}${SEPARATOR}${token}`, seed);
+  return encodeArgs(`${scrambled}${SEPARATOR}${btoa(json)}`);
 };
 
 /**

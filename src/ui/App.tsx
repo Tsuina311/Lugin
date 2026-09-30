@@ -285,6 +285,9 @@ export const App = () => {
     void cartStore.refresh();
     taskQueue.init();
     sessionStore.init();
+    // After captcha / login handoff, bring the panel back if we asked to reopen.
+    reopenOverlayIfPending();
+    setView(readView());
 
     return () => {
       unsubSession();
@@ -305,6 +308,7 @@ export const App = () => {
       } catch {
         /* ignore */
       }
+      window.dispatchEvent(new Event('lugin:overlay-restored'));
     }
     try {
       localStorage.setItem(VIEW_KEY, view);
@@ -381,7 +385,7 @@ export const App = () => {
   // Panels are always mounted (visibility toggled with `hidden`) so state — and
   // any active page filter — persists across tab switches and while hidden.
   const panelClass = (active: boolean, extra = '') =>
-    active ? `min-h-0 flex-1 ${extra}` : 'hidden';
+    active ? `flex min-h-0 flex-1 flex-col overflow-hidden ${extra}` : 'hidden';
 
   return (
     <div data-lugin-theme={theme} style={{ display: 'contents' }}>
@@ -416,9 +420,9 @@ export const App = () => {
           // `pointer-events-auto`: the host ignores the mouse so the page stays
           // usable; only this panel (and the restore button above) catch it.
           view === 'full'
-            ? 'pointer-events-auto fixed inset-0 z-[2147483000] flex h-screen w-screen flex-col overflow-hidden bg-canvas text-ink shadow-panel'
+            ? 'pointer-events-auto fixed inset-0 z-[2147483000] flex h-screen w-screen flex-col overflow-hidden overscroll-none bg-canvas text-ink shadow-panel'
             : view === 'panel'
-              ? `pointer-events-auto fixed top-0 z-[2147483000] flex h-screen w-full flex-col overflow-hidden bg-canvas text-ink shadow-panel ${
+              ? `pointer-events-auto fixed top-0 z-[2147483000] flex h-screen w-full flex-col overflow-hidden overscroll-none bg-canvas text-ink shadow-panel ${
                   side === 'left' ? 'left-0 border-r border-line' : 'right-0 border-l border-line'
                 }`
               : 'hidden'

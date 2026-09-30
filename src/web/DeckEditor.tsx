@@ -51,6 +51,7 @@ import { TagsPanel } from '@/ui/components/TagsPanel';
 import { EdhrecPanel } from '@/ui/components/EdhrecPanel';
 import { GoldfishPanel } from '@/ui/components/GoldfishPanel';
 import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
+import { DeckCardTagMove } from '@/ui/components/DeckCardTagMove';
 
 const SECTIONS: readonly { id: DeckSection; label: string }[] = [
   { id: 'commander', label: 'Commander' },
@@ -204,6 +205,11 @@ export const DeckEditor = ({
     if (!commanderRecs && COMMANDER_PANELS.has(panel)) setPanel('deck');
   }, [commanderRecs, panel]);
 
+  const edhrecDeckCards = useMemo(
+    () => deck.cards.filter(card => card.section === 'main').map(card => ({ name: card.name })),
+    [deck.cards],
+  );
+
   const inDeck = useMemo(() => {
     const map: Record<string, number> = {};
     for (const card of deck.cards) {
@@ -230,7 +236,12 @@ export const DeckEditor = ({
     let cancelled = false;
     const controller = new AbortController();
     setTagBucketsLoading(true);
-    void bucketMainByTagSections(main, tagSectionIds, controller.signal).then(result => {
+    void bucketMainByTagSections(
+      main,
+      tagSectionIds,
+      controller.signal,
+      deck.tagOverrides,
+    ).then(result => {
       if (cancelled) return;
       setTagBuckets(result.buckets);
       setMainRest(result.rest);
@@ -240,7 +251,7 @@ export const DeckEditor = ({
       cancelled = true;
       controller.abort();
     };
-  }, [deck.cards, tagSectionIds.join('|')]);
+  }, [deck.cards, deck.tagOverrides, tagSectionIds.join('|')]);
 
   const setTagSections = (next: string[]) => {
     void syncStore.updateDeck(deck.id, d => ({ ...d, tagSections: next }));
@@ -367,6 +378,17 @@ export const DeckEditor = ({
           : d.cards.map(c => (same(c, card) ? { ...c, quantity } : c)),
     }));
 
+  const setCardTagOverride = (name: string, tagId: string | null) => {
+    const key = cardKey(name);
+    void syncStore.updateDeck(deck.id, d => {
+      const next = { ...(d.tagOverrides ?? {}) };
+      if (tagId == null) delete next[key];
+      else next[key] = tagId;
+      const tagOverrides = Object.keys(next).length > 0 ? next : undefined;
+      return { ...d, tagOverrides };
+    });
+  };
+
   const addToMain = (names: string[]) => {
     const placed = names.map(name => ({ name, quantity: 1, section: 'main' as const }));
     void syncStore.updateDeck(deck.id, d => ({ ...d, cards: mergeDeckCards(d.cards, placed) }));
@@ -485,6 +507,7 @@ export const DeckEditor = ({
         <EdhrecPanel
           collectionByKey={collectionByKey}
           commanderNames={commanders}
+          deckCards={edhrecDeckCards}
           inDeck={inDeck}
           onAdd={addToMain}
         />
@@ -664,32 +687,57 @@ export const DeckEditor = ({
       ) : null}
 
       {(() => {
-        const renderCardList = (cards: DeckCard[]) =>
+        const renderCardList = (cards: DeckCard[], allowTagMove: boolean) =>
           view === 'box' ? (
             <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3">
-              {cards.map(card => (
-                <div key={rowKey(card)} className="flex flex-col gap-1">
-                  <CollectionThumb
-                    candidates={candidatesOf(card.name)}
-                    className="aspect-[488/680] w-full overflow-hidden rounded-lg bg-raised"
-                    imgStyle={{ objectPosition: '50% 17%' }}
-                    name={card.name}
-                    previewKey={`deck|box|${deck.id}|${rowKey(card)}`}
-                  />
-                  <span className="truncate text-xs text-ink" title={card.name}>
-                    {card.name}
-                  </span>
-                  <Stepper
-                    onChange={quantity => setQuantity(card, quantity)}
-                    quantity={card.quantity}
-                  />
-                </div>
-              ))}
+              {cards.map(card => {
+                const key = cardKey(card.name);
+                const ov = deck.tagOverrides;
+                const hasOv = ov != null && Object.prototype.hasOwnProperty.call(ov, key);
+                return (
+                  <div key={rowKey(card)} className="flex flex-col gap-1">
+                    <CollectionThumb
+                      candidates={candidatesOf(card.name)}
+                      className="aspect-[488/680] w-full overflow-hidden rounded-lg bg-raised"
+                      imgStyle={{ objectPosition: '50% 17%' }}
+                      name={card.name}
+                      previewKey={`deck|box|${deck.id}|${rowKey(card)}`}
+                    />
+                    <span className="truncate text-xs text-ink" title={card.name}>
+                      {card.name}
+                    </span>
+                    {allowTagMove && tagSectionIds.length > 0 && (
+                      <DeckCardTagMove
+                        onChange={tagId => setCardTagOverride(card.name, tagId)}
+                        override={hasOv ? ov![key] : undefined}
+                        tagSectionIds={tagSectionIds}
+                      />
+                    )}
+                    <div className="flex items-center gap-1">
+                      <Stepper
+                        onChange={quantity => setQuantity(card, quantity)}
+                        quantity={card.quantity}
+                      />
+                      <button
+                        aria-label={`Remove ${card.name}`}
+                        className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
+                        onClick={() => setQuantity(card, 0)}
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <ul className="divide-y divide-line">
               {cards.map(card => {
                 const key = rowKey(card);
+                const ck = cardKey(card.name);
+                const ov = deck.tagOverrides;
+                const hasOv = ov != null && Object.prototype.hasOwnProperty.call(ov, ck);
                 return (
                   <li key={key} className="flex items-center gap-2 px-2 py-1">
                     <CollectionThumb
@@ -698,6 +746,13 @@ export const DeckEditor = ({
                       previewKey={`deck|list|${deck.id}|${key}`}
                     />
                     <span className="min-w-0 flex-1 truncate text-sm text-ink">{card.name}</span>
+                    {allowTagMove && tagSectionIds.length > 0 && (
+                      <DeckCardTagMove
+                        onChange={tagId => setCardTagOverride(card.name, tagId)}
+                        override={hasOv ? ov![ck] : undefined}
+                        tagSectionIds={tagSectionIds}
+                      />
+                    )}
                     <Stepper
                       onChange={quantity => setQuantity(card, quantity)}
                       quantity={card.quantity}
@@ -765,7 +820,12 @@ export const DeckEditor = ({
                 </button>
               ) : null}
             </h2>
-            {block.cards.length > 0 ? renderCardList(block.cards) : null}
+            {block.cards.length > 0
+              ? renderCardList(
+                  block.cards,
+                  block.key === 'main' || block.key.startsWith('tag:'),
+                )
+              : null}
           </section>
         ));
       })()}

@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseE
 import { compareFavouriteFirst, useFavouriteSellers } from '../useFavouriteSellers';
 import { useWideLayout } from '../useWideLayout';
 
-import { AddCardToWant, wantListOptionsFrom } from './AddCardToWant';
 import { Badge } from './Badge';
 import { BestSellersForList } from './BestSellersForList';
 import { Button } from './Button';
@@ -22,6 +21,7 @@ import {
   Info,
   Library,
   Loader2,
+  Plus,
   ReceiptEuro,
   ShoppingCart,
   Sparkles,
@@ -697,6 +697,8 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
     baseUrl: string;
     name: string;
     profile: string;
+    /** Want list used to filter Singles when opened from Best Sellers. */
+    wantListId?: string;
   } | null>(null);
   const [browseFetchSeq, setBrowseFetchSeq] = useState(0);
   const scanSubjectRef = useRef(scanSubject);
@@ -774,7 +776,12 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
   };
 
   /** Load page 1 of a seller's singles stock; further pages on demand. */
-  const browseSeller = async (name: string, url?: string, cardQuery?: string) => {
+  const browseSeller = async (
+    name: string,
+    url?: string,
+    cardQuery?: string,
+    wantListId?: string,
+  ) => {
     searchAbort.current?.abort();
     setSearch(initialSearch);
 
@@ -798,7 +805,17 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
       return;
     }
 
-    setScanSubject({ baseUrl: resolved.baseUrl, name, profile: resolved.profile });
+    const listId = wantListId?.trim();
+    const baseUrl = listId
+      ? `${resolved.baseUrl}${resolved.baseUrl.includes('?') ? '&' : '?'}idWantslist=${encodeURIComponent(listId)}`
+      : resolved.baseUrl;
+
+    setScanSubject({
+      baseUrl,
+      name,
+      profile: resolved.profile,
+      ...(listId ? { wantListId: listId } : {}),
+    });
     setScan({ ...initialScan, browseLoading: true, status: 'scanning' });
     setBrowseFetchSeq(s => s + 1);
   };
@@ -835,6 +852,18 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
     }
     return m;
   }, [index, wantListName]);
+  const listWantQtys = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!index || !wantListId) return m;
+    for (const [key, entry] of Object.entries(index.cards)) {
+      const here = entry.placements?.find(p => p.listId === wantListId);
+      if (!here) continue;
+      if (here.quantityStatus === 'KNOWN' && here.amount != null && here.amount > 0) {
+        m.set(stripVersion(key), here.amount);
+      }
+    }
+    return m;
+  }, [index, wantListId]);
 
   // ---- Remove a purchase from all want lists (order page) ------------------
   // On `/Orders/<idShipment>` the site can clear everything bought in the order
@@ -888,10 +917,10 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
     }
   };
 
-  // ---- Add to want list (id-less rows, e.g. spoiler pages) -----------------
-  // Keyed by the card's product URL (the id-less rows we offer this on always
-  // carry one). Want lists come from the synced index when available, else a
-  // live fetch the first time a menu opens.
+  // ---- Add to want list (search hits + id-less offer rows) -----------------
+  // Keyed by a stable status key (product URL, optionally with |edition|).
+  // Want lists come from the synced index when available, else a live fetch the
+  // first time a menu opens.
   const [wantAdd, setWantAdd] = useState<
     Record<string, { listName?: string; msg?: string; status: 'adding' | 'added' | 'error' }>
   >({});
@@ -917,23 +946,19 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
     }
   };
 
-  // Add-to-want on this tab needs the list picker even before the user opens a menu.
-  useEffect(() => {
-    if (!index?.lists?.length) void ensureWantLists();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index?.lists?.length]);
-
-  const addToWantList = async (o: ScanMatch, list: { id: string; name: string }) => {
-    const url = o.productUrl;
-    if (!url) return;
+  const addProductToWantList = async (
+    statusKey: string,
+    opts: { href: string; productId?: string; specificEdition?: boolean; isFoil?: boolean },
+    list: { id: string; name: string },
+  ) => {
     setWantMenu(null);
-    setWantAdd(s => ({ ...s, [url]: { status: 'adding' } }));
+    setWantAdd(s => ({ ...s, [statusKey]: { status: 'adding' } }));
     try {
       const token = await cmToken();
       if (!token) {
         setWantAdd(s => ({
           ...s,
-          [url]: {
+          [statusKey]: {
             msg: 'Not signed in — sign in on Cardmarket, then retry.',
             status: 'error',
           },
@@ -941,28 +966,34 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
         askForLogin();
         return;
       }
+      const url = opts.href.startsWith('http')
+        ? opts.href
+        : `${location.origin}${opts.href.startsWith('/') ? '' : '/'}${opts.href}`;
       const ids = await fetchProductIds(url);
       if (!ids?.idMetacard)
         throw new Error('Couldn\u2019t find this card\u2019s id on Cardmarket.');
+      const idProduct = opts.productId?.trim() || ids.idProduct;
+      await pace();
       const r = await addWant(
         {
           idMetacard: ids.idMetacard,
           idWantsList: list.id,
-          isFoil: o.isFoil,
+          isFoil: opts.isFoil,
+          ...(opts.specificEdition && idProduct ? { idProduct } : {}),
           ...readWantDefaults(),
         },
         token,
       );
       setWantAdd(s => ({
         ...s,
-        [url]: r.ok
+        [statusKey]: r.ok
           ? { listName: list.name, status: 'added' }
           : { msg: r.message, status: 'error' },
       }));
     } catch (err) {
       setWantAdd(s => ({
         ...s,
-        [url]: { msg: err instanceof Error ? err.message : String(err), status: 'error' },
+        [statusKey]: { msg: err instanceof Error ? err.message : String(err), status: 'error' },
       }));
     }
   };
@@ -1266,7 +1297,7 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
     if (!pendingBrowse) return;
     const req = sellerBrowseStore.take();
     if (!req) return;
-    void browseSeller(req.name, req.url, req.cardQuery);
+    void browseSeller(req.name, req.url, req.cardQuery, req.wantListId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingBrowse?.id]);
 
@@ -2625,44 +2656,54 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
   };
 
   /**
-   * For id-less rows (e.g. spoiler pages) that carry a product link: an "Add to
-   * want list" button whose dropdown lists the user's want lists. Rows without a
-   * product link keep the plain "no id" marker.
+   * Compact “+ Want” dropdown for a catalogue / product hit (or id-less offer).
+   * Opens a list picker; does not invent a second search box on this tab.
    */
-  const renderWantListControl = (o: ScanMatch) => {
-    const url = o.productUrl;
-    if (!url) return <span className="text-[9px] text-slate-600">no id</span>;
-    const st = wantAdd[url];
+  const renderWantListControlForKey = (
+    statusKey: string,
+    opts: { href: string; productId?: string; specificEdition?: boolean; isFoil?: boolean },
+    label = '+ Want',
+  ) => {
+    const st = wantAdd[statusKey];
     if (st?.status === 'added') {
       return (
         <span className="text-[10px] font-semibold text-emerald-400">
-          ✓ Added{st.listName ? ` to ${st.listName}` : ''}
+          ✓{st.listName ? ` ${st.listName}` : ' Added'}
         </span>
       );
     }
-    const open = wantMenu === url;
+    const open = wantMenu === statusKey;
     return (
-      <div className="relative flex flex-col items-end">
+      <div className="relative flex flex-none flex-col items-end">
         <Button
           disabled={st?.status === 'adding'}
-          onClick={() => {
-            setWantMenu(open ? null : url);
+          icon={Plus}
+          onClick={e => {
+            e.stopPropagation();
+            setWantMenu(open ? null : statusKey);
             if (!open) void ensureWantLists();
           }}
           size="xs"
-          variant="primary"
+          title="Add this card to a want list"
+          variant="neutral"
         >
-          {st?.status === 'adding' ? 'Adding…' : '+ Want ▾'}
+          {st?.status === 'adding' ? '…' : label}
         </Button>
         {open && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setWantMenu(null)} />
+            <div
+              className="fixed inset-0 z-40"
+              onClick={e => {
+                e.stopPropagation();
+                setWantMenu(null);
+              }}
+            />
             <div className="absolute right-0 top-full z-50 mt-1 max-h-48 w-44 overflow-auto rounded border border-slate-700 bg-slate-900 py-1 shadow-lg">
               {wantListOptions === null ? (
                 <div className="px-2 py-1 text-[10px] text-slate-500">
                   {listsLoading
                     ? 'Loading lists…'
-                    : 'No want lists found — read them in the Wants tab first.'}
+                    : 'No want lists found — open the Wants tab and sync first.'}
                 </div>
               ) : wantListOptions.length === 0 ? (
                 <div className="px-2 py-1 text-[10px] text-slate-500">You have no want lists.</div>
@@ -2671,7 +2712,10 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                   <button
                     key={l.id}
                     className="block w-full truncate px-2 py-1 text-left text-[11px] text-slate-200 hover:bg-slate-800"
-                    onClick={() => void addToWantList(o, l)}
+                    onClick={e => {
+                      e.stopPropagation();
+                      void addProductToWantList(statusKey, opts, l);
+                    }}
                     type="button"
                   >
                     {l.name}
@@ -2681,9 +2725,40 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
             </div>
           </>
         )}
+        {st?.status === 'error' && st.msg && (
+          <span className="mt-0.5 max-w-[10rem] truncate text-[9px] text-red-400" title={st.msg}>
+            {st.msg}
+          </span>
+        )}
       </div>
     );
   };
+
+  /**
+   * For id-less rows (e.g. spoiler pages) that carry a product link: an "Add to
+   * want list" button whose dropdown lists the user's want lists. Rows without a
+   * product link keep the plain "no id" marker.
+   */
+  const renderWantListControl = (o: ScanMatch) => {
+    const url = o.productUrl;
+    if (!url) return <span className="text-[9px] text-slate-600">no id</span>;
+    return renderWantListControlForKey(
+      url,
+      { href: url, specificEdition: true, isFoil: o.isFoil },
+      '+ Want',
+    );
+  };
+
+  const renderCatalogueWant = (item: ProductSuggestion, specificEdition: boolean) =>
+    renderWantListControlForKey(
+      specificEdition ? `${item.href}|edition` : item.href,
+      {
+        href: item.href,
+        productId: item.productId,
+        specificEdition,
+      },
+      specificEdition ? '+ Want' : '+ Want',
+    );
 
   /** Add-to-cart button / status for one offer (no price). */
   const addAction = (o: ScanMatch) => {
@@ -2976,22 +3051,6 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
         onSearch={term => void runCatalogueSearch(term)}
         seed={searchSeed}
       />
-      <AddCardToWant
-        lists={wantListOptionsFrom(index?.lists ?? fetchedLists)}
-        onAdded={() => {
-          // Index refresh is optional here — Search doesn't show list contents.
-          // Kick a quiet re-read so the Wants tab sees the new card next open.
-          if (!index) return;
-          void (async () => {
-            try {
-              const lists = await fetchAllWantLists();
-              setFetchedLists(lists);
-            } catch {
-              // ignore
-            }
-          })();
-        }}
-      />
 
       {/* Breadcrumb for catalogue → printing offers. */}
       {showingSearch && (
@@ -3059,6 +3118,19 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
               </>
             )}
           </span>
+          {showingProduct && search.product && (
+            <>
+              {renderCatalogueWant(search.product, !(search.artPrintings && search.artPrintings.length > 1))}
+            </>
+          )}
+          {focusedCatalogueCard && !showingProduct && (
+            <>
+              {renderCatalogueWant(
+                focusedCatalogueCard.printings[0]!,
+                false,
+              )}
+            </>
+          )}
           {search.status === 'error' && (
             <span className="flex-none text-neg" title={search.error ?? undefined}>
               {showingProduct ? 'Couldn’t load the offers' : 'Search failed'}
@@ -3309,6 +3381,14 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                 {isFavourite(scanSubject.profile, scanSubject.name) ? (
                   <FavouriteSellerBadge />
                 ) : null}
+                {scanSubject.wantListId ? (
+                  <span
+                    className="rounded bg-sky-950/60 px-1.5 py-0.5 text-sky-200"
+                    title="Singles filtered with Cardmarket’s ?idWantslist= for this want list"
+                  >
+                    Lugin — your wants
+                  </span>
+                ) : null}
                 {scan.status === 'scanning' || scan.browseLoading ? (
                   <span className="text-slate-400">
                     {scan.browsePage > 0 ? 'Loading next page' : 'Loading stock'}
@@ -3448,7 +3528,11 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
         {/* Main column: what this page is about, then the cards themselves. */}
         <div className="flex min-h-0 flex-1 flex-col">
           {onWantListPage && wantListId && (
-            <BestSellersForList listCards={listCards} wantListId={wantListId} />
+            <BestSellersForList
+              listCards={listCards}
+              listWantQtys={listWantQtys}
+              wantListId={wantListId}
+            />
           )}
 
           {/* Order page: remove the purchase from all want lists */}
@@ -3848,12 +3932,15 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                               ? 'cursor-flip'
                               : 'cursor-zoom-in';
                             return (
-                              <button
+                              <div
                                 key={item.href}
-                                className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-tint"
-                                onClick={() => void openProduct(item)}
-                                type="button"
+                                className="flex w-full items-center gap-2 px-2 py-1.5 transition-colors hover:bg-tint"
                               >
+                                <button
+                                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                  onClick={() => void openProduct(item)}
+                                  type="button"
+                                >
                                 {thumb ? (
                                   <SequentialImage
                                     alt=""
@@ -3892,7 +3979,9 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                                     from {item.fromPrice}
                                   </span>
                                 )}
-                              </button>
+                                </button>
+                                {renderCatalogueWant(item, true)}
+                              </div>
                             );
                           };
 
@@ -3990,12 +4079,15 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                             : null;
                           const fromPrice = catalogueFromPrice(g.printings);
                           return (
-                            <button
+                            <div
                               key={g.key}
-                              className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-tint"
-                              onClick={() => setCatalogueCardKey(g.key)}
-                              type="button"
+                              className="flex w-full items-center gap-2 px-2 py-1.5 transition-colors hover:bg-tint"
                             >
+                              <button
+                                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                onClick={() => setCatalogueCardKey(g.key)}
+                                type="button"
+                              >
                               {thumb ? (
                                 <SequentialImage
                                   alt=""
@@ -4033,7 +4125,9 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                                   from {fromPrice}
                                 </span>
                               )}
-                            </button>
+                              </button>
+                              {lead && renderCatalogueWant(lead, false)}
+                            </div>
                           );
                         })
                       )}

@@ -46,6 +46,7 @@ export interface FusedResult {
     oracleId: string;
     scryfallId: string;
     setCode: string;
+    setName?: string;
   };
   status: ScanIdentityStatus;
 }

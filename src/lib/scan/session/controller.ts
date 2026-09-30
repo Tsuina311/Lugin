@@ -127,9 +127,6 @@ export {
 export type { PostLockDebug, RecognitionAttempt, RecognitionAttemptStatus } from './postLock';
 export { compareQuads, emptyPostLock, shouldReplaceCaptureQuad } from './postLock';
 import {
-  isStrongArtOnly,
-  isStrongDualEvidence,
-  isStrongFooterPrinting,
   isStrongTitleOnly,
   recognizeCard,
   type RecognizeDeps,
@@ -609,7 +606,6 @@ export const createSessionController = (
   let lastNormalizedCardSessionId: number | null = null;
   /** Most recent FrameHelpers — used to invalidate hi-res on beginCardSession. */
   let activeHelpers: FrameHelpers | undefined;
-  let captureIdSeq = 0;
   let lastCaptureId: number | null = null;
   let lastCaptureCardSessionId: number | null = null;
   let lastFrame: ScanImage | null = null;
@@ -721,7 +717,6 @@ export const createSessionController = (
   let lockedAt: number | null = null;
   let finalIdentityAt: number | null = null;
   let printingShownAt: number | null = null;
-  let earlyApplied = false;
 
   const userLatency = (): SessionUserLatency => {
     const firstOracleAt = earlyShownAt ?? finalIdentityAt;
@@ -1053,7 +1048,6 @@ export const createSessionController = (
     lockedAt = null;
     finalIdentityAt = null;
     printingShownAt = null;
-    earlyApplied = false;
     lockEligibleAt = null;
     lockCommittedAt = null;
     captureReplaceUsed = 0;
@@ -1111,7 +1105,6 @@ export const createSessionController = (
     lockedAt = null;
     finalIdentityAt = null;
     printingShownAt = null;
-    earlyApplied = false;
     lockEligibleAt = null;
     lockCommittedAt = null;
     highResSuccess = 0;
@@ -1330,24 +1323,6 @@ export const createSessionController = (
     }
   };
 
-  /** Final wins only when it strongly contradicts the provisional early identity. */
-  const stronglyContradictsEarly = (early: FusedResult, final: FusedResult): boolean => {
-    const earlyKey = early.card?.oracleId ?? early.card?.name;
-    const finalKey = final.card?.oracleId ?? final.card?.name;
-    if (!earlyKey || !finalKey || earlyKey === finalKey) return false;
-    if (final.status !== 'identified' && final.status !== 'printing-ambiguous') return false;
-    // Sticky title provisional must not be displaced by art-only disagreement.
-    if (isStrongTitleOnly(early) && isStrongArtOnly(final) && !isStrongTitleOnly(final)) {
-      return false;
-    }
-    if (early.artConflict && isStrongArtOnly(final) && !isStrongDualEvidence(final)) {
-      return false;
-    }
-    return (
-      isStrongDualEvidence(final) || isStrongTitleOnly(final) || isStrongFooterPrinting(final)
-    );
-  };
-
   const enterSearching = (why: string) => {
     const reason: CardSessionResetReason =
       why === 'Scan again' || why.toLowerCase().includes('scan again')
@@ -1532,7 +1507,6 @@ export const createSessionController = (
     recognitionResolvedAt = null;
     recognitionReturnedName = null;
     recognitionReturnedStatus = null;
-    earlyApplied = false;
     earlyShownAt = null;
     recognizeInvocations += 1;
     if (!changeWatchProbe) {
@@ -1607,7 +1581,6 @@ export const createSessionController = (
             onEarlyIdentity: provisional => {
               if (rejectStaleSession('early-identity-channel')) return;
               if (!bypassPublished && strongTitleAlreadyPublished()) return;
-              earlyApplied = true;
               earlyShownAt = performance.now();
               applyIdentity(provisional, { ...card, image: warp }, {
                 provisional: true,
@@ -1718,7 +1691,6 @@ export const createSessionController = (
           corners: captured.warpQuad ?? card.corners,
           image: captured.warp ?? card.image,
         };
-        earlyApplied = true;
         earlyShownAt = performance.now();
         applyIdentity(rec, prepared, { provisional: false, owningSessionId });
         deps.onEarlyIdentity?.(rec);
@@ -2898,7 +2870,14 @@ export const createSessionController = (
 
     async retryFrozenRecognition(helpers) {
       const warp = lastNormalized;
-      const corners = foundCorners ?? v2Capture.frozenQuad ?? lastDetection.corners;
+      const corners =
+        foundCorners ??
+        v2Capture.frozenQuad ??
+        lastDetection.recognitionCorners ??
+        lastDetection.rawCorners ??
+        (lastDetection.selectedIndex >= 0
+          ? (lastDetection.candidates[lastDetection.selectedIndex]?.corners ?? null)
+          : null);
       if (!warp || !corners) {
         message = 'No frozen capture to retry';
         return snap();

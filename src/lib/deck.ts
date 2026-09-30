@@ -84,6 +84,12 @@ export interface Deck {
    * matching section. Empty / absent = no tag sections.
    */
   tagSections?: string[];
+  /**
+   * Manual placement of main-deck cards into tag sections. Keys are cardKeys;
+   * values are `DECK_TAGS` ids, or `""` to force the card into Main (skip
+   * Scryfall auto-match). Absent key = automatic assignment.
+   */
+  tagOverrides?: Record<string, string>;
   updatedAt: number;
 }
 

@@ -225,7 +225,27 @@ export interface ShippingEstimate {
   method: ShipMethod;
   /** Estimated order weight in grams. */
   weight: number;
+  /** Rough max cards for the chosen method’s weight (Phase A groundwork). */
+  tierMaxCards?: number;
+  /** Next tier that allows more cards, if any. */
+  nextTierMaxCards?: number;
+  /** Grams remaining before the current weight bracket’s max. */
+  remainingWeightInTier?: number;
 }
+
+export interface EstimateShippingOpts {
+  /**
+   * Seller (or Cardmarket) only allows tracked / registered methods — skip
+   * cheap untracked letters that would under-estimate real postage.
+   */
+  requireTracked?: boolean;
+}
+
+/** Page copy Cardmarket shows when a seller cannot ship untracked. */
+export const TRACKED_ONLY_RE =
+  /only allows tracked|tracked shipping only|tracked[- ]only|registered shipping only/i;
+
+export const pageRequiresTrackedShipping = (html: string): boolean => TRACKED_ONLY_RE.test(html);
 
 /**
  * Pick the cheapest shipping method that covers both the estimated weight and
@@ -235,12 +255,28 @@ export const estimateShipping = (
   methods: ShipMethod[],
   cardCount: number,
   orderValue: number,
+  opts: EstimateShippingOpts = {},
 ): ShippingEstimate | null => {
   if (!methods.length) return null;
   const weight = estimateWeightGrams(cardCount);
   const eligible = methods
     .filter(m => m.maxWeight >= weight && m.maxValue >= orderValue)
+    .filter(m => !opts.requireTracked || m.isTracked)
     .sort((a, b) => a.price - b.price);
   if (eligible.length === 0) return null;
-  return { eligible, method: eligible[0], weight };
+  const method = eligible[0];
+  const tiers = shippingTiers(
+    opts.requireTracked ? methods.filter(m => m.isTracked) : methods,
+  );
+  const tierIdx = tiers.findIndex(t => t.name === method.name && t.price === method.price);
+  const tier = tierIdx >= 0 ? tiers[tierIdx] : tiers.find(t => cardCount <= t.maxCards);
+  const next = tierIdx >= 0 ? tiers[tierIdx + 1] : undefined;
+  return {
+    eligible,
+    method,
+    weight,
+    tierMaxCards: tier?.maxCards ?? maxCardsForWeight(method.maxWeight),
+    nextTierMaxCards: next?.maxCards,
+    remainingWeightInTier: Math.max(0, method.maxWeight - weight),
+  };
 };

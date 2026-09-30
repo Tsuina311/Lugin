@@ -8,6 +8,11 @@ export interface SellerBrowseRequest {
   name: string;
   /** Profile or offers URL when known — otherwise resolved from `name`. */
   url?: string;
+  /**
+   * When set (Best Sellers / want-list context), browse Singles filtered with
+   * Cardmarket’s `?idWantslist=` so only that list’s wants appear.
+   */
+  wantListId?: string;
 }
 
 let pending: SellerBrowseRequest | null = null;
@@ -23,7 +28,7 @@ export const sellerBrowseStore = {
     return pending;
   },
 
-  request(name: string, url?: string, cardQuery?: string): void {
+  request(name: string, url?: string, cardQuery?: string, wantListId?: string): void {
     const trimmed = name.trim();
     if (!trimmed) return;
     pending = {
@@ -31,6 +36,7 @@ export const sellerBrowseStore = {
       id: ++seq,
       name: trimmed,
       ...(url ? { url } : {}),
+      ...(wantListId?.trim() ? { wantListId: wantListId.trim() } : {}),
     };
     emit();
   },

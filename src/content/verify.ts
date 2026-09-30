@@ -9,6 +9,8 @@
 // clearance cookie lands, and the interrupted task carries on from its
 // checkpoint when the real page brings the overlay back.
 
+import { hideOverlay } from './overlay';
+
 const KEY = 'lugin:verify';
 
 /**
@@ -53,6 +55,8 @@ export const askForVerification = async (reason: string): Promise<boolean> => {
 
   await chrome.storage.local.set({ [KEY]: { at: Date.now(), reason, reloads } });
   console.debug(`[Lugin] ${reason} — reloading so the check can be solved`);
+  // Get out of the way of the checkbox (and any Turnstile on the current page).
+  hideOverlay();
   location.reload();
   return true;
 };

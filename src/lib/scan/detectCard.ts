@@ -212,14 +212,13 @@ export const detectCardQuad = (image: ScanImage): DetectResult => {
   const accepted = candidates
     .filter(c => c.corners && c.rejectedBecause.length === 0)
     .sort((a, b) => b.score - a.score);
-  const runnerUp = accepted.find((_, i) => i > 0 && accepted[i]!.index !== selected.index) ??
-    accepted[1] ??
-    null;
+  const selectedCand = candidates[selected.index];
+  const runnerUp = accepted.find(c => c !== selectedCand) ?? null;
   const fast = evaluateMtgFastAccept({
     corners: selected.corners,
     score: selected.score,
     frame: { width: fullW, height: fullH },
-    runnerUpScore: runnerUp && runnerUp.index !== selected.index ? runnerUp.score : null,
+    runnerUpScore: runnerUp?.score ?? null,
   });
 
   return {

@@ -19,6 +19,7 @@
 
 import type { CapturedCall } from '@/lib/types';
 import { rememberWriteToken } from '@/content/session';
+import { sellerShipPrefsStore } from '@/content/sellerShipPrefsStore';
 import { shippingStore } from '@/content/shippingStore';
 import {
   fetchServerCart,
@@ -89,12 +90,18 @@ const estimatedSellerShipping = (sellerItems: CartItem[]): number => {
   if (sellerItems.length === 0) return 0;
   const snap = shippingStore.getSnapshot();
   if (snap.toCountry == null) return 0;
+  const sellerName = sellerItems[0]?.seller ?? '';
   const fromId = countryId(sellerItems[0]?.sellerCountry);
   if (fromId == null) return 0;
   const matrix = snap.matrices[fromId];
   if (!matrix?.length) return 0;
   const count = sellerItems.reduce((n, i) => n + i.amount, 0);
-  return estimateShipping(matrix, count, goodsFrom(sellerItems))?.method.price ?? 0;
+  const requireTracked =
+    sellerShipPrefsStore.get(sellerName)?.requireTracked === true;
+  return (
+    estimateShipping(matrix, count, goodsFrom(sellerItems), { requireTracked })?.method
+      .price ?? 0
+  );
 };
 
 /**

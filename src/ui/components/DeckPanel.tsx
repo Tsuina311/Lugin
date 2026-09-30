@@ -4,6 +4,7 @@ import { Badge } from './Badge';
 import { Button } from './Button';
 import { CollectionThumb } from './CollectionThumb';
 import { CutsPanel } from './CutsPanel';
+import { DeckCardTagMove } from './DeckCardTagMove';
 import { DeckFromWants } from './DeckFromWants';
 import { DeckWantList } from './DeckWantList';
 import { EdhrecPanel } from './EdhrecPanel';
@@ -14,6 +15,7 @@ import { IconButton } from './IconButton';
 import { ManaCurve } from './ManaCurve';
 import { SelectionBar } from './Selection';
 import { TagsPanel } from './TagsPanel';
+import { ViewToggle, type ViewShape } from './ViewToggle';
 import { useCardPreview } from './cardPreview';
 import { COLOR_PIPS } from './colorPips';
 import {
@@ -84,20 +86,14 @@ const buyUrl = (name: string): string =>
 // throw in locked-down contexts, so every access is guarded.
 const SPLIT_TYPE_KEY = 'lugin:deckSplitType';
 const SPLIT_COST_KEY = 'lugin:deckSplitCost';
-
-/**
- * Cards we don't hold against your collection. Nobody bothers listing their
- * basics, and they're free to come by anyway, so counting them as missing would
- * make every deck look like a shopping list.
- */
-const skipOwnership = (name: string): boolean => isBasicLand(name);
-
 const CURVE_KEY = 'lugin:deckCurve';
+const OVERVIEW_SHAPE_KEY = 'lugin:deckOverviewShape';
 
 const readFlag = (key: string, fallback = false): boolean => {
   try {
     const raw = localStorage.getItem(key);
-    return raw == null ? fallback : raw === '1';
+    if (raw == null) return fallback;
+    return raw === '1' || raw === 'true';
   } catch {
     return fallback;
   }
@@ -107,9 +103,24 @@ const writeFlag = (key: string, on: boolean): void => {
   try {
     localStorage.setItem(key, on ? '1' : '0');
   } catch {
-    // ignore storage failures
+    /* ignore */
   }
 };
+
+const readShape = (): ViewShape => {
+  try {
+    return localStorage.getItem(OVERVIEW_SHAPE_KEY) === 'box' ? 'box' : 'list';
+  } catch {
+    return 'list';
+  }
+};
+
+/**
+ * Cards we don't hold against your collection. Nobody bothers listing their
+ * basics, and they're free to come by anyway, so counting them as missing would
+ * make every deck look like a shopping list.
+ */
+const skipOwnership = (name: string): boolean => isBasicLand(name);
 
 export const DeckPanel = () => {
   const { decks, error, loading } = useSyncExternalStore(
@@ -427,10 +438,18 @@ const DeckEditor = ({
   const [splitType, setSplitType] = useState(() => readFlag(SPLIT_TYPE_KEY));
   const [splitCost, setSplitCost] = useState(() => readFlag(SPLIT_COST_KEY));
   const [showCurve, setShowCurve] = useState(() => readFlag(CURVE_KEY, true));
+  const [overviewShape, setOverviewShape] = useState<ViewShape>(readShape);
 
   useEffect(() => writeFlag(SPLIT_TYPE_KEY, splitType), [splitType]);
   useEffect(() => writeFlag(SPLIT_COST_KEY, splitCost), [splitCost]);
   useEffect(() => writeFlag(CURVE_KEY, showCurve), [showCurve]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(OVERVIEW_SHAPE_KEY, overviewShape);
+    } catch {
+      /* ignore */
+    }
+  }, [overviewShape]);
 
   useEffect(() => setNameDraft(deck.name), [deck.id, deck.name]);
 
@@ -534,6 +553,22 @@ const DeckEditor = ({
   // The deck itself vs. suggestions for the current commander(s).
   const [view, setView] = useState<DeckView>('deck');
   useEffect(() => setView('deck'), [deck.id]);
+  const edhrecDeckCards = useMemo(
+    () =>
+      deck.cards
+        .filter(c => c.section === 'main')
+        .map(c => {
+          const meta = metaByName[cardKey(c.name)];
+          return {
+            keywords: meta?.keywords,
+            name: c.name,
+            subtypes: meta?.subtypes,
+            typeLine: meta?.typeLine,
+          };
+        }),
+    [deck.cards, metaByName],
+  );
+
   const showSuggestions = fmt.commanderZone && commanders.length > 0;
   const visibleViews = useMemo(
     () => DECK_VIEWS.filter(v => v.id === 'deck' || v.id === 'tags' || showSuggestions),
@@ -633,7 +668,12 @@ const DeckEditor = ({
     }
     let cancelled = false;
     const controller = new AbortController();
-    void bucketMainByTagSections(main, tagSectionIds, controller.signal).then(result => {
+    void bucketMainByTagSections(
+      main,
+      tagSectionIds,
+      controller.signal,
+      deck.tagOverrides,
+    ).then(result => {
       if (cancelled) return;
       setTagBuckets(result.buckets);
       setMainRest(result.rest);
@@ -642,7 +682,7 @@ const DeckEditor = ({
       cancelled = true;
       controller.abort();
     };
-  }, [deck.cards, tagSectionIds.join('|')]);
+  }, [deck.cards, deck.tagOverrides, tagSectionIds.join('|')]);
 
   const pickerTags = useMemo(() => {
     const filtered = filterDeckTags(tagPickerQuery).filter(t => !tagSectionIds.includes(t.id));
@@ -890,6 +930,7 @@ const DeckEditor = ({
             <EdhrecPanel
               collectionByKey={collectionByKey}
               commanderNames={commanders.map(c => c.name)}
+              deckCards={edhrecDeckCards}
               inDeck={inDeck}
               onAdd={names => void deckStore.addCards(deck.id, names, 'main')}
             />
@@ -974,6 +1015,7 @@ const DeckEditor = ({
           {deck.cards.length > 0 && (
             <div className="flex flex-none flex-col gap-1 border-b border-line px-2 py-1">
               <div className="flex flex-wrap items-center gap-1">
+                <ViewToggle onChange={setOverviewShape} value={overviewShape} />
                 <span className="mr-0.5 text-2xs uppercase tracking-wide text-ink-faint">group</span>
                 <Button
                   active={splitType}
@@ -1164,12 +1206,92 @@ const DeckEditor = ({
                               <span className="tabular-nums">{countCards(part.cards)}</span>
                             </div>
                           )}
+                          {overviewShape === 'box' ? (
+                            <div className="grid grid-cols-3 gap-2 p-2 sm:grid-cols-4">
+                              {part.cards.map(c => {
+                                const thumb = thumbOf(c.name);
+                                const key = cardKey(c.name);
+                                const ov = deck.tagOverrides;
+                                const hasOv = ov != null && Object.prototype.hasOwnProperty.call(ov, key);
+                                return (
+                                  <div
+                                    key={`${section}|${key}`}
+                                    className="flex flex-col gap-1 rounded border border-line/60 p-1"
+                                  >
+                                    <CollectionThumb
+                                      candidates={thumb.candidates}
+                                      className="aspect-[488/680] w-full overflow-hidden rounded bg-raised"
+                                      faceImages={thumb.faceImages}
+                                      name={c.name}
+                                      previewKey={`deck|box|${section}|${key}`}
+                                    />
+                                    <span className="truncate text-2xs text-ink" title={c.name}>
+                                      {c.name}
+                                    </span>
+                                    {section === 'main' && tagSectionIds.length > 0 && (
+                                      <DeckCardTagMove
+                                        onChange={tagId =>
+                                          void deckStore.setCardTagOverride(deck.id, c.name, tagId)
+                                        }
+                                        override={hasOv ? ov![key] : undefined}
+                                        tagSectionIds={tagSectionIds}
+                                      />
+                                    )}
+                                    <div className="flex items-center gap-0.5">
+                                      <IconButton
+                                        icon={Minus}
+                                        label={`One less ${c.name}`}
+                                        onClick={() =>
+                                          void deckStore.setQuantity(
+                                            deck.id,
+                                            c.name,
+                                            c.section,
+                                            c.quantity - 1,
+                                          )
+                                        }
+                                        size="xs"
+                                      />
+                                      <span className="min-w-4 flex-1 text-center text-2xs tabular-nums">
+                                        {c.quantity}
+                                      </span>
+                                      <IconButton
+                                        icon={Plus}
+                                        label={`One more ${c.name}`}
+                                        onClick={() =>
+                                          void deckStore.setQuantity(
+                                            deck.id,
+                                            c.name,
+                                            c.section,
+                                            c.quantity + 1,
+                                          )
+                                        }
+                                        size="xs"
+                                      />
+                                      <IconButton
+                                        icon={X}
+                                        label={`Remove ${c.name}`}
+                                        onClick={() =>
+                                          void deckStore.removeCard(deck.id, c.name, c.section)
+                                        }
+                                        size="xs"
+                                        tone="danger"
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
                           <ul className="list-none divide-y divide-line">
                             {part.cards.map(c => {
                               const thumb = thumbOf(c.name);
+                              const key = cardKey(c.name);
+                              const ov = deck.tagOverrides;
+                              const hasOv =
+                                ov != null && Object.prototype.hasOwnProperty.call(ov, key);
                               return (
                                 <DeckRow
-                                  key={`${section}|${cardKey(c.name)}`}
+                                  key={`${section}|${key}`}
                                   auto={
                                     !!deck.autoLands && section === 'main' && isBasicLand(c.name)
                                   }
@@ -1177,13 +1299,22 @@ const DeckEditor = ({
                                   candidates={thumb.candidates}
                                   deckId={deck.id}
                                   faceImages={thumb.faceImages}
+                                  onTagOverride={
+                                    section === 'main' && tagSectionIds.length > 0
+                                      ? tagId =>
+                                          void deckStore.setCardTagOverride(deck.id, c.name, tagId)
+                                      : undefined
+                                  }
                                   owned={ownedOf(c.name)}
-                                  rowId={`${section}|${cardKey(c.name)}`}
+                                  rowId={`${section}|${key}`}
                                   selection={selection}
+                                  tagOverride={hasOv ? ov![key] : undefined}
+                                  tagSectionIds={tagSectionIds}
                                 />
                               );
                             })}
                           </ul>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1216,9 +1347,12 @@ const DeckRow = ({
   commander = false,
   deckId,
   faceImages,
+  onTagOverride,
   owned,
   rowId,
   selection,
+  tagOverride,
+  tagSectionIds = [],
 }: {
   /** Managed by auto-balance — quantity edits here get recalculated away. */
   auto?: boolean;
@@ -1227,10 +1361,13 @@ const DeckRow = ({
   commander?: boolean;
   deckId: string;
   faceImages?: string[];
+  onTagOverride?: (tagId: string | null) => void;
   owned: number;
   /** Selection id; omitted (with `selection`) for rows that can't be picked. */
   rowId?: string;
   selection?: RowSelection;
+  tagOverride?: string;
+  tagSectionIds?: readonly string[];
 }) => {
   const need = Math.max(0, card.quantity - owned);
   const basic = skipOwnership(card.name);
@@ -1263,6 +1400,14 @@ const DeckRow = ({
           </span>
         )}
       </span>
+
+      {onTagOverride && (
+        <DeckCardTagMove
+          onChange={onTagOverride}
+          override={tagOverride}
+          tagSectionIds={tagSectionIds}
+        />
+      )}
 
       {!commander ? (
         // A stepper, quiet until hovered so a long list doesn't read as buttons.

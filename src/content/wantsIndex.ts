@@ -16,6 +16,9 @@ export interface ListCard {
   idWant: string;
   key: string;
   name: string;
+  /** Wanted copies when quantityStatus is KNOWN. */
+  amount?: number;
+  quantityStatus: 'KNOWN' | 'UNKNOWN';
 }
 
 /** What a want list holds, by the local index, in name order. */
@@ -29,6 +32,8 @@ export const listCards = (index: WantsIndex | null, listId: string): ListCard[] 
       idWant: here.idWant,
       key,
       name: entry.name,
+      amount: here.amount,
+      quantityStatus: here.quantityStatus ?? 'UNKNOWN',
     });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -143,7 +148,15 @@ export const moveWants = (
       if (p.listId !== from || !moving.has(p.idWant)) return [p];
       moved++;
       if (alreadyThere) return [];
-      return [{ idWant: p.idWant, listId: to.id, listName: to.name }];
+      return [
+        {
+          idWant: p.idWant,
+          listId: to.id,
+          listName: to.name,
+          amount: p.amount,
+          quantityStatus: p.quantityStatus ?? 'UNKNOWN',
+        },
+      ];
     });
     if (kept.length > 0) cards[key] = { ...entry, placements: kept };
   }
@@ -169,7 +182,12 @@ export const moveWants = (
 export const setListWants = (
   index: WantsIndex,
   list: { id: string; name: string },
-  rows: readonly { idWant: string; name: string }[],
+  rows: readonly {
+    idWant: string;
+    name: string;
+    amount?: number;
+    quantityStatus?: 'KNOWN' | 'UNKNOWN';
+  }[],
 ): WantsIndex => {
   const cards = { ...prune(index, p => p.listId !== list.id).cards };
 
@@ -182,7 +200,13 @@ export const setListWants = (
       lists: entry.lists.includes(list.name) ? entry.lists : [...entry.lists, list.name],
       placements: [
         ...(entry.placements ?? []),
-        { idWant: row.idWant, listId: list.id, listName: list.name },
+        {
+          idWant: row.idWant,
+          listId: list.id,
+          listName: list.name,
+          amount: row.amount,
+          quantityStatus: row.quantityStatus ?? (row.amount != null ? 'KNOWN' : 'UNKNOWN'),
+        },
       ],
     };
   }

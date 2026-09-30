@@ -9,7 +9,6 @@ import type { CameraRef } from 'react-native-vision-camera';
 
 import {
   accumulateUnsafeReasonMs,
-  cornerMarginMetrics,
   dominantUnsafeReason,
   emptyGeometryLockState,
   emptyGeometryTiming,

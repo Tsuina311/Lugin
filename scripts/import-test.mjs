@@ -35,6 +35,7 @@ await writeFile(
    export * from '${root}src/lib/sellerStats';
    export * from '${root}src/lib/purchasesBySeller';
    export * from '${root}src/sites/cardmarket/searchArgs';
+   export * from '${root}src/sites/cardmarket/shoppingWizardParse';
    export * from '${root}src/sites/cardmarket/sellerInventoryFilter';
    export * from '${root}src/sites/cardmarket/challenge';
    export * from '${root}src/sites/cardmarket/productUrl';
@@ -98,10 +99,13 @@ const {
   groupPurchasesBySeller,
   sellerMatchesQuery,
   buildArgs,
+  buildStartCalculationArgs,
   cardmarketSearchUrl,
   encodeArgs,
+  extractWizardAddAllPayload,
   obfuscate,
   tokenFromArgs,
+  WIZARD_XOR_SEED,
   productFactsFromImage,
   expansionFromProductUrl,
   groupCatalogueByArt,
@@ -1517,6 +1521,49 @@ check('a suggestion is pinned to its printing through the image URL', () => {
     productFactsFromImage('https://product-images.s3.cardmarket.com/1/RTR/258288/258288.jpg'),
     { productId: '258288', setCode: 'RTR' },
   );
+});
+
+// --- Shopping Wizard StartCalculation (captured 2026-09) --------------------
+
+const WIZARD_TOKEN = 'd7f2ff00ae689ce6ab6db5357bb097a10834140f688538e4813c3026902607e0';
+const WIZARD_ARGS_PREFIX =
+  '%24%15%1B%02%04%14%10%09%0F%23.%16%10%F0%F1%EB%ED%E3%D2%EF%FD%E9%FB%EE%D4%DF%F9%EF%FD%E4%D2%F3%FF%F7%E0%FA%F6%EC%F0%F5%F5%B6%B7%B4%FB%97%C7%90%C5%C2%95%96%C6%CD%9F%92%92%CF%C8%98%CE%D2%87%D6%D1%81%86%83%80%DA%DB%8A%82%8B%DC%8F%8F%F8%F2%F6%F2%F0%F5%A0%F1%F0%F1%FF%F8%F4%A8%FA%F7%E1%E2%B1%E0%E4%E7%E0%EE%E8%EB%EC%EB%EB%B8%EE%2A%2A%2A';
+const WIZARD_ARGS_JSON_B64 =
+  'eyJfX2NtdGtuIjoiZDdmMmZmMDBhZTY4OWNlNmFiNmRiNTM1N2JiMDk3YTEwODM0MTQwZjY4ODUzOGU0ODEzYzMwMjY5MDI2MDdlMCIsImlkV2FudHNMaXN0IjoiMjQ1NDUwMzgiLCJzZWxsZXJDb3VudHJ5IjpbXSwic2VsbGVyUmVwdXRhdGlvbiI6IjUiLCJtYXhTaGlwcGluZ1RpbWUiOiI3Iiwic3RyYXRlZ3kiOiI0In0=';
+
+check('Shopping Wizard StartCalculation matches a captured Next click', () => {
+  const built = buildStartCalculationArgs(WIZARD_TOKEN, {
+    idWantsList: '24545038',
+    sellerCountry: [],
+    sellerReputation: '5',
+    maxShippingTime: '7',
+    strategy: '4',
+  });
+  // Trailing `=` in base64 may be `%3D` after encodeArgs; compare without that.
+  const norm = s => s.replace(/%3D$/i, '=').replace(/=$/, '=');
+  assert.equal(norm(built), norm(WIZARD_ARGS_PREFIX + WIZARD_ARGS_JSON_B64));
+  assert.equal(WIZARD_XOR_SEED, 0x73);
+});
+
+check('Wizard Results Add All form yields idCalculation and article ids', () => {
+  const html = `
+    <div id="ShoppingWizardResult">
+      <form data-ajax-action="Wantslist_ShoppingWizard_AddArticlesToCart">
+        <input type="hidden" name="__cmtkn" value="abc">
+        <input type="hidden" name="idCalculation" value="2026-9-1454828-6aabea8aafebc">
+        <input type="hidden" name="idArticle[2124337981]" value="1">
+        <input type="hidden" name="amount[2124337981]" value="1">
+        <input type="hidden" name="idArticle[2156561707]" value="1">
+        <input type="hidden" name="amount[2156561707]" value="2">
+      </form>
+    </div>`;
+  const payload = extractWizardAddAllPayload(html);
+  assert.equal(payload.idCalculation, '2026-9-1454828-6aabea8aafebc');
+  assert.equal(payload.token, 'abc');
+  assert.deepEqual(payload.articles, [
+    { articleId: '2124337981', amount: 1 },
+    { articleId: '2156561707', amount: 2 },
+  ]);
 });
 
 check('promo set codes with digits survive', () => {

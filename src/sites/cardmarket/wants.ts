@@ -1,11 +1,14 @@
 import { cardKey, frontFaceName, stripVersion } from '@/lib/cardName';
+import { parseWantAmountFields, type QuantityStatus } from '@/lib/wantAmount';
 import { editionIdOf, normalizeSetName, resolveSet, type EditionTally, type SetIndex } from '@/lib/sets';
 import { replayInPage, requestScryfall } from '@/lib/messaging';
 import { extractCmToken, findCmToken } from '@/sites/cardmarket/cart';
 import { isChallengeResponse, looksLikeChallenge } from '@/sites/cardmarket/challenge';
+import { pageRequiresTrackedShipping } from '@/sites/cardmarket/shipping';
 import { isLanguageName, isUiChromeName, languageOfRow } from '@/sites/cardmarket/language';
 import { parseOrderSeller, parseOrderTimeline, sellerSlugFromHref } from '@/sites/cardmarket/order';
 import { cardmarketSearchUrl } from '@/sites/cardmarket/searchArgs';
+import { SELECTORS } from '@/sites/cardmarket/selectors';
 import {
   EXPANSION_FIELD,
   EXPANSION_FIELD_MULTI,
@@ -23,6 +26,9 @@ import {
   type RawFilterOption,
   type SellerInventoryFilterFields,
 } from '@/sites/cardmarket/sellerInventoryFilter';
+
+export type { QuantityStatus };
+export { parseWantAmountFields };
 
 // ---------------------------------------------------------------------------
 // Want lists: enumeration + local index building
@@ -52,6 +58,12 @@ export interface WantPlacement {
   idWant: string;
   listId: string;
   listName: string;
+  /**
+   * Wanted copies when `quantityStatus === 'KNOWN'`. Never invent this — if the
+   * want-list page did not expose amount, leave status UNKNOWN.
+   */
+  amount?: number;
+  quantityStatus: QuantityStatus;
 }
 
 export interface WantsIndex {
@@ -160,7 +172,51 @@ export interface WantRow {
   /** The list this row actually belongs to (from its delete form), if known. */
   idWantsList?: string;
   name: string;
+  /**
+   * Wanted copies from Cardmarket. Authoritative only when
+   * `quantityStatus === 'KNOWN'`.
+   */
+  amount?: number;
+  quantityStatus: QuantityStatus;
 }
+
+/**
+ * Wanted amount on a want-list row.
+ *
+ * Preference order (centralized — do not re-select in React):
+ * 1. `td[data-amount]` / row `data-amount` (structured)
+ * 2. `input`/`select[name="amount"]`
+ * 3. amount cell text (`.amount` / `.col-amount`)
+ *
+ * Returns UNKNOWN rather than silently defaulting to 1 when nothing is found.
+ */
+export const wantAmountFromRow = (
+  root: ParentNode,
+): { amount?: number; quantityStatus: QuantityStatus } => {
+  const amountTd =
+    root.querySelector<HTMLElement>('td[data-amount]') ??
+    (root instanceof Element && root.matches('td[data-amount]')
+      ? (root as HTMLElement)
+      : null);
+
+  const cell =
+    amountTd ??
+    root.querySelector<HTMLElement>(SELECTORS.wants.amount);
+
+  return parseWantAmountFields({
+    dataAmount: amountTd?.getAttribute('data-amount'),
+    rowDataAmount:
+      root instanceof Element
+        ? root.getAttribute('data-amount') ||
+          root.getAttribute('data-qty') ||
+          root.getAttribute('data-quantity')
+        : null,
+    inputValue:
+      root.querySelector<HTMLInputElement>('input[name="amount"]')?.value ||
+      root.querySelector<HTMLSelectElement>('select[name="amount"]')?.value,
+    cellText: cell?.textContent,
+  });
+};
 
 /** The card name inside a row/accordion item, tried across a few selectors. */
 const rowName = (root: ParentNode): string | null | undefined => {
@@ -210,12 +266,20 @@ export const parseWantRowsDetailed = (doc: ParentNode): ParsedWantRows => {
     idWant: string | null | undefined,
     name: string | null | undefined,
     idWantsList: string | null | undefined,
+    scope: ParentNode,
   ): boolean => {
     const id = idWant?.trim();
     const nm = name?.trim();
     if (id && nm && nm.length > 1 && !seen.has(id)) {
       seen.add(id);
-      out.push({ idWant: id, idWantsList: idWantsList?.trim() || undefined, name: nm });
+      const qty = wantAmountFromRow(scope);
+      out.push({
+        idWant: id,
+        idWantsList: idWantsList?.trim() || undefined,
+        name: nm,
+        amount: qty.amount,
+        quantityStatus: qty.quantityStatus,
+      });
       return true;
     }
     return false;
@@ -228,14 +292,14 @@ export const parseWantRowsDetailed = (doc: ParentNode): ParsedWantRows => {
   let desktop = 0;
   const table = doc.querySelector('#WantsListTable') ?? doc;
   table.querySelectorAll<HTMLElement>('tbody tr[role="row"], tbody tr').forEach(tr => {
-    if (push(rowIdWant(tr), rowName(tr), rowListId(tr))) desktop++;
+    if (push(rowIdWant(tr), rowName(tr), rowListId(tr), tr)) desktop++;
   });
 
   // Mobile accordion (contributes any rows the table didn't already cover —
   // and is the sole source when the desktop table is JS-rendered/absent).
   let mobile = 0;
   doc.querySelectorAll<HTMLElement>('.accordion-item').forEach(item => {
-    if (push(rowIdWant(item), rowName(item), rowListId(item))) mobile++;
+    if (push(rowIdWant(item), rowName(item), rowListId(item), item)) mobile++;
   });
 
   // Marker-anchored fallback: any `.want-name` the passes above didn't cover.
@@ -247,7 +311,7 @@ export const parseWantRowsDetailed = (doc: ParentNode): ParsedWantRows => {
   doc.querySelectorAll<HTMLElement>('.want-name').forEach(nameEl => {
     const scope =
       nameEl.closest<HTMLElement>('.accordion-item, tr, li, h3') ?? nameEl.parentElement ?? nameEl;
-    if (push(rowIdWant(scope), nameEl.textContent, rowListId(scope))) mobile++;
+    if (push(rowIdWant(scope), nameEl.textContent, rowListId(scope), scope)) mobile++;
   });
 
   return { desktop, mobile, rows: out };
@@ -494,6 +558,8 @@ export const syncWants = async (
           idWant: row.idWant,
           listId: meta.id,
           listName: meta.name,
+          amount: row.amount,
+          quantityStatus: row.quantityStatus,
         });
       }
       lists.push({
@@ -576,6 +642,11 @@ export interface ParsedOffer {
   priceValue?: number;
   /** Absolute URL of the product page (for market price lookups). */
   productUrl?: string;
+  /**
+   * Copies available on this article row. Best-effort DOM parse; defaults to 1
+   * when Cardmarket doesn't expose a count.
+   */
+  quantity?: number;
   /** Seller username on the offer row (product pages). */
   seller?: string;
   /** Seller's country / item location, for shipping estimates. */
@@ -632,6 +703,33 @@ const sellerFromRow = (
     locRaw.replace(/^Item location:\s*/i, '').replace(/\s+/g, ' ').trim() || undefined;
 
   return { seller, sellerCountry, sellerRating, sellerSales, sellerUrl };
+};
+
+/**
+ * How many copies this article row offers. Cardmarket markup varies; when nothing
+ * clear is present we treat the row as a single copy.
+ */
+const quantityFromRow = (row: Element): number => {
+  const data =
+    row.getAttribute('data-amount') ||
+    row.getAttribute('data-qty') ||
+    row.getAttribute('data-quantity') ||
+    row.querySelector<HTMLInputElement>('input[name="amount"]')?.value ||
+    row.querySelector<HTMLSelectElement>('select[name="amount"]')?.value;
+  if (data) {
+    const n = Number.parseInt(data, 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const amountEl = row.querySelector(
+    '.amount-container, .item-count, .article-count, [class*="amount"]',
+  );
+  const raw = amountEl?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  const m = raw.match(/\b(\d{1,3})\b/);
+  if (m) {
+    const n = Number.parseInt(m[1], 10);
+    if (Number.isFinite(n) && n > 0 && n < 500) return n;
+  }
+  return 1;
 };
 
 /** Stock overview scraped from a seller's profile + Singles offers pages. */
@@ -1858,6 +1956,7 @@ export const parseOffers = (
       price,
       priceValue: value,
       productUrl,
+      quantity: quantityFromRow(row),
       ...sellerFromRow(row),
     });
   });
@@ -3580,6 +3679,8 @@ export const fetchSellersWithMostWants = async (
 export interface SellerListOffers {
   diagnostics: string[];
   offers: ParsedOffer[];
+  /** Seller / CM forces tracked postage (banner on their offers page). */
+  requireTracked?: boolean;
   requests: number;
 }
 
@@ -3602,5 +3703,10 @@ export const fetchSellerListOffers = async (
     onProgress,
     signal,
   );
-  return { diagnostics, offers: [...offers.values()], requests };
+  return {
+    diagnostics,
+    offers: [...offers.values()],
+    requireTracked: pageRequiresTrackedShipping(first.html) || undefined,
+    requests,
+  };
 };

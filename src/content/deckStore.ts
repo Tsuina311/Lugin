@@ -320,6 +320,21 @@ async replaceAll(decks: Deck[]): Promise<void> {
     await mutateDeck(id, d => ({ ...d, tagSections: [...tagSections] }));
   },
 
+  /**
+   * Pin a main-deck card into a tag section (or Main). `tagId` null clears the
+   * override so Scryfall auto-match applies again; `""` forces Main.
+   */
+  async setCardTagOverride(id: string, name: string, tagId: string | null): Promise<void> {
+    const key = cardKey(name);
+    await mutateDeck(id, d => {
+      const next = { ...(d.tagOverrides ?? {}) };
+      if (tagId == null) delete next[key];
+      else next[key] = tagId;
+      const tagOverrides = Object.keys(next).length > 0 ? next : undefined;
+      return { ...d, tagOverrides };
+    });
+  },
+
   subscribe(listener: () => void): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);

@@ -257,7 +257,7 @@ const ListPane = ({
 
   const snapCents = (name: string): number | undefined => {
     if (!snapshot) return undefined;
-    return priceOf({ name }, snapshot)?.cents;
+    return priceOf({ foil: false, name }, snapshot)?.cents;
   };
 
   const priceLine = (card: ListCard): { from?: string; snap?: string; trend?: string } => {
@@ -663,7 +663,7 @@ const ListPane = ({
       {/* `overscroll-contain`: reaching the end of a pane shouldn't hand the
           wheel to the page underneath the overlay. */}
       <div
-        className={`relative min-h-0 flex-1 overflow-y-auto overscroll-contain ${
+        className={`relative min-h-0 flex-1 overflow-y-auto overscroll-none ${
           over ? 'ring-2 ring-inset ring-accent' : ''
         }`}
         {...selection.listProps}
@@ -1077,7 +1077,9 @@ export const WantListsPanel = () => {
         };
         await wantsStore.applyIndex(next);
         await pace();
-      } else if (!next.lists.some(l => l.id === target.id)) {
+      }
+      if (!target) throw new Error('Missing Lugin Search list');
+      if (!next.lists.some(l => l.id === target.id)) {
         next = { ...next, lists: [...next.lists, target] };
         await wantsStore.applyIndex(next);
       }
@@ -1368,19 +1370,6 @@ export const WantListsPanel = () => {
               })();
             }}
           />
-          <BestSellersForList
-            key={sellerFocus?.wantListId ?? open.id}
-            autoLoad={sellerFocus?.autoLoad ?? false}
-            heading={
-              sellerFocus
-                ? `Best sellers for “${LUGIN_SEARCH_NAME}” (${sellerFocus.listCards.size} card${
-                    sellerFocus.listCards.size === 1 ? '' : 's'
-                  })`
-                : undefined
-            }
-            listCards={sellerFocus?.listCards ?? openListKeys}
-            wantListId={sellerFocus?.wantListId ?? open.id}
-          />
         </>
       )}
 
@@ -1480,50 +1469,67 @@ export const WantListsPanel = () => {
       {error && !open && <p className="px-2 py-1 text-2xs text-neg">{error}</p>}
 
       {open ? (
-        /* A flex row, not a grid: a grid's auto row takes its height from its
-           content, so a long list grew past the overlay instead of scrolling
-           inside it — and the wheel then reached the site behind us. */
-        <div className={`flex min-h-0 flex-1 ${compare ? 'divide-x divide-line' : ''}`}>
-          <ListPane
-            bulk={busy[`bulk:${open.id}`]}
-            cards={openCards}
-            list={open}
-            {...inFlight(open.id)}
-            metaByKey={metaByKey}
-            onBulk={(action, cards) => runBulk(open, action, cards)}
-            onDropWants={compare ? (payload, copy) => dropOnto(open, payload, copy) : undefined}
-            onRemove={card => removeWant(open, card)}
-            onSearchSellers={cards => searchSellersForSelection(open, cards)}
-            removing={removing}
-            searchSellersBusy={searchSellersBusy}
-            shape={shape}
-            shared={shared}
-            split={split}
-            targets={others}
+        /* Best-sellers sits above; the want-card list fills remaining height.
+           When the wizard grid is open it claims flex-1 inside BestSellersForList
+           and this list shrinks via min-h — never leave a blank flex gap on load. */
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <BestSellersForList
+            key={sellerFocus?.wantListId ?? open.id}
+            autoLoad={sellerFocus?.autoLoad ?? false}
+            heading={
+              sellerFocus
+                ? `Best sellers for “${LUGIN_SEARCH_NAME}” (${sellerFocus.listCards.size} card${
+                    sellerFocus.listCards.size === 1 ? '' : 's'
+                  })`
+                : undefined
+            }
+            listCards={sellerFocus?.listCards ?? openListKeys}
+            wantListId={sellerFocus?.wantListId ?? open.id}
           />
-          {compare && (
-            <ListPane
-              bulk={busy[`bulk:${compare.id}`]}
-              cards={compareCards}
-              list={compare}
-              {...inFlight(compare.id)}
-              metaByKey={metaByKey}
-              onBulk={(action, cards) => runBulk(compare, action, cards)}
-              onClose={() => setCompareId(null)}
-              onDropWants={(payload, copy) => dropOnto(compare, payload, copy)}
-              onPick={setCompareId}
-              onRemove={card => removeWant(compare, card)}
-              options={others}
-              removing={removing}
-              shape={shape}
-              shared={shared}
-              split={split}
-              targets={(index?.lists ?? []).filter(l => l.id !== compare.id)}
-            />
-          )}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-line">
+            <div className={`flex min-h-0 flex-1 ${compare ? 'divide-x divide-line' : ''}`}>
+              <ListPane
+                bulk={busy[`bulk:${open.id}`]}
+                cards={openCards}
+                list={open}
+                {...inFlight(open.id)}
+                metaByKey={metaByKey}
+                onBulk={(action, cards) => runBulk(open, action, cards)}
+                onDropWants={compare ? (payload, copy) => dropOnto(open, payload, copy) : undefined}
+                onRemove={card => removeWant(open, card)}
+                onSearchSellers={cards => searchSellersForSelection(open, cards)}
+                removing={removing}
+                searchSellersBusy={searchSellersBusy}
+                shape={shape}
+                shared={shared}
+                split={split}
+                targets={others}
+              />
+              {compare && (
+                <ListPane
+                  bulk={busy[`bulk:${compare.id}`]}
+                  cards={compareCards}
+                  list={compare}
+                  {...inFlight(compare.id)}
+                  metaByKey={metaByKey}
+                  onBulk={(action, cards) => runBulk(compare, action, cards)}
+                  onClose={() => setCompareId(null)}
+                  onDropWants={(payload, copy) => dropOnto(compare, payload, copy)}
+                  onPick={setCompareId}
+                  onRemove={card => removeWant(compare, card)}
+                  options={others}
+                  removing={removing}
+                  shape={shape}
+                  shared={shared}
+                  split={split}
+                  targets={(index?.lists ?? []).filter(l => l.id !== compare.id)}
+                />
+              )}
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-none">
           {lists.length === 0 ? (
             <EmptyState
               action={<Button onClick={sync}>Sync want lists</Button>}

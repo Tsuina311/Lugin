@@ -183,19 +183,24 @@ export const evaluateCaptureSafe = (args: {
       : CAPTURE_SAFE_EDGE_MARGIN;
   const marginPx = edgeMargin * minDim;
 
-  let minEdgeMarginNorm = Infinity;
-  let minCornerMarginPixelsAnalysis = Infinity;
+  let minEdgeMarginNorm: number | null = Infinity;
+  let minCornerMarginPixelsAnalysis: number | null = Infinity;
   let outOfFrame = false;
   let nearEdge = false;
   for (const p of q) {
     if (p.x < 0 || p.y < 0 || p.x > w || p.y > h) outOfFrame = true;
     const m = Math.min(p.x, p.y, w - p.x, h - p.y);
-    minCornerMarginPixelsAnalysis = Math.min(minCornerMarginPixelsAnalysis, m);
-    minEdgeMarginNorm = Math.min(minEdgeMarginNorm, m / minDim);
+    minCornerMarginPixelsAnalysis = Math.min(minCornerMarginPixelsAnalysis ?? Infinity, m);
+    minEdgeMarginNorm = Math.min(minEdgeMarginNorm ?? Infinity, m / minDim);
     if (m < marginPx) nearEdge = true;
   }
-  if (!Number.isFinite(minEdgeMarginNorm)) minEdgeMarginNorm = null;
-  if (!Number.isFinite(minCornerMarginPixelsAnalysis)) minCornerMarginPixelsAnalysis = null;
+  if (minEdgeMarginNorm == null || !Number.isFinite(minEdgeMarginNorm)) minEdgeMarginNorm = null;
+  if (
+    minCornerMarginPixelsAnalysis == null ||
+    !Number.isFinite(minCornerMarginPixelsAnalysis)
+  ) {
+    minCornerMarginPixelsAnalysis = null;
+  }
 
   // HARD GATE: true out-of-frame always blocks, independent of near_edge threshold.
   if (outOfFrame) reasons.push('out_of_frame');

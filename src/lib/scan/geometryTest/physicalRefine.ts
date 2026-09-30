@@ -135,13 +135,6 @@ const UNIT_QUAD: Quad = [
   { x: 0, y: 1 },
 ];
 
-const cornersToPts = (c: CardCorners): Point[] => [
-  c.topLeft,
-  c.topRight,
-  c.bottomRight,
-  c.bottomLeft,
-];
-
 const ptsToCorners = (pts: Point[]): CardCorners => ({
   topLeft: pts[0]!,
   topRight: pts[1]!,
@@ -179,13 +172,13 @@ const isConvexPts = (pts: Point[]): boolean => {
   return sign !== 0;
 };
 
-const aspectOfPts = (pts: Point[]): number => {
+const aspectOfPts = (pts: readonly Point[]): number => {
   const w = (dist(pts[0]!, pts[1]!) + dist(pts[3]!, pts[2]!)) / 2;
   const h = (dist(pts[0]!, pts[3]!) + dist(pts[1]!, pts[2]!)) / 2;
   return w / Math.max(h, 1e-6);
 };
 
-const quadAreaPts = (pts: Point[]): number => {
+const quadAreaPts = (pts: readonly Point[]): number => {
   let a = 0;
   for (let i = 0; i < 4; i++) {
     const p = pts[i]!;
@@ -199,8 +192,7 @@ export const quadOccupancy = (
   corners: CardCorners,
   frame: { width: number; height: number },
 ): number => {
-  const q = cornersToQuad(corners) as Quad;
-  return quadAreaPts(q) / Math.max(1, frame.width * frame.height);
+  return quadAreaPts(cornersToQuad(corners)) / Math.max(1, frame.width * frame.height);
 };
 
 const median = (xs: number[]): number => {
@@ -615,12 +607,12 @@ export const refinePhysicalCardBoundary = (args: {
   }
 
   const frame = args.frame ?? { width: img.width, height: img.height };
-  const pts0 = cornersToPts(args.corners);
+  const pts0 = cornersToQuad(args.corners);
   const minSide = Math.min(
-    dist(pts0[0]!, pts0[1]!),
-    dist(pts0[1]!, pts0[2]!),
-    dist(pts0[2]!, pts0[3]!),
-    dist(pts0[3]!, pts0[0]!),
+    dist(pts0[0], pts0[1]),
+    dist(pts0[1], pts0[2]),
+    dist(pts0[2], pts0[3]),
+    dist(pts0[3], pts0[0]),
   );
   if (minSide < 24) {
     return baseResult({
@@ -648,7 +640,7 @@ export const refinePhysicalCardBoundary = (args: {
 
   let HuvToImg: Float64Array;
   try {
-    HuvToImg = homographyDestToSrc(pts0 as Quad, UNIT_QUAD);
+    HuvToImg = homographyDestToSrc(pts0, UNIT_QUAD);
   } catch {
     return baseResult({
       corners: args.corners,

@@ -47,7 +47,6 @@ import {
   describeArtwork,
   recognizeCapturedCard,
   sharpnessScore,
-  type CapturedRecognitionResult,
   type DetectResult,
   type FrameHelpers,
   type RecognizeDeps,
@@ -78,7 +77,6 @@ import {
   markFirstVerified,
   matchAttemptByArtifacts,
   mayPublishAttemptToUi,
-  terminalStatusFromCapture,
   assessWarpSuspect,
   validateWarpInput,
   classifyGeometryFailure,
@@ -110,9 +108,7 @@ import { getSingleScanWorkflow } from './singleScanWorkflow';
 import { setGeometryTraceContext } from './geometryTrace';
 import type { LabQuadSet } from '@/lib/scan/scannerLab/types';
 import { durationMs, monoNow } from '@/lib/scan/timing';
-import { foldName } from '@/lib/scan/matchName';
 import {
-  correctionTypeFor,
   createNormalScanParentSession,
   nextNormalScanChildId,
   printingRef,
@@ -2140,7 +2136,7 @@ export const useScanSession = (opts: {
     // Never fall back to titleTopCandidate / React caches for CURRENT identity.
     const rawStatus = identityOwnedByCurrentSession
       ? snap.postLock?.recognitionStatus ?? snap.phase
-      : snap.phase === 'found' || snap.phase === 'ambiguous' || snap.phase === 'identified'
+      : snap.phase === 'found' || snap.phase === 'ambiguous'
         ? 'focusing'
         : snap.postLock?.recognitionStatus &&
             snap.postLock.recognitionStatus !== 'found' &&
@@ -2199,7 +2195,7 @@ export const useScanSession = (opts: {
       (det?.recognitionQuadValid !== false ? det?.recognitionCorners ?? null : null) ??
       det?.corners ??
       null;
-    const scoreRaw = det?.score ?? gates?.detectorScore ?? det?.debug?.score ?? 0;
+    const scoreRaw = det?.score ?? gates?.detectorScore ?? 0;
     const score = typeof scoreRaw === 'number' && Number.isFinite(scoreRaw) ? scoreRaw : 0;
     const frame = analysis
       ? { width: analysis.width, height: analysis.height }

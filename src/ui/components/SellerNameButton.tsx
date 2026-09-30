@@ -9,11 +9,14 @@ export const SellerNameButton = ({
   className = 'truncate font-medium text-accent hover:underline',
   name,
   url,
+  wantListId,
 }: {
   className?: string;
   name: string;
   /** Profile or offers URL when known. */
   url?: string | null;
+  /** Prefer Cardmarket’s want-list filter when opening from Best Sellers. */
+  wantListId?: string | null;
 }) => {
   const profile = sellerStockUrls(name, url)?.profile;
 
@@ -24,9 +27,13 @@ export const SellerNameButton = ({
         onClick={e => {
           e.stopPropagation();
           e.preventDefault();
-          sellerBrowseStore.request(name, url ?? undefined);
+          sellerBrowseStore.request(name, url ?? undefined, undefined, wantListId ?? undefined);
         }}
-        title={`Browse ${name}'s stock in Lugin`}
+        title={
+          wantListId
+            ? `Browse ${name}'s stock for this want list in Lugin`
+            : `Browse ${name}'s stock in Lugin`
+        }
         type="button"
       >
         {name}
@@ -38,7 +45,10 @@ export const SellerNameButton = ({
           label={`Open ${name} on Cardmarket`}
           onClick={e => {
             e.stopPropagation();
-            window.open(profile, '_blank', 'noopener,noreferrer');
+            const href = wantListId
+              ? `${profile.replace(/\/?$/, '')}/Offers/Singles?idWantslist=${encodeURIComponent(wantListId)}`
+              : profile;
+            window.open(href, '_blank', 'noopener,noreferrer');
           }}
           size="xs"
           tone="default"

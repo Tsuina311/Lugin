@@ -531,30 +531,6 @@ export function CameraScanScreen(props?: {
       .finally(() => setQualityBusy(false));
   }, [focusPoint, qualityBusy, session]);
 
-  const onCaptureFocusSeries = useCallback(() => {
-    if (seriesBusy) return;
-    if (!claimScannerMode('focus-series')) return;
-    setSeriesBusy(true);
-    setSaveStatus('Focus series… keep the card in the preview');
-    void session
-      .captureFocusSeries()
-      .then(run => {
-        setSeriesDraft(run);
-        const named = run.samples.find(s => s.ocr.matchName)?.ocr.matchName ?? '';
-        setSeriesLabel(named);
-        setSaveStatus(
-          `Focus series ready · ${run.samples.map(s => `T${s.nominalDelayMs}:${s.metrics.titleSharpness.toFixed(0)}`).join(' ')}`,
-        );
-      })
-      .catch(err => {
-        setSaveStatus(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        setSeriesBusy(false);
-        releaseScannerMode('focus-series');
-      });
-  }, [seriesBusy, session]);
-
   const onSaveFocusSeries = useCallback(() => {
     if (!seriesDraft) return;
     setSeriesBusy(true);

@@ -19,7 +19,6 @@ import {
   emptyGeometryLockState,
   tickGeometryLock,
   quadsAgreeForGeometryLock,
-  meanNormalizedCornerMove,
 } from '../geometryTest/lock';
 import { compareQuads } from '../session/postLock';
 import { refinePhysicalCardBoundary } from '../geometryTest/physicalRefine';
@@ -30,7 +29,6 @@ import {
   geometryDelta,
   incumbentSwitchesPerSecond,
   tickIncumbent,
-  type IncumbentState,
 } from './incumbent';
 import {
   emptyRecentSafeWindow,
@@ -106,7 +104,6 @@ const lockResetReason = (args: {
   if (args.decision !== 'confirming' && args.decision !== 'none') return null;
   if (!args.prev) return null;
   const iou = compareQuads(args.prev, args.next).iou;
-  const move = meanNormalizedCornerMove(args.prev, args.next);
   if (!quadsAgreeForGeometryLock(args.prev, args.next)) {
     if (iou < 0.75) return 'QUAD_IOU_DISAGREEMENT';
     return 'CORNER_MOTION';

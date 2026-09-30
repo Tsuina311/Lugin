@@ -73,7 +73,7 @@ export const nextNormalScanChildId = (parent: NormalScanParentSession): string =
 };
 
 export const printingRef = (
-  p: ScryfallPrinting | null | undefined,
+  p: Pick<ScryfallPrinting, 'collectorNumber' | 'setCode'> | null | undefined,
 ): { collectorNumber: string; setCode: string } | null =>
   p ? { collectorNumber: p.collectorNumber, setCode: p.setCode } : null;
 

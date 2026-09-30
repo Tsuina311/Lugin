@@ -20,6 +20,16 @@ export const SELECTORS = {
     row: '.table-body .row, table tbody tr',
   },
 
+  // --- Want list (`/Wants/<id>`) -------------------------------------------
+  wants: {
+    /**
+     * Amount cell on a want row. Prefer `td[data-amount]` (structured) over
+     * `.amount` text — Cardmarket export scripts and MKM Helper rely on the
+     * data-attribute path.
+     */
+    amount: 'td[data-amount], td.amount, .col-amount, .amount',
+  },
+
   // --- Product page (single card) -----------------------------------------
   product: {
     image: '.image img, img.card-image, #image img',

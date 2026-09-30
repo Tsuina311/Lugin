@@ -50,8 +50,11 @@ export const ocrEvidenceFromRecognize = (result: RecognizeResult): RecognitionOc
   const second = result.titleCandidates[1] ?? null;
   const raw = result.ocrDebug?.result.rawText ?? result.readings[0]?.text ?? '';
   return {
-    titleCropDimensions: result.ocrDebug?.rawCrop
-      ? { width: result.ocrDebug.rawCrop.width, height: result.ocrDebug.rawCrop.height }
+    titleCropDimensions: result.ocrDebug?.images?.titleCropRaw
+      ? {
+          width: result.ocrDebug.images.titleCropRaw.width,
+          height: result.ocrDebug.images.titleCropRaw.height,
+        }
       : null,
     ocrRawText: raw || null,
     ocrNormalizedText: raw ? foldName(raw) : null,
