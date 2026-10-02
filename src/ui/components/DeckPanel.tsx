@@ -4,6 +4,7 @@ import { Badge } from './Badge';
 import { BracketMark } from './BracketMark';
 import { Button } from './Button';
 import { CollectionThumb } from './CollectionThumb';
+import { CommanderPicker } from './CommanderPicker';
 import { CutsPanel } from './CutsPanel';
 import { DeckCardTagMove } from './DeckCardTagMove';
 import { DeckFromWants } from './DeckFromWants';
@@ -188,6 +189,11 @@ export const DeckPanel = () => {
           loading={loading}
           onCreate={async format => setEditingId(await deckStore.create('New deck', format))}
           onOpen={setEditingId}
+          onPickCommander={async name => {
+            const id = await deckStore.create(name, 'commander');
+            await deckStore.addCard(id, name, 'commander', 1);
+            setEditingId(id);
+          }}
           onUpload={() => fileInput.current?.click()}
         />
       )}
@@ -225,6 +231,7 @@ const DeckList = ({
   loading,
   onCreate,
   onOpen,
+  onPickCommander,
   onUpload,
 }: {
   collectionByKey: OwnedIndex;
@@ -233,9 +240,11 @@ const DeckList = ({
   loading: boolean;
   onCreate: (format: DeckFormat) => void;
   onOpen: (id: string) => void;
+  onPickCommander: (name: string) => void;
   onUpload: () => void;
 }) => {
   const [newFormat, setNewFormat] = useState<DeckFormat>('commander');
+  const [picking, setPicking] = useState(false);
   const preview = useCardPreview();
   const selection = useRowSelection(decks.map(d => d.id));
 
@@ -246,6 +255,27 @@ const DeckList = ({
 
   const needToBuy = (deck: Deck): number =>
     deckShortfall(deck.cards, collectionByKey).reduce((n, m) => n + m.need, 0);
+
+  const startDeck = (): void => {
+    if (newFormat === 'commander') setPicking(true);
+    else onCreate(newFormat);
+  };
+
+  if (picking) {
+    return (
+      <CommanderPicker
+        onCancel={() => setPicking(false)}
+        onPick={name => {
+          setPicking(false);
+          onPickCommander(name);
+        }}
+        onSkip={() => {
+          setPicking(false);
+          onCreate('commander');
+        }}
+      />
+    );
+  }
 
   return (
     <>
@@ -266,7 +296,7 @@ const DeckList = ({
             ))}
           </Select>
           <IconButton icon={Upload} label="Upload a decklist file" onClick={onUpload} />
-          <Button icon={Plus} onClick={() => onCreate(newFormat)} variant="primary">
+          <Button icon={Plus} onClick={startDeck} variant="primary">
             New deck
           </Button>
         </div>
@@ -288,7 +318,7 @@ const DeckList = ({
         <EmptyState
           action={
             <div className="flex items-center gap-1">
-              <Button icon={Plus} onClick={() => onCreate(newFormat)} variant="primary">
+              <Button icon={Plus} onClick={startDeck} variant="primary">
                 New {formatInfo(newFormat).label} deck
               </Button>
               <Button icon={Upload} onClick={onUpload} variant="neutral">
@@ -645,7 +675,11 @@ const DeckEditor = ({
   const canAddSecondCommander =
     commanders.length === 1 && (firstUnrecognized || allowsSecondCommander(firstCmdInfo));
   const [pickingPartner, setPickingPartner] = useState(false);
-  useEffect(() => setPickingPartner(false), [deck.id]);
+  const [browsingCommanders, setBrowsingCommanders] = useState(false);
+  useEffect(() => {
+    setPickingPartner(false);
+    setBrowsingCommanders(false);
+  }, [deck.id]);
   const commanderSearch = commanders.length === 0 || (pickingPartner && canAddSecondCommander);
 
   // Add a commander. We never block the add (the user knows their cards) — if the
@@ -938,6 +972,21 @@ const DeckEditor = ({
   }${landCounts.total} lands${
     landTarget != null ? `, aiming for ${landTarget}` : ''
   } — click for the full curve and land settings`;
+
+  if (browsingCommanders && fmt.commanderZone) {
+    return (
+      <CommanderPicker
+        cancelLabel="Deck"
+        onCancel={() => setBrowsingCommanders(false)}
+        onPick={name => {
+          setBrowsingCommanders(false);
+          setPickingPartner(false);
+          void addCommander(name);
+        }}
+        title={commanders.length === 0 ? 'Choose a commander' : 'Choose a partner'}
+      />
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -1408,8 +1457,29 @@ const DeckEditor = ({
                         })}
                       </ul>
                     ))}
+                  {commanders.length === 0 && (
+                    <div className="px-2 pt-2">
+                      <Button
+                        onClick={() => setBrowsingCommanders(true)}
+                        size="sm"
+                        variant="primary"
+                      >
+                        Choose a commander
+                      </Button>
+                    </div>
+                  )}
                   {commanderSearch && (
                     <div className="flex items-start gap-1 p-1.5">
+                      {commanders.length > 0 && (
+                        <Button
+                          className="flex-none"
+                          onClick={() => setBrowsingCommanders(true)}
+                          size="sm"
+                          variant="neutral"
+                        >
+                          Browse
+                        </Button>
+                      )}
                       <div className="min-w-0 flex-1">
                         <AddCardBox
                           deckFormat={deck.format}

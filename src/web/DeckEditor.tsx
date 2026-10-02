@@ -42,17 +42,18 @@ import { bucketMainByTagSections, type TagSectionBucket } from '@/lib/deckTagSec
 import { deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
 import { fetchEdhrec } from '@/lib/edhrec';
 import { fetchRemote } from '@/lib/fetchRemote';
-import { fetchGoldfishArchetype } from '@/lib/mtggoldfish';
 import { sortWubrg } from '@/lib/mtg';
+import { fetchGoldfishArchetype } from '@/lib/mtggoldfish';
 import { searchCards } from '@/lib/search';
 import { BracketMark } from '@/ui/components/BracketMark';
 import { CollectionThumb } from '@/ui/components/CollectionThumb';
+import { CommanderPicker } from '@/ui/components/CommanderPicker';
 import { CutsPanel } from '@/ui/components/CutsPanel';
-import { TagsPanel } from '@/ui/components/TagsPanel';
+import { DeckCardTagMove } from '@/ui/components/DeckCardTagMove';
 import { EdhrecPanel } from '@/ui/components/EdhrecPanel';
 import { GoldfishPanel } from '@/ui/components/GoldfishPanel';
+import { TagsPanel } from '@/ui/components/TagsPanel';
 import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
-import { DeckCardTagMove } from '@/ui/components/DeckCardTagMove';
 
 const SECTIONS: readonly { id: DeckSection; label: string }[] = [
   { id: 'commander', label: 'Commander' },
@@ -131,8 +132,12 @@ export const DeckEditor = ({
   const [into, setInto] = useState<DeckSection>('main');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [panel, setPanel] = useState<DeckPanel>('deck');
+  const [browsingCommanders, setBrowsingCommanders] = useState(false);
 
-  useEffect(() => setPanel('deck'), [deck.id]);
+  useEffect(() => {
+    setPanel('deck');
+    setBrowsingCommanders(false);
+  }, [deck.id]);
 
   const [view, setView] = useState<ViewShape>(() => {
     try {
@@ -400,6 +405,22 @@ export const DeckEditor = ({
     }));
   };
 
+  if (browsingCommanders) {
+    return (
+      <CommanderPicker
+        cancelLabel="Deck"
+        onCancel={() => setBrowsingCommanders(false)}
+        onPick={name => {
+          setBrowsingCommanders(false);
+          void syncStore.updateDeck(deck.id, d => ({
+            ...d,
+            cards: mergeDeckCards(d.cards, [{ name, quantity: 1, section: 'commander' }]),
+          }));
+        }}
+      />
+    );
+  }
+
   return (
     <div>
       <div className="sticky top-0 z-10 border-b border-line bg-canvas/95 px-2 py-2 backdrop-blur">
@@ -479,9 +500,18 @@ export const DeckEditor = ({
           </button>
         </div>
         {formatInfo(deck.format).commanderZone && commanders.length === 0 ? (
-          <p className="mt-1 px-2 text-[11px] text-ink-faint">
-            Add a commander to unlock EDHREC, Goldfish and cut suggestions.
-          </p>
+          <div className="mt-1 flex items-center gap-2 px-2">
+            <button
+              className="shrink-0 rounded-md bg-accent px-2.5 py-1.5 text-xs font-semibold text-accent-ink"
+              onClick={() => setBrowsingCommanders(true)}
+              type="button"
+            >
+              Choose a commander
+            </button>
+            <p className="min-w-0 text-[11px] text-ink-faint">
+              Unlocks EDHREC, Goldfish and cut suggestions.
+            </p>
+          </div>
         ) : null}
         {deckTabs.length > 1 ? (
           <div className="mt-2 flex gap-1 overflow-x-auto px-2 pb-1" role="tablist">
@@ -789,21 +819,21 @@ export const DeckEditor = ({
             const qty = (cards: DeckCard[]) => cards.reduce((sum, c) => sum + c.quantity, 0);
 
             const overviewBlocks: {
+              cards: DeckCard[];
               key: string;
               label: string;
-              cards: DeckCard[];
               removable?: string;
             }[] = [];
             const commanders = deck.cards.filter(c => c.section === 'commander');
             if (commanders.length > 0) {
-              overviewBlocks.push({ key: 'commander', label: 'Commander', cards: commanders });
+              overviewBlocks.push({ cards: commanders, key: 'commander', label: 'Commander' });
             }
             for (const bucket of tagBuckets) {
               if (bucket.cards.length === 0 && !tagBucketsLoading) continue;
               overviewBlocks.push({
+                cards: bucket.cards,
                 key: `tag:${bucket.tagId}`,
                 label: bucket.label,
-                cards: bucket.cards,
                 removable: bucket.tagId,
               });
             }
@@ -816,12 +846,12 @@ export const DeckEditor = ({
                   ? deck.cards.filter(c => c.section === 'main')
                   : mainRest;
               if (main.length > 0) {
-                overviewBlocks.push({ key: 'main', label: 'Main deck', cards: main });
+                overviewBlocks.push({ cards: main, key: 'main', label: 'Main deck' });
               }
             }
             const side = deck.cards.filter(c => c.section === 'sideboard');
             if (side.length > 0) {
-              overviewBlocks.push({ key: 'sideboard', label: 'Sideboard', cards: side });
+              overviewBlocks.push({ cards: side, key: 'sideboard', label: 'Sideboard' });
             }
 
             return overviewBlocks.map(block => (

@@ -8,8 +8,8 @@
 // a full Scryfall query field. `total` is surfaced so the UI can decide when the
 // result set is small enough to show card images.
 
-import { fetchRemote } from './fetchRemote';
 import type { DeckFormat } from './deck';
+import { fetchRemote } from './fetchRemote';
 
 export interface CardSearchResult {
   cmc?: number;
@@ -24,6 +24,8 @@ export interface CardSearchResult {
   imageUrl?: string;
   name: string;
   setCode?: string;
+  /** Smaller scan for a grid. The hover preview still uses `imageUrl`. */
+  thumbUrl?: string;
   typeLine?: string;
 }
 
@@ -35,18 +37,23 @@ export interface CardSearchResponse {
   total: number;
 }
 
+/** One Scryfall page, plus the URL of the next page when there is one. */
+export interface CardSearchPage extends CardSearchResponse {
+  next: string | null;
+}
+
 /** The structured search the UI collects. */
 export interface CardQuery {
   cmcMax?: number;
   cmcMin?: number;
+  /** Restrict to cards legal in this deck format; omitted or freeform = no restriction. */
+  format?: DeckFormat;
   /**
    * Restrict to cards playable under this color identity (Commander's rule:
    * the card's identity must be a subset). An empty array means colorless only;
    * `undefined` means no restriction.
    */
   identity?: string[];
-  /** Restrict to cards legal in this deck format; omitted or freeform = no restriction. */
-  format?: DeckFormat;
   /** A subtype — creature type, land type, … ("Wolf"). */
   subtype?: string;
   /** Free text: bare words match names, Scryfall operators pass through. */
@@ -68,6 +75,8 @@ interface ScryfallCard {
 
 interface ScryfallList {
   data?: ScryfallCard[];
+  has_more?: boolean;
+  next_page?: string;
   total_cards?: number;
 }
 
@@ -111,6 +120,7 @@ const toResult = (c: ScryfallCard): CardSearchResult => {
     imageUrl: images?.normal ?? images?.large ?? images?.small,
     name: c.name,
     setCode: c.set,
+    thumbUrl: images?.small ?? images?.normal,
     typeLine: c.type_line,
   };
 };
@@ -187,20 +197,22 @@ export const hasSearchCriteria = (q: CardQuery): boolean =>
   q.cmcMax != null;
 
 /**
- * Run a raw Scryfall query (one printing per card, alphabetical).
+ * One page of a Scryfall search. Pass `next` to continue a previous page.
+ * `order: 'edhrec'` puts the most-played cards first.
  */
-export const searchScryfallQuery = async (
+export const searchScryfallPage = async (
   query: string,
-  limit = 50,
-  format?: DeckFormat,
-): Promise<CardSearchResponse> => {
-  const trimmed = applyDefaultSearchFilters(query, { format });
-  if (!trimmed) return { cards: [], query: '', total: 0 };
+  options: { format?: DeckFormat; next?: string | null; order?: 'edhrec' | 'name' } = {},
+): Promise<CardSearchPage> => {
+  const trimmed = options.next ? query : applyDefaultSearchFilters(query, { format: options.format });
+  if (!options.next && !trimmed) return { cards: [], next: null, query: '', total: 0 };
 
-  const url = `${SEARCH_URL}?order=name&unique=cards&dir=asc&q=${encodeURIComponent(trimmed)}`;
+  const url =
+    options.next ??
+    `${SEARCH_URL}?order=${options.order ?? 'name'}&unique=cards&dir=asc&q=${encodeURIComponent(trimmed)}`;
   const res = await fetchRemote(url, 'application/json');
   if (!res.ok) {
-    if (res.status === 404) return { cards: [], query: trimmed, total: 0 };
+    if (res.status === 404) return { cards: [], next: null, query: trimmed, total: 0 };
     if (res.status === 400) throw new Error('That search isn’t valid Scryfall syntax.');
     if (res.status === 429) {
       throw new Error('Scryfall is rate-limiting right now — wait a second and try again.');
@@ -210,10 +222,23 @@ export const searchScryfallQuery = async (
   const json = JSON.parse(res.body) as ScryfallList;
   const data = json.data ?? [];
   return {
-    cards: data.slice(0, limit).map(toResult),
+    cards: data.map(toResult),
+    next: json.has_more && json.next_page ? json.next_page : null,
     query: trimmed,
     total: json.total_cards ?? data.length,
   };
+};
+
+/**
+ * Run a raw Scryfall query (one printing per card, alphabetical).
+ */
+export const searchScryfallQuery = async (
+  query: string,
+  limit = 50,
+  format?: DeckFormat,
+): Promise<CardSearchResponse> => {
+  const page = await searchScryfallPage(query, { format });
+  return { cards: page.cards.slice(0, limit), query: page.query, total: page.total };
 };
 
 /**

@@ -47,6 +47,7 @@ await writeFile(
    export * from '${root}src/lib/table';
    export * from '${root}src/lib/deckTags';
    export { applyDefaultSearchFilters } from '${root}src/lib/search';
+   export { commanderQuery } from '${root}src/lib/commanders';
    export { goldfishArchetypeSlug } from '${root}src/lib/mtggoldfish';`,
 );
 
@@ -126,6 +127,7 @@ const {
   buildTagsQuery,
   deckTagById,
   applyDefaultSearchFilters,
+  commanderQuery,
   goldfishArchetypeSlug,
   expansionOptionsFrom,
   inventoryIdsFromHtml,
@@ -1806,6 +1808,19 @@ check('deck tags filter by label, category, and synonyms', () => {
   assert.ok(filterDeckTags("city's blessing").some(t => t.id === 'city-blessing'));
   assert.ok(filterDeckTags('dungeon').some(t => t.id === 'dungeon'));
   assert.ok(filterDeckTags('initiative').some(t => t.id === 'dungeon'));
+});
+
+check('Commander picker asks for legal commanders with rules text', () => {
+  assert.equal(commanderQuery(), 'is:commander legal:commander o:/./ game:paper');
+  assert.match(commanderQuery({ identity: ['U', 'W'] }), /id<=wu/);
+  assert.match(commanderQuery({ colorless: true, identity: ['R'] }), /id=c/);
+  assert.doesNotMatch(commanderQuery({ colorless: true, identity: ['R'] }), /id<=/);
+  assert.match(commanderQuery({ rarities: ['uncommon'] }), /r:uncommon/);
+  assert.match(commanderQuery({ rarities: ['mythic', 'rare'] }), /\(r:rare or r:mythic\)/);
+  assert.match(commanderQuery({ name: 'Atraxa' }), /name:Atraxa/);
+  const draw = deckTagById('draw');
+  assert.ok(draw);
+  assert.match(commanderQuery({ tagIds: ['draw'] }), /o:"draw"/);
 });
 
 check('Scryfall search excludes Arena-only cards by default', () => {

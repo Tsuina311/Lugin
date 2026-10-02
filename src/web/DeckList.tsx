@@ -27,6 +27,7 @@ import { DECK_FORMATS, deckShortfall, formatInfo, type Deck, type DeckFormat } f
 import { deckFile } from '@/lib/export';
 import { BracketMark } from '@/ui/components/BracketMark';
 import { CollectionThumb } from '@/ui/components/CollectionThumb';
+import { CommanderPicker } from '@/ui/components/CommanderPicker';
 
 const copies = (deck: Deck): number =>
   deck.cards
@@ -123,6 +124,7 @@ export const DeckList = ({
   const [openId, setOpenId] = useState<string | null>(null);
   const [format, setFormat] = useState<DeckFormat>('commander');
   const [pasting, setPasting] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -137,6 +139,22 @@ export const DeckList = ({
     setError(null);
     try {
       setOpenId(await syncStore.createDeck(format));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pickCommander = async (name: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const id = await syncStore.createDeck('commander', name);
+      await syncStore.updateDeck(id, deck => ({
+        ...deck,
+        cards: [...deck.cards, { name, quantity: 1, section: 'commander' }],
+      }));
+      setPicking(false);
+      setOpenId(id);
     } finally {
       setBusy(false);
     }
@@ -160,6 +178,19 @@ export const DeckList = ({
 
   const sorted = [...decks].sort((a, b) => b.updatedAt - a.updatedAt);
 
+  if (picking) {
+    return (
+      <CommanderPicker
+        onCancel={() => setPicking(false)}
+        onPick={name => void pickCommander(name)}
+        onSkip={() => {
+          setPicking(false);
+          void create();
+        }}
+      />
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center gap-2 border-b border-line px-4 py-3">
@@ -167,7 +198,10 @@ export const DeckList = ({
         <button
           className="flex-1 rounded-lg bg-accent py-2.5 text-sm font-semibold text-accent-ink disabled:opacity-40"
           disabled={busy}
-          onClick={() => void create()}
+          onClick={() => {
+            if (format === 'commander') setPicking(true);
+            else void create();
+          }}
           type="button"
         >
           New deck
