@@ -46,7 +46,7 @@ await writeFile(
    export { shouldWelcome } from '${root}src/ui/firstRun';
    export * from '${root}src/lib/table';
    export * from '${root}src/lib/deckTags';
-   export { applyDefaultSearchFilters } from '${root}src/lib/search';
+   export { applyDefaultSearchFilters, buildScryfallQuery, hasSearchCriteria } from '${root}src/lib/search';
    export { commanderQuery } from '${root}src/lib/commanders';
    export { goldfishArchetypeSlug } from '${root}src/lib/mtggoldfish';`,
 );
@@ -127,7 +127,9 @@ const {
   buildTagsQuery,
   deckTagById,
   applyDefaultSearchFilters,
+  buildScryfallQuery,
   commanderQuery,
+  hasSearchCriteria,
   goldfishArchetypeSlug,
   expansionOptionsFrom,
   inventoryIdsFromHtml,
@@ -1821,6 +1823,16 @@ check('Commander picker asks for legal commanders with rules text', () => {
   const draw = deckTagById('draw');
   assert.ok(draw);
   assert.match(commanderQuery({ tagIds: ['draw'] }), /o:"draw"/);
+});
+
+check('add-card search can be narrowed by deck tags', () => {
+  assert.equal(
+    buildScryfallQuery({ tagIds: ['draw', 'flying'], text: 'bolt' }),
+    'name:bolt (o:"draw") (keyword:flying)',
+  );
+  assert.equal(hasSearchCriteria({ tagIds: ['draw'] }), true);
+  assert.equal(hasSearchCriteria({}), false);
+  assert.equal(hasSearchCriteria({ identity: ['W'] }), false);
 });
 
 check('Scryfall search excludes Arena-only cards by default', () => {

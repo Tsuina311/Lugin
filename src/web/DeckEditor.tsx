@@ -283,6 +283,14 @@ export const DeckEditor = ({
 
   const [remote, setRemote] = useState<string[]>([]);
   const [recNames, setRecNames] = useState<string[]>([]);
+  const [addTags, setAddTags] = useState<Set<string>>(() => new Set());
+  const [addTagQuery, setAddTagQuery] = useState('');
+  const [addTagsOpen, setAddTagsOpen] = useState(false);
+  const addTagGroups = useMemo(
+    () => deckTagsByCategory(filterDeckTags(addTagQuery)),
+    [addTagQuery],
+  );
+  const addTagIds = useMemo(() => [...addTags].sort(), [addTags]);
 
   useEffect(() => {
     if (!commanderRecs) {
@@ -313,7 +321,8 @@ export const DeckEditor = ({
   }, [commanderRecs, commandersKey, commanders]);
 
   const needle = adding.trim();
-  const canSuggest = needle.length >= 2 && !adding.includes('\n');
+  const browsingTags = addTagIds.length > 0 && !adding.includes('\n');
+  const canSuggest = (needle.length >= 2 && !adding.includes('\n')) || browsingTags;
 
   useEffect(() => {
     if (!canSuggest) {
@@ -322,7 +331,15 @@ export const DeckEditor = ({
     }
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void searchCards({ format: deck.format, text: needle }, SUGGESTIONS)
+      void searchCards(
+        {
+          format: deck.format,
+          identity: browsingTags ? commanderIdentity : undefined,
+          tagIds: browsingTags ? addTagIds : undefined,
+          text: needle.length >= 2 ? needle : undefined,
+        },
+        browsingTags ? 24 : SUGGESTIONS,
+      )
         .then(resp => {
           if (!cancelled) setRemote(resp.cards.map(c => c.name));
         })
@@ -334,14 +351,17 @@ export const DeckEditor = ({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [canSuggest, deck.format, needle]);
+  }, [addTagIds, browsingTags, canSuggest, commanderIdentity, deck.format, needle]);
 
   // Scryfall, collection, EDHREC and Goldfish — deduped, then sorted A→Z.
   // Owned cards get a green tint in the UI but don't jump to the front.
   const suggestions = useMemo((): { name: string; owned: boolean }[] => {
     if (!canSuggest) return [];
-    const key = cardKey(needle);
     const ownedOf = (name: string): boolean => (collection?.byKey[cardKey(name)]?.total ?? 0) > 0;
+    if (browsingTags) {
+      return remote.slice(0, 24).map(name => ({ name, owned: ownedOf(name) }));
+    }
+    const key = cardKey(needle);
     const local = collection
       ? Object.values(collection.byKey)
           .filter(row => cardKey(row.name).includes(key))
@@ -360,7 +380,7 @@ export const DeckEditor = ({
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
       .slice(0, SUGGESTIONS)
       .map(name => ({ name, owned: ownedOf(name) }));
-  }, [canSuggest, collection, needle, recNames, remote]);
+  }, [browsingTags, canSuggest, collection, needle, recNames, remote]);
 
   const add = (text: string) => {
     const { cards } = parseDeckList(text);
@@ -701,6 +721,84 @@ export const DeckEditor = ({
               >
                 Add
               </button>
+            </div>
+            <div className="mt-2">
+              <button
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                  addTagsOpen || addTags.size > 0
+                    ? 'border-accent/40 bg-accent-soft text-accent'
+                    : 'border-line-strong text-ink-muted'
+                }`}
+                onClick={() => setAddTagsOpen(open => !open)}
+                type="button"
+              >
+                Tags{addTags.size > 0 ? ` ${addTags.size}` : ''}
+              </button>
+              {addTagIds.length > 0 ? (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {addTagIds.map(id => (
+                    <button
+                      key={id}
+                      className="rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent"
+                      onClick={() =>
+                        setAddTags(current => {
+                          const next = new Set(current);
+                          next.delete(id);
+                          return next;
+                        })
+                      }
+                      type="button"
+                    >
+                      {deckTagById(id)?.label ?? id} ×
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {addTagsOpen ? (
+                <div className="mt-2 rounded-lg border border-line bg-raised p-2">
+                  <input
+                    aria-label="Search tags"
+                    className="mb-2 w-full rounded-md border border-line-strong bg-panel px-2 py-1.5 text-sm text-ink placeholder:text-ink-faint"
+                    onChange={event => setAddTagQuery(event.target.value)}
+                    placeholder="Draw, tokens, elf…"
+                    type="search"
+                    value={addTagQuery}
+                  />
+                  <div className="max-h-48 overflow-auto">
+                    {addTagGroups.map(group => (
+                      <div key={group.category} className="mb-2">
+                        <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                          {group.category}
+                        </p>
+                        <ul className="mt-1 flex flex-wrap gap-1">
+                          {group.tags.map(tag => (
+                            <li key={tag.id}>
+                              <button
+                                className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                                  addTags.has(tag.id)
+                                    ? 'border-accent/40 bg-accent-soft text-accent'
+                                    : 'border-line-strong text-ink-muted'
+                                }`}
+                                onClick={() =>
+                                  setAddTags(current => {
+                                    const next = new Set(current);
+                                    if (next.has(tag.id)) next.delete(tag.id);
+                                    else next.add(tag.id);
+                                    return next;
+                                  })
+                                }
+                                type="button"
+                              >
+                                {tag.label}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
             {suggestions.length > 0 ? (
               <ul className="mt-2 flex flex-wrap gap-1.5">

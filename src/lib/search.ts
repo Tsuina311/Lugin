@@ -9,6 +9,7 @@
 // result set is small enough to show card images.
 
 import type { DeckFormat } from './deck';
+import { deckTagById } from './deckTags';
 import { fetchRemote } from './fetchRemote';
 
 export interface CardSearchResult {
@@ -56,6 +57,8 @@ export interface CardQuery {
   identity?: string[];
   /** A subtype — creature type, land type, … ("Wolf"). */
   subtype?: string;
+  /** Deck-building tags. Each tag's Scryfall query is AND-ed in. */
+  tagIds?: string[];
   /** Free text: bare words match names, Scryfall operators pass through. */
   text?: string;
   /** Card types; a card matching any of them qualifies. */
@@ -181,6 +184,11 @@ export const buildScryfallQuery = (q: CardQuery): string => {
   if (q.cmcMin != null) parts.push(`mv>=${q.cmcMin}`);
   if (q.cmcMax != null) parts.push(`mv<=${q.cmcMax}`);
 
+  for (const id of q.tagIds ?? []) {
+    const tag = deckTagById(id);
+    if (tag) parts.push(`(${tag.query})`);
+  }
+
   return parts.join(' ');
 };
 
@@ -193,6 +201,7 @@ export const hasSearchCriteria = (q: CardQuery): boolean =>
   (q.text?.trim().length ?? 0) >= 2 ||
   !!q.subtype?.trim() ||
   (q.types?.length ?? 0) > 0 ||
+  (q.tagIds?.length ?? 0) > 0 ||
   q.cmcMin != null ||
   q.cmcMax != null;
 
