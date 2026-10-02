@@ -9,6 +9,8 @@ import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
 
+import { loadBracketLists } from '@/lib/bracket';
+import { ensureComboIndex } from '@/lib/combos/load';
 import { ErrorBoundary } from '@/ui/ErrorBoundary';
 // As a stylesheet, where the extension imports this same file with `?inline`: a
 // shadow root needs the text to inject, a page just needs the <style> tag.
@@ -18,6 +20,8 @@ const mount = document.getElementById('root');
 if (!mount) throw new Error('index.html is missing #root');
 
 mount.classList.add('lugin-root');
+loadBracketLists();
+void ensureComboIndex();
 
 createRoot(mount).render(
   <ErrorBoundary label="Lugin">

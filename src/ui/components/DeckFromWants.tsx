@@ -58,8 +58,8 @@ export const DeckFromWants = ({
   const lists = useMemo(() => byList(index), [index]);
   const [pick, setPick] = useState<string | null>(null);
 
-  // Nothing synced yet means nothing to offer, and a row explaining that would
-  // be in the way of everyone who doesn't keep want lists.
+  // Nothing synced yet means nothing to offer, and a section explaining that
+  // would be clutter to everyone who doesn't keep want lists.
   if (lists.length === 0) return null;
 
   const chosen = lists.find(l => l.id === pick) ?? lists[0];
@@ -67,13 +67,15 @@ export const DeckFromWants = ({
   const already = chosen.cards.length - missing.length;
 
   return (
-    <div className="flex flex-none flex-wrap items-center gap-1.5 border-b border-line px-2 py-1 text-2xs">
-      <ClipboardList aria-hidden className="text-ink-faint" size={12} />
-      <span className="text-ink-faint">from a want list</span>
+    <div className="space-y-1.5 border-t border-line pt-2">
+      <p className="flex items-center gap-1 text-2xs font-semibold uppercase tracking-wide text-ink-faint">
+        <ClipboardList aria-hidden size={11} />
+        From a want list
+      </p>
 
       <Select
         aria-label="Want list to add cards from"
-        className="min-w-0 max-w-[45%]"
+        className="w-full"
         onChange={e => setPick(e.target.value)}
         value={chosen.id}
       >
@@ -84,25 +86,25 @@ export const DeckFromWants = ({
         ))}
       </Select>
 
-      <Button
-        disabled={missing.length === 0}
-        onClick={() => onAdd(missing)}
-        size="xs"
-        title={
-          missing.length === 0
-            ? 'Every card in this list is already in the deck'
-            : `Add ${missing.length} card${missing.length === 1 ? '' : 's'} from ${chosen.name}, one copy each`
-        }
-        variant="neutral"
-      >
-        {missing.length === 0 ? 'all here' : `add ${missing.length}`}
-      </Button>
-
-      {already > 0 && (
-        <span className="text-ink-faint">
-          {already} already {missing.length === 0 ? 'in the deck' : 'here'}
-        </span>
-      )}
+      <div className="flex items-center gap-1.5">
+        <Button
+          disabled={missing.length === 0}
+          onClick={() => onAdd(missing)}
+          title={
+            missing.length === 0
+              ? 'Every card in this list is already in the deck'
+              : `Add ${missing.length} card${missing.length === 1 ? '' : 's'} from ${chosen.name}, one copy each`
+          }
+          variant="neutral"
+        >
+          {missing.length === 0 ? 'All here' : `Add ${missing.length}`}
+        </Button>
+        {already > 0 && (
+          <span className="text-2xs text-ink-faint">
+            {already} already {missing.length === 0 ? 'in the deck' : 'here'}
+          </span>
+        )}
+      </div>
     </div>
   );
 };

@@ -1309,6 +1309,14 @@ check('a card known only by name still has a picture', () => {
   assert.match(cardImageUrl({ name: 'Lim-Dûl’s Vault' }), /named\?exact=Lim-D/);
 });
 
+check('a Cardmarket "(V.2)" marker is left out of the name lookup', () => {
+  // Scryfall has no "Dimir Guildgate (V.2)" — asking for it is a 404.
+  assert.match(
+    imageUrlFor(undefined, 'Dimir Guildgate (V.2)'),
+    /named\?exact=Dimir%20Guildgate&format=image/,
+  );
+});
+
 check('a deck card borrows the picture of the copy you own', () => {
   // A deck row is only ever a name; the collection is what knows which printing
   // of it is in your binder.

@@ -15,11 +15,22 @@
 // listeners, which write to the DOM directly.
 
 export interface PreviewState {
+  /**
+   * The element the preview was opened from. While it's still in the document
+   * its card is on screen, and the preview keeps the image loaded for next time.
+   */
+  anchor?: Element;
   index: number;
   /** Identifies the hovered card so async face lookups can target it. */
   key: string;
   /** When true, the preview stays open enlarged until dismissed. */
   pinned?: boolean;
+  /**
+   * A sharper picture of `urls[0]` (the Scryfall scan of that printing). The
+   * enlarged preview shows the Cardmarket photo immediately and paints this on
+   * top once it has decoded, in the same frame.
+   */
+  sharp?: string;
   /** One entry for single-faced cards, two for double-faced. */
   urls: string[];
 }

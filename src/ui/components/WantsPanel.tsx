@@ -40,8 +40,9 @@ import { shippingStore } from '@/content/shippingStore';
 import { taskQueue } from '@/content/taskQueue';
 import { wantsStore } from '@/content/wantsStore';
 import { askForVerification, needsVerification, VERIFY_HELP } from '@/content/verify';
+import { cdnImageFromId } from '@/lib/cardImage';
 import { cardKey, frontFaceName, stripVersion } from '@/lib/cardName';
-import { groupCatalogueByArt, type CatalogueArtGroup } from '@/lib/catalogueArt';
+import { groupCatalogueByArt, matchCataloguePrint, type CatalogueArtGroup } from '@/lib/catalogueArt';
 import { cardKeysFromSeller } from '@/lib/purchasesBySeller';
 import { isUiChromeName } from '@/sites/cardmarket/language';
 import { flags } from '@/lib/flags';
@@ -55,6 +56,7 @@ import {
   searchCatalogue,
   type ProductSuggestion,
 } from '@/sites/cardmarket/search';
+import { productFactsFromImage } from '@/sites/cardmarket/searchArgs';
 import {
   COUNTRIES,
   countryId,
@@ -2539,7 +2541,47 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
    * the flip cursor before Scryfall answers — and with a product id we can build
    * the back-face URL immediately.
    */
-  const previewHandlers = (src: string, name?: string) => {
+  /**
+   * Scryfall's file of this exact printing, from the print list already loaded
+   * for the search. The thumbnail stays Cardmarket's photo; only the enlargement
+   * uses this.
+   *
+   * A product photo is `/1/OTC/764934/764934.jpg` — set code, then the product
+   * id as a folder, then the same id as the file. The id has to come from that
+   * folder (or the catalogue row), which is the number Scryfall stores.
+   */
+  const scryfallZoom = (
+    src: string,
+    name?: string,
+    prints?: readonly CardPrint[],
+    facts?: { expansion?: string; productId?: string; setCode?: string },
+  ): string | undefined => {
+    const list = prints ?? (name ? printsByCard[cardKey(name)] : undefined);
+    if (!list?.length) return undefined;
+    const fromUrl = productFactsFromImage(src);
+    const matched = matchCataloguePrint(
+      {
+        expansion: facts?.expansion,
+        href: src,
+        imageUrl: src,
+        name: name ?? '',
+        productId: facts?.productId ?? fromUrl.productId,
+        setCode: facts?.setCode ?? fromUrl.setCode,
+      },
+      list,
+    );
+    if (!matched) return undefined;
+    // `large` is 672px wide. The pin is 400 CSS px, which is ~800 device px on
+    // a retina screen; `normal` (488) still looks soft there.
+    const normal = cdnImageFromId(matched.id);
+    return normal?.replace('/normal/', '/large/') ?? matched.imageUrl;
+  };
+
+  const previewHandlers = (
+    src: string,
+    name?: string,
+    facts?: { expansion?: string; productId?: string; setCode?: string },
+  ) => {
     const key = name ? cardKey(name) : '';
     const faces = key ? facesByKey[key] : undefined;
     const productId = src.match(/\/(\d+)\.(?:jpg|jpeg|png|webp)(?:[?#]|$)/)?.[1];
@@ -2555,33 +2597,90 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
     return {
       flippable: flipCursor,
       handlers: {
-        onClick: (e: { preventDefault: () => void; stopPropagation: () => void }) => {
-          if (!flipCursor) return;
+        onClick: (e: {
+          currentTarget: Element;
+          preventDefault: () => void;
+          stopPropagation: () => void;
+        }) => {
           e.preventDefault();
           e.stopPropagation();
           const shown = previewStore.getSnapshot();
+          // The zoom cursor promises the enlarged card. A double-faced card
+          // still flips instead, which is what its own cursor says.
+          if (!flipCursor) {
+            const pinKey = `${key}|${src}`;
+            if (shown?.pinned && shown.key === pinKey) {
+              previewStore.hide();
+              return;
+            }
+            const zoom = scryfallZoom(src, name, undefined, facts);
+            previewStore.show(
+              {
+                anchor: e.currentTarget,
+                index: 0,
+                key: pinKey,
+                pinned: true,
+                // The photo is on screen at once. The scan, when we know it,
+                // paints over that same frame after it decodes.
+                sharp: zoom,
+                urls: [src],
+              },
+              window.innerWidth / 2,
+              window.innerHeight / 2,
+            );
+            if (!zoom && name) {
+              void fetchCardPrints(name)
+                .then(list => {
+                  const next = scryfallZoom(src, name, list, facts);
+                  const open = previewStore.getSnapshot();
+                  if (!next || !open?.pinned || open.key !== pinKey) return;
+                  previewStore.show(
+                    { ...open, index: 0, sharp: next, urls: [src] },
+                    previewStore.getPosition().x,
+                    previewStore.getPosition().y,
+                  );
+                })
+                .catch(() => undefined);
+            }
+            return;
+          }
           const at = previewStore.getPosition();
           if (back) {
             if (shown?.key === key && shown.urls.length >= 2) {
               previewStore.flip();
             } else {
-              previewStore.show({ index: 1, key, urls: [src, back] }, at.x, at.y);
+              previewStore.show(
+                { anchor: e.currentTarget, index: 1, key, urls: [src, back] },
+                at.x,
+                at.y,
+              );
             }
             return;
           }
           if (key && name) loadFaces(key, name, editionBack);
         },
-        onMouseEnter: (e: { clientX: number; clientY: number }) => {
+        onMouseEnter: (e: { clientX: number; clientY: number; currentTarget: Element }) => {
+          if (previewStore.getSnapshot()?.pinned) return;
           previewStore.show(
-            { index: 0, key, urls: flippable && back ? [src, back] : [src] },
+            {
+              anchor: e.currentTarget,
+              index: 0,
+              key,
+              urls: flippable && back ? [src, back] : [src],
+            },
             e.clientX,
             e.clientY,
           );
           if (key && faces === undefined && name) loadFaces(key, name, editionBack);
         },
-        onMouseLeave: () => previewStore.hide(),
-        onMouseMove: (e: { clientX: number; clientY: number }) =>
-          previewStore.move(e.clientX, e.clientY),
+        onMouseLeave: () => {
+          if (previewStore.getSnapshot()?.pinned) return;
+          previewStore.hide();
+        },
+        onMouseMove: (e: { clientX: number; clientY: number }) => {
+          if (previewStore.getSnapshot()?.pinned) return;
+          previewStore.move(e.clientX, e.clientY);
+        },
       },
     };
   };
@@ -3927,7 +4026,7 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                           const artGroups = catalogueArtByCard.get(g.key) ?? [];
                           const renderEdition = (item: ProductSuggestion) => {
                             const thumb = item.imageUrl;
-                            const preview = thumb ? previewHandlers(thumb, item.name) : null;
+                            const preview = thumb ? previewHandlers(thumb, item.name, item) : null;
                             const thumbCursor = preview?.flippable
                               ? 'cursor-flip'
                               : 'cursor-zoom-in';
@@ -3990,7 +4089,7 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                             const lead = art.lead as ProductSuggestion;
                             const thumb = lead.imageUrl;
                             const preview = thumb
-                              ? previewHandlers(thumb, lead.name)
+                              ? previewHandlers(thumb, lead.name, lead)
                               : null;
                             const fromPrice = catalogueFromPrice(printings);
                             const expansions = printings
@@ -4075,7 +4174,7 @@ export const WantsPanel = ({ active = true }: { active?: boolean }) => {
                           const lead = g.printings.find(p => p.imageUrl) ?? g.printings[0];
                           const thumb = lead?.imageUrl;
                           const preview = thumb
-                            ? previewHandlers(thumb, lead.name)
+                            ? previewHandlers(thumb, lead.name, lead)
                             : null;
                           const fromPrice = catalogueFromPrice(g.printings);
                           return (

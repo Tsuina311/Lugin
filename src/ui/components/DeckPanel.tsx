@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 import { Badge } from './Badge';
+import { BracketMark } from './BracketMark';
 import { Button } from './Button';
 import { CollectionThumb } from './CollectionThumb';
 import { CutsPanel } from './CutsPanel';
@@ -8,53 +9,66 @@ import { DeckCardTagMove } from './DeckCardTagMove';
 import { DeckFromWants } from './DeckFromWants';
 import { DeckWantList } from './DeckWantList';
 import { EdhrecPanel } from './EdhrecPanel';
+import { EditionPicker } from './EditionPicker';
 import { EmptyState } from './EmptyState';
 import { NumberStepper, SearchInput, Select, TextInput } from './Field';
 import { GoldfishPanel } from './GoldfishPanel';
 import { IconButton } from './IconButton';
-import { ManaCurve } from './ManaCurve';
-import { SelectionBar } from './Selection';
+import { ManaCurve, MiniCurve } from './ManaCurve';
+import { Popover } from './Popover';
+import { SelectionBar, SelectionHint } from './Selection';
+import { SetSymbol } from './SetSymbol';
 import { TagsPanel } from './TagsPanel';
 import { ViewToggle, type ViewShape } from './ViewToggle';
 import { useCardPreview } from './cardPreview';
 import { COLOR_PIPS } from './colorPips';
 import {
-  ArrowLeft,
   BarChart3,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronUp,
   CircleAlert,
   Filter,
   Layers,
   Loader2,
   Minus,
+  Mountain,
   Plus,
   Search,
   ShoppingCart,
   Trash2,
   Upload,
-  Wand2,
   X,
 } from './icons';
 
+import { cardImageOverrideStore } from '@/content/cardImageOverrideStore';
+import { cardmarketArtStore } from '@/content/cardmarketArtStore';
 import { collectionStore } from '@/content/collectionStore';
 import { countCards, deckStore, type DeckCardRef } from '@/content/deckStore';
+import {
+  candidatesByName,
+  cardmarketProductId,
+  cdnImageFromId,
+  leadWithScryfall,
+} from '@/lib/cardImage';
 import { cardKey } from '@/lib/cardName';
-import { candidatesByName, deckCardCandidates } from '@/lib/cardImage';
-import { bucketMainByTagSections, type TagSectionBucket } from '@/lib/deckTagSections';
-import { deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
+import type { Collection } from '@/lib/collection';
 import {
   DECK_FORMATS,
   deckShortfall,
   formatInfo,
   groupDeckCards,
+  manaCurve,
   type Deck,
   type DeckCard,
+  type DeckCardGroup,
   type DeckFormat,
+  type DeckPrinting,
   type DeckSection,
 } from '@/lib/deck';
-import type { Collection } from '@/lib/collection';
+import { bucketMainByTagSections, type TagSectionBucket } from '@/lib/deckTagSections';
+import { deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
 import { basicsMatchPlan, isBasicLand, planBasicLands } from '@/lib/lands';
 import { requestScryfall } from '@/lib/messaging';
 import {
@@ -64,6 +78,8 @@ import {
   sortWubrg,
   type CardMetadata,
 } from '@/lib/mtg';
+import type { CardPrint } from '@/lib/prints';
+import { isScryfallUrl } from '@/lib/scryfallFetch';
 import {
   buildScryfallQuery,
   hasSearchCriteria,
@@ -78,15 +94,17 @@ import { currentLang } from '@/sites/cardmarket/wants';
 import { useCardMetadata } from '@/ui/useCardMetadata';
 import { useRowSelection, type RowSelection } from '@/ui/useRowSelection';
 
-// Cardmarket product search for a card the user still needs to buy.
-const buyUrl = (name: string): string =>
-  `${location.origin}${cardmarketSearchUrl(name, currentLang())}`;
+// Cardmarket product search for a card the user still needs to buy. A chosen
+// printing goes straight to that product; otherwise the search is any edition.
+const buyUrl = (name: string, productId?: number): string =>
+  productId
+    ? `${location.origin}/${currentLang()}/Magic/Products?idProduct=${productId}`
+    : `${location.origin}${cardmarketSearchUrl(name, currentLang())}`;
 
 // How the deck list is broken up — remembered across sessions. localStorage can
 // throw in locked-down contexts, so every access is guarded.
 const SPLIT_TYPE_KEY = 'lugin:deckSplitType';
 const SPLIT_COST_KEY = 'lugin:deckSplitCost';
-const CURVE_KEY = 'lugin:deckCurve';
 const OVERVIEW_SHAPE_KEY = 'lugin:deckOverviewShape';
 
 const readFlag = (key: string, fallback = false): boolean => {
@@ -326,7 +344,7 @@ const DeckList = ({
                             : meta?.imageUrl
                               ? [meta.imageUrl]
                               : [];
-                        const { flippable, handlers } = preview(
+                        const { handlers } = preview(
                           `decklist|${d.id}|${cardKey(c.name)}`,
                           c.name,
                           urls,
@@ -340,12 +358,11 @@ const DeckList = ({
                             {urls[0] && (
                               <img
                                 alt={c.name}
-                                className={`h-full w-full object-cover ${flippable ? 'cursor-flip' : ''}`}
+                                className="h-full w-full cursor-zoom-in object-cover"
                                 decoding="async"
                                 loading="lazy"
                                 src={urls[0]}
                                 style={{ objectPosition: '50% 18%' }}
-                                title={flippable ? 'Click to flip to the other side' : c.name}
                               />
                             )}
                           </div>
@@ -363,6 +380,7 @@ const DeckList = ({
                       {d.source !== 'manual' && ` · ${d.source}`}
                     </div>
                   </div>
+                  <BracketMark deck={d} />
                   {buy > 0 ? (
                     <Badge title={`${buy} cards still to buy`} tone="warn">
                       buy {buy}
@@ -404,6 +422,27 @@ const SECTION_LABEL: Record<DeckSection, string> = {
   sideboard: 'Sideboard',
 };
 
+const SECTION_HEAD =
+  'flex items-center gap-1.5 border-b border-line bg-panel px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-ink-muted';
+/** Sticks a header to the top of the list. Above z-10, where a tile's loading spinner sits. */
+const PINNED = 'sticky top-0 z-20';
+/**
+ * A mana value's or card type's header. Pinned, so the list always shows which
+ * group it's in and the next group's header visibly pushes this one off. Fixed
+ * height, because a subgroup's header pins right under it.
+ */
+const GROUP_HEAD = `${PINNED} flex h-7 items-center gap-2 border-b border-line bg-raised px-2 text-xs font-semibold text-ink`;
+const SUBGROUP_HEAD =
+  'sticky top-7 z-[15] flex h-6 items-center gap-2 border-b border-line bg-panel pl-4 pr-2 text-2xs font-medium text-ink';
+const SECTION_ACTION =
+  'shrink-0 text-2xs font-medium normal-case tracking-normal text-ink-faint hover:text-ink';
+
+/** Every section's tiles, the commander's included, so they all come out one size. */
+const TILE_GRID = 'grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2 p-2';
+
+const POPOVER_HEADING = 'text-2xs font-semibold uppercase tracking-wide text-ink-faint';
+const CHECKBOX = 'h-3 w-3 flex-none accent-[color:var(--lugin-accent)]';
+
 // The editor's panes: the deck itself plus one per recommendation source.
 const DECK_VIEWS = [
   { id: 'deck', label: 'Overview', title: 'The cards in this deck' },
@@ -437,12 +476,10 @@ const DeckEditor = ({
   const [nameDraft, setNameDraft] = useState(deck.name);
   const [splitType, setSplitType] = useState(() => readFlag(SPLIT_TYPE_KEY));
   const [splitCost, setSplitCost] = useState(() => readFlag(SPLIT_COST_KEY));
-  const [showCurve, setShowCurve] = useState(() => readFlag(CURVE_KEY, true));
   const [overviewShape, setOverviewShape] = useState<ViewShape>(readShape);
 
   useEffect(() => writeFlag(SPLIT_TYPE_KEY, splitType), [splitType]);
   useEffect(() => writeFlag(SPLIT_COST_KEY, splitCost), [splitCost]);
-  useEffect(() => writeFlag(CURVE_KEY, showCurve), [showCurve]);
   useEffect(() => {
     try {
       localStorage.setItem(OVERVIEW_SHAPE_KEY, overviewShape);
@@ -457,26 +494,137 @@ const DeckEditor = ({
   // types and mana values for the grouping, curve and land balancing.
   const names = useMemo(() => deck.cards.map(c => c.name), [deck.cards]);
   const { merge: mergeMeta, metaByKey: metaByName } = useCardMetadata(names);
+  const bracketImages = useMemo(() => {
+    const images: Record<string, string> = {};
+    for (const card of deck.cards) {
+      const url = metaByName[cardKey(card.name)]?.imageUrl ?? card.printing?.imageUrl;
+      if (url) images[cardKey(card.name)] = url;
+    }
+    return images;
+  }, [deck.cards, metaByName]);
+  const bracketOracle = useMemo(() => {
+    const out: Record<string, { found: boolean; oracleId?: string }> = {};
+    for (const card of deck.cards) {
+      const meta = metaByName[cardKey(card.name)];
+      if (!meta) continue;
+      out[cardKey(card.name)] = { found: meta.found, oracleId: meta.oracleId };
+    }
+    return out;
+  }, [deck.cards, metaByName]);
 
   const ownedOf = (name: string): number => collectionByKey[cardKey(name)]?.total ?? 0;
 
-  const ownedCandidates = useMemo(
-    () => candidatesByName(collection?.cards ?? []),
-    [collection],
+  const ownedCandidates = useMemo(() => candidatesByName(collection?.cards ?? []), [collection]);
+  const imageOverrides = useSyncExternalStore(
+    cardImageOverrideStore.subscribe,
+    cardImageOverrideStore.getSnapshot,
   );
+  const printingArt = useSyncExternalStore(
+    cardmarketArtStore.subscribe,
+    cardmarketArtStore.getSnapshot,
+  );
+  // The printing already on a collection row, so a deck of cards you own can
+  // show that edition before Scryfall's default arrives.
+  const ownedEdition = useMemo(() => {
+    const map = new Map<string, { scryfallId?: string; setCode?: string; setName?: string }>();
+    for (const card of collection?.cards ?? []) {
+      const key = cardKey(card.name);
+      if (!key || (!card.setCode && !card.setName)) continue;
+      const prev = map.get(key);
+      if (prev?.setCode || prev?.setName) continue;
+      map.set(key, { scryfallId: card.scryfallId, setCode: card.setCode, setName: card.setName });
+    }
+    return map;
+  }, [collection]);
 
-  /** Same picture ladder as the phone: your copy first, then Scryfall by name. */
-  const thumbOf = (name: string): { candidates: readonly string[]; faceImages?: string[] } => {
-    const meta = metaByName[cardKey(name)];
-    const fromOwned = deckCardCandidates(name, ownedCandidates);
-    const candidates =
-      fromOwned.length > 0
-        ? fromOwned
-        : meta?.imageUrl
-          ? [meta.imageUrl]
-          : [];
+  // The line being given a different printing. The picker covers the list.
+  const [picking, setPicking] = useState<DeckCard | null>(null);
+
+  /**
+   * The edition a line shows: the one someone picked, else Scryfall's default.
+   */
+  const editionOf = (
+    card: DeckCard,
+  ): { cardmarketId?: number; scryfallId?: string; setCode?: string; setName?: string } => {
+    const key = cardKey(card.name);
+    const meta = metaByName[key];
+    const override = imageOverrides[key];
+    const owned = ownedEdition.get(key);
+    const picked = card.printing;
     return {
-      candidates,
+      cardmarketId: picked?.cardmarketId ?? meta?.cardmarketId,
+      scryfallId:
+        picked?.scryfallId ?? override?.scryfallId ?? owned?.scryfallId ?? meta?.scryfallId,
+      setCode: picked?.setCode ?? override?.setCode ?? owned?.setCode ?? meta?.setCode,
+      setName: picked?.setName ?? override?.setName ?? owned?.setName ?? meta?.setName,
+    };
+  };
+
+  const chooseEdition = (card: DeckCard, print: CardPrint): void => {
+    const printing: DeckPrinting = {
+      cardmarketId: print.cardmarketId,
+      collectorNumber: print.collectorNumber,
+      imageUrl: print.imageUrl,
+      scryfallId: print.id,
+      setCode: print.setCode,
+      setName: print.setName,
+    };
+    void deckStore.setPrinting(deck.id, card.name, card.section, printing);
+    // The collection's picture of this card follows, when you already own one.
+    if (ownedOf(card.name) > 0) {
+      void cardImageOverrideStore.set(cardKey(card.name), {
+        collectorNumber: printing.collectorNumber,
+        imageUrl: printing.imageUrl,
+        scryfallId: printing.scryfallId,
+        setCode: printing.setCode,
+        setName: printing.setName,
+      });
+    }
+    setPicking(null);
+  };
+
+  // The Cardmarket product ids behind this deck's owned cards, so each one can
+  // be swapped for Scryfall's file of that same printing.
+  useEffect(() => {
+    const names = new Set(deck.cards.map(c => cardKey(c.name)));
+    const ids: string[] = [];
+    for (const card of collection?.cards ?? []) {
+      if (!names.has(cardKey(card.name))) continue;
+      if (card.productId) ids.push(card.productId);
+      const fromImage = cardmarketProductId(card.imageUrl);
+      if (fromImage) ids.push(fromImage);
+    }
+    cardmarketArtStore.ensure(ids);
+  }, [collection, deck.cards]);
+
+  /**
+   * Scryfall's image of the printing, then the Cardmarket photo if that's all
+   * we have. The photo is a small scan; zooming it is what looks soft.
+   */
+  const thumbOf = (card: DeckCard): { candidates: readonly string[]; faceImages?: string[] } => {
+    const key = cardKey(card.name);
+    const meta = metaByName[key];
+    const owned = ownedEdition.get(key);
+    const override = imageOverrides[key];
+    const raw = ownedCandidates.get(key) ?? [];
+    let fromProduct: string | undefined;
+    for (const url of raw) {
+      const id = cardmarketProductId(url);
+      const art = id ? printingArt[id] : undefined;
+      if (art) {
+        fromProduct = art;
+        break;
+      }
+    }
+    const scryfall =
+      cdnImageFromId(card.printing?.scryfallId) ??
+      cdnImageFromId(override?.scryfallId) ??
+      cdnImageFromId(owned?.scryfallId) ??
+      fromProduct ??
+      cdnImageFromId(meta?.scryfallId) ??
+      (meta?.imageUrl && !isScryfallUrl(meta.imageUrl) ? meta.imageUrl : undefined);
+    return {
+      candidates: leadWithScryfall(raw, scryfall),
       faceImages: meta?.faceImages,
     };
   };
@@ -496,7 +644,9 @@ const DeckEditor = ({
   const firstUnrecognized = firstKnown && !firstMeta.found;
   const canAddSecondCommander =
     commanders.length === 1 && (firstUnrecognized || allowsSecondCommander(firstCmdInfo));
-  const showCommanderSearch = commanders.length === 0 || canAddSecondCommander;
+  const [pickingPartner, setPickingPartner] = useState(false);
+  useEffect(() => setPickingPartner(false), [deck.id]);
+  const commanderSearch = commanders.length === 0 || (pickingPartner && canAddSecondCommander);
 
   // Add a commander. We never block the add (the user knows their cards) — if the
   // pair isn't a legal partner combination we surface a note instead (see
@@ -549,6 +699,8 @@ const DeckEditor = ({
     const toBuy = missing.reduce((n, m) => n + m.need, 0);
     return { owned: total - toBuy, toBuy, total };
   }, [deck.cards, missing]);
+
+  const curve = useMemo(() => manaCurve(deck.cards, metaByName), [deck.cards, metaByName]);
 
   // The deck itself vs. suggestions for the current commander(s).
   const [view, setView] = useState<DeckView>('deck');
@@ -656,7 +808,6 @@ const DeckEditor = ({
   const tagSectionIds = deck.tagSections ?? [];
   const [tagBuckets, setTagBuckets] = useState<TagSectionBucket[]>([]);
   const [mainRest, setMainRest] = useState<DeckCard[]>([]);
-  const [addingTagSection, setAddingTagSection] = useState(false);
   const [tagPickerQuery, setTagPickerQuery] = useState('');
 
   useEffect(() => {
@@ -668,16 +819,13 @@ const DeckEditor = ({
     }
     let cancelled = false;
     const controller = new AbortController();
-    void bucketMainByTagSections(
-      main,
-      tagSectionIds,
-      controller.signal,
-      deck.tagOverrides,
-    ).then(result => {
-      if (cancelled) return;
-      setTagBuckets(result.buckets);
-      setMainRest(result.rest);
-    });
+    void bucketMainByTagSections(main, tagSectionIds, controller.signal, deck.tagOverrides).then(
+      result => {
+        if (cancelled) return;
+        setTagBuckets(result.buckets);
+        setMainRest(result.rest);
+      },
+    );
     return () => {
       cancelled = true;
       controller.abort();
@@ -776,21 +924,47 @@ const DeckEditor = ({
     .filter((r): r is DeckCardRef => !!r);
   const movable = (to: DeckSection): DeckCardRef[] => selectedCards.filter(c => c.section !== to);
 
+  const target = fmt.targetSize;
+  const sizeTone =
+    !target || summary.total < target
+      ? 'text-ink'
+      : summary.total > target
+        ? 'text-warn'
+        : 'text-pos';
+  const grouped = splitType || splitCost || tagSectionIds.length > 0;
+  const landsOff = landTarget != null && landCounts.total !== landTarget;
+  const manaTitle = `${
+    curve.average != null ? `Average mana value ${curve.average.toFixed(2)} · ` : ''
+  }${landCounts.total} lands${
+    landTarget != null ? `, aiming for ${landTarget}` : ''
+  } — click for the full curve and land settings`;
+
   return (
-    <>
-      <div className="flex flex-none items-center gap-1 border-b border-line bg-panel px-2 py-1.5">
-        <IconButton icon={ArrowLeft} label="Back to all decks" onClick={onBack} />
-        <TextInput
-          className="min-w-0 flex-1 border-transparent bg-transparent text-base font-semibold hover:border-line-strong"
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex flex-none items-center gap-1 border-b border-line bg-panel px-1.5 py-1.5">
+        <Button
+          className="flex-none pl-1"
+          icon={ChevronLeft}
+          onClick={onBack}
+          title="Back to all your decks"
+          variant="subtle"
+        >
+          Decks
+        </Button>
+        <span aria-hidden className="h-4 w-px flex-none bg-line-strong" />
+        <input
+          aria-label="Deck name"
+          className="h-6 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1.5 text-base font-semibold text-ink outline-none transition-colors hover:border-line-strong focus:border-accent focus:bg-raised"
           onBlur={() => void deckStore.rename(deck.id, nameDraft)}
           onChange={e => setNameDraft(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            if (e.key === 'Enter') e.currentTarget.blur();
           }}
-          title="Deck name"
+          title="Rename the deck"
           value={nameDraft}
         />
         <Select
+          aria-label="Deck format"
           onChange={e => void deckStore.setFormat(deck.id, e.target.value as DeckFormat)}
           title="Deck format"
           value={deck.format}
@@ -801,119 +975,117 @@ const DeckEditor = ({
             </option>
           ))}
         </Select>
-        <IconButton icon={Upload} label="Import a list into this deck" onClick={onMergeUpload} />
+        <BracketMark
+          deck={deck}
+          knownImages={bracketImages}
+          onRemove={card => void deckStore.removeCards(deck.id, [card])}
+          oracleByKey={bracketOracle}
+        />
+        <Popover
+          className="w-72"
+          label="Import cards into this deck"
+          trigger={({ open, toggle }) => (
+            <Button
+              active={open}
+              icon={Upload}
+              onClick={toggle}
+              title="Add cards from a decklist file or one of your want lists"
+              variant="subtle"
+            >
+              Import
+            </Button>
+          )}
+        >
+          {close => (
+            <div className="space-y-2">
+              <button
+                className="flex w-full items-start gap-2 rounded p-1.5 text-left transition-colors hover:bg-tint"
+                onClick={() => {
+                  close();
+                  onMergeUpload();
+                }}
+                type="button"
+              >
+                <Upload aria-hidden className="mt-0.5 flex-none text-ink-muted" size={13} />
+                <span className="min-w-0">
+                  <span className="block font-medium">From a file…</span>
+                  <span className="block text-2xs text-ink-faint">
+                    A decklist (.txt, .dec or .csv). Its cards are added to this deck.
+                  </span>
+                </span>
+              </button>
+              <DeckFromWants
+                inDeck={inDeck}
+                onAdd={names => {
+                  void deckStore.addCards(deck.id, names, 'main');
+                  close();
+                }}
+              />
+            </div>
+          )}
+        </Popover>
       </div>
 
-      {/* Where the deck stands: size against the format, and what it costs you. */}
-      <div className="flex flex-none flex-wrap items-center gap-1.5 border-b border-line px-2 py-1 text-xs">
-        <span className="tabular-nums text-ink-muted">
-          <span className="font-semibold text-ink">{summary.total}</span>
-          {fmt.targetSize ? `/${fmt.targetSize}` : ''} cards
+      <div className="flex flex-none items-center gap-1.5 border-b border-line bg-panel pr-2">
+        <div
+          className="flex min-w-0 flex-1 overflow-x-auto px-1 [scrollbar-width:none]"
+          role="tablist"
+        >
+          {visibleViews.map(v => {
+            const on = view === v.id;
+            return (
+              <button
+                key={v.id}
+                aria-selected={on}
+                className={`relative flex-none px-2 py-1.5 text-xs font-medium transition-colors ${
+                  on ? 'text-ink' : 'text-ink-faint hover:text-ink-muted'
+                }`}
+                onClick={() => setView(v.id)}
+                role="tab"
+                title={v.title}
+                type="button"
+              >
+                {v.label}
+                {on && (
+                  <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-accent" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <span
+          className="flex-none text-2xs tabular-nums text-ink-faint"
+          title={target ? `${fmt.label} decks play ${target} cards` : undefined}
+        >
+          <span className={`text-xs font-semibold ${sizeTone}`}>{summary.total}</span>
+          {target ? `/${target}` : ''} cards
         </span>
-        <Badge title="Cards you already own" tone="pos">
-          {summary.owned} owned
-        </Badge>
         {summary.toBuy > 0 ? (
-          <>
-            <Badge title="Cards missing from your collection" tone="warn">
-              {summary.toBuy} to buy
-            </Badge>
-            <Button
-              active={wantListOpen}
-              icon={ShoppingCart}
-              onClick={() => setWantListOpen(o => !o)}
-              size="xs"
-              title="Put the cards you're missing on a Cardmarket want list"
-            >
-              Want list
-            </Button>
-          </>
+          <button
+            aria-pressed={wantListOpen}
+            className={`flex h-5 flex-none items-center gap-1 rounded-full px-2 text-2xs font-medium transition-colors ${
+              wantListOpen
+                ? 'bg-accent-soft text-accent'
+                : 'bg-warn-soft text-warn hover:ring-1 hover:ring-inset hover:ring-warn'
+            }`}
+            onClick={() => setWantListOpen(o => !o)}
+            title={`You own ${summary.owned} of these. Put the ${summary.toBuy} you're missing on a Cardmarket want list.`}
+            type="button"
+          >
+            <ShoppingCart aria-hidden size={11} />
+            {summary.toBuy} to buy
+          </button>
         ) : (
-          summary.total > 0 && <Badge tone="pos">complete</Badge>
+          summary.total > 0 && (
+            <Badge title="Every card is in your collection" tone="pos">
+              all owned
+            </Badge>
+          )
         )}
       </div>
-      {visibleViews.length > 1 && (
-        <div
-          className="flex flex-none overflow-x-auto border-b border-line"
-          role="group"
-        >
-          {visibleViews.map(v => (
-            <button
-              key={v.id}
-              aria-pressed={view === v.id}
-              className={`flex-none px-2.5 py-1 text-2xs font-medium transition-colors ${
-                view === v.id
-                  ? 'border-b-2 border-accent bg-accent-soft text-accent'
-                  : 'text-ink-faint hover:bg-tint hover:text-ink'
-              }`}
-              onClick={() => setView(v.id)}
-              title={v.title}
-              type="button"
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {wantListOpen && (
         <DeckWantList deck={deck} missing={missing} onClose={() => setWantListOpen(false)} />
-      )}
-
-      {fmt.commanderZone && (
-        <div className="flex-none border-b border-line bg-warn-soft">
-          <div className="flex items-center gap-1.5 px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-warn">
-            <span aria-hidden>♛</span>
-            {SECTION_LABEL.commander}
-            <span className="font-normal tabular-nums opacity-70">
-              {commanders.length}/{canAddSecondCommander || commanders.length === 2 ? 2 : 1}
-            </span>
-          </div>
-          {commanders.length > 0 ? (
-            <ul className="list-none divide-y divide-line">
-              {commanders.map(c => {
-                const thumb = thumbOf(c.name);
-                return (
-                  <DeckRow
-                    key={`commander|${cardKey(c.name)}`}
-                    card={c}
-                    commander
-                    deckId={deck.id}
-                    faceImages={thumb.faceImages}
-                    owned={ownedOf(c.name)}
-                    candidates={thumb.candidates}
-                  />
-                );
-              })}
-            </ul>
-          ) : (
-            <div className="px-2 py-1 text-2xs text-ink-faint">
-              Pick your commander — a legendary creature (or a card that says “can be your
-              commander”).
-            </div>
-          )}
-          {showCommanderSearch && (
-            <AddCardBox
-              deckFormat={deck.format}
-              inDeck={inDeck}
-              onPick={name => void addCommander(name)}
-              placeholder={
-                commanders.length === 0 ? 'Search for your commander…' : 'Add a second commander…'
-              }
-            />
-          )}
-          {commanderNote && (
-            <div className="flex items-start gap-1 px-2 pb-1 text-2xs text-warn">
-              <CircleAlert aria-hidden className="mt-px flex-none" size={11} />
-              {commanderNote}
-            </div>
-          )}
-          {commanders.length === 1 && firstKnown && !canAddSecondCommander && (
-            <div className="px-2 pb-1 text-2xs text-ink-faint">
-              This commander can’t take a partner.
-            </div>
-          )}
-        </div>
       )}
 
       {view !== 'deck' ? (
@@ -956,7 +1128,7 @@ const DeckEditor = ({
           )}
         </div>
       ) : (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col">
           <AddCardBox
             commanderIdentity={commanderIdentity}
             deckFormat={deck.format}
@@ -965,136 +1137,92 @@ const DeckEditor = ({
             onPick={name => void deckStore.addCard(deck.id, name, 'main', 1)}
             onPickMany={names => void deckStore.addCards(deck.id, names, 'main')}
             placeholder="Add a card — name, or t:wolf, mv<3…"
-          />
+            trailing={
+              deck.cards.length > 0 && (
+                <>
+                  <ViewToggle onChange={setOverviewShape} value={overviewShape} />
+                  <Popover
+                    className="w-72"
+                    label="Group the list"
+                    trigger={({ open, toggle }) => (
+                      <Button
+                        active={open || grouped}
+                        icon={Layers}
+                        onClick={toggle}
+                        title="Group the list by card type, mana value or mechanic"
+                      >
+                        Group
+                      </Button>
+                    )}
+                  >
+                    <p className={POPOVER_HEADING}>Group by</p>
+                    <label className="mt-1.5 flex items-center gap-1.5">
+                      <input
+                        checked={splitType}
+                        className={CHECKBOX}
+                        onChange={e => setSplitType(e.target.checked)}
+                        type="checkbox"
+                      />
+                      Card type
+                    </label>
+                    <label className="mt-1 flex items-center gap-1.5">
+                      <input
+                        checked={splitCost}
+                        className={CHECKBOX}
+                        onChange={e => setSplitCost(e.target.checked)}
+                        type="checkbox"
+                      />
+                      Mana value
+                      <span className="text-2xs text-ink-faint">— lands get their own group</span>
+                    </label>
 
-          <DeckFromWants
-            inDeck={inDeck}
-            onAdd={names => void deckStore.addCards(deck.id, names, 'main')}
-          />
-
-          {landTarget != null && (
-            <div className="flex flex-none flex-wrap items-center gap-1.5 border-b border-line px-2 py-1 text-2xs">
-              <Button
-                active={!!deck.autoLands}
-                icon={Wand2}
-                onClick={() => void deckStore.setAutoLands(deck.id, !deck.autoLands)}
-                size="xs"
-                title="Keep the deck at its land count with basics, split by the colored mana its spells need. Basics are recalculated while this is on — turn it off to tweak them by hand."
-              >
-                auto lands
-              </Button>
-              <span className="flex items-center gap-1 text-ink-muted">
-                <NumberStepper
-                  label="Lands this deck should run"
-                  max={200}
-                  onChange={n => void deckStore.setLandTarget(deck.id, n)}
-                  size="xs"
-                  title={`Lands this deck should run — ${fmt.label} usually plays ${fmt.landCount}. Lands you picked yourself count towards it.`}
-                  value={landTarget}
-                />
-                lands
-              </span>
-              <span className="tabular-nums text-ink-faint">
-                {landCounts.total} now
-                {landCounts.chosen > 0 && ` (${landCounts.basics} basic + ${landCounts.chosen})`}
-                {deck.autoLands && landColors.length === 0 && ' · no colors yet'}
-              </span>
-              {landCounts.basics > 0 && (
-                <IconButton
-                  className="ml-auto"
-                  icon={Trash2}
-                  label="Remove all basic lands (also turns off auto-balancing)"
-                  onClick={() => void deckStore.clearBasicLands(deck.id)}
-                  size="xs"
-                  tone="danger"
-                />
-              )}
-            </div>
-          )}
-
-          {deck.cards.length > 0 && (
-            <div className="flex flex-none flex-col gap-1 border-b border-line px-2 py-1">
-              <div className="flex flex-wrap items-center gap-1">
-                <ViewToggle onChange={setOverviewShape} value={overviewShape} />
-                <span className="mr-0.5 text-2xs uppercase tracking-wide text-ink-faint">group</span>
-                <Button
-                  active={splitType}
-                  onClick={() => setSplitType(v => !v)}
-                  size="xs"
-                  title="Group each section by card type"
-                >
-                  type
-                </Button>
-                <Button
-                  active={splitCost}
-                  onClick={() => setSplitCost(v => !v)}
-                  size="xs"
-                  title="Group by mana value. Lands get their own group — they're not part of the curve."
-                >
-                  cost
-                </Button>
-                <Button
-                  active={addingTagSection || tagSectionIds.length > 0}
-                  onClick={() => setAddingTagSection(v => !v)}
-                  size="xs"
-                  title="Add overview sections that auto-sort main-deck cards by mechanic tags"
-                >
-                  tags{tagSectionIds.length > 0 ? ` · ${tagSectionIds.length}` : ''}
-                </Button>
-                <Button
-                  active={showCurve}
-                  className="ml-auto"
-                  icon={BarChart3}
-                  onClick={() => setShowCurve(v => !v)}
-                  size="xs"
-                  title="Show the deck's mana curve as a column chart"
-                >
-                  curve
-                </Button>
-              </div>
-              {(addingTagSection || tagSectionIds.length > 0) && (
-                <div className="space-y-1">
-                  {tagSectionIds.length > 0 && (
-                    <ul className="flex flex-wrap gap-1">
-                      {tagSectionIds.map(id => (
-                        <li key={id}>
-                          <span className="inline-flex items-center gap-0.5 rounded-full border border-line px-1.5 py-0.5 text-2xs text-ink">
-                            {deckTagById(id)?.label ?? id}
-                            <button
-                              aria-label={`Remove ${deckTagById(id)?.label ?? id}`}
-                              className="text-ink-faint hover:text-ink"
-                              onClick={() =>
-                                void deckStore.setTagSections(
-                                  deck.id,
-                                  tagSectionIds.filter(t => t !== id),
-                                )
-                              }
-                              type="button"
-                            >
-                              ×
-                            </button>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {addingTagSection && (
-                    <div className="rounded border border-line bg-raised p-1.5">
+                    <div className="mt-3 border-t border-line pt-2">
+                      <p className={POPOVER_HEADING}>Tag sections</p>
+                      <p className="mt-0.5 text-2xs text-ink-faint">
+                        Sort the main deck into sections by mechanic: ramp, draw, removal…
+                      </p>
+                      {tagSectionIds.length > 0 && (
+                        <ul className="mt-1.5 flex flex-wrap gap-1">
+                          {tagSectionIds.map(id => (
+                            <li key={id}>
+                              <span className="inline-flex items-center gap-0.5 rounded-full border border-line-strong py-0.5 pl-1.5 pr-1 text-2xs text-ink">
+                                {deckTagById(id)?.label ?? id}
+                                <button
+                                  aria-label={`Remove the ${deckTagById(id)?.label ?? id} section`}
+                                  className="rounded-full text-ink-faint hover:text-ink"
+                                  onClick={() =>
+                                    void deckStore.setTagSections(
+                                      deck.id,
+                                      tagSectionIds.filter(t => t !== id),
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  <X aria-hidden size={10} />
+                                </button>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       <SearchInput
+                        className="mt-1.5"
                         onChange={e => setTagPickerQuery(e.target.value)}
-                        placeholder="Search tags to add as a section…"
+                        onClear={() => setTagPickerQuery('')}
+                        placeholder="Find a tag to add as a section…"
                         value={tagPickerQuery}
                       />
-                      <div className="mt-1 max-h-40 overflow-auto">
+                      <div className="mt-1 max-h-48 overflow-auto">
                         {pickerTags.map(group => (
-                          <div key={group.category} className="mb-1">
-                            <div className="px-0.5 text-2xs font-semibold uppercase tracking-wide text-ink-faint">
+                          <div key={group.category} className="mb-1.5">
+                            <div className="text-2xs font-semibold uppercase tracking-wide text-ink-faint">
                               {group.category}
                             </div>
                             <div className="mt-0.5 flex flex-wrap gap-1">
                               {group.tags.map(tag => (
                                 <Button
                                   key={tag.id}
+                                  icon={Plus}
                                   onClick={() => {
                                     void deckStore.setTagSections(deck.id, [
                                       ...tagSectionIds,
@@ -1103,7 +1231,7 @@ const DeckEditor = ({
                                     setTagPickerQuery('');
                                   }}
                                   size="xs"
-                                  title={tag.label}
+                                  title={`Add a ${tag.label} section`}
                                 >
                                   {tag.label}
                                 </Button>
@@ -1112,231 +1240,415 @@ const DeckEditor = ({
                           </div>
                         ))}
                         {pickerTags.length === 0 && (
-                          <p className="px-0.5 py-1 text-2xs text-ink-faint">No tags left to add.</p>
+                          <p className="py-1 text-2xs text-ink-faint">No tags left to add.</p>
                         )}
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {showCurve && deck.cards.length > 0 && (
-            <ManaCurve cards={deck.cards} metaByKey={metaByName} />
-          )}
-
-          {rows.ids.length > 0 && (
-            <SelectionBar selection={selection}>
-              <Button
-                onClick={() => {
-                  void deckStore.removeCards(deck.id, selectedCards);
-                  selection.clear();
-                }}
-                size="xs"
-                title="Remove the selected cards from the deck"
-                variant="danger"
-              >
-                Remove {selection.count}
-              </Button>
-              {movable('sideboard').length > 0 && (
-                <Button
-                  icon={ChevronDown}
-                  onClick={() => void deckStore.moveCards(deck.id, selectedCards, 'sideboard')}
-                  size="xs"
-                  title="Move the selected cards to the sideboard"
-                >
-                  to sideboard
-                </Button>
-              )}
-              {movable('main').length > 0 && (
-                <Button
-                  icon={ChevronUp}
-                  onClick={() => void deckStore.moveCards(deck.id, selectedCards, 'main')}
-                  size="xs"
-                  title="Move the selected cards into the deck"
-                >
-                  to deck
-                </Button>
-              )}
-            </SelectionBar>
-          )}
-
-          <div className="min-h-0 flex-1 overflow-auto outline-none" {...selection.listProps}>
-            {layout.map(({ cards, groups, key, label, section, tagId }) => {
-              return (
-                <div key={key}>
-                  <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b border-line bg-panel px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-ink-muted">
-                    <span className="min-w-0 flex-1 truncate">
-                      {label}
-                      <span className="ml-1.5 font-normal tabular-nums text-ink-faint">
-                        {countCards(cards)}
-                      </span>
-                    </span>
-                    {tagId ? (
-                      <button
-                        className="shrink-0 text-2xs font-medium normal-case tracking-normal text-ink-faint hover:text-ink"
-                        onClick={() =>
-                          void deckStore.setTagSections(
-                            deck.id,
-                            tagSectionIds.filter(t => t !== tagId),
-                          )
-                        }
-                        type="button"
-                      >
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
-                  {groups.map(group => (
-                    <div key={group.key}>
-                      {group.label && (
-                        <div className="flex items-center gap-1.5 bg-tint px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-ink-muted">
-                          {group.label}
-                          <span className="font-normal tabular-nums text-ink-faint">
-                            {countCards(group.cards)}
+                  </Popover>
+                  <Popover
+                    className="w-72"
+                    label="Mana curve and lands"
+                    trigger={({ open, toggle }) => (
+                      <Button active={open} onClick={toggle} title={manaTitle}>
+                        {curve.total > 0 ? (
+                          <MiniCurve curve={curve} />
+                        ) : (
+                          <BarChart3 aria-hidden size={13} />
+                        )}
+                        <Mountain aria-hidden className="ml-1 text-ink-faint" size={12} />
+                        <span className={`tabular-nums ${landsOff ? 'text-warn' : ''}`}>
+                          {landCounts.total}
+                          {landTarget != null && (
+                            <span className="text-ink-faint">/{landTarget}</span>
+                          )}
+                        </span>
+                      </Button>
+                    )}
+                  >
+                    <p className={POPOVER_HEADING}>Mana curve</p>
+                    <div className="mt-1.5">
+                      <ManaCurve curve={curve} />
+                    </div>
+                    {landTarget != null && (
+                      <div className="mt-3 space-y-2 border-t border-line pt-2">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className={POPOVER_HEADING}>Lands</p>
+                          <span className="text-2xs tabular-nums text-ink-faint">
+                            {landCounts.total} now
+                            {landCounts.chosen > 0 &&
+                              ` — ${landCounts.basics} basic, ${landCounts.chosen} other`}
                           </span>
                         </div>
-                      )}
-                      {(group.sub ?? [group]).map(part => (
-                        <div key={part.key}>
-                          {group.sub && (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 pl-4 text-2xs text-ink-faint">
-                              {part.label}
-                              <span className="tabular-nums">{countCards(part.cards)}</span>
-                            </div>
-                          )}
-                          {overviewShape === 'box' ? (
-                            <div className="grid grid-cols-3 gap-2 p-2 sm:grid-cols-4">
-                              {part.cards.map(c => {
-                                const thumb = thumbOf(c.name);
-                                const key = cardKey(c.name);
-                                const ov = deck.tagOverrides;
-                                const hasOv = ov != null && Object.prototype.hasOwnProperty.call(ov, key);
-                                return (
-                                  <div
-                                    key={`${section}|${key}`}
-                                    className="flex flex-col gap-1 rounded border border-line/60 p-1"
-                                  >
-                                    <CollectionThumb
-                                      candidates={thumb.candidates}
-                                      className="aspect-[488/680] w-full overflow-hidden rounded bg-raised"
-                                      faceImages={thumb.faceImages}
-                                      name={c.name}
-                                      previewKey={`deck|box|${section}|${key}`}
-                                    />
-                                    <span className="truncate text-2xs text-ink" title={c.name}>
-                                      {c.name}
-                                    </span>
-                                    {section === 'main' && tagSectionIds.length > 0 && (
-                                      <DeckCardTagMove
-                                        onChange={tagId =>
-                                          void deckStore.setCardTagOverride(deck.id, c.name, tagId)
-                                        }
-                                        override={hasOv ? ov![key] : undefined}
-                                        tagSectionIds={tagSectionIds}
-                                      />
-                                    )}
-                                    <div className="flex items-center gap-0.5">
-                                      <IconButton
-                                        icon={Minus}
-                                        label={`One less ${c.name}`}
-                                        onClick={() =>
-                                          void deckStore.setQuantity(
-                                            deck.id,
-                                            c.name,
-                                            c.section,
-                                            c.quantity - 1,
-                                          )
-                                        }
-                                        size="xs"
-                                      />
-                                      <span className="min-w-4 flex-1 text-center text-2xs tabular-nums">
-                                        {c.quantity}
-                                      </span>
-                                      <IconButton
-                                        icon={Plus}
-                                        label={`One more ${c.name}`}
-                                        onClick={() =>
-                                          void deckStore.setQuantity(
-                                            deck.id,
-                                            c.name,
-                                            c.section,
-                                            c.quantity + 1,
-                                          )
-                                        }
-                                        size="xs"
-                                      />
-                                      <IconButton
-                                        icon={X}
-                                        label={`Remove ${c.name}`}
-                                        onClick={() =>
-                                          void deckStore.removeCard(deck.id, c.name, c.section)
-                                        }
-                                        size="xs"
-                                        tone="danger"
-                                      />
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                          <ul className="list-none divide-y divide-line">
-                            {part.cards.map(c => {
-                              const thumb = thumbOf(c.name);
-                              const key = cardKey(c.name);
-                              const ov = deck.tagOverrides;
-                              const hasOv =
-                                ov != null && Object.prototype.hasOwnProperty.call(ov, key);
-                              return (
-                                <DeckRow
-                                  key={`${section}|${key}`}
-                                  auto={
-                                    !!deck.autoLands && section === 'main' && isBasicLand(c.name)
-                                  }
-                                  card={c}
-                                  candidates={thumb.candidates}
-                                  deckId={deck.id}
-                                  faceImages={thumb.faceImages}
-                                  onTagOverride={
-                                    section === 'main' && tagSectionIds.length > 0
-                                      ? tagId =>
-                                          void deckStore.setCardTagOverride(deck.id, c.name, tagId)
-                                      : undefined
-                                  }
-                                  owned={ownedOf(c.name)}
-                                  rowId={`${section}|${key}`}
-                                  selection={selection}
-                                  tagOverride={hasOv ? ov![key] : undefined}
-                                  tagSectionIds={tagSectionIds}
-                                />
-                              );
-                            })}
-                          </ul>
-                          )}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-ink-muted">Aim for</span>
+                          <NumberStepper
+                            label="Lands this deck should run"
+                            max={200}
+                            onChange={n => void deckStore.setLandTarget(deck.id, n)}
+                            title={`${fmt.label} usually plays ${fmt.landCount}. Lands you picked yourself count towards it.`}
+                            value={landTarget}
+                          />
                         </div>
-                      ))}
+                        <label className="flex items-start gap-1.5">
+                          <input
+                            checked={!!deck.autoLands}
+                            className={`${CHECKBOX} mt-0.5`}
+                            onChange={e => void deckStore.setAutoLands(deck.id, e.target.checked)}
+                            type="checkbox"
+                          />
+                          <span>
+                            <span className="block">Top up with basics</span>
+                            <span className="block text-2xs text-ink-faint">
+                              Basics fill the gap to the target, split by the colors your spells
+                              need. Turn off to set them by hand.
+                            </span>
+                          </span>
+                        </label>
+                        {deck.autoLands && landColors.length === 0 && (
+                          <p className="text-2xs text-warn">No colors to pick basics from yet.</p>
+                        )}
+                        {landCounts.basics > 0 && (
+                          <Button
+                            icon={Trash2}
+                            onClick={() => void deckStore.clearBasicLands(deck.id)}
+                            size="xs"
+                            title="Also stops topping up with basics"
+                            variant="subtle"
+                          >
+                            Remove all basics
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </Popover>
+                </>
+              )
+            }
+          />
+
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <div
+              className={`min-h-0 flex-1 overflow-auto outline-none ${selection.active ? 'pb-12' : ''} ${
+                // Clears the pinned headers when the arrow keys scroll a row into view.
+                splitType && splitCost
+                  ? 'scroll-pt-[3.25rem]'
+                  : splitType || splitCost
+                    ? 'scroll-pt-7'
+                    : 'scroll-pt-6'
+              }`}
+              {...selection.listProps}
+            >
+              {fmt.commanderZone && (
+                <section>
+                  <div className={`${SECTION_HEAD} ${PINNED}`}>
+                    <span className="min-w-0 truncate">
+                      {SECTION_LABEL.commander}
+                      {commanders.length > 1 && (
+                        <span className="ml-1.5 font-normal tabular-nums text-ink-faint">
+                          {commanders.length}
+                        </span>
+                      )}
+                    </span>
+                    {canAddSecondCommander && !pickingPartner && (
+                      <button
+                        className={`${SECTION_ACTION} ml-auto`}
+                        onClick={() => setPickingPartner(true)}
+                        title="Add a second commander — this one can have a partner"
+                        type="button"
+                      >
+                        + Partner
+                      </button>
+                    )}
+                  </div>
+                  {commanderNote && (
+                    <p className="flex items-start gap-1 px-2 pt-1.5 text-2xs text-warn">
+                      <CircleAlert aria-hidden className="mt-px flex-none" size={11} />
+                      {commanderNote}
+                    </p>
+                  )}
+                  {commanders.length > 0 &&
+                    (overviewShape === 'box' ? (
+                      <div className={TILE_GRID}>
+                        {commanders.map(c => {
+                          const thumb = thumbOf(c);
+                          const edition = editionOf(c);
+                          return (
+                            <DeckTile
+                              key={cardKey(c.name)}
+                              candidates={thumb.candidates}
+                              card={c}
+                              faceImages={thumb.faceImages}
+                              onEdition={() => setPicking(c)}
+                              remove={() => void deckStore.removeCard(deck.id, c.name, 'commander')}
+                              setCode={edition.setCode}
+                              setName={edition.setName}
+                            />
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <ul className="list-none divide-y divide-line">
+                        {commanders.map(c => {
+                          const thumb = thumbOf(c);
+                          const edition = editionOf(c);
+                          return (
+                            <DeckRow
+                              key={cardKey(c.name)}
+                              candidates={thumb.candidates}
+                              card={c}
+                              commander
+                              deckId={deck.id}
+                              faceImages={thumb.faceImages}
+                              onEdition={() => setPicking(c)}
+                              owned={ownedOf(c.name)}
+                              setCode={edition.setCode}
+                              setName={edition.setName}
+                            />
+                          );
+                        })}
+                      </ul>
+                    ))}
+                  {commanderSearch && (
+                    <div className="flex items-start gap-1 p-1.5">
+                      <div className="min-w-0 flex-1">
+                        <AddCardBox
+                          deckFormat={deck.format}
+                          embedded
+                          inDeck={inDeck}
+                          onPick={name => {
+                            setPickingPartner(false);
+                            void addCommander(name);
+                          }}
+                          placeholder={
+                            commanders.length === 0
+                              ? 'Search for your commander…'
+                              : 'Search for a partner…'
+                          }
+                        />
+                      </div>
+                      {commanders.length > 0 && (
+                        <IconButton
+                          icon={X}
+                          label="No partner after all"
+                          onClick={() => setPickingPartner(false)}
+                        />
+                      )}
                     </div>
-                  ))}
-                </div>
-              );
-            })}
-            {deck.cards.length === 0 && (
-              <EmptyState
-                hint={
-                  fmt.commanderZone
-                    ? 'Pick a commander for EDHREC and Goldfish — or use Tags to find cards by mechanic, or search by name, type or mana value.'
-                    : 'Search above by name, type or mana value to add cards, or import a list.'
-                }
-                icon={Search}
-                title="This deck is empty"
+                  )}
+                  {commanders.length === 0 && (
+                    <p className="px-2 pb-2 text-2xs text-ink-faint">
+                      Picking one unlocks EDHREC, Goldfish and Cuts, and keeps searches to its
+                      colors.
+                    </p>
+                  )}
+                </section>
+              )}
+              {layout.map(({ cards, groups, key, label, section, tagId }, index) => {
+                // Its group headers take over the top while its cards scroll by.
+                const pinnedGroups = groups.some(g => g.label);
+                return (
+                  <section key={key}>
+                    <div className={`${SECTION_HEAD} ${pinnedGroups ? '' : PINNED}`}>
+                      <span className="max-w-full flex-none truncate">
+                        {label}
+                        <span className="ml-1.5 font-normal tabular-nums text-ink-faint">
+                          {countCards(cards)}
+                        </span>
+                      </span>
+                      {index === 0 && overviewShape === 'list' && !selection.active && (
+                        <SelectionHint className="min-w-0 flex-1 truncate text-right font-normal normal-case tracking-normal" />
+                      )}
+                      {tagId ? (
+                        <button
+                          className={`${SECTION_ACTION} ml-auto`}
+                          onClick={() =>
+                            void deckStore.setTagSections(
+                              deck.id,
+                              tagSectionIds.filter(t => t !== tagId),
+                            )
+                          }
+                          type="button"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                    {groups.map((group, g) => (
+                      <div key={group.key}>
+                        {group.label && (
+                          <div className={`${GROUP_HEAD} ${g > 0 ? 'border-t' : ''}`}>
+                            <GroupHeading
+                              group={group}
+                              section={layout.length > 1 ? label : undefined}
+                            />
+                          </div>
+                        )}
+                        {(group.sub ?? [group]).map((part, p) => (
+                          <div key={part.key}>
+                            {group.sub && (
+                              <div className={`${SUBGROUP_HEAD} ${p > 0 ? 'border-t' : ''}`}>
+                                <GroupHeading group={part} />
+                              </div>
+                            )}
+                            {overviewShape === 'box' ? (
+                              <div className={TILE_GRID}>
+                                {part.cards.map(c => {
+                                  const thumb = thumbOf(c);
+                                  const edition = editionOf(c);
+                                  const key = cardKey(c.name);
+                                  const ov = deck.tagOverrides;
+                                  const hasOv =
+                                    ov != null && Object.prototype.hasOwnProperty.call(ov, key);
+                                  return (
+                                    <DeckTile
+                                      key={`${section}|${key}`}
+                                      candidates={thumb.candidates}
+                                      card={c}
+                                      faceImages={thumb.faceImages}
+                                      onEdition={() => setPicking(c)}
+                                      remove={() =>
+                                        void deckStore.removeCard(deck.id, c.name, c.section)
+                                      }
+                                      setCode={edition.setCode}
+                                      setName={edition.setName}
+                                      setQuantity={n =>
+                                        void deckStore.setQuantity(deck.id, c.name, c.section, n)
+                                      }
+                                    >
+                                      {section === 'main' && tagSectionIds.length > 0 && (
+                                        <DeckCardTagMove
+                                          onChange={tagId =>
+                                            void deckStore.setCardTagOverride(
+                                              deck.id,
+                                              c.name,
+                                              tagId,
+                                            )
+                                          }
+                                          override={hasOv ? ov![key] : undefined}
+                                          tagSectionIds={tagSectionIds}
+                                        />
+                                      )}
+                                    </DeckTile>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <ul className="list-none divide-y divide-line">
+                                {part.cards.map(c => {
+                                  const thumb = thumbOf(c);
+                                  const edition = editionOf(c);
+                                  const key = cardKey(c.name);
+                                  const ov = deck.tagOverrides;
+                                  const hasOv =
+                                    ov != null && Object.prototype.hasOwnProperty.call(ov, key);
+                                  return (
+                                    <DeckRow
+                                      key={`${section}|${key}`}
+                                      auto={
+                                        !!deck.autoLands &&
+                                        section === 'main' &&
+                                        isBasicLand(c.name)
+                                      }
+                                      candidates={thumb.candidates}
+                                      card={c}
+                                      deckId={deck.id}
+                                      faceImages={thumb.faceImages}
+                                      onEdition={() => setPicking(c)}
+                                      onTagOverride={
+                                        section === 'main' && tagSectionIds.length > 0
+                                          ? tagId =>
+                                              void deckStore.setCardTagOverride(
+                                                deck.id,
+                                                c.name,
+                                                tagId,
+                                              )
+                                          : undefined
+                                      }
+                                      owned={ownedOf(c.name)}
+                                      rowId={`${section}|${key}`}
+                                      selection={selection}
+                                      setCode={edition.setCode}
+                                      setName={edition.setName}
+                                      tagOverride={hasOv ? ov![key] : undefined}
+                                      tagSectionIds={tagSectionIds}
+                                    />
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </section>
+                );
+              })}
+              {deck.cards.length === 0 && (
+                <EmptyState
+                  hint={
+                    fmt.commanderZone
+                      ? 'Search above by name, type or mana value, find cards by mechanic under Tags, or bring in a list with Import.'
+                      : 'Search above by name, type or mana value, or bring in a list with Import.'
+                  }
+                  icon={Search}
+                  title="This deck is empty"
+                />
+              )}
+            </div>
+
+            {picking && (
+              <EditionPicker
+                currentId={editionOf(picking).scryfallId}
+                name={picking.name}
+                onClose={() => setPicking(null)}
+                onPick={print => chooseEdition(picking, print)}
               />
             )}
+
+            {/* Floats over the list instead of joining the rows above it: a bar
+              that appeared on the first pick would push the list down under
+              the pointer, and the next click would land on the wrong card. */}
+            {selection.active && (
+              <div className="absolute inset-x-2 bottom-2 z-20 mx-auto max-w-xl overflow-hidden rounded-md border border-line-strong bg-panel shadow-pop [&>div]:border-b-0">
+                <SelectionBar selection={selection}>
+                  <Button
+                    onClick={() => {
+                      void deckStore.removeCards(deck.id, selectedCards);
+                      selection.clear();
+                    }}
+                    size="xs"
+                    title="Remove the selected cards from the deck"
+                    variant="danger"
+                  >
+                    Remove {selection.count}
+                  </Button>
+                  {movable('sideboard').length > 0 && (
+                    <Button
+                      icon={ChevronDown}
+                      onClick={() => void deckStore.moveCards(deck.id, selectedCards, 'sideboard')}
+                      size="xs"
+                      title="Move the selected cards to the sideboard"
+                    >
+                      to sideboard
+                    </Button>
+                  )}
+                  {movable('main').length > 0 && (
+                    <Button
+                      icon={ChevronUp}
+                      onClick={() => void deckStore.moveCards(deck.id, selectedCards, 'main')}
+                      size="xs"
+                      title="Move the selected cards into the deck"
+                    >
+                      to deck
+                    </Button>
+                  )}
+                </SelectionBar>
+              </div>
+            )}
           </div>
-        </>
+        </div>
       )}
-    </>
+    </div>
   );
 };
 
@@ -1347,28 +1659,35 @@ const DeckRow = ({
   commander = false,
   deckId,
   faceImages,
+  onEdition,
   onTagOverride,
   owned,
   rowId,
   selection,
+  setCode,
+  setName,
   tagOverride,
   tagSectionIds = [],
 }: {
   /** Managed by auto-balance — quantity edits here get recalculated away. */
   auto?: boolean;
-  card: DeckCard;
   candidates: readonly string[];
+  card: DeckCard;
   commander?: boolean;
   deckId: string;
   faceImages?: string[];
+  onEdition?: () => void;
   onTagOverride?: (tagId: string | null) => void;
   owned: number;
   /** Selection id; omitted (with `selection`) for rows that can't be picked. */
   rowId?: string;
   selection?: RowSelection;
+  setCode?: string;
+  setName?: string;
   tagOverride?: string;
   tagSectionIds?: readonly string[];
 }) => {
+  const [adding, setAdding] = useState(false);
   const need = Math.max(0, card.quantity - owned);
   const basic = skipOwnership(card.name);
   const status = owned >= card.quantity ? 'owned' : owned > 0 ? 'partial' : 'buy';
@@ -1444,20 +1763,53 @@ const DeckRow = ({
           <Check aria-hidden size={10} strokeWidth={3} />
         </Badge>
       ) : (
-        <a
-          className="flex-none"
-          href={buyUrl(card.name)}
-          rel="noreferrer"
-          target="_blank"
-          title={
-            status === 'partial'
-              ? `You own ${owned} of ${card.quantity} — buy ${need} more on Cardmarket`
-              : `Not in your collection — buy ${need} on Cardmarket`
-          }
-        >
-          <Badge tone={status === 'partial' ? 'warn' : 'neg'}>buy {need}</Badge>
-        </a>
+        <>
+          <button
+            className="inline-flex h-4 flex-none items-center rounded-full bg-pos-soft px-1.5 text-2xs font-medium text-pos hover:ring-1 hover:ring-inset hover:ring-pos disabled:opacity-60"
+            disabled={adding}
+            onClick={() => {
+              setAdding(true);
+              const printing = card.printing;
+              void collectionStore
+                .addCopies(card.name, need)
+                .then(() => {
+                  if (!printing) return;
+                  return cardImageOverrideStore.set(cardKey(card.name), {
+                    collectorNumber: printing.collectorNumber,
+                    imageUrl: printing.imageUrl,
+                    scryfallId: printing.scryfallId,
+                    setCode: printing.setCode,
+                    setName: printing.setName,
+                  });
+                })
+                .finally(() => setAdding(false));
+            }}
+            title={
+              need === 1
+                ? `Add ${card.name} to your collection`
+                : `Add ${need} copies of ${card.name} to your collection`
+            }
+            type="button"
+          >
+            add{need > 1 ? ` ${need}` : ''}
+          </button>
+          <a
+            className="flex-none"
+            href={buyUrl(card.name, card.printing?.cardmarketId)}
+            rel="noreferrer"
+            target="_blank"
+            title={
+              status === 'partial'
+                ? `You own ${owned} of ${card.quantity} — buy ${need} more on Cardmarket`
+                : `Not in your collection — buy ${need} on Cardmarket`
+            }
+          >
+            <Badge tone={status === 'partial' ? 'warn' : 'neg'}>buy {need}</Badge>
+          </a>
+        </>
       )}
+
+      {onEdition && <SetSymbol onClick={onEdition} setCode={setCode} setName={setName} />}
 
       <IconButton
         className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
@@ -1470,6 +1822,124 @@ const DeckRow = ({
     </li>
   );
 };
+
+/** A mana value the way the cards print it: the generic mana symbol. */
+const ManaPip = ({ value }: { value: string }) => (
+  <span
+    aria-label={`Mana value ${value}`}
+    className="inline-flex h-4 min-w-4 flex-none items-center justify-center rounded-full bg-[#cac5c0] px-1 text-2xs font-bold leading-none tabular-nums text-black shadow-[-1px_1px_0_rgb(0_0_0/0.6)]"
+    role="img"
+    title={`Mana value ${value}`}
+  >
+    {value}
+  </span>
+);
+
+/**
+ * A group header's contents. `section` names the section the group belongs to,
+ * for lists with more than one: the section's own header scrolls away while
+ * this one stays pinned.
+ */
+const GroupHeading = ({ group, section }: { group: DeckCardGroup; section?: string }) => {
+  const count = countCards(group.cards);
+  return (
+    <>
+      {group.manaValue ? (
+        <ManaPip value={group.manaValue} />
+      ) : (
+        <span className="min-w-0 truncate">{group.label}</span>
+      )}
+      <span className="flex-none font-normal tabular-nums text-ink-muted">
+        {count} {count === 1 ? 'card' : 'cards'}
+      </span>
+      {section && (
+        <span className="ml-auto min-w-0 truncate pl-2 text-2xs font-medium uppercase tracking-wide text-ink-faint">
+          {section}
+        </span>
+      )}
+    </>
+  );
+};
+
+/**
+ * A card in the image view. Clicking the picture zooms it; the edit controls
+ * wait for the pointer, like a row's, so a grid of a hundred cards reads as
+ * cards rather than as three hundred buttons.
+ */
+const DeckTile = ({
+  candidates,
+  card,
+  children,
+  faceImages,
+  onEdition,
+  remove,
+  setCode,
+  setName,
+  setQuantity,
+}: {
+  candidates: readonly string[];
+  card: DeckCard;
+  /** Goes under the name (the tag-section picker). */
+  children?: ReactNode;
+  faceImages?: string[];
+  onEdition?: () => void;
+  remove: () => void;
+  setCode?: string;
+  setName?: string;
+  /** Left out where the count is fixed at one: a commander. */
+  setQuantity?: (quantity: number) => void;
+}) => (
+  <div className="group flex min-w-0 flex-col gap-1">
+    <div className="relative">
+      <CollectionThumb
+        candidates={candidates}
+        className="card-frame aspect-[488/680] w-full cursor-zoom-in overflow-hidden bg-raised"
+        faceImages={faceImages}
+        hover={false}
+        name={card.name}
+        previewKey={`deck|box|${card.section}|${cardKey(card.name)}`}
+      />
+      {card.quantity > 1 && (
+        <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/75 px-1 text-2xs font-semibold tabular-nums text-white">
+          {card.quantity}×
+        </span>
+      )}
+      <div className="absolute inset-x-1 bottom-1 flex items-center justify-center gap-0.5 rounded border border-line-strong bg-panel p-0.5 opacity-0 shadow-pop transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        {setQuantity && (
+          <>
+            <IconButton
+              icon={Minus}
+              label={`One less ${card.name}`}
+              onClick={() => setQuantity(card.quantity - 1)}
+              size="xs"
+            />
+            <span className="min-w-4 text-center text-2xs font-medium tabular-nums text-ink">
+              {card.quantity}
+            </span>
+            <IconButton
+              icon={Plus}
+              label={`One more ${card.name}`}
+              onClick={() => setQuantity(card.quantity + 1)}
+              size="xs"
+            />
+          </>
+        )}
+        {onEdition && <SetSymbol onClick={onEdition} setCode={setCode} setName={setName} />}
+        <IconButton
+          icon={X}
+          label={`Remove ${card.name}${card.section === 'commander' ? ' from the command zone' : ''}`}
+          onClick={remove}
+          size="xs"
+          tone="danger"
+        />
+      </div>
+    </div>
+    <span className="truncate px-0.5 text-2xs text-ink" title={card.name}>
+      {card.name}
+    </span>
+    {children}
+  </div>
+);
 
 // ---------------------------------------------------------------------------
 // Add-a-card search box
@@ -1504,11 +1974,13 @@ const previewUrls = (c: CardSearchResult): string[] =>
 const AddCardBox = ({
   commanderIdentity,
   deckFormat,
+  embedded = false,
   filters = false,
   inDeck,
   onPick,
   onPickMany,
   placeholder = 'Add a card — type a name…',
+  trailing,
 }: {
   /**
    * The deck commander's color identity, once known. Preselects the identity
@@ -1517,6 +1989,8 @@ const AddCardBox = ({
   commanderIdentity?: string[];
   /** Deck format — restricts results to format-legal cards. */
   deckFormat?: DeckFormat;
+  /** Drop the outer border when the box sits inside another section. */
+  embedded?: boolean;
   /** Show the type/color/mana-value filters (the main add box, not commander search). */
   filters?: boolean;
   /**
@@ -1529,6 +2003,11 @@ const AddCardBox = ({
   /** Add several results at once. Without it, results can't be multi-selected. */
   onPickMany?: (names: string[]) => void;
   placeholder?: string;
+  /**
+   * More controls on the search's line. They wrap under it when the panel is
+   * narrow; the results still open below at full width either way.
+   */
+  trailing?: ReactNode;
 }) => {
   const [text, setText] = useState('');
   const [resp, setResp] = useState<CardSearchResponse | null>(null);
@@ -1681,9 +2160,10 @@ const AddCardBox = ({
   const showImages = results.cards.length > 0 && results.total <= IMAGE_THRESHOLD;
 
   return (
-    <div className="flex-none border-b border-line p-1.5">
-      <div className="flex gap-1">
+    <div className={embedded ? 'min-w-0' : 'flex-none border-b border-line p-1.5'}>
+      <div className="flex flex-wrap gap-1">
         <SearchInput
+          className="min-w-[8rem]"
           onChange={e => setText(e.target.value)}
           onClear={() => setText('')}
           onKeyDown={e => {
@@ -1707,6 +2187,7 @@ const AddCardBox = ({
             {activeFilters > 0 ? activeFilters : ''}
           </Button>
         )}
+        {trailing && <div className="flex flex-none items-center gap-1">{trailing}</div>}
       </div>
 
       {filters && showFilters && (
@@ -1837,9 +2318,9 @@ const AddCardBox = ({
           ) : showImages ? (
             <div className="mt-2 flex flex-wrap gap-2">
               {results.cards.map(c => {
-                // The preview lives on the image so clicking it can flip a
-                // double-faced card; clicks anywhere else on the tile add.
-                const { flippable, handlers } = preview(`search|${c.id}`, c.name, previewUrls(c));
+                // The preview lives on the image so clicking it enlarges the card;
+                // clicks anywhere else on the tile add.
+                const { handlers } = preview(`search|${c.id}`, c.name, previewUrls(c));
                 return (
                   <button
                     key={c.id}
@@ -1852,9 +2333,8 @@ const AddCardBox = ({
                       <span className="block" {...handlers}>
                         <img
                           alt={c.name}
-                          className={`h-28 w-full object-cover ${flippable ? 'cursor-flip' : ''}`}
+                          className="h-28 w-full cursor-zoom-in object-cover"
                           src={c.imageUrl}
-                          title={flippable ? 'Click to flip to the other side' : undefined}
                         />
                       </span>
                     ) : (
@@ -1890,14 +2370,10 @@ const AddCardBox = ({
                   {...selection.listProps}
                 >
                   {results.cards.map(c => {
-                    const { flippable, handlers } = preview(
-                      `search|${c.id}`,
-                      c.name,
-                      previewUrls(c),
-                    );
-                    // Hovering the row previews; the thumbnail is the flip target
-                    // so the rest of the row still adds the card.
-                    const { onClick: flip, ...hover } = handlers;
+                    const { handlers } = preview(`search|${c.id}`, c.name, previewUrls(c));
+                    // Hovering the row previews; the thumbnail enlarges the card
+                    // so the rest of the row still adds it.
+                    const { onClick: zoom, ...hover } = handlers;
                     return (
                       <li
                         key={c.id}
@@ -1914,15 +2390,14 @@ const AddCardBox = ({
                           {c.imageUrl && (
                             <span
                               className="h-6 w-[18px] flex-none overflow-hidden rounded-sm bg-raised"
-                              onClick={flip}
+                              onClick={zoom}
                             >
                               <img
                                 alt=""
-                                className={`h-full w-full object-cover ${flippable ? 'cursor-flip' : ''}`}
+                                className="h-full w-full cursor-zoom-in object-cover"
                                 loading="lazy"
                                 src={c.imageUrl}
                                 style={{ objectPosition: '50% 18%' }}
-                                title={flippable ? 'Click to flip to the other side' : undefined}
                               />
                             </span>
                           )}

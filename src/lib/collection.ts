@@ -182,6 +182,41 @@ export const parseCollection = (
   return { cards, format: 'list' };
 };
 
+/**
+ * A row that counts copies of a card without saying which printing. Deck rows
+ * only know a name, so the copies they add live here rather than on a set.
+ */
+const countsByNameOnly = (card: CollectionCard): boolean =>
+  (card.source ?? 'import') !== 'purchases' &&
+  !card.foil &&
+  !card.setCode &&
+  !card.collectorNumber &&
+  !card.productId &&
+  !card.setName;
+
+/**
+ * `cards` plus `quantity` more copies of `name`.
+ *
+ * They join the name-only row when there is one, and start one otherwise.
+ * Purchase rows are left alone: the next purchase sync rebuilds those from
+ * order history, so a quantity written onto one would vanish.
+ */
+export const withCopies = (
+  cards: readonly CollectionCard[],
+  name: string,
+  quantity: number,
+): CollectionCard[] => {
+  const trimmed = name.trim();
+  const key = cardKey(trimmed);
+  // Same array back: the caller treats that as "nothing changed" and skips the write.
+  if (!key || quantity <= 0) return cards as CollectionCard[];
+  const out = cards.map(card => ({ ...card }));
+  const into = out.find(card => cardKey(card.name) === key && countsByNameOnly(card));
+  if (into) into.quantity += quantity;
+  else out.push({ foil: false, name: trimmed, quantity, source: 'import' });
+  return out;
+};
+
 /** Build the derived index (byKey rollup + totals) from parsed rows. */
 export const buildCollection = (
   cards: CollectionCard[],

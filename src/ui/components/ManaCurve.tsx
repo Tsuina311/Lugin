@@ -1,9 +1,5 @@
-import { useMemo } from 'react';
+import type { ManaCurve as Curve } from '@/lib/deck';
 
-import { manaCurve, type DeckCard } from '@/lib/deck';
-import type { CardMetadata } from '@/lib/mtg';
-
-// Tall enough to read at a glance without pushing the card list off screen.
 const CHART_HEIGHT = 56;
 
 /**
@@ -11,25 +7,17 @@ const CHART_HEIGHT = 56;
  * against the tallest. Lands are excluded (see `manaCurve`), so the shape shows
  * what the deck actually spends mana on.
  */
-export const ManaCurve = ({
-  cards,
-  metaByKey,
-}: {
-  cards: DeckCard[];
-  metaByKey: Record<string, CardMetadata>;
-}) => {
-  const curve = useMemo(() => manaCurve(cards, metaByKey), [cards, metaByKey]);
-
+export const ManaCurve = ({ curve }: { curve: Curve }) => {
   if (curve.total === 0) {
     return (
-      <div className="flex-none border-b border-line px-2 py-1.5 text-2xs text-ink-faint">
+      <p className="text-2xs text-ink-faint">
         {curve.pending > 0 ? 'Working out the curve…' : 'No spells yet — the curve needs cards.'}
-      </div>
+      </p>
     );
   }
 
   return (
-    <div className="flex-none border-b border-line px-2 py-1.5">
+    <div>
       <div className="flex items-end gap-1" style={{ height: CHART_HEIGHT }}>
         {curve.bars.map(bar => {
           const share = Math.round((bar.count / curve.total) * 100);
@@ -58,7 +46,7 @@ export const ManaCurve = ({
         })}
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-2 text-2xs text-ink-faint">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-2xs text-ink-faint">
         <span>
           avg MV{' '}
           <span className="font-medium tabular-nums text-ink-muted">
@@ -72,3 +60,20 @@ export const ManaCurve = ({
     </div>
   );
 };
+
+/**
+ * The same curve as a sparkline small enough for a button: the shape at a
+ * glance, with the numbers left to the full chart.
+ */
+export const MiniCurve = ({ curve }: { curve: Curve }) => (
+  <span aria-hidden className="flex h-3.5 items-end gap-px">
+    {curve.bars.map(bar => (
+      <span
+        key={bar.bucket}
+        className={`w-[3px] rounded-t-[1px] ${bar.count > 0 ? 'bg-accent' : 'bg-tint-strong'}`}
+        // A floor so a lone card still shows as a bar rather than a speck.
+        style={{ height: bar.count > 0 ? `${Math.max(20, (bar.count / curve.peak) * 100)}%` : 1 }}
+      />
+    ))}
+  </span>
+);

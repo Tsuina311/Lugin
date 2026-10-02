@@ -10,10 +10,12 @@ import { openOverlayCart } from './overlay';
 import { startSync } from './syncStore';
 import { verificationCleared } from './verify';
 
+import { DESKTOP_VERSION } from '@/desktopVersion';
+import { loadBracketLists } from '@/lib/bracket';
+import { ensureComboIndex } from '@/lib/combos/load';
 import { isInterceptorEnvelope } from '@/lib/messaging';
 import { adoptRenamedPageKeys } from '@/lib/renamedKeys';
 import { watchLocalChanges } from '@/platform/chrome/localRepository';
-import { DESKTOP_VERSION } from '@/desktopVersion';
 import { App } from '@/ui/App';
 import { ErrorBoundary } from '@/ui/ErrorBoundary';
 // `?inline` gives us the compiled CSS as a string so we can inject it into the
@@ -24,6 +26,9 @@ import overlayCss from '@/ui/index.css?inline';
 // Before anything renders: the overlay decides its theme, side and width from
 // these while it first paints, so the copy has to already be done by then.
 adoptRenamedPageKeys();
+// Game Changers and mass land denial, before the first deck row paints.
+loadBracketLists();
+void ensureComboIndex();
 
 const HOST_ID = 'lugin-overlay-host';
 

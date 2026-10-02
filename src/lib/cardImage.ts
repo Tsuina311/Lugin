@@ -11,7 +11,8 @@
 // Portable on purpose: the extension and the phone build show the same cards, and
 // a rule about which image is the right one has no business existing twice.
 
-import { cardKey } from './cardName';
+import { cardKey, stripVersion } from './cardName';
+import { isScryfallUrl } from './scryfallFetch';
 
 const SCRYFALL_ID_RE = /^[0-9a-f-]{36}$/i;
 
@@ -26,6 +27,29 @@ export const normalizeCardmarketImageUrl = (raw?: string): string | undefined =>
     return `https://product-images.s3.cardmarket.com${path}`;
   }
   return cleaned;
+};
+
+/** Product id baked into a Cardmarket image path (`/1/AVR/254218/254218.jpg`). */
+export const cardmarketProductId = (url?: string): string | undefined => {
+  const match = url?.match(/product-images[^/]*\/\d+\/[A-Za-z0-9]+\/(\d+)\//i);
+  return match?.[1];
+};
+
+/**
+ * Scryfall's CDN file first. Cardmarket's own photo is a small scan (~251×356);
+ * Scryfall's normal file is 488×680, which is what a zoom should show. API image
+ * redirects are dropped — a deck loads every card at once and those 429.
+ */
+export const leadWithScryfall = (candidates: readonly string[], scryfallUrl?: string): string[] => {
+  const lead = scryfallUrl && !isScryfallUrl(scryfallUrl) ? scryfallUrl : undefined;
+  const cdn: string[] = [];
+  const rest: string[] = [];
+  for (const url of candidates) {
+    if (!url || url === lead || isScryfallUrl(url)) continue;
+    const bucket = url.includes('cards.scryfall.io') ? cdn : rest;
+    if (!bucket.includes(url)) bucket.push(url);
+  }
+  return lead ? [lead, ...cdn, ...rest] : [...cdn, ...rest];
 };
 
 const pushUnique = (out: string[], url?: string): void => {
@@ -55,9 +79,10 @@ export const imageUrlFor = (scryfallId?: string, name?: string): string | undefi
   if (scryfallId && SCRYFALL_ID_RE.test(scryfallId)) {
     return `https://api.scryfall.com/cards/${scryfallId}?format=image&version=normal`;
   }
-  if (name?.trim()) {
+  const exact = name ? stripVersion(name) : '';
+  if (exact) {
     return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(
-      name,
+      exact,
     )}&format=image&version=normal`;
   }
   return undefined;
@@ -128,7 +153,8 @@ export const cardImageCandidates = (card: ImageableCard): string[] => {
  * sources of their own (a printing the user picked by hand, an image scraped
  * from a Cardmarket page) should consult those before falling back to this.
  */
-export const cardImageUrl = (card: ImageableCard): string | undefined => cardImageCandidates(card)[0];
+export const cardImageUrl = (card: ImageableCard): string | undefined =>
+  cardImageCandidates(card)[0];
 
 /**
  * How hard a row pins down *which* printing it is. Higher wins.

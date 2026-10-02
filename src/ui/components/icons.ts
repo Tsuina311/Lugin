@@ -40,6 +40,7 @@ export {
   Maximize2,
   Minimize2,
   Minus,
+  Mountain,
   PanelLeft,
   PanelRight,
   Pencil,

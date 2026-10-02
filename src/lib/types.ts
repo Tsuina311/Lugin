@@ -110,6 +110,12 @@ export interface ApiRequest {
   body?: string;
   headers?: Record<string, string>;
   method?: string;
+  /**
+   * Higher runs first when several Scryfall calls are waiting. Background work
+   * (resolving a whole deck's printings) stays at 0 so a click isn't stuck
+   * behind it.
+   */
+  priority?: number;
   url: string;
 }
 

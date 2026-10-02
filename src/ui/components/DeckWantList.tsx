@@ -122,7 +122,7 @@ export const DeckWantList = ({
   const listName = chosen?.name ?? name.trim();
   const start = (): void => {
     taskQueue.enqueue('deckWants', `Want list · ${deck.name}`, {
-      cards: cards.map(c => ({ name: c.name, need: c.need })),
+      cards: cards.map(c => ({ idProduct: c.idProduct, name: c.name, need: c.need })),
       listId: chosen?.id,
       listName,
       minCondition,

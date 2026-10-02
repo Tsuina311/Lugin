@@ -45,6 +45,7 @@ import { fetchRemote } from '@/lib/fetchRemote';
 import { fetchGoldfishArchetype } from '@/lib/mtggoldfish';
 import { sortWubrg } from '@/lib/mtg';
 import { searchCards } from '@/lib/search';
+import { BracketMark } from '@/ui/components/BracketMark';
 import { CollectionThumb } from '@/ui/components/CollectionThumb';
 import { CutsPanel } from '@/ui/components/CutsPanel';
 import { TagsPanel } from '@/ui/components/TagsPanel';
@@ -236,17 +237,14 @@ export const DeckEditor = ({
     let cancelled = false;
     const controller = new AbortController();
     setTagBucketsLoading(true);
-    void bucketMainByTagSections(
-      main,
-      tagSectionIds,
-      controller.signal,
-      deck.tagOverrides,
-    ).then(result => {
-      if (cancelled) return;
-      setTagBuckets(result.buckets);
-      setMainRest(result.rest);
-      setTagBucketsLoading(false);
-    });
+    void bucketMainByTagSections(main, tagSectionIds, controller.signal, deck.tagOverrides).then(
+      result => {
+        if (cancelled) return;
+        setTagBuckets(result.buckets);
+        setMainRest(result.rest);
+        setTagBucketsLoading(false);
+      },
+    );
     return () => {
       cancelled = true;
       controller.abort();
@@ -398,9 +396,7 @@ export const DeckEditor = ({
     const doomed = new Set(names.map(cardKey));
     void syncStore.updateDeck(deck.id, d => ({
       ...d,
-      cards: d.cards.filter(
-        card => !(card.section === 'main' && doomed.has(cardKey(card.name))),
-      ),
+      cards: d.cards.filter(card => !(card.section === 'main' && doomed.has(cardKey(card.name)))),
     }));
   };
 
@@ -418,7 +414,9 @@ export const DeckEditor = ({
           <input
             aria-label="Deck name"
             className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-2 text-sm font-semibold text-ink focus:border-line-strong"
-            onBlur={() => void syncStore.updateDeck(deck.id, d => ({ ...d, name: name.trim() || d.name }))}
+            onBlur={() =>
+              void syncStore.updateDeck(deck.id, d => ({ ...d, name: name.trim() || d.name }))
+            }
             onChange={event => setName(event.target.value)}
             value={name}
           />
@@ -440,9 +438,23 @@ export const DeckEditor = ({
               </option>
             ))}
           </select>
+          <BracketMark
+            deck={deck}
+            onRemove={card =>
+              void syncStore.updateDeck(deck.id, current => ({
+                ...current,
+                cards: current.cards.filter(
+                  item =>
+                    !(item.section === card.section && cardKey(item.name) === cardKey(card.name)),
+                ),
+              }))
+            }
+          />
           <span className="min-w-0 flex-1 truncate text-[11px] tabular-nums text-ink-faint">
             {copies(deck, 'main') + copies(deck, 'commander')}
-            {formatInfo(deck.format).targetSize ? `/${formatInfo(deck.format).targetSize}` : ''}{' '}
+            {formatInfo(deck.format).targetSize
+              ? `/${formatInfo(deck.format).targetSize}`
+              : ''}{' '}
             cards
           </span>
           {deck.cards.length > 0 ? <ViewToggle onChange={setView} size="md" value={view} /> : null}
@@ -472,10 +484,7 @@ export const DeckEditor = ({
           </p>
         ) : null}
         {deckTabs.length > 1 ? (
-          <div
-            className="mt-2 flex gap-1 overflow-x-auto px-2 pb-1"
-            role="tablist"
-          >
+          <div className="mt-2 flex gap-1 overflow-x-auto px-2 pb-1" role="tablist">
             {deckTabs.map(tab => (
               <button
                 key={tab.id}
@@ -527,42 +536,102 @@ export const DeckEditor = ({
         />
       ) : (
         <>
-      {/* Adding sits above the cards: it's what this screen is for, and hunting
+          {/* Adding sits above the cards: it's what this screen is for, and hunting
           for it under a hundred rows would be absurd on a phone. */}
-      <section className="border-b border-line px-4 py-3">
-        <div className="mb-2 flex items-center gap-1">
-          {zones.length > 1 ? (
-            <div className="flex min-w-0 flex-1 flex-wrap gap-1">
-              {zones.map(zone => (
+          <section className="border-b border-line px-4 py-3">
+            <div className="mb-2 flex items-center gap-1">
+              {zones.length > 1 ? (
+                <div className="flex min-w-0 flex-1 flex-wrap gap-1">
+                  {zones.map(zone => (
+                    <button
+                      key={zone.id}
+                      aria-pressed={into === zone.id}
+                      className={`rounded-md px-2.5 py-1.5 text-xs font-medium ${
+                        into === zone.id ? 'bg-accent text-accent-ink' : 'bg-raised text-ink-faint'
+                      }`}
+                      onClick={() => setInto(zone.id)}
+                      type="button"
+                    >
+                      {zone.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <span className="min-w-0 flex-1" />
+              )}
+              {deck.cards.length > 0 ? (
                 <button
-                  key={zone.id}
-                  aria-pressed={into === zone.id}
-                  className={`rounded-md px-2.5 py-1.5 text-xs font-medium ${
-                    into === zone.id ? 'bg-accent text-accent-ink' : 'bg-raised text-ink-faint'
-                  }`}
-                  onClick={() => setInto(zone.id)}
+                  className="shrink-0 rounded-md bg-raised px-2.5 py-1.5 text-xs font-medium text-ink active:bg-tint"
+                  onClick={() => setAddingTagSection(v => !v)}
                   type="button"
                 >
-                  {zone.label}
+                  {addingTagSection ? 'Done' : '+ Tag section'}
                 </button>
-              ))}
+              ) : null}
             </div>
-          ) : (
-            <span className="min-w-0 flex-1" />
-          )}
-          {deck.cards.length > 0 ? (
-            <button
-              className="shrink-0 rounded-md bg-raised px-2.5 py-1.5 text-xs font-medium text-ink active:bg-tint"
-              onClick={() => setAddingTagSection(v => !v)}
-              type="button"
-            >
-              {addingTagSection ? 'Done' : '+ Tag section'}
-            </button>
-          ) : null}
-        </div>
-        {addingTagSection ? (
-          <div className="mb-2 rounded-lg border border-line bg-raised p-2">
-            {tagSectionIds.length > 0 ? (
+            {addingTagSection ? (
+              <div className="mb-2 rounded-lg border border-line bg-raised p-2">
+                {tagSectionIds.length > 0 ? (
+                  <ul className="mb-2 flex flex-wrap gap-1.5">
+                    {tagSectionIds.map(id => (
+                      <li key={id}>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-line-strong bg-panel px-2 py-0.5 text-[11px] text-ink">
+                          {deckTagById(id)?.label ?? id}
+                          <button
+                            aria-label={`Remove ${deckTagById(id)?.label ?? id} section`}
+                            className="text-ink-faint"
+                            onClick={() => removeTagSection(id)}
+                            type="button"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <input
+                  aria-label="Search tags"
+                  className="mb-2 w-full rounded-md border border-line-strong bg-panel px-2 py-1.5 text-sm text-ink placeholder:text-ink-faint"
+                  onChange={e => setTagPickerQuery(e.target.value)}
+                  placeholder="Search tags…"
+                  value={tagPickerQuery}
+                />
+                <div className="max-h-48 overflow-auto">
+                  {pickerTags.length === 0 ? (
+                    <p className="px-1 py-2 text-xs text-ink-faint">
+                      No matching tags left to add.
+                    </p>
+                  ) : (
+                    pickerTags.map(group => (
+                      <div key={group.category} className="mb-2">
+                        <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                          {group.category}
+                        </p>
+                        <ul className="mt-1 flex flex-wrap gap-1">
+                          {group.tags.map(tag => (
+                            <li key={tag.id}>
+                              <button
+                                className="rounded-full border border-line-strong px-2 py-0.5 text-[11px] text-ink-muted active:bg-panel"
+                                onClick={() => addTagSection(tag.id)}
+                                type="button"
+                              >
+                                {tag.label}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {tagBucketsLoading ? (
+                  <p className="mt-1 text-[11px] text-ink-faint">
+                    Sorting cards into tag sections…
+                  </p>
+                ) : null}
+              </div>
+            ) : tagSectionIds.length > 0 ? (
               <ul className="mb-2 flex flex-wrap gap-1.5">
                 {tagSectionIds.map(id => (
                   <li key={id}>
@@ -581,277 +650,236 @@ export const DeckEditor = ({
                 ))}
               </ul>
             ) : null}
-            <input
-              aria-label="Search tags"
-              className="mb-2 w-full rounded-md border border-line-strong bg-panel px-2 py-1.5 text-sm text-ink placeholder:text-ink-faint"
-              onChange={e => setTagPickerQuery(e.target.value)}
-              placeholder="Search tags…"
-              value={tagPickerQuery}
-            />
-            <div className="max-h-48 overflow-auto">
-              {pickerTags.length === 0 ? (
-                <p className="px-1 py-2 text-xs text-ink-faint">No matching tags left to add.</p>
-              ) : (
-                pickerTags.map(group => (
-                  <div key={group.category} className="mb-2">
-                    <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
-                      {group.category}
-                    </p>
-                    <ul className="mt-1 flex flex-wrap gap-1">
-                      {group.tags.map(tag => (
-                        <li key={tag.id}>
-                          <button
-                            className="rounded-full border border-line-strong px-2 py-0.5 text-[11px] text-ink-muted active:bg-panel"
-                            onClick={() => addTagSection(tag.id)}
-                            type="button"
-                          >
-                            {tag.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))
-              )}
+            <div className="flex gap-2">
+              <input
+                aria-label="Card to add"
+                autoCapitalize="words"
+                autoCorrect="off"
+                className="min-w-0 flex-1 rounded-lg border border-line-strong bg-raised px-3 py-2.5 text-base text-ink placeholder:text-ink-faint"
+                onChange={event => setAdding(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') add(adding);
+                }}
+                placeholder="Add a card, or paste a list"
+                value={adding}
+              />
+              <button
+                className="shrink-0 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-40"
+                disabled={!adding.trim()}
+                onClick={() => add(adding)}
+                type="button"
+              >
+                Add
+              </button>
             </div>
-            {tagBucketsLoading ? (
-              <p className="mt-1 text-[11px] text-ink-faint">Sorting cards into tag sections…</p>
-            ) : null}
-          </div>
-        ) : tagSectionIds.length > 0 ? (
-          <ul className="mb-2 flex flex-wrap gap-1.5">
-            {tagSectionIds.map(id => (
-              <li key={id}>
-                <span className="inline-flex items-center gap-1 rounded-full border border-line-strong bg-panel px-2 py-0.5 text-[11px] text-ink">
-                  {deckTagById(id)?.label ?? id}
-                  <button
-                    aria-label={`Remove ${deckTagById(id)?.label ?? id} section`}
-                    className="text-ink-faint"
-                    onClick={() => removeTagSection(id)}
-                    type="button"
-                  >
-                    ×
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <div className="flex gap-2">
-          <input
-            aria-label="Card to add"
-            autoCapitalize="words"
-            autoCorrect="off"
-            className="min-w-0 flex-1 rounded-lg border border-line-strong bg-raised px-3 py-2.5 text-base text-ink placeholder:text-ink-faint"
-            onChange={event => setAdding(event.target.value)}
-            onKeyDown={event => {
-              if (event.key === 'Enter') add(adding);
-            }}
-            placeholder="Add a card, or paste a list"
-            value={adding}
-          />
-          <button
-            className="shrink-0 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-40"
-            disabled={!adding.trim()}
-            onClick={() => add(adding)}
-            type="button"
-          >
-            Add
-          </button>
-        </div>
-        {suggestions.length > 0 ? (
-          <ul className="mt-2 flex flex-wrap gap-1.5">
-            {suggestions.map(suggestion => (
-              <li key={suggestion.name}>
-                <button
-                  className={`rounded-full border px-2.5 py-1 text-xs active:bg-raised ${
-                    suggestion.owned
-                      ? 'border-pos/40 bg-pos-soft text-pos'
-                      : 'border-line-strong text-ink-muted'
-                  }`}
-                  onClick={() => add(suggestion.name)}
-                  type="button"
-                >
-                  {suggestion.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
-
-      {deck.cards.length === 0 ? (
-        <p className="px-6 py-10 text-center text-sm text-ink-muted">
-          Nothing in this deck yet. Add cards above, or paste a list you already have.
-        </p>
-      ) : null}
-
-      {(() => {
-        const renderCardList = (cards: DeckCard[], allowTagMove: boolean) =>
-          view === 'box' ? (
-            <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3">
-              {cards.map(card => {
-                const key = cardKey(card.name);
-                const ov = deck.tagOverrides;
-                const hasOv = ov != null && Object.prototype.hasOwnProperty.call(ov, key);
-                return (
-                  <div key={rowKey(card)} className="flex flex-col gap-1">
-                    <CollectionThumb
-                      candidates={candidatesOf(card.name)}
-                      className="aspect-[488/680] w-full overflow-hidden rounded-lg bg-raised"
-                      imgStyle={{ objectPosition: '50% 17%' }}
-                      name={card.name}
-                      previewKey={`deck|box|${deck.id}|${rowKey(card)}`}
-                    />
-                    <span className="truncate text-xs text-ink" title={card.name}>
-                      {card.name}
-                    </span>
-                    {allowTagMove && tagSectionIds.length > 0 && (
-                      <DeckCardTagMove
-                        onChange={tagId => setCardTagOverride(card.name, tagId)}
-                        override={hasOv ? ov![key] : undefined}
-                        tagSectionIds={tagSectionIds}
-                      />
-                    )}
-                    <div className="flex items-center gap-1">
-                      <Stepper
-                        onChange={quantity => setQuantity(card, quantity)}
-                        quantity={card.quantity}
-                      />
-                      <button
-                        aria-label={`Remove ${card.name}`}
-                        className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
-                        onClick={() => setQuantity(card, 0)}
-                        type="button"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <ul className="divide-y divide-line">
-              {cards.map(card => {
-                const key = rowKey(card);
-                const ck = cardKey(card.name);
-                const ov = deck.tagOverrides;
-                const hasOv = ov != null && Object.prototype.hasOwnProperty.call(ov, ck);
-                return (
-                  <li key={key} className="flex items-center gap-2 px-2 py-1">
-                    <CollectionThumb
-                      candidates={candidatesOf(card.name)}
-                      name={card.name}
-                      previewKey={`deck|list|${deck.id}|${key}`}
-                    />
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{card.name}</span>
-                    {allowTagMove && tagSectionIds.length > 0 && (
-                      <DeckCardTagMove
-                        onChange={tagId => setCardTagOverride(card.name, tagId)}
-                        override={hasOv ? ov![ck] : undefined}
-                        tagSectionIds={tagSectionIds}
-                      />
-                    )}
-                    <Stepper
-                      onChange={quantity => setQuantity(card, quantity)}
-                      quantity={card.quantity}
-                    />
+            {suggestions.length > 0 ? (
+              <ul className="mt-2 flex flex-wrap gap-1.5">
+                {suggestions.map(suggestion => (
+                  <li key={suggestion.name}>
                     <button
-                      aria-label={`Remove ${card.name}`}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
-                      onClick={() => setQuantity(card, 0)}
+                      className={`rounded-full border px-2.5 py-1 text-xs active:bg-raised ${
+                        suggestion.owned
+                          ? 'border-pos/40 bg-pos-soft text-pos'
+                          : 'border-line-strong text-ink-muted'
+                      }`}
+                      onClick={() => add(suggestion.name)}
                       type="button"
                     >
-                      ×
+                      {suggestion.name}
                     </button>
                   </li>
-                );
-              })}
-            </ul>
-          );
-
-        const qty = (cards: DeckCard[]) => cards.reduce((sum, c) => sum + c.quantity, 0);
-
-        const overviewBlocks: { key: string; label: string; cards: DeckCard[]; removable?: string }[] =
-          [];
-        const commanders = deck.cards.filter(c => c.section === 'commander');
-        if (commanders.length > 0) {
-          overviewBlocks.push({ key: 'commander', label: 'Commander', cards: commanders });
-        }
-        for (const bucket of tagBuckets) {
-          if (bucket.cards.length === 0 && !tagBucketsLoading) continue;
-          overviewBlocks.push({
-            key: `tag:${bucket.tagId}`,
-            label: bucket.label,
-            cards: bucket.cards,
-            removable: bucket.tagId,
-          });
-        }
-        if (mainRest.length > 0 || (tagSectionIds.length === 0 && deck.cards.some(c => c.section === 'main'))) {
-          const main =
-            tagSectionIds.length === 0
-              ? deck.cards.filter(c => c.section === 'main')
-              : mainRest;
-          if (main.length > 0) {
-            overviewBlocks.push({ key: 'main', label: 'Main deck', cards: main });
-          }
-        }
-        const side = deck.cards.filter(c => c.section === 'sideboard');
-        if (side.length > 0) {
-          overviewBlocks.push({ key: 'sideboard', label: 'Sideboard', cards: side });
-        }
-
-        return overviewBlocks.map(block => (
-          <section key={block.key}>
-            <h2 className="flex items-center gap-2 bg-panel px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              <span className="min-w-0 flex-1 truncate">
-                {block.label}
-                <span className="ml-2 tabular-nums opacity-70">{qty(block.cards)}</span>
-              </span>
-              {block.removable ? (
-                <button
-                  aria-label={`Remove ${block.label} section`}
-                  className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-ink-faint active:bg-raised"
-                  onClick={() => removeTagSection(block.removable!)}
-                  type="button"
-                >
-                  Remove section
-                </button>
-              ) : null}
-            </h2>
-            {block.cards.length > 0
-              ? renderCardList(
-                  block.cards,
-                  block.key === 'main' || block.key.startsWith('tag:'),
-                )
-              : null}
+                ))}
+              </ul>
+            ) : null}
           </section>
-        ));
-      })()}
 
-      {collection && deck.cards.length > 0 ? (
-        <section className="border-t border-line px-4 py-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-            {missing.length === 0 ? 'Nothing missing' : `Missing ${missing.length}`}
-          </h2>
-          {missing.length === 0 ? (
-            <p className="mt-2 text-sm text-ink-muted">You own every non-basic card in this deck.</p>
-          ) : (
-            <ul className="mt-2 space-y-1.5">
-              {missing.map(card => (
-                <li key={card.name} className="flex items-baseline gap-3 text-sm">
-                  <span className="min-w-0 flex-1 truncate text-ink">{card.name}</span>
-                  {card.owned > 0 ? (
-                    <span className="shrink-0 text-[11px] text-ink-faint">have {card.owned}</span>
+          {deck.cards.length === 0 ? (
+            <p className="px-6 py-10 text-center text-sm text-ink-muted">
+              Nothing in this deck yet. Add cards above, or paste a list you already have.
+            </p>
+          ) : null}
+
+          {(() => {
+            const renderCardList = (cards: DeckCard[], allowTagMove: boolean) =>
+              view === 'box' ? (
+                <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3">
+                  {cards.map(card => {
+                    const key = cardKey(card.name);
+                    const ov = deck.tagOverrides;
+                    const hasOv = ov != null && Object.prototype.hasOwnProperty.call(ov, key);
+                    return (
+                      <div key={rowKey(card)} className="flex flex-col gap-1">
+                        <CollectionThumb
+                          candidates={candidatesOf(card.name)}
+                          className="card-frame aspect-[488/680] w-full overflow-hidden bg-raised"
+                          imgStyle={{ objectPosition: '50% 17%' }}
+                          name={card.name}
+                          previewKey={`deck|box|${deck.id}|${rowKey(card)}`}
+                        />
+                        <span className="truncate text-xs text-ink" title={card.name}>
+                          {card.name}
+                        </span>
+                        {allowTagMove && tagSectionIds.length > 0 && (
+                          <DeckCardTagMove
+                            onChange={tagId => setCardTagOverride(card.name, tagId)}
+                            override={hasOv ? ov![key] : undefined}
+                            tagSectionIds={tagSectionIds}
+                          />
+                        )}
+                        <div className="flex items-center gap-1">
+                          <Stepper
+                            onChange={quantity => setQuantity(card, quantity)}
+                            quantity={card.quantity}
+                          />
+                          <button
+                            aria-label={`Remove ${card.name}`}
+                            className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
+                            onClick={() => setQuantity(card, 0)}
+                            type="button"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {cards.map(card => {
+                    const key = rowKey(card);
+                    const ck = cardKey(card.name);
+                    const ov = deck.tagOverrides;
+                    const hasOv = ov != null && Object.prototype.hasOwnProperty.call(ov, ck);
+                    return (
+                      <li key={key} className="flex items-center gap-2 px-2 py-1">
+                        <CollectionThumb
+                          candidates={candidatesOf(card.name)}
+                          name={card.name}
+                          previewKey={`deck|list|${deck.id}|${key}`}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                          {card.name}
+                        </span>
+                        {allowTagMove && tagSectionIds.length > 0 && (
+                          <DeckCardTagMove
+                            onChange={tagId => setCardTagOverride(card.name, tagId)}
+                            override={hasOv ? ov![ck] : undefined}
+                            tagSectionIds={tagSectionIds}
+                          />
+                        )}
+                        <Stepper
+                          onChange={quantity => setQuantity(card, quantity)}
+                          quantity={card.quantity}
+                        />
+                        <button
+                          aria-label={`Remove ${card.name}`}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
+                          onClick={() => setQuantity(card, 0)}
+                          type="button"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              );
+
+            const qty = (cards: DeckCard[]) => cards.reduce((sum, c) => sum + c.quantity, 0);
+
+            const overviewBlocks: {
+              key: string;
+              label: string;
+              cards: DeckCard[];
+              removable?: string;
+            }[] = [];
+            const commanders = deck.cards.filter(c => c.section === 'commander');
+            if (commanders.length > 0) {
+              overviewBlocks.push({ key: 'commander', label: 'Commander', cards: commanders });
+            }
+            for (const bucket of tagBuckets) {
+              if (bucket.cards.length === 0 && !tagBucketsLoading) continue;
+              overviewBlocks.push({
+                key: `tag:${bucket.tagId}`,
+                label: bucket.label,
+                cards: bucket.cards,
+                removable: bucket.tagId,
+              });
+            }
+            if (
+              mainRest.length > 0 ||
+              (tagSectionIds.length === 0 && deck.cards.some(c => c.section === 'main'))
+            ) {
+              const main =
+                tagSectionIds.length === 0
+                  ? deck.cards.filter(c => c.section === 'main')
+                  : mainRest;
+              if (main.length > 0) {
+                overviewBlocks.push({ key: 'main', label: 'Main deck', cards: main });
+              }
+            }
+            const side = deck.cards.filter(c => c.section === 'sideboard');
+            if (side.length > 0) {
+              overviewBlocks.push({ key: 'sideboard', label: 'Sideboard', cards: side });
+            }
+
+            return overviewBlocks.map(block => (
+              <section key={block.key}>
+                <h2 className="flex items-center gap-2 bg-panel px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+                  <span className="min-w-0 flex-1 truncate">
+                    {block.label}
+                    <span className="ml-2 tabular-nums opacity-70">{qty(block.cards)}</span>
+                  </span>
+                  {block.removable ? (
+                    <button
+                      aria-label={`Remove ${block.label} section`}
+                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-ink-faint active:bg-raised"
+                      onClick={() => removeTagSection(block.removable!)}
+                      type="button"
+                    >
+                      Remove section
+                    </button>
                   ) : null}
-                  <span className="shrink-0 font-semibold tabular-nums text-neg">×{card.need}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ) : null}
+                </h2>
+                {block.cards.length > 0
+                  ? renderCardList(
+                      block.cards,
+                      block.key === 'main' || block.key.startsWith('tag:'),
+                    )
+                  : null}
+              </section>
+            ));
+          })()}
+
+          {collection && deck.cards.length > 0 ? (
+            <section className="border-t border-line px-4 py-4">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+                {missing.length === 0 ? 'Nothing missing' : `Missing ${missing.length}`}
+              </h2>
+              {missing.length === 0 ? (
+                <p className="mt-2 text-sm text-ink-muted">
+                  You own every non-basic card in this deck.
+                </p>
+              ) : (
+                <ul className="mt-2 space-y-1.5">
+                  {missing.map(card => (
+                    <li key={card.name} className="flex items-baseline gap-3 text-sm">
+                      <span className="min-w-0 flex-1 truncate text-ink">{card.name}</span>
+                      {card.owned > 0 ? (
+                        <span className="shrink-0 text-[11px] text-ink-faint">
+                          have {card.owned}
+                        </span>
+                      ) : null}
+                      <span className="shrink-0 font-semibold tabular-nums text-neg">
+                        ×{card.need}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
         </>
       )}
     </div>

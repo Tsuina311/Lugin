@@ -296,6 +296,24 @@ async replaceAll(decks: Deck[]): Promise<void> {
     }));
   },
 
+  /** Remember which printing a deck line is, or clear it back to the default. */
+  async setPrinting(
+    id: string,
+    name: string,
+    section: DeckSection,
+    printing: DeckCard['printing'] | null,
+  ): Promise<void> {
+    const key = cardKey(name);
+    await mutateDeck(id, d => ({
+      ...d,
+      cards: d.cards.map(c =>
+        c.section === section && cardKey(c.name) === key
+          ? { ...c, printing: printing ?? undefined }
+          : c,
+      ),
+    }));
+  },
+
   /** Set a card's quantity (removes it when the quantity drops to 0). */
   async setQuantity(id: string, name: string, section: DeckSection, qty: number): Promise<void> {
     const key = cardKey(name);

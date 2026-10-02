@@ -112,6 +112,8 @@ export default defineManifest({
     ...TARGET_MATCHES,
     'https://help.cardmarket.com/*',
     'https://api.scryfall.com/*',
+    // Commander Spellbook's two-card combo index, downloaded once and cached.
+    'https://backend.commanderspellbook.com/*',
     'https://json.edhrec.com/*',
     'https://www.mtggoldfish.com/*',
     'https://www.googleapis.com/*',

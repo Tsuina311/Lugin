@@ -40,6 +40,7 @@ import {
   X,
 } from './components/icons';
 import { useCalls } from './useCalls';
+import { useScrollCapture } from './useScrollCapture';
 
 import { callStore } from '@/content/callStore';
 import { cartStore } from '@/content/cartStore';
@@ -199,6 +200,8 @@ export const App = () => {
   const [side, setSide] = useState<Side>(readSide);
   const [width, setWidth] = useState<number>(readWidth);
   const [resizing, setResizing] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useScrollCapture({ full: view === 'full', open: view !== 'hidden', panel: panelRef });
   const [tab, setTabState] = useState<Tab>(readTab);
   const setTab = (next: Tab) => {
     setTabState(next);
@@ -414,6 +417,7 @@ export const App = () => {
       )}
 
       <div
+        ref={panelRef}
         className={
           // `overflow-hidden`: a panel that lays itself out taller than the
           // overlay must scroll inside its own list, not spill over the site.

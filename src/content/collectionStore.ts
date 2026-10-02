@@ -13,6 +13,7 @@ import { arrivedOnly } from '@/lib/arrivedPurchases';
 import { cardKey, stripVersion } from '@/lib/cardName';
 import {
   buildCollection,
+  withCopies,
   type Collection,
   type CollectionCard,
   type StoredCollection,
@@ -145,7 +146,50 @@ void chrome.storage.local.get([STORAGE_KEY, DUPES_KEY]).then(stored => {
   }
 });
 
+// One add at a time. Two rows clicked in a row both read the collection first,
+// and the slower write would put back the copy count from before the faster one.
+let copiesQueue: Promise<void> = Promise.resolve();
+
+/** Resolves once the collection has been read from storage. */
+const whenCollectionReady = (): Promise<void> => {
+  if (!state.loading) return Promise.resolve();
+  return new Promise(resolve => {
+    const done = collectionStore.subscribe(() => {
+      if (state.loading) return;
+      done();
+      resolve();
+    });
+  });
+};
+
 export const collectionStore = {
+  /**
+   * Count `quantity` more copies of `name` as owned.
+   *
+   * For a deck that was scanned or imported: those cards are in hand, but they
+   * were never a purchase and never an imported collection file, so nothing else
+   * records them. Written as an ordinary imported row, which a purchase sync keeps.
+   */
+  async addCopies(name: string, quantity: number): Promise<void> {
+    const job = copiesQueue.then(async () => {
+      await whenCollectionReady();
+      const existing = state.collection;
+      const before = existing?.cards ?? [];
+      const cards = withCopies(before, name, quantity);
+      if (cards === before) return;
+      await persistCards(
+        cards,
+        existing?.source || 'Added from a deck',
+        existing?.format ?? 'list',
+      );
+    });
+    copiesQueue = job.then(
+      () => undefined,
+      () => undefined,
+    );
+    return job;
+  },
+
   async clear() {
     const existing = state.collection;
     await chrome.storage.local.remove(STORAGE_KEY);

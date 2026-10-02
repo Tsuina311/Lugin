@@ -29,6 +29,138 @@ const DEFAULT_OPEN = new Set(['highsynergycards', 'highliftcards', 'topcards', '
 
 const pct = (n?: number): string => (n == null ? '—' : `${Math.round(n * 100)}%`);
 
+const shortName = (name: string): string => frontFaceName(name).split(',')[0]!.trim();
+
+const FocusPicker = ({
+  cap,
+  cards,
+  commanderLabel,
+  commanderSearch,
+  focusCards,
+  onToggleCard,
+  onToggleCommander,
+  useCommander,
+}: {
+  cap: number;
+  cards: readonly string[];
+  commanderLabel: string;
+  /** Full commander names, so a search for the subtitle still finds the row. */
+  commanderSearch: string;
+  focusCards: readonly string[];
+  onToggleCard: (name: string) => void;
+  onToggleCommander: () => void;
+  useCommander: boolean;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      const root = rootRef.current;
+      // composedPath sees through the extension shadow root. document target
+      // retargeting would otherwise treat every click in the menu as outside.
+      if (root && event.composedPath().includes(root)) return;
+      setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const q = query.trim().toLowerCase();
+  const showCommander =
+    !q ||
+    commanderLabel.toLowerCase().includes(q) ||
+    commanderSearch.toLowerCase().includes(q);
+  const visibleCards = cards.filter(name => !q || name.toLowerCase().includes(q));
+  const picked = [...(useCommander ? [commanderLabel] : []), ...focusCards];
+  const summary =
+    picked.length === 0
+      ? 'Choose cards'
+      : picked.length <= 2
+        ? picked.join(', ')
+        : `${picked[0]} + ${picked.length - 1}`;
+  const atCap = focusCards.length >= cap;
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        className="inline-flex max-w-[16rem] items-center gap-1 rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 text-left text-[10px] text-slate-200 outline-none hover:border-slate-500"
+        onClick={() => setOpen(cur => !cur)}
+        title="Cards the suggestions must be played with. Uncheck the commander to leave it out."
+        type="button"
+      >
+        <span className="truncate">{summary}</span>
+        <span aria-hidden className="text-slate-500">
+          ▾
+        </span>
+      </button>
+      {open ? (
+        <div className="absolute left-0 z-30 mt-1 flex w-64 flex-col rounded border border-slate-700 bg-slate-950 shadow-lg">
+          <input
+            autoFocus
+            className="border-b border-slate-800 bg-transparent px-2 py-1.5 text-[11px] text-slate-100 outline-none placeholder:text-slate-600"
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search cards"
+            type="search"
+            value={query}
+          />
+          <ul className="max-h-60 list-none overflow-auto py-1">
+            {showCommander ? (
+              <li>
+                <label className="flex cursor-pointer items-center gap-2 px-2 py-1 text-[11px] text-ink hover:bg-tint">
+                  <input
+                    checked={useCommander}
+                    className="accent-sky-500"
+                    onChange={onToggleCommander}
+                    type="checkbox"
+                  />
+                  <span className="min-w-0 truncate">{commanderLabel}</span>
+                </label>
+              </li>
+            ) : null}
+            {visibleCards.map(name => {
+              const checked = focusCards.some(card => cardKey(card) === cardKey(name));
+              return (
+                <li key={cardKey(name)}>
+                  <label
+                    className={`flex items-center gap-2 px-2 py-1 text-[11px] text-ink hover:bg-tint ${
+                      !checked && atCap ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'
+                    }`}
+                  >
+                    <input
+                      checked={checked}
+                      className="accent-sky-500"
+                      disabled={!checked && atCap}
+                      onChange={() => onToggleCard(name)}
+                      type="checkbox"
+                    />
+                    <span className="min-w-0 truncate">{name}</span>
+                  </label>
+                </li>
+              );
+            })}
+            {visibleCards.length === 0 && !showCommander ? (
+              <li className="px-2 py-2 text-[11px] text-slate-500">No cards match.</li>
+            ) : null}
+          </ul>
+          <div className="border-t border-slate-800 px-2 py-1 text-[10px] text-slate-500">
+            {atCap ? `${cap} cards besides the commander` : `Up to ${cap} cards besides the commander`}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const signedPct = (n?: number): string => {
   if (n == null) return '';
   const v = Math.round(n * 100);
@@ -56,8 +188,10 @@ export const EdhrecPanel = ({
   const [combined, setCombined] = useState<EdhrecCombinedCard[] | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
-  /** Main-deck cards to rank by co-occurrence. Empty = this commander. */
+  /** Main-deck cards to rank by co-occurrence. */
   const [focusCards, setFocusCards] = useState<string[]>([]);
+  /** Commander page is one of the checked searches. Off skips it. */
+  const [useCommander, setUseCommander] = useState(true);
   const [theme, setTheme] = useState('');
   const [themeOptions, setThemeOptions] = useState<EdhrecTheme[]>([]);
   const [autoPick, setAutoPick] = useState<EdhrecThemePick | null>(null);
@@ -89,30 +223,36 @@ export const EdhrecPanel = ({
 
   // (Re)load whenever the commander(s), theme, or focus cards change.
   const load = (force = false): void => {
-    if (focusCards.length === 0 && commanderNames.length === 0) return;
+    const wantCommander = useCommander && commanderNames.length > 0;
+    if (!wantCommander && focusCards.length === 0) {
+      ++requestGen.current;
+      setData(null);
+      setCombined(null);
+      setStatus('idle');
+      setError(null);
+      return;
+    }
     const gen = ++requestGen.current;
     const requestedTheme = theme;
     const requestedFocus = focusCards;
     setStatus('loading');
     setError(null);
-    if (requestedFocus.length >= 2) {
+    if (requestedFocus.length + (wantCommander ? 1 : 0) >= 2) {
       setData(null);
       setCombined(null);
       void Promise.all([
         Promise.all(requestedFocus.map(name => fetchEdhrecCard(name, force))),
-        commanderNames.length > 0
-          ? fetchEdhrec(commanderNames, undefined, force).catch(() => null)
-          : Promise.resolve(null),
+        wantCommander ? fetchEdhrec(commanderNames, undefined, force) : Promise.resolve(null),
       ])
         .then(([pages, commander]) => {
           if (gen !== requestGen.current) return;
           const commanderLabel = frontFaceName(
             commander?.commanderName ?? commanderNames[0] ?? 'Commander',
           ).split(',')[0]!.trim();
+          const cardPages = requestedFocus.map((label, i) => ({ data: pages[i]!, label }));
           setCombined(
             combineEdhrecCardPages(
-              requestedFocus.map((label, i) => ({ data: pages[i]!, label })),
-              commander ? { data: commander, label: commanderLabel } : null,
+              commander ? [{ data: commander, label: commanderLabel }, ...cardPages] : cardPages,
             ),
           );
           setData(null);
@@ -155,12 +295,13 @@ export const EdhrecPanel = ({
     load();
     // `load` closes over the values in this dep list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [namesKey, theme, focusKey]);
+  }, [namesKey, theme, focusKey, useCommander]);
 
   // Reset the theme when switching commanders — themes are commander-specific.
   useEffect(() => {
     userPicked.current = false;
     setFocusCards([]);
+    setUseCommander(true);
     setCombined(null);
     setTheme('');
     setThemeOptions([]);
@@ -199,7 +340,7 @@ export const EdhrecPanel = ({
   }, [focusOptions]);
 
   useEffect(() => {
-    if (focusCards.length > 0 || userPicked.current || theme !== '' || !data?.themes.length) return;
+    if (!useCommander || focusCards.length > 0 || userPicked.current || theme !== '' || !data?.themes.length) return;
     const pick = pickEdhrecTheme(data.themes, deckCards);
     if (!pick) {
       setAutoPick(null);
@@ -313,6 +454,11 @@ export const EdhrecPanel = ({
     );
   }
 
+  const commanderKeys = new Set(commanderNames.map(cardKey));
+  const commanderLabel = commanderNames.map(shortName).join(' & ');
+  const pickerCards = focusOptions.filter(name => !commanderKeys.has(cardKey(name)));
+  const selectedLabels = [...(useCommander ? [commanderLabel] : []), ...focusCards];
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Controls */}
@@ -321,14 +467,14 @@ export const EdhrecPanel = ({
         {combined ? (
           <span className="text-slate-500">
             Partners of{' '}
-            {focusCards.length <= 1
-              ? focusCards[0]
-              : `${focusCards.slice(0, -1).join(', ')} and ${focusCards[focusCards.length - 1]}`}
+            {selectedLabels.length <= 1
+              ? selectedLabels[0]
+              : `${selectedLabels.slice(0, -1).join(', ')} and ${selectedLabels[selectedLabels.length - 1]}`}
           </span>
         ) : data?.deckCount != null ? (
           <span className="text-slate-500">
             {data.deckCount.toLocaleString()} deck{data.deckCount === 1 ? '' : 's'}
-            {focusCards.length === 1 ? ` with ${focusCards[0]}` : ''}
+            {focusCards.length === 1 && !useCommander ? ` · ${focusCards[0]}` : ''}
           </span>
         ) : null}
         {(data || combined) && ownedStats.total > 0 && (
@@ -360,51 +506,24 @@ export const EdhrecPanel = ({
       </div>
 
       <div className="flex flex-none flex-wrap items-center gap-2 border-b border-slate-800 px-2 py-1.5 text-[10px]">
-        {focusCards.map(name => (
-          <button
-            key={cardKey(name)}
-            className="inline-flex max-w-[12rem] items-center gap-1 rounded-full border border-slate-600 bg-slate-900 px-1.5 py-0.5 text-slate-200"
-            onClick={() =>
-              setFocusCards(cur => cur.filter(card => cardKey(card) !== cardKey(name)))
-            }
-            title={`Stop combining ${name}`}
-            type="button"
-          >
-            <span className="truncate">{name}</span>
-            <span aria-hidden className="text-slate-500">
-              ×
-            </span>
-          </button>
-        ))}
-        <select
-          className="min-w-0 max-w-[14rem] rounded border border-slate-700 bg-slate-950 px-1 py-0.5 text-[10px] text-slate-200 outline-none focus:border-sky-500"
-          onChange={e => {
-            const next = e.target.value;
-            if (!next) {
-              setFocusCards([]);
-              return;
-            }
+        <FocusPicker
+          cap={EDHREC_FOCUS_CAP}
+          cards={pickerCards}
+          commanderLabel={commanderLabel}
+          commanderSearch={commanderNames.join(' ')}
+          focusCards={focusCards}
+          onToggleCard={name =>
             setFocusCards(cur => {
-              if (cur.some(name => cardKey(name) === cardKey(next)) || cur.length >= EDHREC_FOCUS_CAP) {
-                return cur;
-              }
-              return [...cur, next];
-            });
-          }}
-          title="Add a deck card. With two or more, suggestions must be common partners of each."
-          value=""
-        >
-          <option value="">This commander</option>
-          {focusCards.length < EDHREC_FOCUS_CAP &&
-            focusOptions
-              .filter(name => !focusCards.some(picked => cardKey(picked) === cardKey(name)))
-              .map(name => (
-                <option key={cardKey(name)} value={name}>
-                  With {name}
-                </option>
-              ))}
-        </select>
-        {focusCards.length > 0 ? null : (
+              const key = cardKey(name);
+              if (cur.some(card => cardKey(card) === key)) return cur.filter(card => cardKey(card) !== key);
+              if (cur.length >= EDHREC_FOCUS_CAP) return cur;
+              return [...cur, name];
+            })
+          }
+          onToggleCommander={() => setUseCommander(cur => !cur)}
+          useCommander={useCommander}
+        />
+        {useCommander && focusCards.length === 0 ? (
           <>
             <select
               className="min-w-0 max-w-[160px] rounded border border-slate-700 bg-slate-950 px-1 py-0.5 text-[10px] text-slate-200 outline-none focus:border-sky-500"
@@ -430,7 +549,7 @@ export const EdhrecPanel = ({
               </span>
             ) : null}
           </>
-        )}
+        ) : null}
         <label className="flex items-center gap-1 text-slate-400" title="Only cards you own">
           <input
             checked={ownedOnly}
@@ -472,6 +591,11 @@ export const EdhrecPanel = ({
 
       {/* Body */}
       <div className="min-h-0 flex-1 overflow-auto outline-none" {...selection.listProps}>
+        {!useCommander && focusCards.length === 0 && status !== 'loading' ? (
+          <div className="px-4 py-6 text-center text-xs text-slate-500">
+            Check the commander or a deck card.
+          </div>
+        ) : null}
         {status === 'loading' && !data && !combined && (
           <div className="px-4 py-6 text-center text-xs text-slate-500">
             Loading EDHREC recommendations…
@@ -594,7 +718,7 @@ const EdhrecRow = ({
   sourceLine?: string;
 }) => {
   const preview = useCardPreview();
-  const { flippable, handlers } = preview(
+  const { handlers } = preview(
     `edhrec|${cardKey(card.name)}`,
     card.name,
     card.imageUrl ? [card.imageUrl] : [],
@@ -617,7 +741,6 @@ const EdhrecRow = ({
             loading="lazy"
             src={card.imageUrl}
             style={{ objectPosition: '50% 18%' }}
-            title={flippable ? 'Click to enlarge; click again to flip' : 'Click to enlarge'}
           />
         )}
       </div>

@@ -55,9 +55,25 @@ export const DECK_FORMATS: DeckFormatInfo[] = [
 export const formatInfo = (format?: DeckFormat): DeckFormatInfo =>
   DECK_FORMATS.find(f => f.id === format) ?? DECK_FORMATS[DECK_FORMATS.length - 1];
 
+/**
+ * The printing a deck line is played as. Absent means Scryfall's default
+ * printing, which is what the card showed before anyone chose.
+ */
+export interface DeckPrinting {
+  /** Cardmarket product id, so a want or a buy names this printing. */
+  cardmarketId?: number;
+  collectorNumber?: string;
+  imageUrl?: string;
+  scryfallId?: string;
+  setCode?: string;
+  setName?: string;
+}
+
 /** One deck line: a card name + how many copies, in a given section. */
 export interface DeckCard {
   name: string;
+  /** The edition this copy is. Absent until someone picks one. */
+  printing?: DeckPrinting;
   quantity: number;
   section: DeckSection;
 }
@@ -331,6 +347,8 @@ export const withFormat = (deck: Deck, format: DeckFormat): Deck => ({
 
 /** A card the deck is short of, and by how many copies. */
 export interface DeckShortfall {
+  /** Cardmarket product id, when the deck line names a printing. */
+  idProduct?: string;
   name: string;
   /** Copies still to find: quantity minus what you own. */
   need: number;
@@ -354,21 +372,25 @@ export const deckShortfall = (
   cards: DeckCard[],
   ownedByKey: Record<string, { total: number }>,
 ): DeckShortfall[] => {
-  const wanted = new Map<string, { copies: number; name: string }>();
+  const wanted = new Map<string, { copies: number; idProduct?: string; name: string }>();
   for (const card of cards) {
     if (isBasicLand(card.name)) continue;
     const key = cardKey(card.name);
     if (!key) continue;
+    const idProduct = card.printing?.cardmarketId ? String(card.printing.cardmarketId) : undefined;
     const row = wanted.get(key);
-    if (row) row.copies += card.quantity;
-    else wanted.set(key, { copies: card.quantity, name: card.name });
+    if (row) {
+      row.copies += card.quantity;
+      // The first section to name a printing is the one a want list asks for.
+      if (!row.idProduct && idProduct) row.idProduct = idProduct;
+    } else wanted.set(key, { copies: card.quantity, idProduct, name: card.name });
   }
 
   const out: DeckShortfall[] = [];
-  for (const [key, { copies, name }] of wanted) {
+  for (const [key, { copies, idProduct, name }] of wanted) {
     const owned = ownedByKey[key]?.total ?? 0;
     const need = Math.max(0, copies - owned);
-    if (need > 0) out.push({ name, need, owned });
+    if (need > 0) out.push({ idProduct, name, need, owned });
   }
   return out;
 };
@@ -389,6 +411,8 @@ export interface DeckCardGroup {
   key: string;
   /** Header to show, or null when the group holds everything (no split). */
   label: string | null;
+  /** The mana value a cost group holds ("0"–"6", "7+"); absent on every other group. */
+  manaValue?: string;
   /** Groups within this one, or null when there's nothing to nest. */
   sub: DeckCardGroup[] | null;
 }
@@ -440,6 +464,7 @@ const isLandCard = (name: string, meta?: CardMetadata): boolean =>
 interface Bucket {
   key: string;
   label: string;
+  manaValue?: string;
   order: number;
 }
 
@@ -454,7 +479,8 @@ const costBucket = (name: string, meta?: CardMetadata): Bucket => {
   if (isLandCard(name, meta)) return { key: 'cost:land', label: 'Lands', order: 90 };
   if (meta?.cmc == null) return { key: 'cost:?', label: 'Unknown cost', order: 91 };
   const bucket = manaValueBucket(meta.cmc);
-  return { key: `cost:${bucket}`, label: `MV ${manaValueLabel(bucket)}`, order: bucket };
+  const manaValue = manaValueLabel(bucket);
+  return { key: `cost:${bucket}`, label: `MV ${manaValue}`, manaValue, order: bucket };
 };
 
 const bucketize = (
@@ -471,7 +497,13 @@ const bucketize = (
   }
   return [...groups.values()]
     .sort((a, b) => a.order - b.order)
-    .map(g => ({ cards: g.cards, key: g.key, label: g.label, sub: g.sub }));
+    .map(g => ({
+      cards: g.cards,
+      key: g.key,
+      label: g.label,
+      manaValue: g.manaValue,
+      sub: g.sub,
+    }));
 };
 
 /**

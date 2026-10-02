@@ -229,16 +229,14 @@ export const AddCardToWant = ({
 
   const thumb = (previewKey: string, name: string, src: string | undefined, size: string) => {
     if (!src) return <span className={`${size} flex-none rounded-sm bg-panel`} />;
-    const { flippable, handlers } = preview(previewKey, name, [src]);
+    const { handlers } = preview(previewKey, name, [src]);
     return (
       <img
         alt=""
-        className={`${size} flex-none rounded-sm object-cover ${
-          flippable ? 'cursor-flip' : 'cursor-zoom-in'
-        }`}
+        className={`${size} flex-none cursor-zoom-in rounded-sm object-cover`}
         decoding="async"
         src={src}
-        title={flippable ? 'Hover to preview · click to flip' : 'Hover to preview'}
+        title="Hover to preview"
         {...handlers}
       />
     );

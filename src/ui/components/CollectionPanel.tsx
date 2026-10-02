@@ -24,6 +24,7 @@ import {
 } from './icons';
 
 import { cardImageOverrideStore } from '@/content/cardImageOverrideStore';
+import { cardmarketArtStore } from '@/content/cardmarketArtStore';
 import {
   collectionStore,
   setAddPurchasesToCollection,
@@ -39,9 +40,11 @@ import { taskQueue } from '@/content/taskQueue';
 import { arrivedOnly, inTransitCopies } from '@/lib/arrivedPurchases';
 import {
   cardImageCandidates,
+  cardmarketProductId,
   cdnImageFromId,
   imageFromProductId,
   imageUrlForPrinting,
+  leadWithScryfall,
 } from '@/lib/cardImage';
 import { cardKey, stripVersion } from '@/lib/cardName';
 import { flags } from '@/lib/flags';
@@ -51,6 +54,7 @@ import { MANA_VALUE_BUCKETS, manaValueBucket, manaValueLabel, type CardMetadata 
 import { collectionValue, money, signedMoney } from '@/lib/prices';
 import { fetchCardPrints, type CardPrint } from '@/lib/prints';
 import type { PurchaseVerdict } from '@/lib/purchaseDuplicates';
+import { isScryfallUrl } from '@/lib/scryfallFetch';
 import { editionIdOf, groupEditionsByYear, tallyEditions } from '@/lib/sets';
 import {
   currentLang,
@@ -226,6 +230,10 @@ export const CollectionPanel = () => {
   const overrides = useSyncExternalStore(
     cardImageOverrideStore.subscribe,
     cardImageOverrideStore.getSnapshot,
+  );
+  const printingArt = useSyncExternalStore(
+    cardmarketArtStore.subscribe,
+    cardmarketArtStore.getSnapshot,
   );
   const expIcons = useSyncExternalStore(
     expansionIconStore.subscribe,
@@ -559,7 +567,13 @@ export const CollectionPanel = () => {
   // of the expansion and go through name matching.
   const { index: setIndex, status: setStatus } = useSetIndex();
   const editionYears = useMemo(
-    () => groupEditionsByYear(tallyEditions(rows.flatMap(r => r.editions), setIndex)),
+    () =>
+      groupEditionsByYear(
+        tallyEditions(
+          rows.flatMap(r => r.editions),
+          setIndex,
+        ),
+      ),
     [rows, setIndex],
   );
 
@@ -689,6 +703,15 @@ export const CollectionPanel = () => {
     const start = (safePage - 1) * PAGE_SIZE;
     return visibleRows.slice(start, start + PAGE_SIZE);
   }, [visibleRows, safePage]);
+  useEffect(() => {
+    const ids: string[] = [];
+    for (const row of pageRows) {
+      if (row.productId) ids.push(row.productId);
+      const fromImage = cardmarketProductId(row.imageUrl);
+      if (fromImage) ids.push(fromImage);
+    }
+    cardmarketArtStore.ensure(ids);
+  }, [pageRows]);
   const listRef = useRef<HTMLDivElement>(null);
   const goToPage = (next: number) => {
     setPage(Math.min(pageCount, Math.max(1, next)));
@@ -701,10 +724,7 @@ export const CollectionPanel = () => {
   const selection = useRowSelection(pageRows.map(r => r.key));
   const { decks } = useSyncExternalStore(deckStore.subscribe, deckStore.getSnapshot);
   const [deckTarget, setDeckTarget] = useState('');
-  const nameByKey = useMemo(
-    () => new Map(pageRows.map(r => [r.key, r.name] as const)),
-    [pageRows],
-  );
+  const nameByKey = useMemo(() => new Map(pageRows.map(r => [r.key, r.name] as const)), [pageRows]);
   const selectedNames = (): string[] =>
     selection.ids.map(id => nameByKey.get(id) ?? '').filter(Boolean);
 
@@ -810,9 +830,10 @@ export const CollectionPanel = () => {
   // (so per-edition badges don't clash with the row's main icon).
   const openPreview =
     (previewKey: string, url: string, name: string, flippable: boolean, faces?: string[]) =>
-    (e: { clientX: number; clientY: number }) => {
+    (e: { clientX: number; clientY: number; currentTarget: Element }) => {
       previewStore.show(
         {
+          anchor: e.currentTarget,
           index: 0,
           key: previewKey,
           // Keep the edition-specific front and borrow only the back face.
@@ -943,7 +964,14 @@ export const CollectionPanel = () => {
     const purchase = purchaseImageFor(row.name);
     if (purchase && !out.includes(purchase)) out.push(purchase);
     if (meta?.imageUrl && !out.includes(meta.imageUrl)) out.push(meta.imageUrl);
-    return out;
+    const productId = row.productId ?? cardmarketProductId(row.imageUrl);
+    const fromProduct = productId ? (printingArt[productId] ?? undefined) : undefined;
+    const scryfall =
+      cdnImageFromId(override?.scryfallId) ??
+      cdnImageFromId(row.scryfallId) ??
+      fromProduct ??
+      (meta?.imageUrl && !isScryfallUrl(meta.imageUrl) ? meta.imageUrl : undefined);
+    return leadWithScryfall(out, scryfall);
   };
 
   // Prefer printing-accurate art in list view too (not only the grid).
@@ -1239,9 +1267,7 @@ export const CollectionPanel = () => {
                 onClick={syncPurchasesNow}
                 size="xs"
                 title={
-                  purchasesNeedLogin
-                    ? purchasesLoginHint
-                    : 'Fetch your Cardmarket orders again'
+                  purchasesNeedLogin ? purchasesLoginHint : 'Fetch your Cardmarket orders again'
                 }
                 variant="subtle"
               >

@@ -61,7 +61,7 @@ export interface Task {
      * deckWants: the cards to add, snapshotted when the task was created — the
      * user asked for these, so a collection edit mid-run can't change the job.
      */
-    cards?: Array<{ name: string; need: number }>;
+    cards?: Array<{ idProduct?: string; name: string; need: number }>;
     /** deckWants: an existing list to fill; absent means create `listName`. */
     listId?: string;
     listName?: string;
@@ -441,6 +441,8 @@ const handleDeckWants = async (
           {
             amount: card.need,
             idMetacard: ids.idMetacard,
+            // The printing the deck line was set to. Omitted, the want is any edition.
+            idProduct: card.idProduct,
             idWantsList: listId,
             ...wantDefaults,
             // An explicit per-task condition still wins over the stored default.

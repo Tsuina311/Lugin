@@ -204,19 +204,18 @@ const CutRow = ({
   const faces = meta?.faceImages;
   const imageUrls = faces && faces.length >= 2 ? faces : meta?.imageUrl ? [meta.imageUrl] : [];
   const preview = useCardPreview();
-  const { flippable, handlers } = preview(`cuts|${cardKey(card.name)}`, card.name, imageUrls);
+  const { handlers } = preview(`cuts|${cardKey(card.name)}`, card.name, imageUrls);
   return (
     <li {...selection.rowProps(rowId, 'flex items-center gap-2 py-1.5 pl-2 pr-2 text-[11px]')}>
       <div className="h-8 w-8 flex-none overflow-hidden rounded bg-slate-800" {...handlers}>
         {imageUrls[0] && (
           <img
             alt={card.name}
-            className={`h-full w-full object-cover ${flippable ? 'cursor-flip' : 'cursor-zoom-in'}`}
+            className="h-full w-full cursor-zoom-in object-cover"
             decoding="async"
             loading="lazy"
             src={imageUrls[0]}
             style={{ objectPosition: '50% 18%' }}
-            title={flippable ? 'Click to flip to the other side' : undefined}
           />
         )}
       </div>

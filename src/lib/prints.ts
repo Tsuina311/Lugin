@@ -49,6 +49,10 @@ interface ScryfallList {
 
 const SEARCH_URL = 'https://api.scryfall.com/cards/search';
 const MAX_PAGES = 6; // 175 prints/page — plenty for even the most-reprinted cards.
+/** Ahead of background printing lookups, which otherwise fill the Scryfall queue. */
+const PICKER_PRIORITY = 2;
+
+const printsByName = new Map<string, CardPrint[]>();
 
 const toPrint = (c: ScryfallCard): CardPrint => {
   const images = c.image_uris ?? c.card_faces?.[0]?.image_uris;
@@ -72,13 +76,15 @@ const toPrint = (c: ScryfallCard): CardPrint => {
  */
 export const fetchCardPrints = async (name: string): Promise<CardPrint[]> => {
   const exact = frontFaceName(name).trim();
+  const cached = printsByName.get(exact.toLowerCase());
+  if (cached) return cached;
   const query = `!"${exact}"`;
   const url = `${SEARCH_URL}?order=released&dir=desc&unique=prints&q=${encodeURIComponent(query)}`;
 
   const out: CardPrint[] = [];
   let next: string | undefined = url;
   for (let page = 0; next && page < MAX_PAGES; page++) {
-    const res = await requestApi({ url: next });
+    const res = await requestApi({ priority: PICKER_PRIORITY, url: next });
     if (!res.ok) {
       if (res.status === 404) break; // no matching card
       throw new Error(`Scryfall search failed (HTTP ${res.status})`);
@@ -87,5 +93,6 @@ export const fetchCardPrints = async (name: string): Promise<CardPrint[]> => {
     for (const c of json.data ?? []) out.push(toPrint(c));
     next = json.has_more ? json.next_page : undefined;
   }
+  printsByName.set(exact.toLowerCase(), out);
   return out;
 };

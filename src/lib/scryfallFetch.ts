@@ -13,8 +13,18 @@ const HOST = 'api.scryfall.com';
 const MIN_GAP_MS = 120;
 const MAX_RETRIES = 5;
 
-let chain: Promise<unknown> = Promise.resolve();
 let lastStartedAt = 0;
+
+interface Queued {
+  priority: number;
+  reject: (error: unknown) => void;
+  request: ApiRequest;
+  resolve: (result: ApiResult) => void;
+}
+
+/** Not yet started. A higher priority is pulled out ahead of whatever was queued first. */
+const waiting: Queued[] = [];
+let draining = false;
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -53,43 +63,61 @@ const toResult = async (response: Response): Promise<ApiResult> => {
   };
 };
 
+const run = async (request: ApiRequest): Promise<ApiResult> => {
+  const gap = Math.max(0, MIN_GAP_MS - (Date.now() - lastStartedAt));
+  if (gap > 0) await sleep(gap);
+
+  for (let attempt = 0; ; attempt++) {
+    lastStartedAt = Date.now();
+    const response = await fetch(request.url, {
+      body: request.body,
+      headers: {
+        Accept: 'application/json',
+        ...request.headers,
+      },
+      method: request.method ?? 'GET',
+    });
+
+    if (response.status === 429 && attempt < MAX_RETRIES) {
+      await sleep(retryWaitMs(response.headers, attempt));
+      continue;
+    }
+
+    return toResult(response);
+  }
+};
+
+const drain = async (): Promise<void> => {
+  if (draining) return;
+  draining = true;
+  try {
+    while (waiting.length > 0) {
+      let best = 0;
+      for (let i = 1; i < waiting.length; i++) {
+        if (waiting[i].priority > waiting[best].priority) best = i;
+      }
+      const job = waiting.splice(best, 1)[0];
+      try {
+        job.resolve(await run(job.request));
+      } catch (error) {
+        job.reject(error);
+      }
+    }
+  } finally {
+    draining = false;
+    if (waiting.length > 0) void drain();
+  }
+};
+
 /**
  * Fetch a Scryfall URL through the shared rate gate.
  *
  * Safe to call from the background worker and from the phone build's direct
  * fetch path — each JS realm gets its own queue, which is what we want.
+ * `priority` (higher first) lets a print picker pass a deck's background lookups.
  */
-export const scryfallFetch = (request: ApiRequest): Promise<ApiResult> => {
-  const run = async (): Promise<ApiResult> => {
-    const gap = Math.max(0, MIN_GAP_MS - (Date.now() - lastStartedAt));
-    if (gap > 0) await sleep(gap);
-
-    for (let attempt = 0; ; attempt++) {
-      lastStartedAt = Date.now();
-      const response = await fetch(request.url, {
-        body: request.body,
-        headers: {
-          Accept: 'application/json',
-          ...request.headers,
-        },
-        method: request.method ?? 'GET',
-      });
-
-      if (response.status === 429 && attempt < MAX_RETRIES) {
-        await sleep(retryWaitMs(response.headers, attempt));
-        continue;
-      }
-
-      return toResult(response);
-    }
-  };
-
-  // Keep going even if a prior request failed — one bad call shouldn't stall
-  // the queue for everyone else.
-  const done = chain.then(run, run);
-  chain = done.then(
-    () => undefined,
-    () => undefined,
-  );
-  return done;
-};
+export const scryfallFetch = (request: ApiRequest): Promise<ApiResult> =>
+  new Promise((resolve, reject) => {
+    waiting.push({ priority: request.priority ?? 0, reject, request, resolve });
+    void drain();
+  });

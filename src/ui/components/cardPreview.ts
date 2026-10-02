@@ -1,10 +1,12 @@
 // The hover card preview used by every card list in the overlay.
 //
-// Hovering a thumbnail pops the full card up next to the cursor. Double-faced
-// cards are clickable to flip: if we don't already know the card's faces, the
-// first hover resolves them from Scryfall (cache first) and upgrades the popup
-// that's already on screen — so the front art appears instantly and the back
-// becomes available a moment later.
+// Hovering a thumbnail pops the full card up next to the cursor. A click pins
+// that image in the center; clicking the centered image flips a double-faced
+// card, and clicking the dimmed page closes it. The thumbnail itself never
+// flips. If we don't already know the card's faces, the first hover resolves
+// them from Scryfall (cache first) and upgrades the popup that's already on
+// screen — so the front art appears instantly and the back becomes available
+// a moment later.
 //
 // Faces are cached module-wide, so hovering the same card in another panel (or
 // again later) flips immediately.
@@ -85,7 +87,7 @@ interface PreviewHandlers {
 }
 
 export interface CardPreview {
-  /** True once we know the card has a second face, so a click will flip it. */
+  /** True once we know the card has a second face. The centered preview flips. */
   flippable: boolean;
   /** Spread onto the hover target. Empty when there's no image to show. */
   handlers: PreviewHandlers;
@@ -120,22 +122,25 @@ export const useCardPreview = (): ((key: string, name: string, urls: string[]) =
           const shown = previewStore.getSnapshot();
           if (shown?.key === key) {
             if (shown.pinned) {
-              if (shown.urls.length >= 2) previewStore.flip();
-              else previewStore.hide();
+              previewStore.hide();
               return;
             }
             previewStore.pin();
             return;
           }
           previewStore.show(
-            { index: 0, key, pinned: true, urls: faces },
+            { anchor: e.currentTarget, index: 0, key, pinned: true, urls: faces },
             window.innerWidth / 2,
             window.innerHeight / 2,
           );
           if (!flippable) resolveFaces(name, key);
         },
         onMouseEnter: (e: MouseEvent) => {
-          previewStore.show({ index: 0, key, urls: faces }, e.clientX, e.clientY);
+          previewStore.show(
+            { anchor: e.currentTarget, index: 0, key, urls: faces },
+            e.clientX,
+            e.clientY,
+          );
           if (!flippable) resolveFaces(name, key);
         },
         onMouseLeave: () => {

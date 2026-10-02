@@ -3,11 +3,14 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { Loader2 } from './icons';
 import { useCardPreview } from './cardPreview';
 
+import { previewStore } from '@/content/previewStore';
+
 /** Small card art in a search-result row — hover to preview, click to enlarge. */
 export const CardResultThumb = ({
   candidates,
   className = 'relative h-8 w-8 flex-none overflow-hidden rounded bg-raised',
   faceImages,
+  hover = true,
   imgStyle = { objectPosition: '50% 18%' },
   name,
   previewKey,
@@ -16,20 +19,23 @@ export const CardResultThumb = ({
   candidates: readonly string[];
   className?: string;
   faceImages?: string[];
+  /** False when the art is already large — a hover popup then fights the grid. */
+  hover?: boolean;
   imgStyle?: CSSProperties;
   name: string;
   previewKey: string;
 }) => {
   const [index, setIndex] = useState(0);
-  const [loaded, setLoaded] = useState(false);
+  // The URL that finished loading, not a flag: the list can change around a
+  // picture that's already up (metadata adding a fallback), and an unchanged
+  // `src` never fires a second load to set a reset flag back.
+  const [loadedSrc, setLoadedSrc] = useState<string>();
   const key = candidates.join('\0');
 
-  useEffect(() => {
-    setIndex(0);
-    setLoaded(false);
-  }, [key]);
+  useEffect(() => setIndex(0), [key]);
 
   const src = candidates[index];
+  const loaded = !!src && src === loadedSrc;
   const failed = candidates.length > 0 && index >= candidates.length;
   const waiting = !!src && !loaded && !failed;
   const previewUrls =
@@ -39,13 +45,30 @@ export const CardResultThumb = ({
         ? [src]
         : [];
   const preview = useCardPreview();
-  const { flippable, handlers } = preview(previewKey, name, previewUrls);
+  const { handlers } = preview(previewKey, name, previewUrls);
+  const pointer =
+    previewUrls.length > 0 || waiting
+      ? hover
+        ? handlers
+        : handlers.onClick
+          ? { onClick: handlers.onClick }
+          : {}
+      : {};
 
+  // A thumbnail unmounted under the pointer never gets its mouseleave, which
+  // would leave its hover popup up.
+  useEffect(() => {
+    return () => {
+      const shown = previewStore.getSnapshot();
+      if (shown?.key === previewKey && !shown.pinned) previewStore.hide();
+    };
+  }, [previewKey]);
+
+  // Positioned whatever `className` says: the loading spinner is `absolute
+  // inset-0`, and without a containing block here it spreads over the whole
+  // overlay, swallowing every click and wheel scroll until the image loads.
   return (
-    <div
-      className={className}
-      {...(previewUrls.length > 0 || waiting ? handlers : {})}
-    >
+    <div className={`relative ${className}`} {...pointer}>
       {src && !failed ? (
         <>
           {waiting && (
@@ -57,17 +80,13 @@ export const CardResultThumb = ({
             alt={name}
             className={`h-full w-full object-cover transition-opacity duration-150 ${
               loaded ? 'opacity-100' : 'opacity-0'
-            } ${flippable ? 'cursor-flip' : 'cursor-zoom-in'}`}
+            } cursor-zoom-in`}
             decoding="async"
             loading="lazy"
-            onError={() => {
-              setLoaded(false);
-              setIndex(i => i + 1);
-            }}
-            onLoad={() => setLoaded(true)}
+            onError={() => setIndex(i => i + 1)}
+            onLoad={() => setLoadedSrc(src)}
             src={src}
             style={imgStyle}
-            title={flippable ? 'Click to enlarge; click again to flip' : 'Click to enlarge'}
           />
         </>
       ) : waiting ? (

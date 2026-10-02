@@ -322,7 +322,7 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
             <div key={row.key} className="flex flex-col gap-1">
               <CollectionThumb
                 candidates={row.candidates}
-                className="aspect-[488/680] w-full overflow-hidden rounded-lg bg-raised"
+                className="card-frame aspect-[488/680] w-full overflow-hidden bg-raised"
                 imgStyle={{ objectPosition: '50% 17%' }}
                 name={row.name}
                 previewKey={`collection|box|${row.key}`}

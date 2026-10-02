@@ -7,6 +7,7 @@ export const CollectionThumb = ({
   candidates,
   className = 'relative h-8 w-8 flex-none overflow-hidden rounded bg-raised',
   faceImages,
+  hover,
   imgStyle,
   name,
   previewKey,
@@ -14,6 +15,7 @@ export const CollectionThumb = ({
   candidates: readonly string[];
   className?: string;
   faceImages?: string[];
+  hover?: boolean;
   imgStyle?: CSSProperties;
   name: string;
   previewKey: string;
@@ -22,6 +24,7 @@ export const CollectionThumb = ({
     candidates={candidates}
     className={className}
     faceImages={faceImages}
+    hover={hover}
     imgStyle={imgStyle}
     name={name}
     previewKey={previewKey}

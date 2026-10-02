@@ -165,9 +165,17 @@ export interface CardMetadata {
   manaCost?: string;
   /** Name we looked up (normalized request key echoes back even if not found). */
   name: string;
+  /** Scryfall oracle id: the rules object, shared by every printing. */
+  oracleId?: string;
   oracleText?: string;
   rarity?: string;
+  /** Scryfall id of the printing this metadata describes. */
+  scryfallId?: string;
   scryfallUri?: string;
+  /** Set code of that printing (`clb`). */
+  setCode?: string;
+  /** Set name of that printing. */
+  setName?: string;
   /** Subtypes — includes creature types (Elf, Goblin…), land types, etc. */
   subtypes: string[];
   supertypes: string[];

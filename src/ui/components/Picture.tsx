@@ -6,7 +6,7 @@
  * your thumb as pictures land is worse than no pictures.
  */
 export const Picture = ({ alt, ready, src }: { alt: string; ready: boolean; src?: string }) => (
-  <div className="flex aspect-[488/680] w-full items-center justify-center overflow-hidden rounded-lg bg-raised">
+  <div className="card-frame flex aspect-[488/680] w-full items-center justify-center overflow-hidden bg-raised">
     {ready && src ? (
       <img alt={alt} className="h-full w-full object-cover" src={src} />
     ) : (

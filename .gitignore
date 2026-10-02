@@ -9,6 +9,11 @@ release
 # Local price snapshot used while Pages does not yet serve prices.json.
 .lugin-prices/
 
+# Commander Spellbook combo index (`yarn combos:update`). The software repo is
+# MIT; that was not verified as permission to redistribute the combo dataset,
+# so the generated JSON stays local.
+generated/commander-combos/*.json
+
 # Scanner test corpus: Scryfall card art plus tesseract traineddata, both
 # downloaded on demand from the committed manifest in scripts/fixtures. Card
 # images are copyrighted and have no business in the repository.

@@ -29,6 +29,16 @@ const selectionShortcuts = (): string =>
   }+A for all, esc to clear.`;
 
 /**
+ * The idle bar's words on their own, for a list that only brings the bar up
+ * once something is picked and still has to say how to start.
+ */
+export const SelectionHint = ({ className = '' }: { className?: string }) => (
+  <span className={`text-ink-faint ${className}`} title={selectionShortcuts()}>
+    {selectionHint()}
+  </span>
+);
+
+/**
  * It only takes on the accent wash — and only shows the actions — once something
  * is selected, so an idle list stays quiet and just says how to start.
  * `trailing` stays visible either way (e.g. a disabled “Search sellers” control).

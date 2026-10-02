@@ -387,7 +387,7 @@ const GoldfishRow = ({
   selection: RowSelection;
 }) => {
   const preview = useCardPreview();
-  const { flippable, handlers } = preview(
+  const { handlers } = preview(
     `goldfish|${cardKey(card.name)}`,
     card.name,
     card.imageUrl ? [card.imageUrl] : [],
@@ -405,12 +405,11 @@ const GoldfishRow = ({
         {card.imageUrl && (
           <img
             alt={card.name}
-            className={`h-full w-full object-cover ${flippable ? 'cursor-flip' : 'cursor-zoom-in'}`}
+            className="h-full w-full cursor-zoom-in object-cover"
             decoding="async"
             loading="lazy"
             src={card.imageUrl}
             style={{ objectPosition: '50% 18%' }}
-            title={flippable ? 'Click to flip to the other side' : undefined}
           />
         )}
       </div>

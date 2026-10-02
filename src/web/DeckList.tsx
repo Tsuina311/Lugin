@@ -23,14 +23,9 @@ import { syncStore } from './syncStore';
 
 import { candidatesByName, deckCardCandidates } from '@/lib/cardImage';
 import type { Collection } from '@/lib/collection';
-import {
-  DECK_FORMATS,
-  deckShortfall,
-  formatInfo,
-  type Deck,
-  type DeckFormat,
-} from '@/lib/deck';
+import { DECK_FORMATS, deckShortfall, formatInfo, type Deck, type DeckFormat } from '@/lib/deck';
 import { deckFile } from '@/lib/export';
+import { BracketMark } from '@/ui/components/BracketMark';
 import { CollectionThumb } from '@/ui/components/CollectionThumb';
 
 const copies = (deck: Deck): number =>
@@ -131,13 +126,11 @@ export const DeckList = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ownedCandidates = useMemo(
-    () => candidatesByName(collection?.cards ?? []),
-    [collection],
-  );
+  const ownedCandidates = useMemo(() => candidatesByName(collection?.cards ?? []), [collection]);
 
   const open = decks.find(deck => deck.id === openId);
-  if (open) return <DeckEditor collection={collection} deck={open} onBack={() => setOpenId(null)} />;
+  if (open)
+    return <DeckEditor collection={collection} deck={open} onBack={() => setOpenId(null)} />;
 
   const create = async () => {
     setBusy(true);
@@ -192,10 +185,16 @@ export const DeckList = ({
       </div>
 
       {pasting ? (
-        <PasteList busy={busy} onCancel={() => setPasting(false)} onPaste={text => void paste(text)} />
+        <PasteList
+          busy={busy}
+          onCancel={() => setPasting(false)}
+          onPaste={text => void paste(text)}
+        />
       ) : null}
 
-      {error ? <p className="border-b border-line bg-neg-soft px-4 py-2 text-xs text-neg">{error}</p> : null}
+      {error ? (
+        <p className="border-b border-line bg-neg-soft px-4 py-2 text-xs text-neg">{error}</p>
+      ) : null}
 
       {decks.length === 0 ? (
         <p className="px-6 py-10 text-center text-sm text-ink-muted">
@@ -228,13 +227,16 @@ export const DeckList = ({
                       <span className="h-14 w-10 flex-none rounded-md bg-raised" />
                     )}
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-ink">{deck.name}</span>
+                      <span className="block truncate text-sm font-medium text-ink">
+                        {deck.name}
+                      </span>
                       <span className="mt-0.5 block text-[11px] capitalize text-ink-faint">
                         {deck.format} · {copies(deck)} cards
                         {missing > 0 ? ` · ${missing} missing` : ''}
                       </span>
                     </span>
                   </button>
+                  <BracketMark deck={deck} />
                   <ExportBar actions={['copy', 'save', 'share']} file={() => deckFile(deck)} />
                   <button
                     aria-label={`Open ${deck.name}`}

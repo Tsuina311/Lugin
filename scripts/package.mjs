@@ -21,7 +21,7 @@
 // headers over deflated bytes plus a central directory, and node has zlib.
 
 import { deflateRawSync } from 'node:zlib';
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -29,6 +29,12 @@ const DIST = join(ROOT, 'dist');
 const OUT_DIR = join(ROOT, 'release');
 
 const FOR_TESTERS = process.argv.includes('--testers');
+
+if (existsSync(join(ROOT, 'generated', 'commander-combos', 'runtime.json'))) {
+  console.warn(
+    'Licensing: this package includes the local Commander Spellbook combo index. Redistribution of that dataset is not cleared. Do not upload this build until it is.',
+  );
+}
 
 // Sourcemaps are ~4x the bundle and no use to a reviewer or a tester; the store
 // counts them against the package size limit all the same. The 192/512 icons are

@@ -1,4 +1,4 @@
-import { cardKey, frontFaceName, looseKey } from '@/lib/cardName';
+import { cardKey, frontFaceName, looseKey, stripVersion } from '@/lib/cardName';
 import type { CardMetadata, CommanderInfo, CommanderPairing } from '@/lib/mtg';
 import { scryfallFetch } from '@/lib/scryfallFetch';
 
@@ -28,8 +28,14 @@ const MISS_TTL_MS = 24 * 60 * 60 * 1000; // 1 day.
  * keys get overwritten, so nothing is left behind).
  *   2 — added `commander` (partner rules), derived from oracle text.
  *   3 — added `cardmarketId`, so cards can be named to Cardmarket exactly.
+ *   4 — lookups drop Cardmarket's "(V.n)" marker, which Scryfall answered as a
+ *       miss ("Dimir Guildgate (V.2)").
+ *   5 — added the printing's set and Scryfall id, so a deck can show its
+ *       edition before anyone picks a different one.
+ *   6 — added `oracleId`, so combo matching follows the rules object rather
+ *       than a printing.
  */
-const CACHE_SCHEMA = 3;
+const CACHE_SCHEMA = 6;
 
 const SUPERTYPES = new Set([
   'Legendary',
@@ -174,8 +180,12 @@ const toMetadata = (card: Record<string, unknown>): CardMetadata => {
     imageUrl: images?.normal ?? images?.small ?? faceImage?.normal ?? faceImage?.small,
     keywords: Array.isArray(card.keywords) ? (card.keywords as string[]) : [],
     manaCost: typeof card.mana_cost === 'string' ? card.mana_cost : undefined,
+    oracleId: typeof card.oracle_id === 'string' ? card.oracle_id : undefined,
     rarity: typeof card.rarity === 'string' ? card.rarity : undefined,
+    scryfallId: typeof card.id === 'string' ? card.id : undefined,
     scryfallUri: typeof card.scryfall_uri === 'string' ? card.scryfall_uri : undefined,
+    setCode: typeof card.set === 'string' ? card.set : undefined,
+    setName: typeof card.set_name === 'string' ? card.set_name : undefined,
     // NOTE: we deliberately don't keep `oracle_text` — it's by far the heaviest
     // field and nothing in the UI uses it, so dropping it keeps the on-disk cache
     // small (a few hundred bytes/card) and fast to read back.
@@ -243,11 +253,12 @@ export const getCachedMetadata = async (rawNames: string[]): Promise<CardMetadat
  * guaranteed to match the input; callers should index by normalized name.
  */
 export const getCardMetadata = async (rawNames: string[]): Promise<CardMetadata[]> => {
-  // Dedupe by front-face key; keep the front-face name to query Scryfall with.
+  // Dedupe by front-face key; keep the front-face name to query Scryfall with,
+  // minus Cardmarket's "(V.2)"-style printing marker, which no Scryfall name has.
   const uniqueNames = new Map<string, string>(); // cardKey -> front-face name
   for (const raw of rawNames) {
     const key = cardKey(raw);
-    if (key) uniqueNames.set(key, frontFaceName(raw));
+    if (key) uniqueNames.set(key, stripVersion(frontFaceName(raw)));
   }
 
   const results = new Map<string, CardMetadata>();
@@ -269,6 +280,8 @@ export const getCardMetadata = async (rawNames: string[]): Promise<CardMetadata[
       body: JSON.stringify({ identifiers }),
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
+      // Ahead of per-card art lookups, behind a print picker the user just opened.
+      priority: 1,
       url: COLLECTION_URL,
     });
     if (!result.ok) {
