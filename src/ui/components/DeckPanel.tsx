@@ -2092,8 +2092,6 @@ const AddCardBox = ({
   const [subtype, setSubtype] = useState('');
   const [cmcMin, setCmcMin] = useState('');
   const [cmcMax, setCmcMax] = useState('');
-  const [tags, setTags] = useState<Set<string>>(() => new Set());
-  const [tagSearch, setTagSearch] = useState('');
 
   // Adopt the commander's identity whenever it changes (it arrives a moment
   // after the commander itself, once Scryfall metadata lands).
@@ -2111,9 +2109,6 @@ const AddCardBox = ({
     return v.trim() === '' || !Number.isFinite(n) ? undefined : n;
   };
 
-  const groupedTags = useMemo(() => deckTagsByCategory(filterDeckTags(tagSearch)), [tagSearch]);
-  const selectedTags = useMemo(() => [...tags].sort(), [tags]);
-
   const query: CardQuery = useMemo(
     () => ({
       cmcMax: filters ? num(cmcMax) : undefined,
@@ -2121,11 +2116,10 @@ const AddCardBox = ({
       format: deckFormat,
       identity: filters && useIdentity ? sortWubrg([...identity]) : undefined,
       subtype: filters ? subtype : undefined,
-      tagIds: filters && tags.size > 0 ? [...tags] : undefined,
       text,
       types: filters ? [...types] : undefined,
     }),
-    [cmcMax, cmcMin, deckFormat, filters, identity, subtype, tags, text, types, useIdentity],
+    [cmcMax, cmcMin, deckFormat, filters, identity, subtype, text, types, useIdentity],
   );
 
   const runnable = hasSearchCriteria(query);
@@ -2142,7 +2136,7 @@ const AddCardBox = ({
     let cancelled = false;
     setSearching(true);
     const timer = window.setTimeout(() => {
-      void searchCards(query, tags.size > 0 ? 40 : 12)
+      void searchCards(query)
         .then(r => {
           if (!cancelled) {
             setResp(r);
@@ -2222,7 +2216,6 @@ const AddCardBox = ({
   const activeFilters =
     (useIdentity ? 1 : 0) +
     types.size +
-    tags.size +
     (subtype.trim() ? 1 : 0) +
     (cmcMin ? 1 : 0) +
     (cmcMax ? 1 : 0);
@@ -2231,7 +2224,7 @@ const AddCardBox = ({
   function keepSearchOpen(q: string): boolean {
     if (!filters) return false;
     if (looksLikeSyntax(q.trim())) return true;
-    return types.size > 0 || tags.size > 0 || !!subtype.trim() || !!cmcMin || !!cmcMax;
+    return types.size > 0 || !!subtype.trim() || !!cmcMin || !!cmcMax;
   }
 
   const showImages = results.cards.length > 0 && results.total <= IMAGE_THRESHOLD;
@@ -2264,71 +2257,8 @@ const AddCardBox = ({
             {activeFilters > 0 ? activeFilters : ''}
           </Button>
         )}
-        {filters && (
-          <Popover
-            align="left"
-            className="w-72"
-            label="Card tags"
-            trigger={({ open, toggle }) => (
-              <Button active={open || tags.size > 0} onClick={toggle} title="Filter by mechanic or theme">
-                Tags{tags.size > 0 ? ` ${tags.size}` : ''}
-              </Button>
-            )}
-          >
-            <div className="space-y-1.5 p-1.5">
-              <input
-                aria-label="Search tags"
-                className="w-full rounded border border-line-strong bg-raised px-2 py-1 text-xs text-ink placeholder:text-ink-faint"
-                onChange={event => setTagSearch(event.target.value)}
-                placeholder="Draw, tokens, elf…"
-                type="search"
-                value={tagSearch}
-              />
-              <div className="max-h-64 space-y-2 overflow-auto">
-                {groupedTags.map(group => (
-                  <div key={group.category}>
-                    <div className="text-2xs font-semibold uppercase tracking-wide text-ink-faint">
-                      {group.category}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap gap-1">
-                      {group.tags.map(tag => (
-                        <button
-                          key={tag.id}
-                          className={`rounded-full border px-2 py-0.5 text-2xs ${
-                            tags.has(tag.id)
-                              ? 'border-accent/40 bg-accent-soft text-accent'
-                              : 'border-line text-ink-muted'
-                          }`}
-                          onClick={() => toggleIn(tags, tag.id, setTags)}
-                          type="button"
-                        >
-                          {tag.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Popover>
-        )}
         {trailing && <div className="flex flex-none items-center gap-1">{trailing}</div>}
       </div>
-
-      {filters && selectedTags.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {selectedTags.map(id => (
-            <button
-              key={id}
-              className="rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-2xs font-medium text-accent"
-              onClick={() => toggleIn(tags, id, setTags)}
-              type="button"
-            >
-              {deckTagById(id)?.label ?? id} ×
-            </button>
-          ))}
-        </div>
-      )}
 
       {filters && showFilters && (
         <div className="mt-1.5 space-y-1.5 rounded border border-line bg-panel p-1.5 text-2xs">
@@ -2412,8 +2342,6 @@ const AddCardBox = ({
                 onClick={() => {
                   setUseIdentity(false);
                   setTypes(new Set());
-                  setTags(new Set());
-                  setTagSearch('');
                   setSubtype('');
                   setCmcMin('');
                   setCmcMax('');

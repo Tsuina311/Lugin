@@ -6,13 +6,12 @@
 // you are — start a deck, put cards in it, take cards out — so that "new deck"
 // isn't a door into a room you can't furnish.
 //
-// Cards go in as text, which sounds primitive and isn't: the same box takes a
-// typed name, a "2 Lightning Bolt" line, and a whole list pasted from Moxfield,
-// because it hands the string to `parseDeckList` — the parser the desktop uses
-// for the same job. Suggestions merge Scryfall, your collection, and — when a
-// commander is set — EDHREC and MTGGoldfish staples, sorted A→Z; cards you
-// own are tinted green. Suggested cuts use the same EDHREC play-rate logic as
-// the extension when a commander is set.
+// A typed word is a search, not a card. It only goes into the deck when you tap
+// a suggestion — Scryfall, your collection, or (with a commander) EDHREC and
+// MTGGoldfish, sorted A→Z, cards you own tinted green. A pasted list is the
+// exception: several lines go through `parseDeckList`, the same parser the
+// desktop uses. Suggested cuts use the same EDHREC play-rate logic as the
+// extension when a commander is set.
 //
 // Pictures in list and box view use the same small thumbnails as Tags — tap to
 // enlarge. A deck card is only ever a name, so the picture is looked up in your
@@ -283,14 +282,6 @@ export const DeckEditor = ({
 
   const [remote, setRemote] = useState<string[]>([]);
   const [recNames, setRecNames] = useState<string[]>([]);
-  const [addTags, setAddTags] = useState<Set<string>>(() => new Set());
-  const [addTagQuery, setAddTagQuery] = useState('');
-  const [addTagsOpen, setAddTagsOpen] = useState(false);
-  const addTagGroups = useMemo(
-    () => deckTagsByCategory(filterDeckTags(addTagQuery)),
-    [addTagQuery],
-  );
-  const addTagIds = useMemo(() => [...addTags].sort(), [addTags]);
 
   useEffect(() => {
     if (!commanderRecs) {
@@ -321,8 +312,7 @@ export const DeckEditor = ({
   }, [commanderRecs, commandersKey, commanders]);
 
   const needle = adding.trim();
-  const browsingTags = addTagIds.length > 0 && !adding.includes('\n');
-  const canSuggest = (needle.length >= 2 && !adding.includes('\n')) || browsingTags;
+  const canSuggest = needle.length >= 2 && !adding.includes('\n');
 
   useEffect(() => {
     if (!canSuggest) {
@@ -331,15 +321,7 @@ export const DeckEditor = ({
     }
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void searchCards(
-        {
-          format: deck.format,
-          identity: browsingTags ? commanderIdentity : undefined,
-          tagIds: browsingTags ? addTagIds : undefined,
-          text: needle.length >= 2 ? needle : undefined,
-        },
-        browsingTags ? 24 : SUGGESTIONS,
-      )
+      void searchCards({ format: deck.format, text: needle }, SUGGESTIONS)
         .then(resp => {
           if (!cancelled) setRemote(resp.cards.map(c => c.name));
         })
@@ -351,17 +333,14 @@ export const DeckEditor = ({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [addTagIds, browsingTags, canSuggest, commanderIdentity, deck.format, needle]);
+  }, [canSuggest, deck.format, needle]);
 
   // Scryfall, collection, EDHREC and Goldfish — deduped, then sorted A→Z.
   // Owned cards get a green tint in the UI but don't jump to the front.
   const suggestions = useMemo((): { name: string; owned: boolean }[] => {
     if (!canSuggest) return [];
-    const ownedOf = (name: string): boolean => (collection?.byKey[cardKey(name)]?.total ?? 0) > 0;
-    if (browsingTags) {
-      return remote.slice(0, 24).map(name => ({ name, owned: ownedOf(name) }));
-    }
     const key = cardKey(needle);
+    const ownedOf = (name: string): boolean => (collection?.byKey[cardKey(name)]?.total ?? 0) > 0;
     const local = collection
       ? Object.values(collection.byKey)
           .filter(row => cardKey(row.name).includes(key))
@@ -380,17 +359,27 @@ export const DeckEditor = ({
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
       .slice(0, SUGGESTIONS)
       .map(name => ({ name, owned: ownedOf(name) }));
-  }, [browsingTags, canSuggest, collection, needle, recNames, remote]);
+  }, [canSuggest, collection, needle, recNames, remote]);
 
-  const add = (text: string) => {
+  const addCard = (name: string) => {
+    void syncStore.updateDeck(deck.id, d => ({
+      ...d,
+      cards: mergeDeckCards(d.cards, [{ name, quantity: 1, section: into }]),
+    }));
+    setAdding('');
+  };
+
+  const addPastedList = (text: string) => {
     const { cards } = parseDeckList(text);
     if (cards.length === 0) return;
-    // A pasted list can name its own sections; a typed line can't, so anything
-    // the parser defaulted to "main" goes wherever the button says instead.
+    // A pasted list can name its own sections; a line it filed as main goes
+    // wherever the zone button says instead.
     const placed = cards.map(card => (card.section === 'main' ? { ...card, section: into } : card));
     void syncStore.updateDeck(deck.id, d => ({ ...d, cards: mergeDeckCards(d.cards, placed) }));
     setAdding('');
   };
+
+  const pasted = adding.includes('\n');
 
   const setQuantity = (card: DeckCard, quantity: number) =>
     void syncStore.updateDeck(deck.id, d => ({
@@ -708,96 +697,31 @@ export const DeckEditor = ({
                 className="min-w-0 flex-1 rounded-lg border border-line-strong bg-raised px-3 py-2.5 text-base text-ink placeholder:text-ink-faint"
                 onChange={event => setAdding(event.target.value)}
                 onKeyDown={event => {
-                  if (event.key === 'Enter') add(adding);
+                  if (event.key !== 'Enter' || event.shiftKey) return;
+                  if (pasted) {
+                    event.preventDefault();
+                    addPastedList(adding);
+                    return;
+                  }
+                  const exact = suggestions.find(item => cardKey(item.name) === cardKey(needle));
+                  const only = suggestions.length === 1 ? suggestions[0] : undefined;
+                  const pick = exact ?? only;
+                  if (!pick) return;
+                  event.preventDefault();
+                  addCard(pick.name);
                 }}
-                placeholder="Add a card, or paste a list"
+                placeholder="Search for a card, or paste a list"
                 value={adding}
               />
-              <button
-                className="shrink-0 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-40"
-                disabled={!adding.trim()}
-                onClick={() => add(adding)}
-                type="button"
-              >
-                Add
-              </button>
-            </div>
-            <div className="mt-2">
-              <button
-                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                  addTagsOpen || addTags.size > 0
-                    ? 'border-accent/40 bg-accent-soft text-accent'
-                    : 'border-line-strong text-ink-muted'
-                }`}
-                onClick={() => setAddTagsOpen(open => !open)}
-                type="button"
-              >
-                Tags{addTags.size > 0 ? ` ${addTags.size}` : ''}
-              </button>
-              {addTagIds.length > 0 ? (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {addTagIds.map(id => (
-                    <button
-                      key={id}
-                      className="rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent"
-                      onClick={() =>
-                        setAddTags(current => {
-                          const next = new Set(current);
-                          next.delete(id);
-                          return next;
-                        })
-                      }
-                      type="button"
-                    >
-                      {deckTagById(id)?.label ?? id} ×
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              {addTagsOpen ? (
-                <div className="mt-2 rounded-lg border border-line bg-raised p-2">
-                  <input
-                    aria-label="Search tags"
-                    className="mb-2 w-full rounded-md border border-line-strong bg-panel px-2 py-1.5 text-sm text-ink placeholder:text-ink-faint"
-                    onChange={event => setAddTagQuery(event.target.value)}
-                    placeholder="Draw, tokens, elf…"
-                    type="search"
-                    value={addTagQuery}
-                  />
-                  <div className="max-h-48 overflow-auto">
-                    {addTagGroups.map(group => (
-                      <div key={group.category} className="mb-2">
-                        <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
-                          {group.category}
-                        </p>
-                        <ul className="mt-1 flex flex-wrap gap-1">
-                          {group.tags.map(tag => (
-                            <li key={tag.id}>
-                              <button
-                                className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                                  addTags.has(tag.id)
-                                    ? 'border-accent/40 bg-accent-soft text-accent'
-                                    : 'border-line-strong text-ink-muted'
-                                }`}
-                                onClick={() =>
-                                  setAddTags(current => {
-                                    const next = new Set(current);
-                                    if (next.has(tag.id)) next.delete(tag.id);
-                                    else next.add(tag.id);
-                                    return next;
-                                  })
-                                }
-                                type="button"
-                              >
-                                {tag.label}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {pasted ? (
+                <button
+                  className="shrink-0 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-40"
+                  disabled={!adding.trim()}
+                  onClick={() => addPastedList(adding)}
+                  type="button"
+                >
+                  Add list
+                </button>
               ) : null}
             </div>
             {suggestions.length > 0 ? (
@@ -810,7 +734,7 @@ export const DeckEditor = ({
                           ? 'border-pos/40 bg-pos-soft text-pos'
                           : 'border-line-strong text-ink-muted'
                       }`}
-                      onClick={() => add(suggestion.name)}
+                      onClick={() => addCard(suggestion.name)}
                       type="button"
                     >
                       {suggestion.name}
@@ -823,7 +747,7 @@ export const DeckEditor = ({
 
           {deck.cards.length === 0 ? (
             <p className="px-6 py-10 text-center text-sm text-ink-muted">
-              Nothing in this deck yet. Add cards above, or paste a list you already have.
+              Nothing in this deck yet. Search for a card above, or paste a list you already have.
             </p>
           ) : null}
 

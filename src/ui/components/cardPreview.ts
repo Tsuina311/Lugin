@@ -14,7 +14,8 @@
 import { useCallback, useSyncExternalStore, type MouseEvent } from 'react';
 
 import { previewStore } from '@/content/previewStore';
-import { cardKey } from '@/lib/cardName';
+import { cardKey, frontFaceName, stripVersion } from '@/lib/cardName';
+import { fetchRemote } from '@/lib/fetchRemote';
 import { requestScryfall, requestScryfallCached } from '@/lib/messaging';
 
 /** cardKey -> face images. An empty array means "resolved, single-faced". */
@@ -53,15 +54,50 @@ export const rememberFaces = (metas: readonly { faceImages?: string[]; name: str
   }
 };
 
+const isExtension = (): boolean => typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id);
+
+/** Per-face scans. Split and adventure cards share one image, so they stay out. */
+const faceImagesOf = (card: {
+  card_faces?: Array<{ image_uris?: Record<string, string> }>;
+}): string[] => {
+  const urls = (card.card_faces ?? [])
+    .map(face => face.image_uris?.normal ?? face.image_uris?.large ?? face.image_uris?.small)
+    .filter((url): url is string => typeof url === 'string');
+  return urls.length >= 2 ? urls : [];
+};
+
+/**
+ * Both faces of a card, or an empty list when it has one picture. The extension
+ * reads the worker's cache. The phone has no worker, so it asks Scryfall itself
+ * — either face's name is enough for a double-faced card.
+ */
+const lookupFaces = async (name: string): Promise<string[] | null> => {
+  if (isExtension()) {
+    const [cached] = await requestScryfallCached([name]);
+    const card = cached ?? (await requestScryfall([name]))[0];
+    return card?.faceImages ?? [];
+  }
+  const front = stripVersion(frontFaceName(name));
+  if (!front) return [];
+  const res = await fetchRemote(
+    `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(front)}`,
+    'application/json',
+  );
+  if (!res.ok) return null;
+  const card = JSON.parse(res.body) as {
+    card_faces?: Array<{ image_uris?: Record<string, string> }>;
+  };
+  return faceImagesOf(card);
+};
+
 const resolveFaces = (name: string, previewKey: string): void => {
   const key = cardKey(name);
   if (!key || facesByKey.has(key) || inFlight.has(key)) return;
   inFlight.add(key);
   void (async () => {
     try {
-      const [cached] = await requestScryfallCached([name]);
-      const card = cached ?? (await requestScryfall([name]))[0];
-      const faces = card?.faceImages ?? [];
+      const faces = await lookupFaces(name);
+      if (!faces) return;
       facesByKey.set(key, faces);
       if (faces.length >= 2) {
         // setFaces keeps the front already on screen (which may be a specific

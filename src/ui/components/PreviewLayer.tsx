@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent,
+} from 'react';
 
 import { previewStore, type PreviewState } from '@/content/previewStore';
 
@@ -168,9 +175,14 @@ const PinnedPreview = ({ shown }: { shown: PreviewState | null }) => {
   if (!view || !active) return null;
   if (!market && kept.length === 0) return null;
 
-  const onCardClick = (event: { stopPropagation: () => void }): void => {
+  const onCardClick = (event: MouseEvent): void => {
+    event.preventDefault();
     event.stopPropagation();
-    if (flippable) previewStore.flip();
+    // Read the store, not the render that opened the card. The second face
+    // arrives a moment after the tap that enlarged it, and that tap's handler
+    // would still think the card has one side.
+    const current = previewStore.getSnapshot();
+    if (current && current.urls.length >= 2) previewStore.flip();
   };
 
   // Closed, it stays in the document out of sight, so its images keep what
@@ -183,7 +195,10 @@ const PinnedPreview = ({ shown }: { shown: PreviewState | null }) => {
           ? 'pointer-events-auto fixed inset-0 z-[2147483647] flex items-center justify-center bg-black/70 p-4'
           : 'hidden'
       }
-      onClick={() => previewStore.hide()}
+      onClick={event => {
+        if (event.target !== event.currentTarget) return;
+        previewStore.hide();
+      }}
       role={open ? 'dialog' : undefined}
     >
       {market ? (
