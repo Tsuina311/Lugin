@@ -66,12 +66,68 @@ const faceImagesOf = (card: {
   return urls.length >= 2 ? urls : [];
 };
 
+/** The other side of a Scryfall CDN scan, if this URL is one side of a printing. */
+const otherCdnFace = (url: string): string | undefined => {
+  const match = url.match(
+    /^(https:\/\/cards\.scryfall\.io\/[^/?#]+)\/(front|back)\/([0-9a-f]\/[0-9a-f]\/[0-9a-f-]{36}\.[a-z]+)(?:[?#].*)?$/i,
+  );
+  if (!match) return undefined;
+  const side = match[2].toLowerCase() === 'front' ? 'back' : 'front';
+  return `${match[1]}/${side}/${match[3]}`;
+};
+
+const idFromImageUrl = (url: string): string | undefined => {
+  const cdn = url.match(
+    /cards\.scryfall\.io\/[^/]+\/(?:front|back)\/[0-9a-f]\/[0-9a-f]\/([0-9a-f-]{36})/i,
+  );
+  if (cdn) return cdn[1];
+  const api = url.match(/api\.scryfall\.com\/cards\/([0-9a-f-]{36})/i);
+  return api?.[1];
+};
+
+const productFromImageUrl = (url: string): string | undefined =>
+  url.match(/api\.scryfall\.com\/cards\/cardmarket\/(\d+)/i)?.[1] ??
+  url.match(/product-images[^/]*\/\d+\/[A-Za-z0-9]+\/(\d+)\//i)?.[1];
+
+const imageExists = (url: string): Promise<boolean> =>
+  new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(img.naturalWidth > 0);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+
+/** null when the request failed, so a later tap can try again. */
+const fetchFaceImages = async (url: string): Promise<string[] | null> => {
+  const res = await fetchRemote(url, 'application/json');
+  if (!res.ok) return null;
+  try {
+    return faceImagesOf(JSON.parse(res.body) as { card_faces?: Array<{ image_uris?: Record<string, string> }> });
+  } catch {
+    return null;
+  }
+};
+
 /**
- * Both faces of a card, or an empty list when it has one picture. The extension
- * reads the worker's cache. The phone has no worker, so it asks Scryfall itself
- * — either face's name is enough for a double-faced card.
+ * Both faces, or an empty list when the card has one picture. null means we
+ * never got an answer. The picture on screen is tried first (its Scryfall id,
+ * or the CDN file for the other side), then the card's name.
  */
-const lookupFaces = async (name: string): Promise<string[] | null> => {
+const lookupFaces = async (name: string, frontUrl?: string): Promise<string[] | null> => {
+  if (frontUrl) {
+    const other = otherCdnFace(frontUrl);
+    if (other && (await imageExists(other))) return [frontUrl, other];
+    const id = idFromImageUrl(frontUrl);
+    if (id) {
+      const faces = await fetchFaceImages(`https://api.scryfall.com/cards/${id}`);
+      if (faces) return faces;
+    }
+    const product = productFromImageUrl(frontUrl);
+    if (product) {
+      const faces = await fetchFaceImages(`https://api.scryfall.com/cards/cardmarket/${product}`);
+      if (faces) return faces;
+    }
+  }
   if (isExtension()) {
     const [cached] = await requestScryfallCached([name]);
     const card = cached ?? (await requestScryfall([name]))[0];
@@ -79,40 +135,71 @@ const lookupFaces = async (name: string): Promise<string[] | null> => {
   }
   const front = stripVersion(frontFaceName(name));
   if (!front) return [];
-  const res = await fetchRemote(
+  const exact = await fetchFaceImages(
     `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(front)}`,
-    'application/json',
   );
-  if (!res.ok) return null;
-  const card = JSON.parse(res.body) as {
-    card_faces?: Array<{ image_uris?: Record<string, string> }>;
-  };
-  return faceImagesOf(card);
+  if (exact) return exact;
+  return fetchFaceImages(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(front)}`);
 };
 
-const resolveFaces = (name: string, previewKey: string): void => {
+const jobs = new Map<string, Promise<string[] | null>>();
+
+const ensureFaces = (name: string, previewKey: string, frontUrl?: string): Promise<string[] | null> => {
   const key = cardKey(name);
-  if (!key || facesByKey.has(key) || inFlight.has(key)) return;
-  inFlight.add(key);
-  void (async () => {
-    try {
-      const faces = await lookupFaces(name);
-      if (!faces) return;
+  if (!key) return Promise.resolve([]);
+  const known = facesByKey.get(key);
+  if (known) {
+    if (known.length >= 2) previewStore.setFaces(previewKey, known);
+    return Promise.resolve(known);
+  }
+  const running = jobs.get(key);
+  if (running) return running;
+  const job = lookupFaces(name, frontUrl)
+    .then(faces => {
+      if (!faces) return null;
       facesByKey.set(key, faces);
       if (faces.length >= 2) {
-        // setFaces keeps the front already on screen (which may be a specific
-        // printing) and only borrows the extra face(s).
+        // setFaces keeps the front already on screen and only borrows the rest.
         previewStore.setFaces(previewKey, faces);
-        // Single-faced cards change nothing on screen, so only two-sided ones
-        // are worth re-rendering the (potentially long) lists for.
         emit();
       }
-    } catch {
-      // Leave it unresolved so a later hover can retry.
-    } finally {
-      inFlight.delete(key);
+      return faces;
+    })
+    .catch(() => null)
+    .finally(() => {
+      jobs.delete(key);
+    });
+  jobs.set(key, job);
+  return job;
+};
+
+const resolveFaces = (name: string, previewKey: string, frontUrl?: string): void => {
+  if (!cardKey(name) || facesByKey.has(cardKey(name)) || inFlight.has(cardKey(name))) return;
+  const key = cardKey(name);
+  inFlight.add(key);
+  void ensureFaces(name, previewKey, frontUrl).finally(() => {
+    inFlight.delete(key);
+  });
+};
+
+let flipping = false;
+
+/** Tap on the enlarged card: show the other side, looking it up first if needed. */
+export const flipZoomedCard = async (): Promise<void> => {
+  if (flipping) return;
+  const shown = previewStore.getSnapshot();
+  if (!shown?.pinned) return;
+  flipping = true;
+  try {
+    if (shown.urls.length < 2 && shown.name) {
+      await ensureFaces(shown.name, shown.key, shown.urls[0]);
     }
-  })();
+    const now = previewStore.getSnapshot();
+    if (!now?.pinned || now.key !== shown.key || now.urls.length < 2) return;
+    previewStore.flip();
+  } finally {
+    flipping = false;
+  }
 };
 
 interface PreviewHandlers {
@@ -165,19 +252,19 @@ export const useCardPreview = (): ((key: string, name: string, urls: string[]) =
             return;
           }
           previewStore.show(
-            { anchor: e.currentTarget, index: 0, key, pinned: true, urls: faces },
+            { anchor: e.currentTarget, index: 0, key, name, pinned: true, urls: faces },
             window.innerWidth / 2,
             window.innerHeight / 2,
           );
-          if (!flippable) resolveFaces(name, key);
+          if (!flippable) resolveFaces(name, key, urls[0]);
         },
         onMouseEnter: (e: MouseEvent) => {
           previewStore.show(
-            { anchor: e.currentTarget, index: 0, key, urls: faces },
+            { anchor: e.currentTarget, index: 0, key, name, urls: faces },
             e.clientX,
             e.clientY,
           );
-          if (!flippable) resolveFaces(name, key);
+          if (!flippable) resolveFaces(name, key, urls[0]);
         },
         onMouseLeave: () => {
           if (!previewStore.getSnapshot()?.pinned) previewStore.hide();

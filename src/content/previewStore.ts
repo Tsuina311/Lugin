@@ -23,6 +23,8 @@ export interface PreviewState {
   index: number;
   /** Identifies the hovered card so async face lookups can target it. */
   key: string;
+  /** Card name, so a pinned preview can look up its other face. */
+  name?: string;
   /** When true, the preview stays open enlarged until dismissed. */
   pinned?: boolean;
   /**
@@ -71,21 +73,23 @@ export const previewStore = {
     emit();
   },
 
-  /** Keep the current preview open, enlarged and centered, until dismissed. */
-  pin() {
-    if (!state) return;
-    state = { ...state, pinned: true };
-    emit();
-  },
-
+  
   /**
    * Follow the cursor. No React state changes here — only the position
    * listeners, which move the popup on the next animation frame.
    */
-  move(x: number, y: number) {
+move(x: number, y: number) {
     if (!state) return;
     position = { x, y };
     for (const l of positionListeners) l(position);
+  },
+
+  
+  /** Keep the current preview open, enlarged and centered, until dismissed. */
+pin() {
+    if (!state) return;
+    state = { ...state, pinned: true };
+    emit();
   },
 
   /**

@@ -414,6 +414,17 @@ const GoldfishRow = ({
         )}
       </div>
 
+      {deckQty === 0 && (
+        <button
+          className="flex h-8 w-7 flex-none items-center justify-center rounded text-base leading-none text-slate-300 hover:bg-sky-600 hover:text-white"
+          onClick={onAdd}
+          title={`Add ${card.name} to the deck`}
+          type="button"
+        >
+          +
+        </button>
+      )}
+
       <div className="min-w-0 flex-1">
         <div className="truncate text-slate-100" title={card.name}>
           {card.name}
@@ -453,16 +464,7 @@ const GoldfishRow = ({
         >
           in deck
         </span>
-      ) : (
-        <button
-          className="flex h-5 w-5 flex-none items-center justify-center rounded bg-slate-800 text-slate-300 hover:bg-sky-600 hover:text-white"
-          onClick={onAdd}
-          title={`Add ${card.name} to the deck`}
-          type="button"
-        >
-          +
-        </button>
-      )}
+      ) : null}
     </li>
   );
 };

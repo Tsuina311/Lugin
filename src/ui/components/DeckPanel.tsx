@@ -2386,37 +2386,40 @@ const AddCardBox = ({
                   : 'No cards match these filters.'}
             </div>
           ) : showImages ? (
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {results.cards.map(c => {
-                // The preview lives on the image so clicking it enlarges the card;
-                // clicks anywhere else on the tile add.
+                // The picture is only for looking. The control beside it adds, so
+                // a hover can become an add with a short move off the art.
                 const { handlers } = preview(`search|${c.id}`, c.name, previewUrls(c));
                 return (
-                  <button
+                  <div
                     key={c.id}
-                    className="group w-20 overflow-hidden rounded border border-line-strong bg-raised text-left transition-colors hover:border-accent"
-                    onClick={() => add(c.name)}
-                    title={`Add ${c.name}`}
-                    type="button"
+                    className="flex items-stretch overflow-hidden rounded border border-line-strong bg-raised"
                   >
                     {c.imageUrl ? (
-                      <span className="block" {...handlers}>
+                      <span className="block w-14 flex-none" {...handlers}>
                         <img
                           alt={c.name}
-                          className="h-28 w-full cursor-zoom-in object-cover"
+                          className="h-20 w-full cursor-zoom-in object-cover"
                           src={c.imageUrl}
+                          style={{ objectPosition: '50% 18%' }}
                         />
                       </span>
                     ) : (
-                      <div className="flex h-28 w-full items-center justify-center text-2xs text-ink-faint">
+                      <div className="flex h-20 w-14 flex-none items-center justify-center text-2xs text-ink-faint">
                         no image
                       </div>
                     )}
-                    <div className="flex items-center gap-0.5 px-1 py-0.5 text-2xs text-ink-muted group-hover:text-accent">
-                      <Plus aria-hidden className="flex-none" size={9} />
-                      <span className="truncate">{c.name}</span>
-                    </div>
-                  </button>
+                    <button
+                      className="flex w-16 flex-col items-center justify-center gap-1 px-1 text-center text-2xs text-ink-muted hover:bg-tint hover:text-accent"
+                      onClick={() => add(c.name)}
+                      title={`Add ${c.name}`}
+                      type="button"
+                    >
+                      <Plus aria-hidden className="flex-none" size={12} />
+                      <span className="line-clamp-3 w-full leading-tight">{c.name}</span>
+                    </button>
+                  </div>
                 );
               })}
             </div>

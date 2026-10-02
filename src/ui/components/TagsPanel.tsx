@@ -370,6 +370,14 @@ const TagRow = ({
       )}
     >
       <CardResultThumb candidates={urls} name={card.name} previewKey={`tags|${card.id}`} />
+      <button
+        className="flex h-8 w-7 flex-none items-center justify-center rounded text-base leading-none text-ink-muted hover:bg-tint hover:text-accent"
+        onClick={onAdd}
+        title={`Add ${card.name}`}
+        type="button"
+      >
+        +
+      </button>
       <div className="min-w-0 flex-1">
         <div className="truncate text-ink" title={card.name}>
           {card.name}
@@ -384,9 +392,6 @@ const TagRow = ({
           owned{owned > 1 ? ` ×${owned}` : ''}
         </span>
       ) : null}
-      <Button onClick={onAdd} size="xs" title={`Add ${card.name}`}>
-        add
-      </Button>
     </li>
   );
 };

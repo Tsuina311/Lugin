@@ -1,13 +1,7 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type MouseEvent,
-} from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { previewStore, type PreviewState } from '@/content/previewStore';
+import { flipZoomedCard } from '@/ui/components/cardPreview';
 
 // The full card image that pops up beside the cursor while you hover a
 // thumbnail, or enlarged in the center when you click.
@@ -154,6 +148,7 @@ const PinnedPreview = ({ shown }: { shown: PreviewState | null }) => {
   // Closing hides the dialog but leaves the last card mounted, so opening it
   // again shows the picture that already decoded.
   const [held, setHeld] = useState<PreviewState | null>(null);
+  const lastFlip = useRef(0);
   if (shown && shown !== held) setHeld(shown);
   const view = shown ?? held;
   const open = shown != null;
@@ -175,14 +170,15 @@ const PinnedPreview = ({ shown }: { shown: PreviewState | null }) => {
   if (!view || !active) return null;
   if (!market && kept.length === 0) return null;
 
-  const onCardClick = (event: MouseEvent): void => {
+  const onFlip = (event: { preventDefault: () => void; stopPropagation: () => void }): void => {
     event.preventDefault();
     event.stopPropagation();
-    // Read the store, not the render that opened the card. The second face
-    // arrives a moment after the tap that enlarged it, and that tap's handler
-    // would still think the card has one side.
-    const current = previewStore.getSnapshot();
-    if (current && current.urls.length >= 2) previewStore.flip();
+    // A tap produces both pointerup and click. One of them has to flip; the
+    // other must not flip straight back.
+    const now = Date.now();
+    if (now - lastFlip.current < 400) return;
+    lastFlip.current = now;
+    void flipZoomedCard();
   };
 
   // Closed, it stays in the document out of sight, so its images keep what
@@ -201,38 +197,36 @@ const PinnedPreview = ({ shown }: { shown: PreviewState | null }) => {
       }}
       role={open ? 'dialog' : undefined}
     >
-      {market ? (
-        <div
-          className={`card-zoom card-zoom-market shadow-pop ${flippable ? 'cursor-flip' : ''}`}
-          onClick={onCardClick}
-          title={flippable ? 'Click to see the other side' : undefined}
-        >
-          <img alt="" className="card-zoom-base" decoding="sync" draggable={false} src={active} />
-          {sharp ? <SharpCover key={sharp} src={sharp} /> : null}
-        </div>
-      ) : (
-        kept.map(url => (
-          <img
-            key={url}
-            alt=""
-            className={`${cornerClip(url)} shadow-pop ${flippable ? 'cursor-flip' : ''}`}
-            // Decoded before the frame that shows it, so reopening a card never
-            // flashes an empty box first.
-            decoding="sync"
-            onClick={onCardClick}
-            src={url}
-            style={{
-              display: url === active ? 'block' : 'none',
-              // A width, not only a cap. Scryfall's normal file is 488×680 and
-              // would fill a 400px cap on its own; Cardmarket's product photo is
-              // about 251×356 and would otherwise stay that small.
-              maxHeight: '85vh',
-              width: 'min(400px, 90vw)',
-            }}
-            title={flippable ? 'Click to see the other side' : undefined}
-          />
-        ))
-      )}
+      <button
+        className={`m-0 inline-flex touch-manipulation border-0 bg-transparent p-0 ${flippable ? 'cursor-flip' : ''}`}
+        onClick={onFlip}
+        onPointerUp={onFlip}
+        title={flippable ? 'Tap to see the other side' : undefined}
+        type="button"
+      >
+        {market ? (
+          <div className="card-zoom card-zoom-market shadow-pop">
+            <img alt="" className="card-zoom-base pointer-events-none" decoding="sync" draggable={false} src={active} />
+            {sharp ? <SharpCover key={sharp} src={sharp} /> : null}
+          </div>
+        ) : (
+          kept.map(url => (
+            <img
+              key={url}
+              alt=""
+              className={`${cornerClip(url)} pointer-events-none shadow-pop`}
+              decoding="sync"
+              draggable={false}
+              src={url}
+              style={{
+                display: url === active ? 'block' : 'none',
+                maxHeight: '85vh',
+                width: 'min(400px, 90vw)',
+              }}
+            />
+          ))
+        )}
+      </button>
     </div>
   );
 };
