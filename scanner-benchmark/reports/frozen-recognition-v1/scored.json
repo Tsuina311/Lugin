@@ -1,0 +1,1948 @@
+{
+  "createdAt": "2026-10-07T15:11:01.035Z",
+  "margin": 0.05,
+  "bySplit": {
+    "train": {
+      "human": {
+        "cleanRaw": {
+          "n": 70,
+          "top1": 50,
+          "top3": 57,
+          "top5": 59,
+          "top10": 62,
+          "meanRank": 6.457142857142857,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 50,
+          "wrongWithheld": 20,
+          "precision": null,
+          "safeHit": 0
+        },
+        "prototypeRaw": {
+          "n": 70,
+          "top1": 47,
+          "top3": 57,
+          "top5": 59,
+          "top10": 62,
+          "meanRank": 15.32857142857143,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 47,
+          "wrongWithheld": 23,
+          "precision": null,
+          "safeHit": 0
+        },
+        "cleanMargin": {
+          "n": 70,
+          "top1": 50,
+          "top3": 57,
+          "top5": 59,
+          "top10": 62,
+          "meanRank": 6.457142857142857,
+          "medianRank": 1,
+          "correctPublished": 36,
+          "wrongPublished": 1,
+          "correctWithheld": 14,
+          "wrongWithheld": 19,
+          "precision": 0.972972972972973,
+          "safeHit": 0.5142857142857142
+        },
+        "prototypeMargin": {
+          "n": 70,
+          "top1": 47,
+          "top3": 57,
+          "top5": 59,
+          "top10": 62,
+          "meanRank": 15.32857142857143,
+          "medianRank": 1,
+          "correctPublished": 35,
+          "wrongPublished": 0,
+          "correctWithheld": 12,
+          "wrongWithheld": 23,
+          "precision": 1,
+          "safeHit": 0.5
+        },
+        "agreement": {
+          "n": 70,
+          "top1": 47,
+          "top3": 57,
+          "top5": 59,
+          "top10": 62,
+          "meanRank": 15.32857142857143,
+          "medianRank": 1,
+          "correctPublished": 34,
+          "wrongPublished": 0,
+          "correctWithheld": 13,
+          "wrongWithheld": 23,
+          "precision": 1,
+          "safeHit": 0.4857142857142857
+        }
+      },
+      "detector": {
+        "cleanRaw": {
+          "n": 70,
+          "top1": 41,
+          "top3": 48,
+          "top5": 52,
+          "top10": 52,
+          "meanRank": 83.94285714285714,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 41,
+          "wrongWithheld": 29,
+          "precision": null,
+          "safeHit": 0
+        },
+        "prototypeRaw": {
+          "n": 70,
+          "top1": 45,
+          "top3": 51,
+          "top5": 52,
+          "top10": 54,
+          "meanRank": 103.88571428571429,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 45,
+          "wrongWithheld": 25,
+          "precision": null,
+          "safeHit": 0
+        },
+        "cleanMargin": {
+          "n": 70,
+          "top1": 41,
+          "top3": 48,
+          "top5": 52,
+          "top10": 52,
+          "meanRank": 83.94285714285714,
+          "medianRank": 1,
+          "correctPublished": 27,
+          "wrongPublished": 4,
+          "correctWithheld": 14,
+          "wrongWithheld": 25,
+          "precision": 0.8709677419354839,
+          "safeHit": 0.38571428571428573
+        },
+        "prototypeMargin": {
+          "n": 70,
+          "top1": 45,
+          "top3": 51,
+          "top5": 52,
+          "top10": 54,
+          "meanRank": 103.88571428571429,
+          "medianRank": 1,
+          "correctPublished": 30,
+          "wrongPublished": 1,
+          "correctWithheld": 15,
+          "wrongWithheld": 24,
+          "precision": 0.967741935483871,
+          "safeHit": 0.42857142857142855
+        },
+        "agreement": {
+          "n": 70,
+          "top1": 45,
+          "top3": 51,
+          "top5": 52,
+          "top10": 54,
+          "meanRank": 103.88571428571429,
+          "medianRank": 1,
+          "correctPublished": 29,
+          "wrongPublished": 1,
+          "correctWithheld": 16,
+          "wrongWithheld": 24,
+          "precision": 0.9666666666666667,
+          "safeHit": 0.4142857142857143
+        }
+      },
+      "learnedRecognition": {
+        "cleanRaw": {
+          "n": 70,
+          "top1": 46,
+          "top3": 54,
+          "top5": 57,
+          "top10": 58,
+          "meanRank": 21.12857142857143,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 46,
+          "wrongWithheld": 24,
+          "precision": null,
+          "safeHit": 0
+        },
+        "prototypeRaw": {
+          "n": 70,
+          "top1": 49,
+          "top3": 55,
+          "top5": 57,
+          "top10": 57,
+          "meanRank": 23.3,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 49,
+          "wrongWithheld": 21,
+          "precision": null,
+          "safeHit": 0
+        },
+        "cleanMargin": {
+          "n": 70,
+          "top1": 46,
+          "top3": 54,
+          "top5": 57,
+          "top10": 58,
+          "meanRank": 21.12857142857143,
+          "medianRank": 1,
+          "correctPublished": 32,
+          "wrongPublished": 2,
+          "correctWithheld": 14,
+          "wrongWithheld": 22,
+          "precision": 0.9411764705882353,
+          "safeHit": 0.45714285714285713
+        },
+        "prototypeMargin": {
+          "n": 70,
+          "top1": 49,
+          "top3": 55,
+          "top5": 57,
+          "top10": 57,
+          "meanRank": 23.3,
+          "medianRank": 1,
+          "correctPublished": 37,
+          "wrongPublished": 0,
+          "correctWithheld": 12,
+          "wrongWithheld": 21,
+          "precision": 1,
+          "safeHit": 0.5285714285714286
+        },
+        "agreement": {
+          "n": 70,
+          "top1": 49,
+          "top3": 55,
+          "top5": 57,
+          "top10": 57,
+          "meanRank": 23.3,
+          "medianRank": 1,
+          "correctPublished": 34,
+          "wrongPublished": 0,
+          "correctWithheld": 15,
+          "wrongWithheld": 21,
+          "precision": 1,
+          "safeHit": 0.4857142857142857
+        }
+      }
+    },
+    "dev": {
+      "human": {
+        "cleanRaw": {
+          "n": 17,
+          "top1": 15,
+          "top3": 16,
+          "top5": 16,
+          "top10": 16,
+          "meanRank": 198.7058823529412,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 15,
+          "wrongWithheld": 2,
+          "precision": null,
+          "safeHit": 0
+        },
+        "prototypeRaw": {
+          "n": 17,
+          "top1": 14,
+          "top3": 16,
+          "top5": 16,
+          "top10": 16,
+          "meanRank": 287.29411764705884,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 14,
+          "wrongWithheld": 3,
+          "precision": null,
+          "safeHit": 0
+        },
+        "cleanMargin": {
+          "n": 17,
+          "top1": 15,
+          "top3": 16,
+          "top5": 16,
+          "top10": 16,
+          "meanRank": 198.7058823529412,
+          "medianRank": 1,
+          "correctPublished": 4,
+          "wrongPublished": 0,
+          "correctWithheld": 11,
+          "wrongWithheld": 2,
+          "precision": 1,
+          "safeHit": 0.23529411764705882
+        },
+        "prototypeMargin": {
+          "n": 17,
+          "top1": 14,
+          "top3": 16,
+          "top5": 16,
+          "top10": 16,
+          "meanRank": 287.29411764705884,
+          "medianRank": 1,
+          "correctPublished": 8,
+          "wrongPublished": 0,
+          "correctWithheld": 6,
+          "wrongWithheld": 3,
+          "precision": 1,
+          "safeHit": 0.47058823529411764
+        },
+        "agreement": {
+          "n": 17,
+          "top1": 14,
+          "top3": 16,
+          "top5": 16,
+          "top10": 16,
+          "meanRank": 287.29411764705884,
+          "medianRank": 1,
+          "correctPublished": 7,
+          "wrongPublished": 0,
+          "correctWithheld": 7,
+          "wrongWithheld": 3,
+          "precision": 1,
+          "safeHit": 0.4117647058823529
+        }
+      },
+      "detector": {
+        "cleanRaw": {
+          "n": 17,
+          "top1": 9,
+          "top3": 11,
+          "top5": 11,
+          "top10": 11,
+          "meanRank": 697.2941176470588,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 9,
+          "wrongWithheld": 8,
+          "precision": null,
+          "safeHit": 0
+        },
+        "prototypeRaw": {
+          "n": 17,
+          "top1": 12,
+          "top3": 12,
+          "top5": 13,
+          "top10": 13,
+          "meanRank": 445.4117647058824,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 12,
+          "wrongWithheld": 5,
+          "precision": null,
+          "safeHit": 0
+        },
+        "cleanMargin": {
+          "n": 17,
+          "top1": 9,
+          "top3": 11,
+          "top5": 11,
+          "top10": 11,
+          "meanRank": 697.2941176470588,
+          "medianRank": 1,
+          "correctPublished": 7,
+          "wrongPublished": 0,
+          "correctWithheld": 2,
+          "wrongWithheld": 8,
+          "precision": 1,
+          "safeHit": 0.4117647058823529
+        },
+        "prototypeMargin": {
+          "n": 17,
+          "top1": 12,
+          "top3": 12,
+          "top5": 13,
+          "top10": 13,
+          "meanRank": 445.4117647058824,
+          "medianRank": 1,
+          "correctPublished": 8,
+          "wrongPublished": 1,
+          "correctWithheld": 4,
+          "wrongWithheld": 4,
+          "precision": 0.8888888888888888,
+          "safeHit": 0.47058823529411764
+        },
+        "agreement": {
+          "n": 17,
+          "top1": 12,
+          "top3": 12,
+          "top5": 13,
+          "top10": 13,
+          "meanRank": 445.4117647058824,
+          "medianRank": 1,
+          "correctPublished": 8,
+          "wrongPublished": 0,
+          "correctWithheld": 4,
+          "wrongWithheld": 5,
+          "precision": 1,
+          "safeHit": 0.47058823529411764
+        }
+      },
+      "learnedRecognition": {
+        "cleanRaw": {
+          "n": 17,
+          "top1": 12,
+          "top3": 14,
+          "top5": 15,
+          "top10": 15,
+          "meanRank": 157.8235294117647,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 12,
+          "wrongWithheld": 5,
+          "precision": null,
+          "safeHit": 0
+        },
+        "prototypeRaw": {
+          "n": 17,
+          "top1": 13,
+          "top3": 13,
+          "top5": 13,
+          "top10": 15,
+          "meanRank": 45.1764705882353,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 13,
+          "wrongWithheld": 4,
+          "precision": null,
+          "safeHit": 0
+        },
+        "cleanMargin": {
+          "n": 17,
+          "top1": 12,
+          "top3": 14,
+          "top5": 15,
+          "top10": 15,
+          "meanRank": 157.8235294117647,
+          "medianRank": 1,
+          "correctPublished": 7,
+          "wrongPublished": 0,
+          "correctWithheld": 5,
+          "wrongWithheld": 5,
+          "precision": 1,
+          "safeHit": 0.4117647058823529
+        },
+        "prototypeMargin": {
+          "n": 17,
+          "top1": 13,
+          "top3": 13,
+          "top5": 13,
+          "top10": 15,
+          "meanRank": 45.1764705882353,
+          "medianRank": 1,
+          "correctPublished": 10,
+          "wrongPublished": 0,
+          "correctWithheld": 3,
+          "wrongWithheld": 4,
+          "precision": 1,
+          "safeHit": 0.5882352941176471
+        },
+        "agreement": {
+          "n": 17,
+          "top1": 13,
+          "top3": 13,
+          "top5": 13,
+          "top10": 15,
+          "meanRank": 45.1764705882353,
+          "medianRank": 1,
+          "correctPublished": 9,
+          "wrongPublished": 0,
+          "correctWithheld": 4,
+          "wrongWithheld": 4,
+          "precision": 1,
+          "safeHit": 0.5294117647058824
+        }
+      }
+    },
+    "holdout": {
+      "human": {
+        "cleanRaw": {
+          "n": 26,
+          "top1": 16,
+          "top3": 18,
+          "top5": 18,
+          "top10": 19,
+          "meanRank": 512.1153846153846,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 16,
+          "wrongWithheld": 10,
+          "precision": null,
+          "safeHit": 0
+        },
+        "prototypeRaw": {
+          "n": 26,
+          "top1": 19,
+          "top3": 21,
+          "top5": 21,
+          "top10": 22,
+          "meanRank": 535.3846153846154,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 19,
+          "wrongWithheld": 7,
+          "precision": null,
+          "safeHit": 0
+        },
+        "cleanMargin": {
+          "n": 26,
+          "top1": 16,
+          "top3": 18,
+          "top5": 18,
+          "top10": 19,
+          "meanRank": 512.1153846153846,
+          "medianRank": 1,
+          "correctPublished": 8,
+          "wrongPublished": 0,
+          "correctWithheld": 8,
+          "wrongWithheld": 10,
+          "precision": 1,
+          "safeHit": 0.3076923076923077
+        },
+        "prototypeMargin": {
+          "n": 26,
+          "top1": 19,
+          "top3": 21,
+          "top5": 21,
+          "top10": 22,
+          "meanRank": 535.3846153846154,
+          "medianRank": 1,
+          "correctPublished": 12,
+          "wrongPublished": 2,
+          "correctWithheld": 7,
+          "wrongWithheld": 5,
+          "precision": 0.8571428571428571,
+          "safeHit": 0.46153846153846156
+        },
+        "agreement": {
+          "n": 26,
+          "top1": 19,
+          "top3": 21,
+          "top5": 21,
+          "top10": 22,
+          "meanRank": 535.3846153846154,
+          "medianRank": 1,
+          "correctPublished": 11,
+          "wrongPublished": 0,
+          "correctWithheld": 8,
+          "wrongWithheld": 7,
+          "precision": 1,
+          "safeHit": 0.4230769230769231
+        }
+      },
+      "detector": {
+        "cleanRaw": {
+          "n": 26,
+          "top1": 12,
+          "top3": 14,
+          "top5": 15,
+          "top10": 16,
+          "meanRank": 1249.2307692307693,
+          "medianRank": 2.5,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 12,
+          "wrongWithheld": 14,
+          "precision": null,
+          "safeHit": 0
+        },
+        "prototypeRaw": {
+          "n": 26,
+          "top1": 14,
+          "top3": 16,
+          "top5": 17,
+          "top10": 19,
+          "meanRank": 1581.923076923077,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 14,
+          "wrongWithheld": 12,
+          "precision": null,
+          "safeHit": 0
+        },
+        "cleanMargin": {
+          "n": 26,
+          "top1": 12,
+          "top3": 14,
+          "top5": 15,
+          "top10": 16,
+          "meanRank": 1249.2307692307693,
+          "medianRank": 2.5,
+          "correctPublished": 9,
+          "wrongPublished": 0,
+          "correctWithheld": 3,
+          "wrongWithheld": 14,
+          "precision": 1,
+          "safeHit": 0.34615384615384615
+        },
+        "prototypeMargin": {
+          "n": 26,
+          "top1": 14,
+          "top3": 16,
+          "top5": 17,
+          "top10": 19,
+          "meanRank": 1581.923076923077,
+          "medianRank": 1,
+          "correctPublished": 10,
+          "wrongPublished": 0,
+          "correctWithheld": 4,
+          "wrongWithheld": 12,
+          "precision": 1,
+          "safeHit": 0.38461538461538464
+        },
+        "agreement": {
+          "n": 26,
+          "top1": 14,
+          "top3": 16,
+          "top5": 17,
+          "top10": 19,
+          "meanRank": 1581.923076923077,
+          "medianRank": 1,
+          "correctPublished": 10,
+          "wrongPublished": 0,
+          "correctWithheld": 4,
+          "wrongWithheld": 12,
+          "precision": 1,
+          "safeHit": 0.38461538461538464
+        }
+      },
+      "learnedRecognition": {
+        "cleanRaw": {
+          "n": 26,
+          "top1": 13,
+          "top3": 14,
+          "top5": 15,
+          "top10": 16,
+          "meanRank": 428.7692307692308,
+          "medianRank": 1.5,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 13,
+          "wrongWithheld": 13,
+          "precision": null,
+          "safeHit": 0
+        },
+        "prototypeRaw": {
+          "n": 26,
+          "top1": 16,
+          "top3": 18,
+          "top5": 18,
+          "top10": 21,
+          "meanRank": 391.3076923076923,
+          "medianRank": 1,
+          "correctPublished": 0,
+          "wrongPublished": 0,
+          "correctWithheld": 16,
+          "wrongWithheld": 10,
+          "precision": null,
+          "safeHit": 0
+        },
+        "cleanMargin": {
+          "n": 26,
+          "top1": 13,
+          "top3": 14,
+          "top5": 15,
+          "top10": 16,
+          "meanRank": 428.7692307692308,
+          "medianRank": 1.5,
+          "correctPublished": 10,
+          "wrongPublished": 0,
+          "correctWithheld": 3,
+          "wrongWithheld": 13,
+          "precision": 1,
+          "safeHit": 0.38461538461538464
+        },
+        "prototypeMargin": {
+          "n": 26,
+          "top1": 16,
+          "top3": 18,
+          "top5": 18,
+          "top10": 21,
+          "meanRank": 391.3076923076923,
+          "medianRank": 1,
+          "correctPublished": 10,
+          "wrongPublished": 0,
+          "correctWithheld": 6,
+          "wrongWithheld": 10,
+          "precision": 1,
+          "safeHit": 0.38461538461538464
+        },
+        "agreement": {
+          "n": 26,
+          "top1": 16,
+          "top3": 18,
+          "top5": 18,
+          "top10": 21,
+          "meanRank": 391.3076923076923,
+          "medianRank": 1,
+          "correctPublished": 10,
+          "wrongPublished": 0,
+          "correctWithheld": 6,
+          "wrongWithheld": 10,
+          "precision": 1,
+          "safeHit": 0.38461538461538464
+        }
+      }
+    }
+  },
+  "attributionCounts": {
+    "RECOGNITION_SENSITIVITY": 14,
+    "ART_CROP_DOMINANT": 1,
+    "UNCHANGED": 5,
+    "MULTIPLE": 2,
+    "OUTER_QUAD_DOMINANT": 4
+  },
+  "correlation": [
+    {
+      "id": "lt50",
+      "n": 4,
+      "top1Loss": 3,
+      "marginLoss": 4,
+      "agreementLoss": 1,
+      "safeHitLoss": 1
+    },
+    {
+      "id": "50to70",
+      "n": 1,
+      "top1Loss": 0,
+      "marginLoss": 0,
+      "agreementLoss": 0,
+      "safeHitLoss": 0
+    },
+    {
+      "id": "70to80",
+      "n": 1,
+      "top1Loss": 0,
+      "marginLoss": 0,
+      "agreementLoss": 0,
+      "safeHitLoss": 0
+    },
+    {
+      "id": "ge80",
+      "n": 20,
+      "top1Loss": 2,
+      "marginLoss": 6,
+      "agreementLoss": 1,
+      "safeHitLoss": 1
+    }
+  ],
+  "geometry": {
+    "current": {
+      "n": 26,
+      "ge80": 20,
+      "ge70": 21,
+      "lt50": 4,
+      "median": 0.926,
+      "p10": 0.429
+    },
+    "learned": {
+      "n": 26,
+      "ge80": 24,
+      "ge70": 26,
+      "lt50": 0,
+      "median": 0.945,
+      "p10": 0.867
+    }
+  },
+  "learnedVerdict": "LEARNED_GEOMETRY_NEUTRAL",
+  "learnedChanges": [
+    {
+      "frameId": "replay__negate-unsleeved-20260908T082746",
+      "label": "negate unsleeved",
+      "cardName": "Negate",
+      "current": {
+        "index": 40,
+        "iou": 0.853,
+        "utility": 0.8825,
+        "detectorScore": 0.9499,
+        "method": "edge"
+      },
+      "learned": {
+        "index": 0,
+        "iou": 0.898,
+        "utility": 0.914,
+        "detectorScore": 0.9373
+      },
+      "oracleBestIou": 0.913,
+      "humanPublish": true,
+      "detectorPublish": true,
+      "learnedPublish": true,
+      "humanProto": "Negate",
+      "detectorProto": "Negate",
+      "learnedProto": "Negate",
+      "humanClean": "Negate",
+      "detectorClean": "Negate",
+      "learnedClean": "Negate"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-001-source_geom-001-source",
+      "label": "geometry-test-20261006-150559 geom-001",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "current": {
+        "index": 24,
+        "iou": 0.491,
+        "utility": 0.7046,
+        "detectorScore": 0.906,
+        "method": "luma@28"
+      },
+      "learned": {
+        "index": 0,
+        "iou": 0.776,
+        "utility": 0.7124,
+        "detectorScore": 0.7902
+      },
+      "oracleBestIou": 0.776,
+      "humanPublish": false,
+      "detectorPublish": false,
+      "learnedPublish": false,
+      "humanProto": "Skaab Wrangler",
+      "detectorProto": "Nahiri's Binding",
+      "learnedProto": "Sangromancer",
+      "humanClean": "Famished Foragers",
+      "detectorClean": "Pest Control",
+      "learnedClean": "Skaab Wrangler"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-002-source_geom-002-source",
+      "label": "geometry-test-20261006-150559 geom-002",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "current": {
+        "index": 32,
+        "iou": 0.367,
+        "utility": 0.4473,
+        "detectorScore": 0.7803,
+        "method": "chroma@28"
+      },
+      "learned": {
+        "index": 40,
+        "iou": 0.724,
+        "utility": 0.7792,
+        "detectorScore": 0.8481
+      },
+      "oracleBestIou": 0.785,
+      "humanPublish": false,
+      "detectorPublish": false,
+      "learnedPublish": false,
+      "humanProto": "Yuriko, the Tiger's Shadow",
+      "detectorProto": "Occupation of Llanowar",
+      "learnedProto": "Xantcha, Sleeper Agent",
+      "humanClean": "Yuriko, the Tiger's Shadow",
+      "detectorClean": "Double-Faced Substitute Card",
+      "learnedClean": "Evie Frye"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-004-source_geom-004-source",
+      "label": "geometry-test-20261006-150559 geom-004",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "current": {
+        "index": 16,
+        "iou": 0.605,
+        "utility": 0.4951,
+        "detectorScore": 0.8905,
+        "method": "luma@28"
+      },
+      "learned": {
+        "index": 32,
+        "iou": 0.854,
+        "utility": 0.8709,
+        "detectorScore": 0.9129
+      },
+      "oracleBestIou": 0.854,
+      "humanPublish": false,
+      "detectorPublish": false,
+      "learnedPublish": false,
+      "humanProto": "March from the Black Gate",
+      "detectorProto": "Spiteful Banditry",
+      "learnedProto": "Rona, Sheoldred's Faithful",
+      "humanClean": "Restless Bloodseeker",
+      "detectorClean": "Ward of Bones",
+      "learnedClean": "Rona, Sheoldred's Faithful"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-009-source_geom-009-source",
+      "label": "geometry-test-20261006-150559 geom-009",
+      "cardName": "Moonsnare Specialist",
+      "current": {
+        "index": 12,
+        "iou": 0.196,
+        "utility": 0.4194,
+        "detectorScore": 0.7126,
+        "method": "luma@28"
+      },
+      "learned": {
+        "index": 28,
+        "iou": 0.934,
+        "utility": 0.8762,
+        "detectorScore": 0.8484
+      },
+      "oracleBestIou": 0.934,
+      "humanPublish": true,
+      "detectorPublish": false,
+      "learnedPublish": true,
+      "humanProto": "Moonsnare Specialist",
+      "detectorProto": "Tranquil Cove",
+      "learnedProto": "Moonsnare Specialist",
+      "humanClean": "Moonsnare Specialist",
+      "detectorClean": "Road",
+      "learnedClean": "Moonsnare Specialist"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-010-source_geom-010-source",
+      "label": "geometry-test-20261006-150559 geom-010",
+      "cardName": "Kaito, Bane of Nightmares",
+      "current": {
+        "index": 28,
+        "iou": 0.318,
+        "utility": 0.3868,
+        "detectorScore": 0.8538,
+        "method": "chroma@40"
+      },
+      "learned": {
+        "index": 17,
+        "iou": 0.958,
+        "utility": 0.8866,
+        "detectorScore": 0.835
+      },
+      "oracleBestIou": 0.958,
+      "humanPublish": false,
+      "detectorPublish": false,
+      "learnedPublish": false,
+      "humanProto": "Kaito, Bane of Nightmares",
+      "detectorProto": "Isperia, Supreme Judge",
+      "learnedProto": "Kaito, Bane of Nightmares",
+      "humanClean": "Brazen Upstart",
+      "detectorClean": "Timebender",
+      "learnedClean": "Havi, the All-Father"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-003-source_geom-003-source",
+      "label": "geometry-test-20261006-152155 geom-003",
+      "cardName": "Kaito, Bane of Nightmares",
+      "current": {
+        "index": 41,
+        "iou": 0.908,
+        "utility": 0.8957,
+        "detectorScore": 0.9682,
+        "method": "edge"
+      },
+      "learned": {
+        "index": 4,
+        "iou": 0.972,
+        "utility": 0.9124,
+        "detectorScore": 0.9592
+      },
+      "oracleBestIou": 0.972,
+      "humanPublish": false,
+      "detectorPublish": true,
+      "learnedPublish": false,
+      "humanProto": "Kaito, Bane of Nightmares",
+      "detectorProto": "Kaito, Bane of Nightmares",
+      "learnedProto": "Kaito, Bane of Nightmares",
+      "humanClean": "Myrkul's Invoker",
+      "detectorClean": "Kaito, Bane of Nightmares",
+      "learnedClean": "Havi, the All-Father"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-009-source_geom-009-source",
+      "label": "geometry-test-20261006-152155 geom-009",
+      "cardName": "Chasm Skulker",
+      "current": {
+        "index": 40,
+        "iou": 0.929,
+        "utility": 0.8825,
+        "detectorScore": 0.967,
+        "method": "edge"
+      },
+      "learned": {
+        "index": 8,
+        "iou": 0.949,
+        "utility": 0.902,
+        "detectorScore": 0.9591
+      },
+      "oracleBestIou": 0.949,
+      "humanPublish": false,
+      "detectorPublish": false,
+      "learnedPublish": false,
+      "humanProto": "Chasm Skulker",
+      "detectorProto": "Searchlight Geist",
+      "learnedProto": "Chasm Skulker",
+      "humanClean": "Nazgûl",
+      "detectorClean": "Hidetsugu Consumes All",
+      "learnedClean": "Chasm Skulker"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-015-source_geom-015-source",
+      "label": "geometry-test-20261006-152155 geom-015",
+      "cardName": "Command Tower",
+      "current": {
+        "index": 24,
+        "iou": 0.948,
+        "utility": 0.9147,
+        "detectorScore": 0.9662,
+        "method": "luma@28"
+      },
+      "learned": {
+        "index": 5,
+        "iou": 0.972,
+        "utility": 0.9182,
+        "detectorScore": 0.9642
+      },
+      "oracleBestIou": 0.972,
+      "humanPublish": true,
+      "detectorPublish": true,
+      "learnedPublish": true,
+      "humanProto": "Command Tower",
+      "detectorProto": "Command Tower",
+      "learnedProto": "Command Tower",
+      "humanClean": "Command Tower",
+      "detectorClean": "Command Tower",
+      "learnedClean": "Command Tower"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-032-source_geom-032-source",
+      "label": "geometry-test-20261006-152155 geom-032",
+      "cardName": "Ulamog's Crusher",
+      "current": {
+        "index": 0,
+        "iou": 0.989,
+        "utility": 0.8551,
+        "detectorScore": 0.929,
+        "method": "luma×2.5"
+      },
+      "learned": {
+        "index": 4,
+        "iou": 0.971,
+        "utility": 0.8879,
+        "detectorScore": 0.9181
+      },
+      "oracleBestIou": 0.989,
+      "humanPublish": true,
+      "detectorPublish": true,
+      "learnedPublish": false,
+      "humanProto": "Ulamog's Crusher",
+      "detectorProto": "Ulamog's Crusher",
+      "learnedProto": "Beast Within",
+      "humanClean": "Ulamog's Crusher",
+      "detectorClean": "Ulamog's Crusher",
+      "learnedClean": "Beast Within"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-033-source_geom-033-source",
+      "label": "geometry-test-20261006-152155 geom-033",
+      "cardName": "Whiplash Trap",
+      "current": {
+        "index": 32,
+        "iou": 0.873,
+        "utility": 0.8687,
+        "detectorScore": 0.9703,
+        "method": "edge"
+      },
+      "learned": {
+        "index": 16,
+        "iou": 0.928,
+        "utility": 0.8898,
+        "detectorScore": 0.9574
+      },
+      "oracleBestIou": 0.928,
+      "humanPublish": false,
+      "detectorPublish": false,
+      "learnedPublish": true,
+      "humanProto": "Whiplash Trap",
+      "detectorProto": "Whiplash Trap",
+      "learnedProto": "Whiplash Trap",
+      "humanClean": "Whiplash Trap",
+      "detectorClean": "Armix, Filigree Thrasher",
+      "learnedClean": "Whiplash Trap"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-041-source_geom-041-source",
+      "label": "geometry-test-20261006-152155 geom-041",
+      "cardName": "Deadly Rollick",
+      "current": {
+        "index": 4,
+        "iou": 0.745,
+        "utility": 0.7184,
+        "detectorScore": 0.8936,
+        "method": "luma×3.5"
+      },
+      "learned": {
+        "index": 41,
+        "iou": 0.917,
+        "utility": 0.8825,
+        "detectorScore": 0.9671
+      },
+      "oracleBestIou": 0.917,
+      "humanPublish": false,
+      "detectorPublish": false,
+      "learnedPublish": false,
+      "humanProto": "Crypt Lurker",
+      "detectorProto": "Consign",
+      "learnedProto": "Crypt Lurker",
+      "humanClean": "Minions",
+      "detectorClean": "Polluted Cistern",
+      "learnedClean": "Power Word Kill"
+    },
+    {
+      "frameId": "scan-inbox_sessions_normal-scan-session-20260911-111516--card-007_source-highres_source-highres",
+      "label": null,
+      "cardName": "Sprouting Goblin",
+      "current": {
+        "index": 1,
+        "iou": 0.977,
+        "utility": 0.8801,
+        "detectorScore": 0.8869,
+        "method": "luma×2.5"
+      },
+      "learned": {
+        "index": 32,
+        "iou": 0.967,
+        "utility": 0.8825,
+        "detectorScore": 0.8918
+      },
+      "oracleBestIou": 0.977,
+      "humanPublish": false,
+      "detectorPublish": false,
+      "learnedPublish": false,
+      "humanProto": "Sprouting Goblin",
+      "detectorProto": "Lure of Prey",
+      "learnedProto": "Bane of Progress",
+      "humanClean": "Sprouting Goblin",
+      "detectorClean": "Glorious End",
+      "learnedClean": "Glorious End"
+    }
+  ],
+  "failureClasses": {
+    "NOT_A_GEOMETRY_MISS": 3,
+    "BOTH_POSSIBLE": 2,
+    "SELECTION_FAILURE": 3
+  },
+  "failures": [
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source",
+      "label": null,
+      "cardName": "Sword of the Animist",
+      "class": "NOT_A_GEOMETRY_MISS",
+      "oracleBestIou": 0.951,
+      "currentIou": 0.951,
+      "learnedIou": 0.951,
+      "lostSafeHit": true,
+      "lostPrototypeTop1": false,
+      "attribution": "RECOGNITION_SENSITIVITY"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-001-source_geom-001-source",
+      "label": "geometry-test-20261006-150559 geom-001",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "class": "BOTH_POSSIBLE",
+      "oracleBestIou": 0.776,
+      "currentIou": 0.491,
+      "learnedIou": 0.776,
+      "lostSafeHit": false,
+      "lostPrototypeTop1": false,
+      "attribution": "MULTIPLE"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-002-source_geom-002-source",
+      "label": "geometry-test-20261006-150559 geom-002",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "class": "BOTH_POSSIBLE",
+      "oracleBestIou": 0.785,
+      "currentIou": 0.367,
+      "learnedIou": 0.724,
+      "lostSafeHit": false,
+      "lostPrototypeTop1": true,
+      "attribution": "OUTER_QUAD_DOMINANT"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-004-source_geom-004-source",
+      "label": "geometry-test-20261006-150559 geom-004",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "class": "SELECTION_FAILURE",
+      "oracleBestIou": 0.854,
+      "currentIou": 0.605,
+      "learnedIou": 0.854,
+      "lostSafeHit": false,
+      "lostPrototypeTop1": false,
+      "attribution": "MULTIPLE"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-009-source_geom-009-source",
+      "label": "geometry-test-20261006-150559 geom-009",
+      "cardName": "Moonsnare Specialist",
+      "class": "SELECTION_FAILURE",
+      "oracleBestIou": 0.934,
+      "currentIou": 0.196,
+      "learnedIou": 0.934,
+      "lostSafeHit": true,
+      "lostPrototypeTop1": true,
+      "attribution": "OUTER_QUAD_DOMINANT"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-010-source_geom-010-source",
+      "label": "geometry-test-20261006-150559 geom-010",
+      "cardName": "Kaito, Bane of Nightmares",
+      "class": "SELECTION_FAILURE",
+      "oracleBestIou": 0.958,
+      "currentIou": 0.318,
+      "learnedIou": 0.958,
+      "lostSafeHit": false,
+      "lostPrototypeTop1": true,
+      "attribution": "OUTER_QUAD_DOMINANT"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-009-source_geom-009-source",
+      "label": "geometry-test-20261006-152155 geom-009",
+      "cardName": "Chasm Skulker",
+      "class": "NOT_A_GEOMETRY_MISS",
+      "oracleBestIou": 0.949,
+      "currentIou": 0.929,
+      "learnedIou": 0.949,
+      "lostSafeHit": false,
+      "lostPrototypeTop1": true,
+      "attribution": "RECOGNITION_SENSITIVITY"
+    },
+    {
+      "frameId": "scan-inbox_sessions_normal-scan-session-20260911-111516--card-007_source-highres_source-highres",
+      "label": null,
+      "cardName": "Sprouting Goblin",
+      "class": "NOT_A_GEOMETRY_MISS",
+      "oracleBestIou": 0.977,
+      "currentIou": 0.977,
+      "learnedIou": 0.967,
+      "lostSafeHit": false,
+      "lostPrototypeTop1": true,
+      "attribution": "RECOGNITION_SENSITIVITY"
+    }
+  ],
+  "generationRank": [
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-002-source_geom-002-source",
+      "label": "geometry-test-20261006-150559 geom-002",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "class": "BOTH_POSSIBLE",
+      "oracleBestIou": 0.785,
+      "currentIou": 0.367,
+      "learnedIou": 0.724,
+      "lostSafeHit": false,
+      "lostPrototypeTop1": true,
+      "attribution": "OUTER_QUAD_DOMINANT"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-001-source_geom-001-source",
+      "label": "geometry-test-20261006-150559 geom-001",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "class": "BOTH_POSSIBLE",
+      "oracleBestIou": 0.776,
+      "currentIou": 0.491,
+      "learnedIou": 0.776,
+      "lostSafeHit": false,
+      "lostPrototypeTop1": false,
+      "attribution": "MULTIPLE"
+    }
+  ],
+  "keyFrames": [
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source",
+      "label": null,
+      "cardName": "Sword of the Animist",
+      "oracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+      "split": "holdout",
+      "candidateCount": 7,
+      "oracleBestIou": 0.951,
+      "hasGoodCandidate": true,
+      "hasUsableCandidate": true,
+      "current": {
+        "index": 0,
+        "method": "luma×2.5",
+        "detectorScore": 0.8994,
+        "iou": 0.951,
+        "metrics": {
+          "iou": 0.951,
+          "meanCornerPx": 17.6,
+          "maxCornerPx": 25.9,
+          "meanCornerOverDiagonal": 0.0081,
+          "areaRatio": 0.976,
+          "humanInside": 0.963,
+          "outside": 0.013
+        },
+        "art": {
+          "emitted": true,
+          "confidence": 0.723,
+          "anchor": "frame-art+3",
+          "top": 0.106,
+          "bottom": 0.568,
+          "edges": {
+            "titleArt": {
+              "detected": true,
+              "confidence": 0.952,
+              "reason": null
+            },
+            "artType": {
+              "detected": true,
+              "confidence": 0.911,
+              "reason": null
+            },
+            "typeText": {
+              "detected": true,
+              "confidence": 0.871,
+              "reason": null
+            },
+            "innerLeft": {
+              "detected": true,
+              "confidence": 0.805,
+              "reason": null
+            },
+            "innerRight": {
+              "detected": true,
+              "confidence": 0.723,
+              "reason": null
+            }
+          }
+        },
+        "utility": 0.914
+      },
+      "learned": {
+        "index": 0,
+        "utility": 0.914,
+        "secondUtility": 0.8754,
+        "secondIndex": 32,
+        "detectorScore": 0.8994,
+        "iou": 0.951,
+        "metrics": {
+          "iou": 0.951,
+          "meanCornerPx": 17.6,
+          "maxCornerPx": 25.9,
+          "meanCornerOverDiagonal": 0.0081,
+          "areaRatio": 0.976,
+          "humanInside": 0.963,
+          "outside": 0.013
+        },
+        "art": {
+          "emitted": true,
+          "confidence": 0.723,
+          "anchor": "frame-art+3",
+          "top": 0.106,
+          "bottom": 0.568
+        },
+        "sameAsCurrent": true,
+        "recognition": {
+          "clean": {
+            "top1Name": "Sword of the Animist",
+            "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+            "top1Score": 0.6444126201794059,
+            "top2Name": "Elrond, Master of Healing",
+            "top2OracleId": "28aefa3a-16d3-4207-bb8c-588b722a4041",
+            "top2Score": 0.6180097838330894,
+            "margin": 0.02640283634631657,
+            "rank": 1,
+            "top3": true,
+            "top5": true,
+            "top10": true,
+            "correct": true
+          },
+          "prototype": {
+            "top1Name": "Sword of the Animist",
+            "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+            "top1Score": 0.7107706495233418,
+            "top2Name": "Elrond, Master of Healing",
+            "top2OracleId": "28aefa3a-16d3-4207-bb8c-588b722a4041",
+            "top2Score": 0.6862782983690687,
+            "margin": 0.024492351154273062,
+            "rank": 1,
+            "top3": true,
+            "top5": true,
+            "top10": true,
+            "correct": true
+          },
+          "publish": false,
+          "cleanPublish": false,
+          "prototypePublish": false
+        }
+      },
+      "humanArt": {
+        "emitted": true,
+        "confidence": 0.932,
+        "anchor": "frame-art+3",
+        "top": 0.106,
+        "bottom": 0.559,
+        "edges": {
+          "titleArt": {
+            "detected": true,
+            "confidence": 0.956,
+            "reason": null
+          },
+          "artType": {
+            "detected": true,
+            "confidence": 0.952,
+            "reason": null
+          },
+          "typeText": {
+            "detected": true,
+            "confidence": 0.89,
+            "reason": null
+          },
+          "innerLeft": {
+            "detected": true,
+            "confidence": 0.932,
+            "reason": null
+          },
+          "innerRight": {
+            "detected": true,
+            "confidence": 0.962,
+            "reason": null
+          }
+        }
+      },
+      "artMeanCorner": 11.6,
+      "artMaxCorner": 19.5,
+      "candidates": [
+        {
+          "index": 0,
+          "method": "luma×2.5",
+          "iou": 0.951,
+          "detectorScore": 0.8994,
+          "utility": 0.914
+        },
+        {
+          "index": 32,
+          "method": "edge",
+          "iou": 0.846,
+          "detectorScore": 0.9215,
+          "utility": 0.8754
+        },
+        {
+          "index": 28,
+          "method": "chroma@40",
+          "iou": 0.45,
+          "detectorScore": 0.9109,
+          "utility": 0.6214
+        },
+        {
+          "index": 12,
+          "method": "luma@18",
+          "iou": 0.45,
+          "detectorScore": 0.9087,
+          "utility": 0.6111
+        },
+        {
+          "index": 16,
+          "method": "luma@28",
+          "iou": 0.554,
+          "detectorScore": 0.7491,
+          "utility": 0.5725
+        },
+        {
+          "index": 8,
+          "method": "luma@12",
+          "iou": 0.272,
+          "detectorScore": 0.8863,
+          "utility": 0.3502
+        },
+        {
+          "index": 24,
+          "method": "chroma@28",
+          "iou": 0.275,
+          "detectorScore": 0.8812,
+          "utility": 0.3416
+        }
+      ],
+      "human": {
+        "clean": {
+          "top1Name": "Sword of the Animist",
+          "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+          "top1Score": 0.6668837453691739,
+          "top2Name": "Snapcaster Mage",
+          "top2OracleId": "2bb2eda7-3b38-4c56-870f-c3218a1056f5",
+          "top2Score": 0.6170136928046213,
+          "margin": 0.04987005256455268,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "prototype": {
+          "top1Name": "Sword of the Animist",
+          "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+          "top1Score": 0.7447602398665776,
+          "top2Name": "Stifle",
+          "top2OracleId": "b3b00911-ece7-4484-bc36-f211ce72b6cc",
+          "top2Score": 0.6723250844813027,
+          "margin": 0.0724351553852749,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "publish": true,
+        "cleanPublish": false,
+        "prototypePublish": true
+      },
+      "detector": {
+        "clean": {
+          "top1Name": "Sword of the Animist",
+          "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+          "top1Score": 0.6444126201794059,
+          "top2Name": "Elrond, Master of Healing",
+          "top2OracleId": "28aefa3a-16d3-4207-bb8c-588b722a4041",
+          "top2Score": 0.6180097838330894,
+          "margin": 0.02640283634631657,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "prototype": {
+          "top1Name": "Sword of the Animist",
+          "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+          "top1Score": 0.7107706495233418,
+          "top2Name": "Elrond, Master of Healing",
+          "top2OracleId": "28aefa3a-16d3-4207-bb8c-588b722a4041",
+          "top2Score": 0.6862782983690687,
+          "margin": 0.024492351154273062,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "publish": false,
+        "cleanPublish": false,
+        "prototypePublish": false
+      },
+      "learnedRecognition": {
+        "clean": {
+          "top1Name": "Sword of the Animist",
+          "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+          "top1Score": 0.6444126201794059,
+          "top2Name": "Elrond, Master of Healing",
+          "top2OracleId": "28aefa3a-16d3-4207-bb8c-588b722a4041",
+          "top2Score": 0.6180097838330894,
+          "margin": 0.02640283634631657,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "prototype": {
+          "top1Name": "Sword of the Animist",
+          "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+          "top1Score": 0.7107706495233418,
+          "top2Name": "Elrond, Master of Healing",
+          "top2OracleId": "28aefa3a-16d3-4207-bb8c-588b722a4041",
+          "top2Score": 0.6862782983690687,
+          "margin": 0.024492351154273062,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "publish": false,
+        "cleanPublish": false,
+        "prototypePublish": false
+      },
+      "C": {
+        "clean": {
+          "top1Name": "Sword of the Animist",
+          "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+          "top1Score": 0.6677596295643896,
+          "top2Name": "Teyo, the Shieldmage",
+          "top2OracleId": "cda93cf5-da51-4117-b461-f4448aa2d16c",
+          "top2Score": 0.5814912326126712,
+          "margin": 0.0862683969517184,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "prototype": {
+          "top1Name": "Sword of the Animist",
+          "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+          "top1Score": 0.730792096800837,
+          "top2Name": "Battle Mastery",
+          "top2OracleId": "a06c7c1a-8534-40fb-8bb8-59f8f2530567",
+          "top2Score": 0.6397358724637079,
+          "margin": 0.09105622433712912,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "publish": true,
+        "cleanPublish": true,
+        "prototypePublish": true
+      },
+      "D": {
+        "clean": {
+          "top1Name": "Sword of the Animist",
+          "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+          "top1Score": 0.7151601475270263,
+          "top2Name": "Snapcaster Mage",
+          "top2OracleId": "2bb2eda7-3b38-4c56-870f-c3218a1056f5",
+          "top2Score": 0.6042182036896857,
+          "margin": 0.11094194383734057,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "prototype": {
+          "top1Name": "Sword of the Animist",
+          "top1OracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+          "top1Score": 0.774789107843163,
+          "top2Name": "Stifle",
+          "top2OracleId": "b3b00911-ece7-4484-bc36-f211ce72b6cc",
+          "top2Score": 0.6548247618507069,
+          "margin": 0.11996434599245609,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "publish": true,
+        "cleanPublish": true,
+        "prototypePublish": true
+      },
+      "attribution": "RECOGNITION_SENSITIVITY",
+      "task1": "RECOGNITION_SENSITIVITY"
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-009-source_geom-009-source",
+      "label": "geometry-test-20261006-150559 geom-009",
+      "cardName": "Moonsnare Specialist",
+      "oracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+      "split": "holdout",
+      "candidateCount": 3,
+      "oracleBestIou": 0.934,
+      "hasGoodCandidate": true,
+      "hasUsableCandidate": true,
+      "current": {
+        "index": 12,
+        "method": "luma@28",
+        "detectorScore": 0.7126,
+        "iou": 0.196,
+        "metrics": {
+          "iou": 0.196,
+          "meanCornerPx": 651.3,
+          "maxCornerPx": 789.4,
+          "meanCornerOverDiagonal": 0.2996,
+          "areaRatio": 4.312,
+          "humanInside": 0.872,
+          "outside": 0.798
+        },
+        "art": {
+          "emitted": false,
+          "confidence": null,
+          "anchor": "canonical-window",
+          "top": null,
+          "bottom": null,
+          "edges": {
+            "titleArt": {
+              "detected": true,
+              "confidence": 0.49,
+              "reason": null
+            },
+            "artType": {
+              "detected": true,
+              "confidence": 0.411,
+              "reason": null
+            },
+            "typeText": {
+              "detected": false,
+              "confidence": 0.331,
+              "reason": "low-continuity"
+            },
+            "innerLeft": {
+              "detected": false,
+              "confidence": 0.36,
+              "reason": "low-continuity"
+            },
+            "innerRight": {
+              "detected": false,
+              "confidence": 0.441,
+              "reason": "low-prominence"
+            }
+          }
+        },
+        "utility": 0.4194
+      },
+      "learned": {
+        "index": 28,
+        "utility": 0.8762,
+        "secondUtility": 0.4194,
+        "secondIndex": 12,
+        "detectorScore": 0.8484,
+        "iou": 0.934,
+        "metrics": {
+          "iou": 0.934,
+          "meanCornerPx": 14.8,
+          "maxCornerPx": 16.2,
+          "meanCornerOverDiagonal": 0.0068,
+          "areaRatio": 1.071,
+          "humanInside": 1,
+          "outside": 0.066
+        },
+        "art": {
+          "emitted": true,
+          "confidence": 0.897,
+          "anchor": "frame-art+3",
+          "top": 0.116,
+          "bottom": 0.565
+        },
+        "sameAsCurrent": false,
+        "recognition": {
+          "clean": {
+            "top1Name": "Moonsnare Specialist",
+            "top1OracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+            "top1Score": 0.7112056272490528,
+            "top2Name": "Coward",
+            "top2OracleId": "21591447-c045-4317-8d0e-705627aa157b",
+            "top2Score": 0.6372403105614001,
+            "margin": 0.07396531668765272,
+            "rank": 1,
+            "top3": true,
+            "top5": true,
+            "top10": true,
+            "correct": true
+          },
+          "prototype": {
+            "top1Name": "Moonsnare Specialist",
+            "top1OracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+            "top1Score": 0.80817638875318,
+            "top2Name": "Big Mother Mouser",
+            "top2OracleId": "94751968-e006-45d0-970b-0ed45d28e6cc",
+            "top2Score": 0.6947437378979653,
+            "margin": 0.1134326508552147,
+            "rank": 1,
+            "top3": true,
+            "top5": true,
+            "top10": true,
+            "correct": true
+          },
+          "publish": true,
+          "cleanPublish": true,
+          "prototypePublish": true
+        }
+      },
+      "humanArt": {
+        "emitted": true,
+        "confidence": 0.797,
+        "anchor": "frame-art+3",
+        "top": 0.106,
+        "bottom": 0.57,
+        "edges": {
+          "titleArt": {
+            "detected": true,
+            "confidence": 0.96,
+            "reason": null
+          },
+          "artType": {
+            "detected": true,
+            "confidence": 0.876,
+            "reason": null
+          },
+          "typeText": {
+            "detected": true,
+            "confidence": 0.881,
+            "reason": null
+          },
+          "innerLeft": {
+            "detected": true,
+            "confidence": 0.912,
+            "reason": null
+          },
+          "innerRight": {
+            "detected": true,
+            "confidence": 0.797,
+            "reason": null
+          }
+        }
+      },
+      "artMeanCorner": null,
+      "artMaxCorner": null,
+      "candidates": [
+        {
+          "index": 28,
+          "method": "edge",
+          "iou": 0.934,
+          "detectorScore": 0.8484,
+          "utility": 0.8762
+        },
+        {
+          "index": 12,
+          "method": "luma@28",
+          "iou": 0.196,
+          "detectorScore": 0.7126,
+          "utility": 0.4194
+        },
+        {
+          "index": 8,
+          "method": "luma@18",
+          "iou": 0.148,
+          "detectorScore": 0.8958,
+          "utility": 0.335
+        }
+      ],
+      "human": {
+        "clean": {
+          "top1Name": "Moonsnare Specialist",
+          "top1OracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+          "top1Score": 0.7501505035201713,
+          "top2Name": "Coward",
+          "top2OracleId": "21591447-c045-4317-8d0e-705627aa157b",
+          "top2Score": 0.6518656357721913,
+          "margin": 0.09828486774798006,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "prototype": {
+          "top1Name": "Moonsnare Specialist",
+          "top1OracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+          "top1Score": 0.8257261224409848,
+          "top2Name": "Eldrazi Temple",
+          "top2OracleId": "7fab8d65-af51-47d3-8f10-2676bf6e8ba3",
+          "top2Score": 0.741878836830373,
+          "margin": 0.08384728561061172,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "publish": true,
+        "cleanPublish": true,
+        "prototypePublish": true
+      },
+      "detector": {
+        "clean": {
+          "top1Name": "Road",
+          "top1OracleId": "f18d8939-7ee8-4a44-a1c8-6ae3a08f52fd",
+          "top1Score": 0.642909298318783,
+          "top2Name": "Double-Faced Substitute Card",
+          "top2OracleId": "cb5ca670-a50e-4c73-879a-8dc0aa2cbd9f",
+          "top2Score": 0.6291897374239052,
+          "margin": 0.013719560894877803,
+          "rank": 2120,
+          "top3": false,
+          "top5": false,
+          "top10": false,
+          "correct": false
+        },
+        "prototype": {
+          "top1Name": "Tranquil Cove",
+          "top1OracleId": "5d641bf6-0f93-4189-8dc1-ec7ea446dade",
+          "top1Score": 0.682311329380291,
+          "top2Name": "Maze of Ith",
+          "top2OracleId": "38a12bd7-4394-44a8-91a0-6a4ff7fa4f71",
+          "top2Score": 0.6563793694184978,
+          "margin": 0.025931959961793205,
+          "rank": 2300,
+          "top3": false,
+          "top5": false,
+          "top10": false,
+          "correct": false
+        },
+        "publish": false,
+        "cleanPublish": false,
+        "prototypePublish": false
+      },
+      "learnedRecognition": {
+        "clean": {
+          "top1Name": "Moonsnare Specialist",
+          "top1OracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+          "top1Score": 0.7112056272490528,
+          "top2Name": "Coward",
+          "top2OracleId": "21591447-c045-4317-8d0e-705627aa157b",
+          "top2Score": 0.6372403105614001,
+          "margin": 0.07396531668765272,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "prototype": {
+          "top1Name": "Moonsnare Specialist",
+          "top1OracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+          "top1Score": 0.80817638875318,
+          "top2Name": "Big Mother Mouser",
+          "top2OracleId": "94751968-e006-45d0-970b-0ed45d28e6cc",
+          "top2Score": 0.6947437378979653,
+          "margin": 0.1134326508552147,
+          "rank": 1,
+          "top3": true,
+          "top5": true,
+          "top10": true,
+          "correct": true
+        },
+        "publish": true,
+        "cleanPublish": true,
+        "prototypePublish": true
+      },
+      "C": null,
+      "D": {
+        "clean": {
+          "top1Name": "Double-Faced Substitute Card",
+          "top1OracleId": "cb5ca670-a50e-4c73-879a-8dc0aa2cbd9f",
+          "top1Score": 0.6438150997808831,
+          "top2Name": "Blade of Selves",
+          "top2OracleId": "9c329f3d-4d0a-4012-8aa6-92afdd120a52",
+          "top2Score": 0.6352630590282937,
+          "margin": 0.008552040752589418,
+          "rank": 2247,
+          "top3": false,
+          "top5": false,
+          "top10": false,
+          "correct": false
+        },
+        "prototype": {
+          "top1Name": "Tranquil Cove",
+          "top1OracleId": "5d641bf6-0f93-4189-8dc1-ec7ea446dade",
+          "top1Score": 0.6948903841153615,
+          "top2Name": "Maze of Ith",
+          "top2OracleId": "38a12bd7-4394-44a8-91a0-6a4ff7fa4f71",
+          "top2Score": 0.6614437435924193,
+          "margin": 0.03344664052294222,
+          "rank": 2523,
+          "top3": false,
+          "top5": false,
+          "top10": false,
+          "correct": false
+        },
+        "publish": false,
+        "cleanPublish": false,
+        "prototypePublish": false
+      },
+      "attribution": "OUTER_QUAD_DOMINANT",
+      "task1": "CARD_QUAD_FAILURE"
+    }
+  ]
+}

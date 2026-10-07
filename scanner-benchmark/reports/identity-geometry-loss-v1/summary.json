@@ -1,0 +1,328 @@
+{
+  "verdict": "OUTER_GEOMETRY_NEXT",
+  "rows": [
+    {
+      "id": "moonsnare-geom-009",
+      "cardName": "Moonsnare Specialist",
+      "label": "geometry-test-20261006-150559 geom-009",
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-009-source_geom-009-source",
+      "cardIou": 0.196,
+      "meanCornerPx": 651.3,
+      "meanCornerOverDiagonal": 0.2996,
+      "cornersClose": false,
+      "humanInsideDetector": 0.872,
+      "areaRatio": 4.312,
+      "detectorOutside": 0.798,
+      "detectorArtEmitted": false,
+      "detectorArtConfidence": null,
+      "humanArtEmitted": true,
+      "humanArtConfidence": 0.797,
+      "detectorEdges": {
+        "titleTop": {
+          "detected": true,
+          "confidence": 0.668,
+          "reason": null
+        },
+        "titleArt": {
+          "detected": true,
+          "confidence": 0.49,
+          "reason": null
+        },
+        "artType": {
+          "detected": true,
+          "confidence": 0.411,
+          "reason": null
+        },
+        "typeText": {
+          "detected": false,
+          "confidence": 0.331,
+          "reason": "low-continuity"
+        },
+        "textFooter": {
+          "detected": false,
+          "confidence": 0,
+          "reason": "no-energy"
+        },
+        "footerBottom": {
+          "detected": false,
+          "confidence": 0,
+          "reason": "no-energy"
+        },
+        "innerLeft": {
+          "detected": false,
+          "confidence": 0.36,
+          "reason": "low-continuity"
+        },
+        "innerRight": {
+          "detected": false,
+          "confidence": 0.441,
+          "reason": "low-prominence"
+        }
+      },
+      "humanEdges": {
+        "titleTop": {
+          "detected": true,
+          "confidence": 0.773,
+          "reason": null
+        },
+        "titleArt": {
+          "detected": true,
+          "confidence": 0.96,
+          "reason": null
+        },
+        "artType": {
+          "detected": true,
+          "confidence": 0.876,
+          "reason": null
+        },
+        "typeText": {
+          "detected": true,
+          "confidence": 0.881,
+          "reason": null
+        },
+        "textFooter": {
+          "detected": true,
+          "confidence": 0.82,
+          "reason": null
+        },
+        "footerBottom": {
+          "detected": true,
+          "confidence": 0.729,
+          "reason": null
+        },
+        "innerLeft": {
+          "detected": true,
+          "confidence": 0.912,
+          "reason": null
+        },
+        "innerRight": {
+          "detected": true,
+          "confidence": 0.797,
+          "reason": null
+        }
+      },
+      "artMeanCorner": null,
+      "humanArtBounds": {
+        "top": 0.106,
+        "bottom": 0.57,
+        "left": 0.032,
+        "right": 0.991,
+        "reachesTypeLine": false,
+        "reachesRulesText": false,
+        "reachesOuterBorder": true
+      },
+      "detectorArtBounds": {
+        "top": 0,
+        "bottom": 1,
+        "left": 0,
+        "right": 1,
+        "reachesTypeLine": true,
+        "reachesRulesText": true,
+        "reachesOuterBorder": true
+      },
+      "detectorAnchor": "canonical-window",
+      "humanAnchor": "frame-art+3",
+      "recognition": {
+        "A": {
+          "anchor": "frame-art+3",
+          "valid": true,
+          "top1Name": "Moonsnare Specialist",
+          "top2Name": "Eldrazi Temple",
+          "margin": 0.0838,
+          "prototypeCorrect": true,
+          "rank": 1,
+          "cleanTop1": "Moonsnare Specialist"
+        },
+        "B": {
+          "anchor": "canonical-window",
+          "valid": false,
+          "top1Name": "Tranquil Cove",
+          "top2Name": "Maze of Ith",
+          "margin": 0.0259,
+          "prototypeCorrect": false,
+          "rank": 2300,
+          "cleanTop1": "Road"
+        },
+        "C": null,
+        "D": {
+          "anchor": "human-art-on-detector-warp",
+          "valid": true,
+          "top1Name": "Tranquil Cove",
+          "top2Name": "Maze of Ith",
+          "margin": 0.0334,
+          "prototypeCorrect": false,
+          "rank": 2523,
+          "cleanTop1": "Double-Faced Substitute Card"
+        }
+      },
+      "class": "CARD_QUAD_FAILURE",
+      "strip": "identity-geometry-loss-v1/moonsnare-geom-009.png"
+    },
+    {
+      "id": "sword-of-the-animist",
+      "cardName": "Sword of the Animist",
+      "label": null,
+      "frameId": "scan-inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source",
+      "cardIou": 0.951,
+      "meanCornerPx": 17.6,
+      "meanCornerOverDiagonal": 0.0081,
+      "cornersClose": true,
+      "humanInsideDetector": 0.963,
+      "areaRatio": 0.976,
+      "detectorOutside": 0.013,
+      "detectorArtEmitted": true,
+      "detectorArtConfidence": 0.723,
+      "humanArtEmitted": true,
+      "humanArtConfidence": 0.932,
+      "detectorEdges": {
+        "titleTop": {
+          "detected": true,
+          "confidence": 0.852,
+          "reason": null
+        },
+        "titleArt": {
+          "detected": true,
+          "confidence": 0.952,
+          "reason": null
+        },
+        "artType": {
+          "detected": true,
+          "confidence": 0.911,
+          "reason": null
+        },
+        "typeText": {
+          "detected": true,
+          "confidence": 0.871,
+          "reason": null
+        },
+        "textFooter": {
+          "detected": true,
+          "confidence": 0.795,
+          "reason": null
+        },
+        "footerBottom": {
+          "detected": true,
+          "confidence": 0.492,
+          "reason": null
+        },
+        "innerLeft": {
+          "detected": true,
+          "confidence": 0.805,
+          "reason": null
+        },
+        "innerRight": {
+          "detected": true,
+          "confidence": 0.723,
+          "reason": null
+        }
+      },
+      "humanEdges": {
+        "titleTop": {
+          "detected": true,
+          "confidence": 0.794,
+          "reason": null
+        },
+        "titleArt": {
+          "detected": true,
+          "confidence": 0.956,
+          "reason": null
+        },
+        "artType": {
+          "detected": true,
+          "confidence": 0.952,
+          "reason": null
+        },
+        "typeText": {
+          "detected": true,
+          "confidence": 0.89,
+          "reason": null
+        },
+        "textFooter": {
+          "detected": true,
+          "confidence": 0.797,
+          "reason": null
+        },
+        "footerBottom": {
+          "detected": true,
+          "confidence": 0.48,
+          "reason": null
+        },
+        "innerLeft": {
+          "detected": true,
+          "confidence": 0.932,
+          "reason": null
+        },
+        "innerRight": {
+          "detected": true,
+          "confidence": 0.962,
+          "reason": null
+        }
+      },
+      "artMeanCorner": 11.6,
+      "humanArtBounds": {
+        "top": 0.106,
+        "bottom": 0.559,
+        "left": 0.075,
+        "right": 0.937,
+        "reachesTypeLine": false,
+        "reachesRulesText": false,
+        "reachesOuterBorder": false
+      },
+      "detectorArtBounds": {
+        "top": 0.106,
+        "bottom": 0.568,
+        "left": 0.074,
+        "right": 0.96,
+        "reachesTypeLine": false,
+        "reachesRulesText": false,
+        "reachesOuterBorder": false
+      },
+      "detectorAnchor": "frame-art+3",
+      "humanAnchor": "frame-art+3",
+      "recognition": {
+        "A": {
+          "anchor": "frame-art+3",
+          "valid": true,
+          "top1Name": "Sword of the Animist",
+          "top2Name": "Stifle",
+          "margin": 0.0724,
+          "prototypeCorrect": true,
+          "rank": 1,
+          "cleanTop1": "Sword of the Animist"
+        },
+        "B": {
+          "anchor": "frame-art+3",
+          "valid": true,
+          "top1Name": "Sword of the Animist",
+          "top2Name": "Elrond, Master of Healing",
+          "margin": 0.0245,
+          "prototypeCorrect": true,
+          "rank": 1,
+          "cleanTop1": "Sword of the Animist"
+        },
+        "C": {
+          "anchor": "detector-art-on-human-warp",
+          "valid": true,
+          "top1Name": "Sword of the Animist",
+          "top2Name": "Battle Mastery",
+          "margin": 0.0911,
+          "prototypeCorrect": true,
+          "rank": 1,
+          "cleanTop1": "Sword of the Animist"
+        },
+        "D": {
+          "anchor": "human-art-on-detector-warp",
+          "valid": true,
+          "top1Name": "Sword of the Animist",
+          "top2Name": "Stifle",
+          "margin": 0.12,
+          "prototypeCorrect": true,
+          "rank": 1,
+          "cleanTop1": "Sword of the Animist"
+        }
+      },
+      "class": "RECOGNITION_SENSITIVITY",
+      "strip": "identity-geometry-loss-v1/sword-of-the-animist.png"
+    }
+  ]
+}

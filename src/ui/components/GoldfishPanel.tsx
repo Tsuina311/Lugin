@@ -9,6 +9,9 @@ import {
   GoldfishNotFound,
   fetchGoldfishArchetype,
   fetchGoldfishDecks,
+  goldfishDeckCount,
+  goldfishSampleSize,
+  goldfishZoomUrl,
   type GoldfishArchetype,
   type GoldfishCard,
   type GoldfishDecks,
@@ -21,6 +24,20 @@ const PAGE_SIZE = 15;
 const DEFAULT_OPEN = new Set(['Creatures']);
 
 const pct = (n?: number): string => (n == null ? '—' : `${Math.round(n * 100)}%`);
+
+/**
+ * A 4-deck sample only prints 25% steps, which reads as a broken round. Say
+ * "1 of 4 decks" until the sample is large enough for a percent to mean something.
+ */
+const COARSE_SAMPLE = 12;
+
+const shareLabel = (card: GoldfishCard, sample?: number): string => {
+  if (sample != null && sample <= COARSE_SAMPLE && card.inclusion != null) {
+    const count = goldfishDeckCount(Math.round(card.inclusion * 100), sample);
+    if (count != null) return `${count} of ${sample} deck${sample === 1 ? '' : 's'}`;
+  }
+  return `${pct(card.inclusion)} of decks`;
+};
 
 const errText = (e: unknown): string =>
   e instanceof GoldfishNotFound || e instanceof Error ? e.message : 'Failed to load MTGGoldfish';
@@ -105,6 +122,16 @@ export const GoldfishPanel = ({
 
   const ownedOf = (name: string): number => collectionByKey[cardKey(name)]?.total ?? 0;
   const deckQtyOf = (name: string): number => inDeck[cardKey(name)] ?? 0;
+
+  const sampleSize = useMemo(() => {
+    if (!arch) return undefined;
+    const percents = arch.categories.flatMap(category =>
+      category.cards.flatMap(card =>
+        card.inclusion == null ? [] : [Math.round(card.inclusion * 100)],
+      ),
+    );
+    return goldfishSampleSize(percents);
+  }, [arch]);
 
   const visibleCategories = useMemo(() => {
     if (!arch) return [];
@@ -300,6 +327,7 @@ export const GoldfishPanel = ({
                         onAdd={() => onAdd([c.name])}
                         owned={ownedOf(c.name)}
                         rowId={`${cat.header}|${cardKey(c.name)}`}
+                        sampleSize={sampleSize}
                         selection={selection}
                       />
                     ))}
@@ -377,6 +405,7 @@ const GoldfishRow = ({
   onAdd,
   owned,
   rowId,
+  sampleSize,
   selection,
 }: {
   card: GoldfishCard;
@@ -384,13 +413,15 @@ const GoldfishRow = ({
   onAdd: () => void;
   owned: number;
   rowId: string;
+  sampleSize?: number;
   selection: RowSelection;
 }) => {
   const preview = useCardPreview();
+  const zoomUrl = card.imageUrl ? goldfishZoomUrl(card.imageUrl) : undefined;
   const { handlers } = preview(
     `goldfish|${cardKey(card.name)}`,
     card.name,
-    card.imageUrl ? [card.imageUrl] : [],
+    zoomUrl ? [zoomUrl] : [],
   );
   return (
     <li
@@ -430,8 +461,14 @@ const GoldfishRow = ({
           {card.name}
         </div>
         <div className="flex items-center gap-1.5 text-[9px] text-slate-500">
-          <span title="Share of this archetype's decks that play it">
-            {pct(card.inclusion)} of decks
+          <span
+            title={
+              sampleSize != null && sampleSize <= COARSE_SAMPLE
+                ? `Goldfish counted ${sampleSize} decks for this commander.`
+                : 'Share of decks in this archetype that play it'
+            }
+          >
+            {shareLabel(card, sampleSize)}
           </span>
           {card.avgCopies != null && card.avgCopies !== 1 && (
             <span className="text-sky-400/80" title="Average copies played">

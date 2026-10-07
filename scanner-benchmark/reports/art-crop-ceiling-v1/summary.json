@@ -1,0 +1,3813 @@
+{
+  "date": "2026-10-05T18:21:44.503Z",
+  "git": "9c89f6f",
+  "evalHash": "c9470c26eebd80e257f577fa09aae7a5c82cf3dc9fdd8b047922bcf40c182d27",
+  "n": 46,
+  "manualAnnotated": 46,
+  "autoFailures": 6,
+  "clip": "Xenova/clip-vit-base-patch32@q1",
+  "adapter": {
+    "path": "/Library/Projects/Lugin/.scan-fixtures/embedding-bakeoff/models/b1.json",
+    "sha256": "b0e10ffe2c9c5e387049a407d7ef4a389541422e4efc1f6097543bb057f2971c",
+    "params": 262656
+  },
+  "gallery": {
+    "id": "CLIP_VIT_B32_B1_ART",
+    "sha256": "be0a66141de71f38fb60bae715fa0b40c70d2bc04ca200ddcffbfcd802980f8b",
+    "count": 49968
+  },
+  "table": [
+    {
+      "id": "current",
+      "top1": "32/46",
+      "top3": "35/46",
+      "top5": "36/46",
+      "top10": "37/46",
+      "wrongConfident": "2/46"
+    },
+    {
+      "id": "auto_anchor",
+      "top1": "35/46",
+      "top3": "35/46",
+      "top5": "35/46",
+      "top10": "35/46",
+      "wrongConfident": "2/46"
+    },
+    {
+      "id": "manual_gt",
+      "top1": "33/46",
+      "top3": "37/46",
+      "top5": "38/46",
+      "top10": "39/46",
+      "wrongConfident": "0/46"
+    }
+  ],
+  "summaries": {
+    "current": {
+      "n": 46,
+      "top1": 32,
+      "top3": 35,
+      "top5": 36,
+      "top10": 37,
+      "wrongConfident": 2
+    },
+    "auto_anchor": {
+      "n": 46,
+      "top1": 35,
+      "top3": 35,
+      "top5": 35,
+      "top10": 35,
+      "wrongConfident": 2
+    },
+    "manual_gt": {
+      "n": 46,
+      "top1": 33,
+      "top3": 37,
+      "top5": 38,
+      "top10": 39,
+      "wrongConfident": 0
+    }
+  },
+  "transitions": {
+    "currentToAuto": {
+      "n": 46,
+      "wrongToCorrect": 4,
+      "correctToWrong": 1,
+      "unchangedCorrect": 31,
+      "unchangedWrong": 10
+    },
+    "currentToManual": {
+      "n": 46,
+      "wrongToCorrect": 6,
+      "correctToWrong": 5,
+      "unchangedCorrect": 27,
+      "unchangedWrong": 8
+    },
+    "autoToManual": {
+      "n": 46,
+      "wrongToCorrect": 5,
+      "correctToWrong": 7,
+      "unchangedCorrect": 28,
+      "unchangedWrong": 6
+    }
+  },
+  "transitionNames": {
+    "currentToManual": {
+      "wrongToCorrect": [
+        "Wand of Wonder",
+        "Livaan, Cultist of Tiamat",
+        "Bulk Up",
+        "Havi, the All-Father",
+        "Mudbutton Torchrunner",
+        "Octopus Form"
+      ],
+      "correctToWrong": [
+        "Livaan, Cultist of Tiamat",
+        "Maddening Hex",
+        "Sword of Hearth and Home",
+        "Maddening Hex",
+        "Goblin Lookout"
+      ],
+      "unchangedCorrect": [
+        "Basilisk Collar",
+        "Lizard Blades",
+        "Negate",
+        "Negate",
+        "Slip Out the Back",
+        "Teferi's Veil",
+        "Wand of Wonder",
+        "Lizard Blades",
+        "Teferi's Veil",
+        "Feywild Trickster",
+        "Sword of Feast and Famine",
+        "Teferi's Veil",
+        "Wand of Wonder",
+        "Wand of Wonder",
+        "Livaan, Cultist of Tiamat",
+        "Island",
+        "Mask of Memory",
+        "The Ozolith",
+        "Sword of the Animist",
+        "Netherese Puzzle-Ward",
+        "Critical Hit",
+        "Sword of the Animist",
+        "Swiftfoot Boots",
+        "Livaan, Cultist of Tiamat",
+        "Sprouting Goblin",
+        "Goblin Blastronauts",
+        "Elder Auntie"
+      ],
+      "unchangedWrong": [
+        "Island",
+        "Livaan, Cultist of Tiamat",
+        "Excalibur, Sword of Eden",
+        "The Spear of Leonidas",
+        "Island",
+        "Blacksmith's Talent",
+        "Island",
+        "Island"
+      ]
+    },
+    "autoToManual": {
+      "wrongToCorrect": [
+        "Negate",
+        "Wand of Wonder",
+        "Livaan, Cultist of Tiamat",
+        "Bulk Up",
+        "Mudbutton Torchrunner"
+      ],
+      "correctToWrong": [
+        "Livaan, Cultist of Tiamat",
+        "Maddening Hex",
+        "Sword of Hearth and Home",
+        "Maddening Hex",
+        "The Spear of Leonidas",
+        "Goblin Lookout",
+        "Island"
+      ],
+      "unchangedCorrect": [
+        "Basilisk Collar",
+        "Lizard Blades",
+        "Negate",
+        "Slip Out the Back",
+        "Teferi's Veil",
+        "Wand of Wonder",
+        "Lizard Blades",
+        "Teferi's Veil",
+        "Feywild Trickster",
+        "Sword of Feast and Famine",
+        "Teferi's Veil",
+        "Wand of Wonder",
+        "Wand of Wonder",
+        "Livaan, Cultist of Tiamat",
+        "Island",
+        "Mask of Memory",
+        "The Ozolith",
+        "Sword of the Animist",
+        "Netherese Puzzle-Ward",
+        "Critical Hit",
+        "Sword of the Animist",
+        "Swiftfoot Boots",
+        "Havi, the All-Father",
+        "Livaan, Cultist of Tiamat",
+        "Sprouting Goblin",
+        "Goblin Blastronauts",
+        "Elder Auntie",
+        "Octopus Form"
+      ],
+      "unchangedWrong": [
+        "Island",
+        "Livaan, Cultist of Tiamat",
+        "Excalibur, Sword of Eden",
+        "Island",
+        "Blacksmith's Talent",
+        "Island"
+      ]
+    }
+  },
+  "geometry": {
+    "n": 46,
+    "reviewed": 46,
+    "autoDetected": 40,
+    "autoMisses": [
+      {
+        "imageId": ".scan-fixtures/replay/negate-20260908T082630/source-highres.png",
+        "cardName": "Negate"
+      },
+      {
+        "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+        "cardName": "Island"
+      },
+      {
+        "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+        "cardName": "Wand of Wonder"
+      },
+      {
+        "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+        "cardName": "Livaan, Cultist of Tiamat"
+      },
+      {
+        "imageId": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+        "cardName": "Bulk Up"
+      },
+      {
+        "imageId": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+        "cardName": "Mudbutton Torchrunner"
+      }
+    ],
+    "medianIou": 0.918963100690711,
+    "p10Iou": 0.5363437735268543,
+    "p25Iou": 0.7781275709422167,
+    "medianCornerError": 21.549424243016603,
+    "p90CornerError": 466.01527215177924,
+    "unchangedByIou": 26,
+    "materialDiff": 15,
+    "accepted": 0,
+    "edited": 0,
+    "manual": 46
+  },
+  "anchorVerdict": "AUTO_ANCHOR_PROMISING",
+  "anchorWhy": "Coverage 40/46, median IoU 0.919, IoU≥0.9 26, IoU<0.75 or missed 15.",
+  "failures": [
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+      "expected": "Island",
+      "top1Prediction": "Double-Faced Substitute Card",
+      "expectedRank": 36,
+      "autoRank": null,
+      "manualRank": 2,
+      "manualTop1": "Plains",
+      "fixed": false,
+      "top1Score": 0.8086339036242748,
+      "expectedScore": 0.6349948079147432,
+      "margin": 0.09359252669083118,
+      "cropSource": "current",
+      "failureClass": "UNKNOWN",
+      "notes": "auto art box not detected"
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+      "expected": "Wand of Wonder",
+      "top1Prediction": "Who",
+      "expectedRank": 3679,
+      "autoRank": null,
+      "manualRank": 1,
+      "manualTop1": "Wand of Wonder",
+      "fixed": true,
+      "top1Score": 0.5453619826537168,
+      "expectedScore": 0.2836730797026401,
+      "margin": 0.03312514377315212,
+      "cropSource": "current",
+      "failureClass": "BAD_ART_CROP",
+      "notes": "auto art box not detected"
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+      "expected": "Livaan, Cultist of Tiamat",
+      "top1Prediction": "Temple Garden",
+      "expectedRank": 138,
+      "autoRank": null,
+      "manualRank": 1,
+      "manualTop1": "Livaan, Cultist of Tiamat",
+      "fixed": true,
+      "top1Score": 0.43854635172340095,
+      "expectedScore": 0.31726416581899597,
+      "margin": 0.003334772105580086,
+      "cropSource": "current",
+      "failureClass": "BAD_ART_CROP",
+      "notes": "auto art box not detected"
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t500-source.png",
+      "expected": "Livaan, Cultist of Tiamat",
+      "top1Prediction": "Nevermind",
+      "expectedRank": 48,
+      "autoRank": 44,
+      "manualRank": 50,
+      "manualTop1": "Dark Ritual",
+      "fixed": false,
+      "top1Score": 0.46042313043492933,
+      "expectedScore": 0.40164243002276684,
+      "margin": 0.011023660180835337,
+      "cropSource": "current",
+      "failureClass": "GLARE_OR_FOIL",
+      "notes": ""
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132801/t500-source.png",
+      "expected": "Excalibur, Sword of Eden",
+      "top1Prediction": "Return to Nature",
+      "expectedRank": 403,
+      "autoRank": 156,
+      "manualRank": 65,
+      "manualTop1": "Sanctify",
+      "fixed": false,
+      "top1Score": 0.7409271041872257,
+      "expectedScore": 0.5736219612983848,
+      "margin": 0.018192664582358575,
+      "cropSource": "current",
+      "failureClass": "GLARE_OR_FOIL",
+      "notes": ""
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-007-source/geom-007-source.png",
+      "expected": "The Spear of Leonidas",
+      "top1Prediction": "Engulfing Eruption",
+      "expectedRank": 2,
+      "autoRank": 1,
+      "manualRank": 2,
+      "manualTop1": "The Black Arrow",
+      "fixed": false,
+      "top1Score": 0.7204762455643664,
+      "expectedScore": 0.71874225004443,
+      "margin": 0.00173399551993636,
+      "cropSource": "current",
+      "failureClass": "UNKNOWN",
+      "notes": ""
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-007-source/geom-007-source.png",
+      "expected": "Island",
+      "top1Prediction": "Double-Faced Substitute Card",
+      "expectedRank": 510,
+      "autoRank": 52,
+      "manualRank": 5,
+      "manualTop1": "Dreadship Reef",
+      "fixed": false,
+      "top1Score": 0.6733765041938493,
+      "expectedScore": 0.49844122714854755,
+      "margin": 0.037096650420878396,
+      "cropSource": "current",
+      "failureClass": "UNKNOWN",
+      "notes": ""
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-155241/geom-006-source/geom-006-source.png",
+      "expected": "Blacksmith's Talent",
+      "top1Prediction": "Royal",
+      "expectedRank": 3867,
+      "autoRank": 1731,
+      "manualRank": 1443,
+      "manualTop1": "Road",
+      "fixed": false,
+      "top1Score": 0.5038476746251276,
+      "expectedScore": 0.24022432035199381,
+      "margin": 0.05327494805055788,
+      "cropSource": "current",
+      "failureClass": "UNKNOWN",
+      "notes": ""
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+      "expected": "Bulk Up",
+      "top1Prediction": "Cauldron Familiar",
+      "expectedRank": 662,
+      "autoRank": null,
+      "manualRank": 1,
+      "manualTop1": "Bulk Up",
+      "fixed": true,
+      "top1Score": 0.513020763212715,
+      "expectedScore": 0.3974890450757739,
+      "margin": 0.0051551807232503855,
+      "cropSource": "current",
+      "failureClass": "BAD_ART_CROP",
+      "notes": "auto art box not detected"
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-001-source/geom-001-source.png",
+      "expected": "Island",
+      "top1Prediction": "Riverglide Pathway",
+      "expectedRank": 8,
+      "autoRank": 42,
+      "manualRank": 12,
+      "manualTop1": "Sunset Revelry",
+      "fixed": false,
+      "top1Score": 0.7418701274919115,
+      "expectedScore": 0.6812009536499251,
+      "margin": 0.03246559171463892,
+      "cropSource": "current",
+      "failureClass": "UNKNOWN",
+      "notes": ""
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-085827/geom-001-source/geom-001-source.png",
+      "expected": "Havi, the All-Father",
+      "top1Prediction": "Minions",
+      "expectedRank": 3,
+      "autoRank": 1,
+      "manualRank": 1,
+      "manualTop1": "Havi, the All-Father",
+      "fixed": true,
+      "top1Score": 0.7175765353248584,
+      "expectedScore": 0.6666549080878433,
+      "margin": 0.028268840166059905,
+      "cropSource": "current",
+      "failureClass": "BAD_ART_CROP",
+      "notes": ""
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+      "expected": "Mudbutton Torchrunner",
+      "top1Prediction": "That's No Moonmist",
+      "expectedRank": 1698,
+      "autoRank": null,
+      "manualRank": 1,
+      "manualTop1": "Mudbutton Torchrunner",
+      "fixed": true,
+      "top1Score": 0.5340348933628838,
+      "expectedScore": 0.3425840322649045,
+      "margin": 0.007250337275225616,
+      "cropSource": "current",
+      "failureClass": "BAD_ART_CROP",
+      "notes": "auto art box not detected"
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-03-source.png",
+      "expected": "Octopus Form",
+      "top1Prediction": "Specimen Freighter",
+      "expectedRank": 2,
+      "autoRank": 1,
+      "manualRank": 1,
+      "manualTop1": "Octopus Form",
+      "fixed": true,
+      "top1Score": 0.6905114715797959,
+      "expectedScore": 0.673650965571273,
+      "margin": 0.016860506008522846,
+      "cropSource": "current",
+      "failureClass": "BAD_ART_CROP",
+      "notes": ""
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-03-source.png",
+      "expected": "Island",
+      "top1Prediction": "Mountain",
+      "expectedRank": 4,
+      "autoRank": 1,
+      "manualRank": 2,
+      "manualTop1": "Plains",
+      "fixed": false,
+      "top1Score": 0.7653887456677141,
+      "expectedScore": 0.686367839691147,
+      "margin": 0.0336888688152176,
+      "cropSource": "current",
+      "failureClass": "UNKNOWN",
+      "notes": ""
+    }
+  ],
+  "answers": [
+    "Manual GT changes Top1 from 32/46 to 33/46 (+1).",
+    "Top3 moves from 35/46 to 37/46. Top5 moves from 36/46 to 38/46.",
+    "Of 14 current misses, 6 become correct under the human art box and are classed BAD_ART_CROP.",
+    "13 frames stay wrong with the human art box.",
+    "Current-correct → manual-wrong: 5.",
+    "Auto-anchor Top1 is 35/46 and manual GT Top1 is 33/46. Auto → manual wrong→correct 5, correct→wrong 7.",
+    "Auto-anchor’s main weakness is coverage: missed art boxes, more than the boxes it does place.",
+    "Where auto and manual name the same top1, median IoU is 0.921. Where they disagree, median IoU is 0.631. Agreement is 25/30 at IoU≥0.85 and 4/10 below that.",
+    "Remaining current misses that the human box does not fix stay UNKNOWN unless the frame is tagged glare, foil, or a bad capture. That is not evidence for a CLIP fine-tune. UNKNOWN count: 6."
+  ],
+  "frames": [
+    {
+      "imageId": ".scan-fixtures/replay/basilisk-collar-20260908T111744/source-highres.png",
+      "cardName": "Basilisk Collar",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Basilisk Collar",
+        "top1Score": 0.6791719133706255,
+        "top2Score": 0.6611031085681013,
+        "expectedScore": 0.6791719133706255,
+        "margin": 0.018068804802524263,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Basilisk Collar",
+        "top1Score": 0.7011360639770446,
+        "top2Score": 0.6244701976764085,
+        "expectedScore": 0.7011360639770446,
+        "margin": 0.0766658663006361,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Basilisk Collar",
+        "top1Score": 0.7112841065082957,
+        "top2Score": 0.6127970391915118,
+        "expectedScore": 0.7112841065082957,
+        "margin": 0.0984870673167838,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 11.475257468943912,
+        "corners": [
+          8.537979191437111,
+          7.74305790710699,
+          16.85707804286614,
+          12.762914734365413
+        ],
+        "iou": 0.9530356981521038
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-fixtures/replay/basilisk-collar-20260908T111744/source-highres.png",
+        "current": "artifacts/.scan-fixtures_replay_basilisk-collar-20260908T111744_source-highres.png/current.png",
+        "auto_anchor": "artifacts/.scan-fixtures_replay_basilisk-collar-20260908T111744_source-highres.png/auto.png",
+        "manual_gt": "artifacts/.scan-fixtures_replay_basilisk-collar-20260908T111744_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/0225d038-bba4-4965-8f90-5d9d2e6dcf70.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "top1Score": 0.695407587875992,
+        "top2Score": 0.5917742710857101,
+        "expectedScore": 0.695407587875992,
+        "margin": 0.10363331679028187,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "top1Score": 0.6652697121425554,
+        "top2Score": 0.5831254451328556,
+        "expectedScore": 0.6652697121425554,
+        "margin": 0.08214426700969979,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 508,
+        "top1Name": "Nahiri's Resolve",
+        "top1Score": 0.6934226874127085,
+        "top2Score": 0.6712893854814517,
+        "expectedScore": 0.5600783661629188,
+        "margin": 0.022133301931256844,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 570.3086847891922,
+        "corners": [
+          759.525723617047,
+          515.9231827577618,
+          626.6053739402462,
+          379.1804588417137
+        ],
+        "iou": 0.6214730502968631
+      },
+      "tags": [
+        "FOIL",
+        "foil"
+      ],
+      "images": {
+        "source": "../../../.scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png",
+        "current": "artifacts/fixtures_replay_livaan-cultist-of-tiamat-foil-20260908T111916_source-highres.png/current.png",
+        "auto_anchor": "artifacts/fixtures_replay_livaan-cultist-of-tiamat-foil-20260908T111916_source-highres.png/auto.png",
+        "manual_gt": "artifacts/fixtures_replay_livaan-cultist-of-tiamat-foil-20260908T111916_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/06bcc2a8-c7be-45c8-8048-e81638558d66.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/lizard-blades-french-20260908T111833/source-highres.png",
+      "cardName": "Lizard Blades",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Lizard Blades",
+        "top1Score": 0.7650119262454569,
+        "top2Score": 0.6336926515860435,
+        "expectedScore": 0.7650119262454569,
+        "margin": 0.1313192746594134,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Lizard Blades",
+        "top1Score": 0.7584170698117668,
+        "top2Score": 0.6390777827121792,
+        "expectedScore": 0.7584170698117668,
+        "margin": 0.11933928709958763,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Lizard Blades",
+        "top1Score": 0.7246172097602296,
+        "top2Score": 0.6805383115080086,
+        "expectedScore": 0.7246172097602296,
+        "margin": 0.044078898252221,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 573.4199731203345,
+        "corners": [
+          662.7021865875813,
+          483.35203356853367,
+          681.6104001734438,
+          466.01527215177924
+        ],
+        "iou": 0.920354922402332
+      },
+      "tags": [
+        "FOREIGN_LANGUAGE",
+        "language-fr"
+      ],
+      "images": {
+        "source": "../../../.scan-fixtures/replay/lizard-blades-french-20260908T111833/source-highres.png",
+        "current": "artifacts/.scan-fixtures_replay_lizard-blades-french-20260908T111833_source-highres.png/current.png",
+        "auto_anchor": "artifacts/.scan-fixtures_replay_lizard-blades-french-20260908T111833_source-highres.png/auto.png",
+        "manual_gt": "artifacts/.scan-fixtures_replay_lizard-blades-french-20260908T111833_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/0562f64d-ac25-4f9a-9fab-db3a820f8d68.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+      "cardName": "Maddening Hex",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Maddening Hex",
+        "top1Score": 0.7746663699985766,
+        "top2Score": 0.6834608882838447,
+        "expectedScore": 0.7746663699985766,
+        "margin": 0.09120548171473197,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Maddening Hex",
+        "top1Score": 0.7613571338906829,
+        "top2Score": 0.6539200299075857,
+        "expectedScore": 0.7613571338906829,
+        "margin": 0.10743710398309725,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 19,
+        "top1Name": "Crucible of Worlds",
+        "top1Score": 0.7115721259826897,
+        "top2Score": 0.702317098389192,
+        "expectedScore": 0.6685216954910972,
+        "margin": 0.009255027593497722,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 537.3592935628726,
+        "corners": [
+          628.6020145939882,
+          433.2595140862537,
+          653.241231625378,
+          434.3344139458706
+        ],
+        "iou": 0.947798415239005
+      },
+      "tags": [
+        "ALT_ART"
+      ],
+      "images": {
+        "source": "../../../.scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+        "current": "artifacts/.scan-fixtures_replay_maddening-hex-alt-art-20260908T082448_source-highres.png/current.png",
+        "auto_anchor": "artifacts/.scan-fixtures_replay_maddening-hex-alt-art-20260908T082448_source-highres.png/auto.png",
+        "manual_gt": "artifacts/.scan-fixtures_replay_maddening-hex-alt-art-20260908T082448_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/699efd96-3e68-46fd-897d-cf95a16a8863.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/negate-20260908T082630/source-highres.png",
+      "cardName": "Negate",
+      "detected": true,
+      "notes": "auto art box not detected",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Negate",
+        "top1Score": 0.6589058659633453,
+        "top2Score": 0.6238291020820915,
+        "expectedScore": 0.6589058659633453,
+        "margin": 0.0350767638812538,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": false,
+        "failed": true,
+        "reason": "no art box",
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": null,
+        "top1Name": null,
+        "top1Score": null,
+        "top2Score": null,
+        "expectedScore": null,
+        "margin": null,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Negate",
+        "top1Score": 0.6362650354056325,
+        "top2Score": 0.604443754830978,
+        "expectedScore": 0.6362650354056325,
+        "margin": 0.0318212805746545,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": null,
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-fixtures/replay/negate-20260908T082630/source-highres.png",
+        "current": "artifacts/.scan-fixtures_replay_negate-20260908T082630_source-highres.png/current.png",
+        "auto_anchor": null,
+        "manual_gt": "artifacts/.scan-fixtures_replay_negate-20260908T082630_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/026c499d-3d5b-4f65-a824-f78f146b82ef.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/negate-unsleeved-20260908T082746/source-highres.png",
+      "cardName": "Negate",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Negate",
+        "top1Score": 0.7816147328107027,
+        "top2Score": 0.6943625122384255,
+        "expectedScore": 0.7816147328107027,
+        "margin": 0.08725222057227722,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Negate",
+        "top1Score": 0.6985613077580031,
+        "top2Score": 0.6335860095749458,
+        "expectedScore": 0.6985613077580031,
+        "margin": 0.06497529818305725,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Negate",
+        "top1Score": 0.7541430527409156,
+        "top2Score": 0.6382937306202925,
+        "expectedScore": 0.7541430527409156,
+        "margin": 0.11584932212062315,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 14.541063097805226,
+        "corners": [
+          14.959371108228725,
+          14.855273582693787,
+          19.63664275333536,
+          8.712964946963032
+        ],
+        "iou": 0.9514458472584258
+      },
+      "tags": [
+        "UNSLEEVED",
+        "SLEEVED",
+        "unsleeved"
+      ],
+      "images": {
+        "source": "../../../.scan-fixtures/replay/negate-unsleeved-20260908T082746/source-highres.png",
+        "current": "artifacts/.scan-fixtures_replay_negate-unsleeved-20260908T082746_source-highres.png/current.png",
+        "auto_anchor": "artifacts/.scan-fixtures_replay_negate-unsleeved-20260908T082746_source-highres.png/auto.png",
+        "manual_gt": "artifacts/.scan-fixtures_replay_negate-unsleeved-20260908T082746_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/026c499d-3d5b-4f65-a824-f78f146b82ef.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+      "cardName": "Sword of Hearth and Home",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sword of Hearth and Home",
+        "top1Score": 0.695645069764656,
+        "top2Score": 0.6333494242879412,
+        "expectedScore": 0.695645069764656,
+        "margin": 0.062295645476714845,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sword of Hearth and Home",
+        "top1Score": 0.6820133489981987,
+        "top2Score": 0.6686761191658978,
+        "expectedScore": 0.6820133489981987,
+        "margin": 0.0133372298323009,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 2,
+        "top1Name": "Immolating Glare",
+        "top1Score": 0.665499390169943,
+        "top2Score": 0.6589213962082194,
+        "expectedScore": 0.6589213962082194,
+        "margin": 0.006577993961723538,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 6.836957872899406,
+        "corners": [
+          8.444501512773087,
+          7.8166862132604935,
+          3.461832184874192,
+          7.624811580689853
+        ],
+        "iou": 0.9660643946142066
+      },
+      "tags": [
+        "FOREIGN_LANGUAGE",
+        "language-fr"
+      ],
+      "images": {
+        "source": "../../../.scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+        "current": "artifacts/tures_replay_p-e-d-tre-et-de-foyer-french-goo-20260908T082303_source-highres.png/current.png",
+        "auto_anchor": "artifacts/tures_replay_p-e-d-tre-et-de-foyer-french-goo-20260908T082303_source-highres.png/auto.png",
+        "manual_gt": "artifacts/tures_replay_p-e-d-tre-et-de-foyer-french-goo-20260908T082303_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/0c530cf5-601a-4e9c-b81e-5bddff0c1196.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/slip-out-the-back-italian-20260908T111643/source-highres.png",
+      "cardName": "Slip Out the Back",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Slip Out the Back",
+        "top1Score": 0.7274640155461387,
+        "top2Score": 0.6625276616445961,
+        "expectedScore": 0.7274640155461387,
+        "margin": 0.06493635390154262,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Slip Out the Back",
+        "top1Score": 0.675222176265936,
+        "top2Score": 0.6304473786922135,
+        "expectedScore": 0.675222176265936,
+        "margin": 0.04477479757372249,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Slip Out the Back",
+        "top1Score": 0.7208423952823934,
+        "top2Score": 0.6896324483437962,
+        "expectedScore": 0.7208423952823934,
+        "margin": 0.031209946938597133,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 16.538866914056044,
+        "corners": [
+          21.426564578150032,
+          11.169551075615498,
+          10.623494441695895,
+          22.935857560762756
+        ],
+        "iou": 0.9369742110237107
+      },
+      "tags": [
+        "FOREIGN_LANGUAGE",
+        "language-it"
+      ],
+      "images": {
+        "source": "../../../.scan-fixtures/replay/slip-out-the-back-italian-20260908T111643/source-highres.png",
+        "current": "artifacts/can-fixtures_replay_slip-out-the-back-italian-20260908T111643_source-highres.png/current.png",
+        "auto_anchor": "artifacts/can-fixtures_replay_slip-out-the-back-italian-20260908T111643_source-highres.png/auto.png",
+        "manual_gt": "artifacts/can-fixtures_replay_slip-out-the-back-italian-20260908T111643_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/8725f4c4-fad7-460e-b86c-ff81674f0980.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/teferi-veil-old-edition-good-cap-20260908T111548/source-highres.png",
+      "cardName": "Teferi's Veil",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Teferi's Veil",
+        "top1Score": 0.8503905437822996,
+        "top2Score": 0.6360134842358571,
+        "expectedScore": 0.8503905437822996,
+        "margin": 0.21437705954644248,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Teferi's Veil",
+        "top1Score": 0.8426415088613693,
+        "top2Score": 0.7047161116539368,
+        "expectedScore": 0.8426415088613693,
+        "margin": 0.13792539720743258,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Teferi's Veil",
+        "top1Score": 0.8322945202161706,
+        "top2Score": 0.6716252841162164,
+        "expectedScore": 0.8322945202161706,
+        "margin": 0.1606692360999542,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 25.6428049062785,
+        "corners": [
+          2.6205978495219098,
+          46.465840605173284,
+          42.60218231481881,
+          10.882598855599998
+        ],
+        "iou": 0.9094304366175662
+      },
+      "tags": [
+        "OLD_FRAME"
+      ],
+      "images": {
+        "source": "../../../.scan-fixtures/replay/teferi-veil-old-edition-good-cap-20260908T111548/source-highres.png",
+        "current": "artifacts/tures_replay_teferi-veil-old-edition-good-cap-20260908T111548_source-highres.png/current.png",
+        "auto_anchor": "artifacts/tures_replay_teferi-veil-old-edition-good-cap-20260908T111548_source-highres.png/auto.png",
+        "manual_gt": "artifacts/tures_replay_teferi-veil-old-edition-good-cap-20260908T111548_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/1021e097-a595-48d7-9780-bbc8ebbc07e8.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/wand-of-wonder-20260908T073958/source-highres.png",
+      "cardName": "Wand of Wonder",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Wand of Wonder",
+        "top1Score": 0.7125721536997499,
+        "top2Score": 0.6917243166741456,
+        "expectedScore": 0.7125721536997499,
+        "margin": 0.020847837025604332,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Wand of Wonder",
+        "top1Score": 0.7588647802436991,
+        "top2Score": 0.6895362094573445,
+        "expectedScore": 0.7588647802436991,
+        "margin": 0.06932857078635457,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Wand of Wonder",
+        "top1Score": 0.7651467964462214,
+        "top2Score": 0.6655099835074654,
+        "expectedScore": 0.7651467964462214,
+        "margin": 0.09963681293875604,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 23.550017597245752,
+        "corners": [
+          21.267162080398244,
+          24.93041278532632,
+          25.704406927628654,
+          22.29808859562979
+        ],
+        "iou": 0.905574630005009
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-fixtures/replay/wand-of-wonder-20260908T073958/source-highres.png",
+        "current": "artifacts/.scan-fixtures_replay_wand-of-wonder-20260908T073958_source-highres.png/current.png",
+        "auto_anchor": "artifacts/.scan-fixtures_replay_wand-of-wonder-20260908T073958_source-highres.png/auto.png",
+        "manual_gt": "artifacts/.scan-fixtures_replay_wand-of-wonder-20260908T073958_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/05d1b195-1142-4a9a-92a5-fda8c25c1e21.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+      "cardName": "Maddening Hex",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Maddening Hex",
+        "top1Score": 0.7568474914626275,
+        "top2Score": 0.7061019969011366,
+        "expectedScore": 0.7568474914626275,
+        "margin": 0.05074549456149091,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Maddening Hex",
+        "top1Score": 0.7812664037888469,
+        "top2Score": 0.7203711311828654,
+        "expectedScore": 0.7812664037888469,
+        "margin": 0.06089527260598149,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": true,
+        "rank": 6,
+        "top1Name": "Invoke Calamity",
+        "top1Score": 0.7052139637350281,
+        "top2Score": 0.7048706125977284,
+        "expectedScore": 0.6854697092181288,
+        "margin": 0.0003433511372996634,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 452.516424769961,
+        "corners": [
+          462.44994520673305,
+          459.2584278736174,
+          452.52409813507865,
+          435.83322786441494
+        ],
+        "iou": 0
+      },
+      "tags": [
+        "GLARE",
+        "ALT_ART"
+      ],
+      "images": {
+        "source": "../../../.scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+        "current": "artifacts/.scan-fixtures_real-photos_maddening-hex-afc-showcase-glare.png/current.png",
+        "auto_anchor": "artifacts/.scan-fixtures_real-photos_maddening-hex-afc-showcase-glare.png/auto.png",
+        "manual_gt": "artifacts/.scan-fixtures_real-photos_maddening-hex-afc-showcase-glare.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/699efd96-3e68-46fd-897d-cf95a16a8863.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120539/photo-source.png",
+      "cardName": "Lizard Blades",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Lizard Blades",
+        "top1Score": 0.7701815915599733,
+        "top2Score": 0.6618436334389803,
+        "expectedScore": 0.7701815915599733,
+        "margin": 0.108337958120993,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Lizard Blades",
+        "top1Score": 0.7207817085587599,
+        "top2Score": 0.6370743958403722,
+        "expectedScore": 0.7207817085587599,
+        "margin": 0.08370731271838772,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Lizard Blades",
+        "top1Score": 0.7778926773753896,
+        "top2Score": 0.6670754547472014,
+        "expectedScore": 0.7778926773753896,
+        "margin": 0.11081722262818816,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 24.795919446655013,
+        "corners": [
+          18.76738017226997,
+          29.280559804273523,
+          26.950698993424083,
+          24.185038816652472
+        ],
+        "iou": 0.9104580860845712
+      },
+      "tags": [
+        "sleeved",
+        "language-fr"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/cq-20260908T120539/photo-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120539_photo-source.png/current.png",
+        "auto_anchor": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120539_photo-source.png/auto.png",
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120539_photo-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/0562f64d-ac25-4f9a-9fab-db3a820f8d68.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+      "cardName": "Island",
+      "detected": true,
+      "notes": "auto art box not detected",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 36,
+        "top1Name": "Double-Faced Substitute Card",
+        "top1Score": 0.8086339036242748,
+        "top2Score": 0.7150413769334436,
+        "expectedScore": 0.6349948079147432,
+        "margin": 0.09359252669083118,
+        "wrongConfident": true
+      },
+      "auto_anchor": {
+        "available": false,
+        "failed": true,
+        "reason": "no art box",
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": null,
+        "top1Name": null,
+        "top1Score": null,
+        "top2Score": null,
+        "expectedScore": null,
+        "margin": null,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 2,
+        "top1Name": "Plains",
+        "top1Score": 0.7240156245725736,
+        "top2Score": 0.7155720637774907,
+        "expectedScore": 0.7155720637774907,
+        "margin": 0.008443560795082905,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": null,
+      "tags": [
+        "unsleeved"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120629_photo-source.png/current.png",
+        "auto_anchor": null,
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120629_photo-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/000f1f50-08e5-4d83-8159-98f06a0e2279.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120722/photo-source.png",
+      "cardName": "Teferi's Veil",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Teferi's Veil",
+        "top1Score": 0.8588448837837084,
+        "top2Score": 0.6563762401176397,
+        "expectedScore": 0.8588448837837084,
+        "margin": 0.20246864366606865,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Teferi's Veil",
+        "top1Score": 0.8069250129208377,
+        "top2Score": 0.6724981389865103,
+        "expectedScore": 0.8069250129208377,
+        "margin": 0.1344268739343274,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Teferi's Veil",
+        "top1Score": 0.7875009568981105,
+        "top2Score": 0.6446834399451077,
+        "expectedScore": 0.7875009568981105,
+        "margin": 0.14281751695300282,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 18.73484237270033,
+        "corners": [
+          5.911555867775472,
+          29.315064254464538,
+          34.0408378280411,
+          5.671911540520212
+        ],
+        "iou": 0.9065147218777344
+      },
+      "tags": [
+        "sleeved",
+        "classic-frame"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/cq-20260908T120722/photo-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120722_photo-source.png/current.png",
+        "auto_anchor": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120722_photo-source.png/auto.png",
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120722_photo-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/1021e097-a595-48d7-9780-bbc8ebbc07e8.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+      "cardName": "Wand of Wonder",
+      "detected": true,
+      "notes": "auto art box not detected",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 3679,
+        "top1Name": "Who",
+        "top1Score": 0.5453619826537168,
+        "top2Score": 0.5122368388805647,
+        "expectedScore": 0.2836730797026401,
+        "margin": 0.03312514377315212,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": false,
+        "failed": true,
+        "reason": "no art box",
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": null,
+        "top1Name": null,
+        "top1Score": null,
+        "top2Score": null,
+        "expectedScore": null,
+        "margin": null,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Wand of Wonder",
+        "top1Score": 0.6907442421838774,
+        "top2Score": 0.6003291690790666,
+        "expectedScore": 0.6907442421838774,
+        "margin": 0.09041507310481078,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": null,
+      "tags": [
+        "sleeved"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120751_photo-source.png/current.png",
+        "auto_anchor": null,
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120751_photo-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/05d1b195-1142-4a9a-92a5-fda8c25c1e21.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "detected": true,
+      "notes": "auto art box not detected",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 138,
+        "top1Name": "Temple Garden",
+        "top1Score": 0.43854635172340095,
+        "top2Score": 0.43521157961782087,
+        "expectedScore": 0.31726416581899597,
+        "margin": 0.003334772105580086,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": false,
+        "failed": true,
+        "reason": "no art box",
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": null,
+        "top1Name": null,
+        "top1Score": null,
+        "top2Score": null,
+        "expectedScore": null,
+        "margin": null,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "top1Score": 0.6452994858587131,
+        "top2Score": 0.5655686250041864,
+        "expectedScore": 0.6452994858587131,
+        "margin": 0.07973086085452674,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": null,
+      "tags": [
+        "sleeved",
+        "foil"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120813_photo-source.png/current.png",
+        "auto_anchor": null,
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_cq-20260908T120813_photo-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/06bcc2a8-c7be-45c8-8048-e81638558d66.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c008/deck-011-source.png",
+      "cardName": "Feywild Trickster",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Feywild Trickster",
+        "top1Score": 0.8076390256536602,
+        "top2Score": 0.5848862588345647,
+        "expectedScore": 0.8076390256536602,
+        "margin": 0.2227527668190955,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Feywild Trickster",
+        "top1Score": 0.7942796096024124,
+        "top2Score": 0.5884262474444845,
+        "expectedScore": 0.7942796096024124,
+        "margin": 0.20585336215792793,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Feywild Trickster",
+        "top1Score": 0.7868758194431439,
+        "top2Score": 0.5640315797216711,
+        "expectedScore": 0.7868758194431439,
+        "margin": 0.22284423972147283,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 18.555559513031284,
+        "corners": [
+          30.313260764187863,
+          19.067115022082486,
+          3.896701908644378,
+          20.945160357210412
+        ],
+        "iou": 0.9244445085497615
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c008/deck-011-source.png",
+        "current": "artifacts/ons_deck-test-20260910-085502_deck-test-20260910-085502-c008_deck-011-source.png/current.png",
+        "auto_anchor": "artifacts/ons_deck-test-20260910-085502_deck-test-20260910-085502-c008_deck-011-source.png/auto.png",
+        "manual_gt": "artifacts/ons_deck-test-20260910-085502_deck-test-20260910-085502-c008_deck-011-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/c93e0296-69e0-45e0-a1c2-0214a53c52d0.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c000/deck-001-source.png",
+      "cardName": "Sword of Feast and Famine",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sword of Feast and Famine",
+        "top1Score": 0.7908546166092423,
+        "top2Score": 0.6538108145662018,
+        "expectedScore": 0.7908546166092423,
+        "margin": 0.13704380204304045,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sword of Feast and Famine",
+        "top1Score": 0.7910025479349883,
+        "top2Score": 0.6385887437626206,
+        "expectedScore": 0.7910025479349883,
+        "margin": 0.1524138041723676,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sword of Feast and Famine",
+        "top1Score": 0.7521021527733539,
+        "top2Score": 0.6193146295324311,
+        "expectedScore": 0.7521021527733539,
+        "margin": 0.1327875232409228,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 9.128569237834624,
+        "corners": [
+          9.261893729164086,
+          3.1816676832506445,
+          11.223616605987282,
+          12.847098932936484
+        ],
+        "iou": 0.9624474178525224
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c000/deck-001-source.png",
+        "current": "artifacts/ons_deck-test-20260910-085502_deck-test-20260910-085502-c000_deck-001-source.png/current.png",
+        "auto_anchor": "artifacts/ons_deck-test-20260910-085502_deck-test-20260910-085502-c000_deck-001-source.png/auto.png",
+        "manual_gt": "artifacts/ons_deck-test-20260910-085502_deck-test-20260910-085502-c000_deck-001-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/0a469d00-1416-48dd-ad91-eb6f3fb4b42b.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t500-source.png",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 48,
+        "top1Name": "Nevermind",
+        "top1Score": 0.46042313043492933,
+        "top2Score": 0.449399470254094,
+        "expectedScore": 0.40164243002276684,
+        "margin": 0.011023660180835337,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 44,
+        "top1Name": "Muraganda Eldrazi",
+        "top1Score": 0.4826059963385244,
+        "top2Score": 0.48136247742878324,
+        "expectedScore": 0.4385027967836099,
+        "margin": 0.0012435189097411703,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 50,
+        "top1Name": "Dark Ritual",
+        "top1Score": 0.6644837023715315,
+        "top2Score": 0.6475495629737659,
+        "expectedScore": 0.5895535149668553,
+        "margin": 0.01693413939776567,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 270.34829350106827,
+        "corners": [
+          192.7319782684002,
+          16.867425101398023,
+          235.14874668718767,
+          636.6450239472871
+        ],
+        "iou": 0.6312637559631643
+      },
+      "tags": [
+        "foil",
+        "frozen-quad-series"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t500-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T124234_t500-source.png/current.png",
+        "auto_anchor": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T124234_t500-source.png/auto.png",
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T124234_t500-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/06bcc2a8-c7be-45c8-8048-e81638558d66.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124408/t500-source.png",
+      "cardName": "Teferi's Veil",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Teferi's Veil",
+        "top1Score": 0.8340249675229474,
+        "top2Score": 0.654378547507191,
+        "expectedScore": 0.8340249675229474,
+        "margin": 0.17964642001575637,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Teferi's Veil",
+        "top1Score": 0.8072847872287584,
+        "top2Score": 0.6675620099699079,
+        "expectedScore": 0.8072847872287584,
+        "margin": 0.13972277725885052,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Teferi's Veil",
+        "top1Score": 0.7877978081339937,
+        "top2Score": 0.6858006549071151,
+        "expectedScore": 0.7877978081339937,
+        "margin": 0.10199715322687863,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 30.662119138649842,
+        "corners": [
+          10.007831458202062,
+          61.04106915568583,
+          44.18674489862958,
+          7.412831042081899
+        ],
+        "iou": 0.894407427448637
+      },
+      "tags": [
+        "classic-frame",
+        "frozen-quad-series"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/focus-series-20260908T124408/t500-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T124408_t500-source.png/current.png",
+        "auto_anchor": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T124408_t500-source.png/auto.png",
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T124408_t500-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/1021e097-a595-48d7-9780-bbc8ebbc07e8.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t500-source.png",
+      "cardName": "Wand of Wonder",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Wand of Wonder",
+        "top1Score": 0.7291255383458154,
+        "top2Score": 0.6369123754523747,
+        "expectedScore": 0.7291255383458154,
+        "margin": 0.09221316289344073,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Wand of Wonder",
+        "top1Score": 0.6949312429580502,
+        "top2Score": 0.6144252289164392,
+        "expectedScore": 0.6949312429580502,
+        "margin": 0.08050601404161095,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Wand of Wonder",
+        "top1Score": 0.691961699416451,
+        "top2Score": 0.6121597592754091,
+        "expectedScore": 0.691961699416451,
+        "margin": 0.07980194014104192,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 18.496491542284375,
+        "corners": [
+          19.622477066277973,
+          25.826833353344526,
+          5.151625688815673,
+          23.385030060699332
+        ],
+        "iou": 0.9317150773707872
+      },
+      "tags": [
+        "per-snapshot-series"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t500-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132626_t500-source.png/current.png",
+        "auto_anchor": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132626_t500-source.png/auto.png",
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132626_t500-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/05d1b195-1142-4a9a-92a5-fda8c25c1e21.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t000-source.png",
+      "cardName": "Wand of Wonder",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Wand of Wonder",
+        "top1Score": 0.7185818970668275,
+        "top2Score": 0.6361914213077614,
+        "expectedScore": 0.7185818970668275,
+        "margin": 0.0823904757590661,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Wand of Wonder",
+        "top1Score": 0.6667406583446749,
+        "top2Score": 0.6619387922470625,
+        "expectedScore": 0.6667406583446749,
+        "margin": 0.004801866097612351,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Wand of Wonder",
+        "top1Score": 0.707351436937297,
+        "top2Score": 0.6179533214587485,
+        "expectedScore": 0.707351436937297,
+        "margin": 0.08939811547854848,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 1555.852121651491,
+        "corners": [
+          28.30207772985083,
+          22.74461773301688,
+          30.742279243616423,
+          6141.61951189948
+        ],
+        "iou": 0.633493036817075
+      },
+      "tags": [
+        "per-snapshot-series"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t000-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132626_t000-source.png/current.png",
+        "auto_anchor": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132626_t000-source.png/auto.png",
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132626_t000-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/05d1b195-1142-4a9a-92a5-fda8c25c1e21.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132712/t800-source.png",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "top1Score": 0.697130655570496,
+        "top2Score": 0.5665609552091883,
+        "expectedScore": 0.697130655570496,
+        "margin": 0.13056970036130777,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "top1Score": 0.7065942686044824,
+        "top2Score": 0.6135419064073228,
+        "expectedScore": 0.7065942686044824,
+        "margin": 0.09305236219715962,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "top1Score": 0.715867715520373,
+        "top2Score": 0.5661031004401055,
+        "expectedScore": 0.715867715520373,
+        "margin": 0.1497646150802675,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 31.064427933301005,
+        "corners": [
+          51.95845306919475,
+          16.550939781295526,
+          5.582237255711693,
+          50.16608162700204
+        ],
+        "iou": 0.8916440598444016
+      },
+      "tags": [
+        "foil",
+        "per-snapshot-series"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/focus-series-20260908T132712/t800-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132712_t800-source.png/current.png",
+        "auto_anchor": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132712_t800-source.png/auto.png",
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132712_t800-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/06bcc2a8-c7be-45c8-8048-e81638558d66.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132801/t500-source.png",
+      "cardName": "Excalibur, Sword of Eden",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 403,
+        "top1Name": "Return to Nature",
+        "top1Score": 0.7409271041872257,
+        "top2Score": 0.7227344396048672,
+        "expectedScore": 0.5736219612983848,
+        "margin": 0.018192664582358575,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 156,
+        "top1Name": "Sanctify",
+        "top1Score": 0.7423138518190221,
+        "top2Score": 0.7341745765635646,
+        "expectedScore": 0.6161576113312639,
+        "margin": 0.008139275255457545,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 65,
+        "top1Name": "Sanctify",
+        "top1Score": 0.7315426186616787,
+        "top2Score": 0.709070811960305,
+        "expectedScore": 0.6269223515802209,
+        "margin": 0.02247180670137372,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 6.3254710126028515,
+        "corners": [
+          3.939732036628963,
+          6.426911398571924,
+          9.168075920544904,
+          5.767164694665612
+        ],
+        "iou": 0.9709477754964542
+      },
+      "tags": [
+        "foil",
+        "language-fr",
+        "per-snapshot-series"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/focus-series-20260908T132801/t500-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132801_t500-source.png/current.png",
+        "auto_anchor": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132801_t500-source.png/auto.png",
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_focus-series-20260908T132801_t500-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/26dbf574-3193-413e-a982-4b9d27dafaf5.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-007-source/geom-007-source.png",
+      "cardName": "The Spear of Leonidas",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 2,
+        "top1Name": "Engulfing Eruption",
+        "top1Score": 0.7204762455643664,
+        "top2Score": 0.71874225004443,
+        "expectedScore": 0.71874225004443,
+        "margin": 0.00173399551993636,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "The Spear of Leonidas",
+        "top1Score": 0.7104506025697375,
+        "top2Score": 0.6472813460730027,
+        "expectedScore": 0.7104506025697375,
+        "margin": 0.06316925649673477,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 2,
+        "top1Name": "The Black Arrow",
+        "top1Score": 0.6874122735736354,
+        "top2Score": 0.6643954525049589,
+        "expectedScore": 0.6643954525049589,
+        "margin": 0.02301682106867653,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 13.297931800141333,
+        "corners": [
+          13.899579759104277,
+          10.40174702427052,
+          9.32562511279752,
+          19.564775304393017
+        ],
+        "iou": 0.9621190775442188
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-153114/geom-007-source/geom-007-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-153114_geom-007-source_geom-007-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-153114_geom-007-source_geom-007-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-153114_geom-007-source_geom-007-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/160d6ce7-2452-41a2-aa70-41e1b8045c54.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-001-source/geom-001-source.png",
+      "cardName": "Island",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Island",
+        "top1Score": 0.791146796454778,
+        "top2Score": 0.745908234038963,
+        "expectedScore": 0.791146796454778,
+        "margin": 0.04523856241581503,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Island",
+        "top1Score": 0.7931780366670568,
+        "top2Score": 0.7338415407524331,
+        "expectedScore": 0.7931780366670568,
+        "margin": 0.059336495914623644,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Island",
+        "top1Score": 0.7729219206681587,
+        "top2Score": 0.7624591387150019,
+        "expectedScore": 0.7729219206681587,
+        "margin": 0.010462781953156752,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 62.15265860986449,
+        "corners": [
+          7.661588807521569,
+          6.950799918054892,
+          119.1242423568799,
+          114.8740033570016
+        ],
+        "iou": 0.7269668720365795
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-153114/geom-001-source/geom-001-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-153114_geom-001-source_geom-001-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-153114_geom-001-source_geom-001-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-153114_geom-001-source_geom-001-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/000f1f50-08e5-4d83-8159-98f06a0e2279.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-007-source/geom-007-source.png",
+      "cardName": "Island",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 510,
+        "top1Name": "Double-Faced Substitute Card",
+        "top1Score": 0.6733765041938493,
+        "top2Score": 0.6362798537729709,
+        "expectedScore": 0.49844122714854755,
+        "margin": 0.037096650420878396,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 52,
+        "top1Name": "Double-Faced Substitute Card",
+        "top1Score": 0.7129030124566356,
+        "top2Score": 0.6617696010740247,
+        "expectedScore": 0.5606808122205669,
+        "margin": 0.05113341138261085,
+        "wrongConfident": true
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": true,
+        "top10": true,
+        "rank": 5,
+        "top1Name": "Dreadship Reef",
+        "top1Score": 0.7031409751033443,
+        "top2Score": 0.6871426136078516,
+        "expectedScore": 0.662908909785114,
+        "margin": 0.01599836149549272,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 638.4071973416847,
+        "corners": [
+          668.6657931480887,
+          786.7530404026542,
+          664.6358147547791,
+          433.57414106121684
+        ],
+        "iou": 0.1415968505001744
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-154646/geom-007-source/geom-007-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-154646_geom-007-source_geom-007-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-154646_geom-007-source_geom-007-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-154646_geom-007-source_geom-007-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/000f1f50-08e5-4d83-8159-98f06a0e2279.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-001-source/geom-001-source.png",
+      "cardName": "Mask of Memory",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Mask of Memory",
+        "top1Score": 0.6628676926457739,
+        "top2Score": 0.641415712939232,
+        "expectedScore": 0.6628676926457739,
+        "margin": 0.02145197970654189,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Mask of Memory",
+        "top1Score": 0.797770327904466,
+        "top2Score": 0.6724627156222097,
+        "expectedScore": 0.797770327904466,
+        "margin": 0.1253076122822563,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Mask of Memory",
+        "top1Score": 0.7426621029633366,
+        "top2Score": 0.6402333755891894,
+        "expectedScore": 0.7426621029633366,
+        "margin": 0.10242872737414721,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 6.767145908809317,
+        "corners": [
+          2.5460158587760904,
+          6.560768551800013,
+          6.697461738308515,
+          11.264337486352648
+        ],
+        "iou": 0.97129950514644
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-154646/geom-001-source/geom-001-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-154646_geom-001-source_geom-001-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-154646_geom-001-source_geom-001-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-154646_geom-001-source_geom-001-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/30acbb34-3ff5-4d38-b349-f108351f94f8.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-155241/geom-006-source/geom-006-source.png",
+      "cardName": "Blacksmith's Talent",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 3867,
+        "top1Name": "Royal",
+        "top1Score": 0.5038476746251276,
+        "top2Score": 0.4505727265745697,
+        "expectedScore": 0.24022432035199381,
+        "margin": 0.05327494805055788,
+        "wrongConfident": true
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 1731,
+        "top1Name": "Royal",
+        "top1Score": 0.5710138056618707,
+        "top2Score": 0.5195592178703153,
+        "expectedScore": 0.31402714802034837,
+        "margin": 0.05145458779155532,
+        "wrongConfident": true
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 1443,
+        "top1Name": "Road",
+        "top1Score": 0.6950950150998793,
+        "top2Score": 0.6865032632317168,
+        "expectedScore": 0.498592434911916,
+        "margin": 0.008591751868162412,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 284.4713535436005,
+        "corners": [
+          4.269838919916121,
+          309.6112825200259,
+          470.86969049096047,
+          353.13460224349956
+        ],
+        "iou": 0.3465749042800808
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-155241/geom-006-source/geom-006-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-155241_geom-006-source_geom-006-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-155241_geom-006-source_geom-006-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-155241_geom-006-source_geom-006-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/4bb318fa-481d-40a7-978e-f01b49101ae0.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+      "cardName": "Bulk Up",
+      "detected": true,
+      "notes": "auto art box not detected",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 662,
+        "top1Name": "Cauldron Familiar",
+        "top1Score": 0.513020763212715,
+        "top2Score": 0.5078655824894646,
+        "expectedScore": 0.3974890450757739,
+        "margin": 0.0051551807232503855,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": false,
+        "failed": true,
+        "reason": "no art box",
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": null,
+        "top1Name": null,
+        "top1Score": null,
+        "top2Score": null,
+        "expectedScore": null,
+        "margin": null,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Bulk Up",
+        "top1Score": 0.6412845060020416,
+        "top2Score": 0.6260117060642375,
+        "expectedScore": 0.6412845060020416,
+        "margin": 0.01527279993780406,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": null,
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-162108_geom-001-source_geom-001-source.png/current.png",
+        "auto_anchor": null,
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-162108_geom-001-source_geom-001-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/39d337d2-d8c9-4e9a-9531-cfe4db769cb3.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-164005/geom-001-source/geom-001-source.png",
+      "cardName": "The Ozolith",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "The Ozolith",
+        "top1Score": 0.7915764572419169,
+        "top2Score": 0.7403309420322727,
+        "expectedScore": 0.7915764572419169,
+        "margin": 0.051245515209644266,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "The Ozolith",
+        "top1Score": 0.782405572232223,
+        "top2Score": 0.7426597013291221,
+        "expectedScore": 0.782405572232223,
+        "margin": 0.03974587090310089,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "The Ozolith",
+        "top1Score": 0.7845061686830219,
+        "top2Score": 0.719840635631549,
+        "expectedScore": 0.7845061686830219,
+        "margin": 0.06466553305147293,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 8.93332916421385,
+        "corners": [
+          8.609481028675194,
+          9.155138450998974,
+          3.483063770203791,
+          14.485633406977444
+        ],
+        "iou": 0.9629321522558033
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-164005/geom-001-source/geom-001-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-164005_geom-001-source_geom-001-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-164005_geom-001-source_geom-001-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-164005_geom-001-source_geom-001-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/1fac900d-c40d-4f33-9ae5-45e31e5ce66c.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-006-source/geom-006-source.png",
+      "cardName": "Sword of the Animist",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sword of the Animist",
+        "top1Score": 0.7735869737478306,
+        "top2Score": 0.682893798831186,
+        "expectedScore": 0.7735869737478306,
+        "margin": 0.09069317491664464,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sword of the Animist",
+        "top1Score": 0.6510073053584619,
+        "top2Score": 0.623193426877399,
+        "expectedScore": 0.6510073053584619,
+        "margin": 0.02781387848106287,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sword of the Animist",
+        "top1Score": 0.7591794087244135,
+        "top2Score": 0.6571908518896566,
+        "expectedScore": 0.7591794087244135,
+        "margin": 0.10198855683475683,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 10.604386693928168,
+        "corners": [
+          12.98204861451694,
+          15.445173357048509,
+          7.7378092791484505,
+          6.252515524998776
+        ],
+        "iou": 0.9605538574451897
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-165339/geom-006-source/geom-006-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/01048220-cef3-47ee-8d68-d01d324ad8af.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-001-source/geom-001-source.png",
+      "cardName": "Island",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": true,
+        "rank": 8,
+        "top1Name": "Riverglide Pathway",
+        "top1Score": 0.7418701274919115,
+        "top2Score": 0.7094045357772726,
+        "expectedScore": 0.6812009536499251,
+        "margin": 0.03246559171463892,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 42,
+        "top1Name": "Riverglide Pathway",
+        "top1Score": 0.700699135436844,
+        "top2Score": 0.6999039650577589,
+        "expectedScore": 0.6258951209220263,
+        "margin": 0.0007951703790851639,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 12,
+        "top1Name": "Sunset Revelry",
+        "top1Score": 0.7166282779825303,
+        "top2Score": 0.6926496155132329,
+        "expectedScore": 0.6721256652091113,
+        "margin": 0.023978662469297363,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 175.42932484746507,
+        "corners": [
+          27.17737746923023,
+          17.603106737111126,
+          334.15662868438335,
+          322.78018649913554
+        ],
+        "iou": 0.5363437735268543
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-165339/geom-001-source/geom-001-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-165339_geom-001-source_geom-001-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-165339_geom-001-source_geom-001-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-165339_geom-001-source_geom-001-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/000f1f50-08e5-4d83-8159-98f06a0e2279.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-006-source/geom-006-source.png",
+      "cardName": "Netherese Puzzle-Ward",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Netherese Puzzle-Ward",
+        "top1Score": 0.7563247706229136,
+        "top2Score": 0.6948471510874841,
+        "expectedScore": 0.7563247706229136,
+        "margin": 0.06147761953542952,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Netherese Puzzle-Ward",
+        "top1Score": 0.7479233883631587,
+        "top2Score": 0.6711907810781387,
+        "expectedScore": 0.7479233883631587,
+        "margin": 0.07673260728502007,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Netherese Puzzle-Ward",
+        "top1Score": 0.7801466663175324,
+        "top2Score": 0.7214484918501377,
+        "expectedScore": 0.7801466663175324,
+        "margin": 0.05869817446739467,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 57.08216809119892,
+        "corners": [
+          39.51801499021171,
+          25.708044699388893,
+          81.46118262182985,
+          81.64143005336524
+        ],
+        "iou": 0.7781275709422167
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-173530/geom-006-source/geom-006-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-173530_geom-006-source_geom-006-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-173530_geom-006-source_geom-006-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-173530_geom-006-source_geom-006-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/26bd3a70-3154-44a4-8705-1eac01cde8fd.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-001-source/geom-001-source.png",
+      "cardName": "Critical Hit",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Critical Hit",
+        "top1Score": 0.8098991552538123,
+        "top2Score": 0.6321702702353694,
+        "expectedScore": 0.8098991552538123,
+        "margin": 0.17772888501844286,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Critical Hit",
+        "top1Score": 0.7384615694527488,
+        "top2Score": 0.6349444486368399,
+        "expectedScore": 0.7384615694527488,
+        "margin": 0.10351712081590891,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Critical Hit",
+        "top1Score": 0.7852757872923439,
+        "top2Score": 0.6612958541574092,
+        "expectedScore": 0.7852757872923439,
+        "margin": 0.12397993313493472,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 36.56689475394832,
+        "corners": [
+          62.42907690480364,
+          9.265465676579637,
+          8.481205414811782,
+          66.09183101959823
+        ],
+        "iou": 0.8803419331317875
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-173530/geom-001-source/geom-001-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/d2e9aaaf-0b51-4721-b75c-923892a41743.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-005-source/geom-005-source.png",
+      "cardName": "Sword of the Animist",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sword of the Animist",
+        "top1Score": 0.7813322424377458,
+        "top2Score": 0.6350618204358437,
+        "expectedScore": 0.7813322424377458,
+        "margin": 0.1462704220019021,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sword of the Animist",
+        "top1Score": 0.7225611008424769,
+        "top2Score": 0.6546872163759154,
+        "expectedScore": 0.7225611008424769,
+        "margin": 0.06787388446656151,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sword of the Animist",
+        "top1Score": 0.6964419441967001,
+        "top2Score": 0.6432202048764838,
+        "expectedScore": 0.6964419441967001,
+        "margin": 0.053221739320216344,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 6.88912207473278,
+        "corners": [
+          9.623284061045526,
+          2.3704479694368437,
+          6.048470061602824,
+          9.514286206845926
+        ],
+        "iou": 0.9752443942723608
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-192617/geom-005-source/geom-005-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-192617_geom-005-source_geom-005-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-192617_geom-005-source_geom-005-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-192617_geom-005-source_geom-005-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/01048220-cef3-47ee-8d68-d01d324ad8af.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-001-source/geom-001-source.png",
+      "cardName": "Swiftfoot Boots",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Swiftfoot Boots",
+        "top1Score": 0.7532029548275102,
+        "top2Score": 0.6965114130671892,
+        "expectedScore": 0.7532029548275102,
+        "margin": 0.056691541760320985,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Swiftfoot Boots",
+        "top1Score": 0.7686077023886599,
+        "top2Score": 0.6875621387424099,
+        "expectedScore": 0.7686077023886599,
+        "margin": 0.08104556364625004,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Swiftfoot Boots",
+        "top1Score": 0.7634872806942439,
+        "top2Score": 0.6931015032715703,
+        "expectedScore": 0.7634872806942439,
+        "margin": 0.0703857774226736,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 8.437457349577274,
+        "corners": [
+          6.129660822970229,
+          12.100087463796926,
+          13.200964830315309,
+          2.3191162812266364
+        ],
+        "iou": 0.9667250129714969
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260910-192617/geom-001-source/geom-001-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260910-192617_geom-001-source_geom-001-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260910-192617_geom-001-source_geom-001-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260910-192617_geom-001-source_geom-001-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/01ba455b-9cd4-4ba2-9bbf-d83b84dcc891.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-085827/geom-001-source/geom-001-source.png",
+      "cardName": "Havi, the All-Father",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 3,
+        "top1Name": "Minions",
+        "top1Score": 0.7175765353248584,
+        "top2Score": 0.6893076951587985,
+        "expectedScore": 0.6666549080878433,
+        "margin": 0.028268840166059905,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Havi, the All-Father",
+        "top1Score": 0.7084140670030454,
+        "top2Score": 0.6915590638464707,
+        "expectedScore": 0.7084140670030454,
+        "margin": 0.016855003156574733,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Havi, the All-Father",
+        "top1Score": 0.6721070503854968,
+        "top2Score": 0.6680623434817881,
+        "expectedScore": 0.6721070503854968,
+        "margin": 0.004044706903708728,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 39.019582798529555,
+        "corners": [
+          55.590797891402666,
+          26.167645399213452,
+          21.95147990412253,
+          52.36840799937956
+        ],
+        "iou": 0.8679987088628248
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260911-085827/geom-001-source/geom-001-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260911-085827_geom-001-source_geom-001-source.png/current.png",
+        "auto_anchor": "artifacts/inbox_sessions_geometry-test-20260911-085827_geom-001-source_geom-001-source.png/auto.png",
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260911-085827_geom-001-source_geom-001-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/4ffdd5a9-bc4f-48de-b87b-8087241f6d41.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+      "cardName": "Mudbutton Torchrunner",
+      "detected": true,
+      "notes": "auto art box not detected",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 1698,
+        "top1Name": "That's No Moonmist",
+        "top1Score": 0.5340348933628838,
+        "top2Score": 0.5267845560876582,
+        "expectedScore": 0.3425840322649045,
+        "margin": 0.007250337275225616,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": false,
+        "failed": true,
+        "reason": "no art box",
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": null,
+        "top1Name": null,
+        "top1Score": null,
+        "top2Score": null,
+        "expectedScore": null,
+        "margin": null,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Mudbutton Torchrunner",
+        "top1Score": 0.8369111406336892,
+        "top2Score": 0.6383016094120679,
+        "expectedScore": 0.8369111406336892,
+        "margin": 0.19860953122162128,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": null,
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+        "current": "artifacts/inbox_sessions_geometry-test-20260911-100459_geom-003-source_geom-003-source.png/current.png",
+        "auto_anchor": null,
+        "manual_gt": "artifacts/inbox_sessions_geometry-test-20260911-100459_geom-003-source_geom-003-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/20c19ccf-999b-4c7d-ae5b-f93555d08a7a.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/livaan-foil-20260908T105241/source-highres.png",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "top1Score": 0.6102454403734233,
+        "top2Score": 0.5192928489115554,
+        "expectedScore": 0.6102454403734233,
+        "margin": 0.09095259146186796,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "top1Score": 0.572064363499836,
+        "top2Score": 0.5162565509380436,
+        "expectedScore": 0.572064363499836,
+        "margin": 0.05580781256179246,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "top1Score": 0.6988297333890001,
+        "top2Score": 0.6147049050916318,
+        "expectedScore": 0.6988297333890001,
+        "margin": 0.08412482829736834,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 79.11859310104052,
+        "corners": [
+          89.14854298184362,
+          67.25611749717977,
+          73.40237150696554,
+          86.66734041817311
+        ],
+        "iou": 0.7115239576179033
+      },
+      "tags": [
+        "FOIL",
+        "foil"
+      ],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/livaan-foil-20260908T105241/source-highres.png",
+        "current": "artifacts/can-inbox_sessions_phone-20260908_livaan-foil-20260908T105241_source-highres.png/current.png",
+        "auto_anchor": "artifacts/can-inbox_sessions_phone-20260908_livaan-foil-20260908T105241_source-highres.png/auto.png",
+        "manual_gt": "artifacts/can-inbox_sessions_phone-20260908_livaan-foil-20260908T105241_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/06bcc2a8-c7be-45c8-8048-e81638558d66.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-111516--card-007/source-highres/source-highres.png",
+      "cardName": "Sprouting Goblin",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sprouting Goblin",
+        "top1Score": 0.684430138060505,
+        "top2Score": 0.6522949683791982,
+        "expectedScore": 0.684430138060505,
+        "margin": 0.03213516968130681,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sprouting Goblin",
+        "top1Score": 0.6863347015856416,
+        "top2Score": 0.6707115972760005,
+        "expectedScore": 0.6863347015856416,
+        "margin": 0.01562310430964109,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Sprouting Goblin",
+        "top1Score": 0.6959774722878231,
+        "top2Score": 0.6320255664767279,
+        "expectedScore": 0.6959774722878231,
+        "margin": 0.06395190581109522,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 19.548830888787453,
+        "corners": [
+          13.540265991577693,
+          23.825854017686936,
+          28.77756369288958,
+          12.051639852995601
+        ],
+        "iou": 0.9212662631324557
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/normal-scan-session-20260911-111516--card-007/source-highres/source-highres.png",
+        "current": "artifacts/_normal-scan-session-20260911-111516--card-007_source-highres_source-highres.png/current.png",
+        "auto_anchor": "artifacts/_normal-scan-session-20260911-111516--card-007_source-highres_source-highres.png/auto.png",
+        "manual_gt": "artifacts/_normal-scan-session-20260911-111516--card-007_source-highres_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/602f5370-d096-4765-b612-16bcec3aafa7.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-006/source-highres/source-highres.png",
+      "cardName": "Goblin Lookout",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Goblin Lookout",
+        "top1Score": 0.7632918003636409,
+        "top2Score": 0.6887714328663901,
+        "expectedScore": 0.7632918003636409,
+        "margin": 0.07452036749725077,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Goblin Lookout",
+        "top1Score": 0.7723462126520063,
+        "top2Score": 0.6690050755870294,
+        "expectedScore": 0.7723462126520063,
+        "margin": 0.10334113706497694,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": false,
+        "top10": false,
+        "rank": 2969,
+        "top1Name": "Commando Raid",
+        "top1Score": 0.6547795891992083,
+        "top2Score": 0.6460268166996325,
+        "expectedScore": 0.43663883443718254,
+        "margin": 0.008752772499575845,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 519.1390747969753,
+        "corners": [
+          572.8507970582356,
+          451.3729725009475,
+          595.5859576229394,
+          456.7465720057784
+        ],
+        "iou": 0.9568815981704046
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/normal-scan-session-20260911-113049--card-006/source-highres/source-highres.png",
+        "current": "artifacts/_normal-scan-session-20260911-113049--card-006_source-highres_source-highres.png/current.png",
+        "auto_anchor": "artifacts/_normal-scan-session-20260911-113049--card-006_source-highres_source-highres.png/auto.png",
+        "manual_gt": "artifacts/_normal-scan-session-20260911-113049--card-006_source-highres_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/23bbe84a-8857-467a-a4a1-e57086cc9501.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-001/source-highres/source-highres.png",
+      "cardName": "Goblin Blastronauts",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Goblin Blastronauts",
+        "top1Score": 0.7211379085302578,
+        "top2Score": 0.7188374050942726,
+        "expectedScore": 0.7211379085302578,
+        "margin": 0.0023005034359852017,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Goblin Blastronauts",
+        "top1Score": 0.7696079381464472,
+        "top2Score": 0.708352051430616,
+        "expectedScore": 0.7696079381464472,
+        "margin": 0.061255886715831265,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Goblin Blastronauts",
+        "top1Score": 0.773726937662674,
+        "top2Score": 0.7297753830602245,
+        "expectedScore": 0.773726937662674,
+        "margin": 0.04395155460244948,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 7.995524231734553,
+        "corners": [
+          7.774285580954185,
+          7.465846832332517,
+          12.606381215259965,
+          4.135583298391545
+        ],
+        "iou": 0.9720441610107268
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/normal-scan-session-20260911-113049--card-001/source-highres/source-highres.png",
+        "current": "artifacts/_normal-scan-session-20260911-113049--card-001_source-highres_source-highres.png/current.png",
+        "auto_anchor": "artifacts/_normal-scan-session-20260911-113049--card-001_source-highres_source-highres.png/auto.png",
+        "manual_gt": "artifacts/_normal-scan-session-20260911-113049--card-001_source-highres_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/10fee86e-3916-436a-8e18-85cdd5215f7e.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-120703--card-005/source-highres/source-highres.png",
+      "cardName": "Elder Auntie",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Elder Auntie",
+        "top1Score": 0.7806208622433741,
+        "top2Score": 0.6873025807181424,
+        "expectedScore": 0.7806208622433741,
+        "margin": 0.0933182815252317,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Elder Auntie",
+        "top1Score": 0.7597196542866231,
+        "top2Score": 0.6531846087050787,
+        "expectedScore": 0.7597196542866231,
+        "margin": 0.10653504558154447,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Elder Auntie",
+        "top1Score": 0.7546588106399051,
+        "top2Score": 0.6690274497622404,
+        "expectedScore": 0.7546588106399051,
+        "margin": 0.08563136087766476,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 17.827571753642463,
+        "corners": [
+          8.306927379095084,
+          24.67961472359604,
+          32.35223802721179,
+          5.971506884666933
+        ],
+        "iou": 0.9370057381965121
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/normal-scan-session-20260911-120703--card-005/source-highres/source-highres.png",
+        "current": "artifacts/_normal-scan-session-20260911-120703--card-005_source-highres_source-highres.png/current.png",
+        "auto_anchor": "artifacts/_normal-scan-session-20260911-120703--card-005_source-highres_source-highres.png/auto.png",
+        "manual_gt": "artifacts/_normal-scan-session-20260911-120703--card-005_source-highres_source-highres.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/84678e98-2258-4ea1-aaf0-8ac4cc2ecf8d.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-03-source.png",
+      "cardName": "Octopus Form",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 2,
+        "top1Name": "Specimen Freighter",
+        "top1Score": 0.6905114715797959,
+        "top2Score": 0.673650965571273,
+        "expectedScore": 0.673650965571273,
+        "margin": 0.016860506008522846,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Octopus Form",
+        "top1Score": 0.7533268273724825,
+        "top2Score": 0.7095198931063328,
+        "expectedScore": 0.7533268273724825,
+        "margin": 0.04380693426614968,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Octopus Form",
+        "top1Score": 0.7333426568962053,
+        "top2Score": 0.7094970709751696,
+        "expectedScore": 0.7333426568962053,
+        "margin": 0.023845585921035695,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 10.847705196605837,
+        "corners": [
+          11.287445655312494,
+          11.22396664605926,
+          7.094430721736389,
+          13.784977763315203
+        ],
+        "iou": 0.91757127897909
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-03-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_swap-test-20260908-171149_swap-03-source.png/current.png",
+        "auto_anchor": "artifacts/.scan-inbox_sessions_phone-20260908_swap-test-20260908-171149_swap-03-source.png/auto.png",
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_swap-test-20260908-171149_swap-03-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/ce96a826-53a0-4029-bf34-46779d133b13.jpg"
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-03-source.png",
+      "cardName": "Island",
+      "detected": true,
+      "notes": "",
+      "current": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": false,
+        "top5": true,
+        "top10": true,
+        "rank": 4,
+        "top1Name": "Mountain",
+        "top1Score": 0.7653887456677141,
+        "top2Score": 0.7316998768524965,
+        "expectedScore": 0.686367839691147,
+        "margin": 0.0336888688152176,
+        "wrongConfident": false
+      },
+      "auto_anchor": {
+        "available": true,
+        "failed": false,
+        "top1": true,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 1,
+        "top1Name": "Island",
+        "top1Score": 0.7407310738250056,
+        "top2Score": 0.7393478262032472,
+        "expectedScore": 0.7407310738250056,
+        "margin": 0.0013832476217583434,
+        "wrongConfident": false
+      },
+      "manual_gt": {
+        "available": true,
+        "failed": false,
+        "top1": false,
+        "top3": true,
+        "top5": true,
+        "top10": true,
+        "rank": 2,
+        "top1Name": "Plains",
+        "top1Score": 0.7579711148040368,
+        "top2Score": 0.7543053019628171,
+        "expectedScore": 0.7543053019628171,
+        "margin": 0.0036658128412196955,
+        "wrongConfident": false
+      },
+      "artReview": {
+        "source": "manual"
+      },
+      "artGeometry": {
+        "meanCornerError": 16.362086309182423,
+        "corners": [
+          4.2278754776042975,
+          25.7292848161987,
+          29.8149483424717,
+          5.676236600455
+        ],
+        "iou": 0.9054438834836382
+      },
+      "tags": [],
+      "images": {
+        "source": "../../../.scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-03-source.png",
+        "current": "artifacts/.scan-inbox_sessions_phone-20260908_swap-test-20260908-171306_swap-03-source.png/current.png",
+        "auto_anchor": "artifacts/.scan-inbox_sessions_phone-20260908_swap-test-20260908-171306_swap-03-source.png/auto.png",
+        "manual_gt": "artifacts/.scan-inbox_sessions_phone-20260908_swap-test-20260908-171306_swap-03-source.png/manual.png",
+        "canonical": "../../../.scan-fixtures/visual-embed/art-crops/000f1f50-08e5-4d83-8159-98f06a0e2279.jpg"
+      }
+    }
+  ],
+  "verdict": "REPRESENTATION_BOTTLENECK_DOMINANT",
+  "verdictWhy": "Manual art geometry moved Top1 from 32/46 to 33/46.",
+  "next": "Frame anchors are not the identity bottleneck. The next measurement is a harder adapter or a different encoder, not a CLIP fine-tune until that measurement says so."
+}

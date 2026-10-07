@@ -5,6 +5,7 @@ import { BracketMark } from './BracketMark';
 import { Button } from './Button';
 import { CollectionThumb } from './CollectionThumb';
 import { CommanderPicker } from './CommanderPicker';
+import { CopyCoverage } from './CopyCoverage';
 import { CutsPanel } from './CutsPanel';
 import { DeckCardTagMove } from './DeckCardTagMove';
 import { DeckFromWants } from './DeckFromWants';
@@ -16,6 +17,7 @@ import { NumberStepper, SearchInput, Select, TextInput } from './Field';
 import { GoldfishPanel } from './GoldfishPanel';
 import { IconButton } from './IconButton';
 import { ManaCurve, MiniCurve } from './ManaCurve';
+import { PaperToggle } from './PaperToggle';
 import { Popover } from './Popover';
 import { SelectionBar, SelectionHint } from './Selection';
 import { SetSymbol } from './SetSymbol';
@@ -57,12 +59,17 @@ import { cardKey } from '@/lib/cardName';
 import type { Collection } from '@/lib/collection';
 import {
   DECK_FORMATS,
+  copiesAcrossDecks,
   deckShortfall,
   formatInfo,
   groupDeckCards,
+  isPaperLocked,
   manaCurve,
+  PAPER_LOCK_TITLE,
+  paperFreezeState,
   type Deck,
   type DeckCard,
+  type DeckCopyUse,
   type DeckCardGroup,
   type DeckFormat,
   type DeckPrinting,
@@ -178,6 +185,7 @@ export const DeckPanel = () => {
           collection={collection}
           collectionByKey={collection?.byKey ?? {}}
           deck={editing}
+          decks={decks}
           onBack={() => setEditingId(null)}
           onMergeUpload={() => mergeInput.current?.click()}
         />
@@ -405,6 +413,7 @@ const DeckList = ({
                     <div className="truncate text-sm font-medium text-ink">{d.name}</div>
                     <div className="truncate text-2xs text-ink-faint">
                       {formatInfo(d.format).label} · {countCards(d.cards)} cards
+                      {d.frozen ? ' · paper' : ''}
                       {countCards(d.cards, 'sideboard') > 0 &&
                         ` · ${countCards(d.cards, 'sideboard')} SB`}
                       {d.source !== 'manual' && ` · ${d.source}`}
@@ -494,12 +503,14 @@ const DeckEditor = ({
   collection,
   collectionByKey,
   deck,
+  decks,
   onBack,
   onMergeUpload,
 }: {
   collection: Collection | null;
   collectionByKey: OwnedIndex;
   deck: Deck;
+  decks: readonly Deck[];
   onBack: () => void;
   onMergeUpload: () => void;
 }) => {
@@ -543,6 +554,19 @@ const DeckEditor = ({
   }, [deck.cards, metaByName]);
 
   const ownedOf = (name: string): number => collectionByKey[cardKey(name)]?.total ?? 0;
+  const paper = useMemo(
+    () => paperFreezeState(deck, decks, collectionByKey),
+    [collectionByKey, deck, decks],
+  );
+  const coverageOf = useMemo(() => {
+    const map = new Map<string, DeckCopyUse[]>();
+    for (const card of deck.cards) {
+      const key = cardKey(card.name);
+      if (!key || map.has(key) || skipOwnership(card.name)) continue;
+      map.set(key, copiesAcrossDecks(card.name, decks));
+    }
+    return map;
+  }, [deck.cards, decks]);
 
   const ownedCandidates = useMemo(() => candidatesByName(collection?.cards ?? []), [collection]);
   const imageOverrides = useSyncExternalStore(
@@ -1012,10 +1036,17 @@ const DeckEditor = ({
           title="Rename the deck"
           value={nameDraft}
         />
+        <PaperToggle
+          canMark={paper.canMark}
+          checked={deck.frozen === true}
+          onChange={frozen => void deckStore.setFrozen(deck.id, frozen)}
+          title={paper.title}
+        />
         <Select
           aria-label="Deck format"
+          disabled={deck.frozen === true}
           onChange={e => void deckStore.setFormat(deck.id, e.target.value as DeckFormat)}
-          title="Deck format"
+          title={deck.frozen ? PAPER_LOCK_TITLE : 'Deck format'}
           value={deck.format}
         >
           {DECK_FORMATS.map(f => (
@@ -1162,6 +1193,8 @@ const DeckEditor = ({
               inDeck={inDeck}
               onAdd={names => void deckStore.addCards(deck.id, names, 'main')}
             />
+          ) : deck.frozen ? (
+            <p className="px-4 py-6 text-center text-xs text-ink-faint">{PAPER_LOCK_TITLE}</p>
           ) : (
             <CutsPanel
               cards={deck.cards}
@@ -1185,7 +1218,11 @@ const DeckEditor = ({
             inDeck={inDeck}
             onPick={name => void deckStore.addCard(deck.id, name, 'main', 1)}
             onPickMany={names => void deckStore.addCards(deck.id, names, 'main')}
-            placeholder="Add a card — name, or t:wolf, mv<3…"
+            placeholder={
+              deck.frozen
+                ? 'Add a card to the sideboard…'
+                : 'Add a card — name, or t:wolf, mv<3…'
+            }
             trailing={
               deck.cards.length > 0 && (
                 <>
@@ -1332,9 +1369,14 @@ const DeckEditor = ({
                           <span className="text-ink-muted">Aim for</span>
                           <NumberStepper
                             label="Lands this deck should run"
-                            max={200}
+                            max={deck.frozen ? landTarget : 200}
+                            min={deck.frozen ? landTarget : 0}
                             onChange={n => void deckStore.setLandTarget(deck.id, n)}
-                            title={`${fmt.label} usually plays ${fmt.landCount}. Lands you picked yourself count towards it.`}
+                            title={
+                              deck.frozen
+                                ? PAPER_LOCK_TITLE
+                                : `${fmt.label} usually plays ${fmt.landCount}. Lands you picked yourself count towards it.`
+                            }
                             value={landTarget}
                           />
                         </div>
@@ -1342,7 +1384,9 @@ const DeckEditor = ({
                           <input
                             checked={!!deck.autoLands}
                             className={`${CHECKBOX} mt-0.5`}
+                            disabled={deck.frozen === true}
                             onChange={e => void deckStore.setAutoLands(deck.id, e.target.checked)}
+                            title={deck.frozen ? PAPER_LOCK_TITLE : undefined}
                             type="checkbox"
                           />
                           <span>
@@ -1356,7 +1400,7 @@ const DeckEditor = ({
                         {deck.autoLands && landColors.length === 0 && (
                           <p className="text-2xs text-warn">No colors to pick basics from yet.</p>
                         )}
-                        {landCounts.basics > 0 && (
+                        {landCounts.basics > 0 && !deck.frozen && (
                           <Button
                             icon={Trash2}
                             onClick={() => void deckStore.clearBasicLands(deck.id)}
@@ -1427,10 +1471,14 @@ const DeckEditor = ({
                               candidates={thumb.candidates}
                               card={c}
                               faceImages={thumb.faceImages}
-                              onEdition={() => setPicking(c)}
+                              hereFrozen={deck.frozen === true}
+                              locked={deck.frozen === true}
+                              onEdition={deck.frozen ? undefined : () => setPicking(c)}
+                              owned={ownedOf(c.name)}
                               remove={() => void deckStore.removeCard(deck.id, c.name, 'commander')}
                               setCode={edition.setCode}
                               setName={edition.setName}
+                              uses={coverageOf.get(cardKey(c.name)) ?? []}
                             />
                           );
                         })}
@@ -1448,10 +1496,13 @@ const DeckEditor = ({
                               commander
                               deckId={deck.id}
                               faceImages={thumb.faceImages}
-                              onEdition={() => setPicking(c)}
+                              hereFrozen={deck.frozen === true}
+                              locked={deck.frozen === true}
+                              onEdition={deck.frozen ? undefined : () => setPicking(c)}
                               owned={ownedOf(c.name)}
                               setCode={edition.setCode}
                               setName={edition.setName}
+                              uses={coverageOf.get(cardKey(c.name)) ?? []}
                             />
                           );
                         })}
@@ -1575,7 +1626,12 @@ const DeckEditor = ({
                                       candidates={thumb.candidates}
                                       card={c}
                                       faceImages={thumb.faceImages}
-                                      onEdition={() => setPicking(c)}
+                                      hereFrozen={deck.frozen === true}
+                                      locked={isPaperLocked(deck, section)}
+                                      onEdition={
+                                        isPaperLocked(deck, section) ? undefined : () => setPicking(c)
+                                      }
+                                      owned={ownedOf(c.name)}
                                       remove={() =>
                                         void deckStore.removeCard(deck.id, c.name, c.section)
                                       }
@@ -1584,6 +1640,7 @@ const DeckEditor = ({
                                       setQuantity={n =>
                                         void deckStore.setQuantity(deck.id, c.name, c.section, n)
                                       }
+                                      uses={coverageOf.get(key) ?? []}
                                     >
                                       {section === 'main' && tagSectionIds.length > 0 && (
                                         <DeckCardTagMove
@@ -1623,7 +1680,11 @@ const DeckEditor = ({
                                       card={c}
                                       deckId={deck.id}
                                       faceImages={thumb.faceImages}
-                                      onEdition={() => setPicking(c)}
+                                      hereFrozen={deck.frozen === true}
+                                      locked={isPaperLocked(deck, section)}
+                                      onEdition={
+                                        isPaperLocked(deck, section) ? undefined : () => setPicking(c)
+                                      }
                                       onTagOverride={
                                         section === 'main' && tagSectionIds.length > 0
                                           ? tagId =>
@@ -1635,12 +1696,13 @@ const DeckEditor = ({
                                           : undefined
                                       }
                                       owned={ownedOf(c.name)}
-                                      rowId={`${section}|${key}`}
-                                      selection={selection}
+                                      rowId={isPaperLocked(deck, section) ? undefined : `${section}|${key}`}
+                                      selection={isPaperLocked(deck, section) ? undefined : selection}
                                       setCode={edition.setCode}
                                       setName={edition.setName}
                                       tagOverride={hasOv ? ov![key] : undefined}
                                       tagSectionIds={tagSectionIds}
+                                      uses={coverageOf.get(key) ?? []}
                                     />
                                   );
                                 })}
@@ -1692,7 +1754,7 @@ const DeckEditor = ({
                   >
                     Remove {selection.count}
                   </Button>
-                  {movable('sideboard').length > 0 && (
+                  {!deck.frozen && movable('sideboard').length > 0 && (
                     <Button
                       icon={ChevronDown}
                       onClick={() => void deckStore.moveCards(deck.id, selectedCards, 'sideboard')}
@@ -1702,7 +1764,7 @@ const DeckEditor = ({
                       to sideboard
                     </Button>
                   )}
-                  {movable('main').length > 0 && (
+                  {!deck.frozen && movable('main').length > 0 && (
                     <Button
                       icon={ChevronUp}
                       onClick={() => void deckStore.moveCards(deck.id, selectedCards, 'main')}
@@ -1729,6 +1791,8 @@ const DeckRow = ({
   commander = false,
   deckId,
   faceImages,
+  hereFrozen = false,
+  locked = false,
   onEdition,
   onTagOverride,
   owned,
@@ -1738,6 +1802,7 @@ const DeckRow = ({
   setName,
   tagOverride,
   tagSectionIds = [],
+  uses,
 }: {
   /** Managed by auto-balance — quantity edits here get recalculated away. */
   auto?: boolean;
@@ -1746,6 +1811,10 @@ const DeckRow = ({
   commander?: boolean;
   deckId: string;
   faceImages?: string[];
+  /** This row’s deck is built in paper. */
+  hereFrozen?: boolean;
+  /** Main list or command zone of a paper deck: the row cannot be edited. */
+  locked?: boolean;
   onEdition?: () => void;
   onTagOverride?: (tagId: string | null) => void;
   owned: number;
@@ -1756,12 +1825,13 @@ const DeckRow = ({
   setName?: string;
   tagOverride?: string;
   tagSectionIds?: readonly string[];
+  uses: readonly DeckCopyUse[];
 }) => {
   const [adding, setAdding] = useState(false);
   const need = Math.max(0, card.quantity - owned);
   const basic = skipOwnership(card.name);
   const status = owned >= card.quantity ? 'owned' : owned > 0 ? 'partial' : 'buy';
-  // `group` so the row's remove button can hide until the pointer arrives.
+  // `group` so the quantity stepper stays quiet until the pointer arrives.
   const base = 'group flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-tint';
   return (
     <li {...(selection && rowId ? selection.rowProps(rowId, base) : { className: base })}>
@@ -1771,6 +1841,20 @@ const DeckRow = ({
         name={card.name}
         previewKey={`deck|${card.section}|${cardKey(card.name)}`}
       />
+      {locked ? null : (
+        <button
+          className="flex h-8 w-7 flex-none items-center justify-center rounded text-base leading-none text-ink-muted hover:bg-neg-soft hover:text-neg"
+          onClick={() => void deckStore.removeCard(deckId, card.name, card.section)}
+          title={
+            commander
+              ? `Remove ${card.name} from the command zone`
+              : `Remove ${card.name} from the deck`
+          }
+          type="button"
+        >
+          ×
+        </button>
+      )}
 
       {commander ? (
         <span aria-hidden className="text-sm text-warn" title="Commander">
@@ -1799,6 +1883,14 @@ const DeckRow = ({
       )}
 
       {!commander ? (
+        locked ? (
+          <span
+            className="min-w-4 flex-none text-center text-xs font-medium tabular-nums text-ink"
+            title={PAPER_LOCK_TITLE}
+          >
+            {card.quantity}
+          </span>
+        ) : (
         // A stepper, quiet until hovered so a long list doesn't read as buttons.
         // Sits after the name, just before ownership badges / remove.
         <div className="flex flex-none items-center">
@@ -1824,71 +1916,64 @@ const DeckRow = ({
             size="xs"
           />
         </div>
+        )
       ) : null}
 
       {basic ? (
         <Badge title="Basic lands aren’t tracked in your collection">basic</Badge>
-      ) : status === 'owned' ? (
-        <Badge title={`You own ${owned}`} tone="pos">
-          <Check aria-hidden size={10} strokeWidth={3} />
-        </Badge>
       ) : (
         <>
-          <button
-            className="inline-flex h-4 flex-none items-center rounded-full bg-pos-soft px-1.5 text-2xs font-medium text-pos hover:ring-1 hover:ring-inset hover:ring-pos disabled:opacity-60"
-            disabled={adding}
-            onClick={() => {
-              setAdding(true);
-              const printing = card.printing;
-              void collectionStore
-                .addCopies(card.name, need)
-                .then(() => {
-                  if (!printing) return;
-                  return cardImageOverrideStore.set(cardKey(card.name), {
-                    collectorNumber: printing.collectorNumber,
-                    imageUrl: printing.imageUrl,
-                    scryfallId: printing.scryfallId,
-                    setCode: printing.setCode,
-                    setName: printing.setName,
-                  });
-                })
-                .finally(() => setAdding(false));
-            }}
-            title={
-              need === 1
-                ? `Add ${card.name} to your collection`
-                : `Add ${need} copies of ${card.name} to your collection`
-            }
-            type="button"
-          >
-            add{need > 1 ? ` ${need}` : ''}
-          </button>
-          <a
-            className="flex-none"
-            href={buyUrl(card.name, card.printing?.cardmarketId)}
-            rel="noreferrer"
-            target="_blank"
-            title={
-              status === 'partial'
-                ? `You own ${owned} of ${card.quantity} — buy ${need} more on Cardmarket`
-                : `Not in your collection — buy ${need} on Cardmarket`
-            }
-          >
-            <Badge tone={status === 'partial' ? 'warn' : 'neg'}>buy {need}</Badge>
-          </a>
+          <CopyCoverage hereFrozen={hereFrozen} owned={owned} uses={uses} />
+          {status !== 'owned' && (
+            <>
+              <button
+                className="inline-flex h-4 flex-none items-center rounded-full bg-pos-soft px-1.5 text-2xs font-medium text-pos hover:ring-1 hover:ring-inset hover:ring-pos disabled:opacity-60"
+                disabled={adding}
+                onClick={() => {
+                  setAdding(true);
+                  const printing = card.printing;
+                  void collectionStore
+                    .addCopies(card.name, need)
+                    .then(() => {
+                      if (!printing) return;
+                      return cardImageOverrideStore.set(cardKey(card.name), {
+                        collectorNumber: printing.collectorNumber,
+                        imageUrl: printing.imageUrl,
+                        scryfallId: printing.scryfallId,
+                        setCode: printing.setCode,
+                        setName: printing.setName,
+                      });
+                    })
+                    .finally(() => setAdding(false));
+                }}
+                title={
+                  need === 1
+                    ? `Add ${card.name} to your collection`
+                    : `Add ${need} copies of ${card.name} to your collection`
+                }
+                type="button"
+              >
+                add{need > 1 ? ` ${need}` : ''}
+              </button>
+              <a
+                className="flex-none"
+                href={buyUrl(card.name, card.printing?.cardmarketId)}
+                rel="noreferrer"
+                target="_blank"
+                title={
+                  status === 'partial'
+                    ? `You own ${owned} of ${card.quantity} — buy ${need} more on Cardmarket`
+                    : `Not in your collection — buy ${need} on Cardmarket`
+                }
+              >
+                <Badge tone={status === 'partial' ? 'warn' : 'neg'}>buy {need}</Badge>
+              </a>
+            </>
+          )}
         </>
       )}
 
       {onEdition && <SetSymbol onClick={onEdition} setCode={setCode} setName={setName} />}
-
-      <IconButton
-        className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
-        icon={X}
-        label={`Remove ${card.name} from the deck`}
-        onClick={() => void deckStore.removeCard(deckId, card.name, card.section)}
-        size="xs"
-        tone="danger"
-      />
     </li>
   );
 };
@@ -1941,23 +2026,31 @@ const DeckTile = ({
   card,
   children,
   faceImages,
+  hereFrozen = false,
+  locked = false,
   onEdition,
+  owned,
   remove,
   setCode,
   setName,
   setQuantity,
+  uses,
 }: {
   candidates: readonly string[];
   card: DeckCard;
   /** Goes under the name (the tag-section picker). */
   children?: ReactNode;
   faceImages?: string[];
+  hereFrozen?: boolean;
+  locked?: boolean;
   onEdition?: () => void;
+  owned?: number;
   remove: () => void;
   setCode?: string;
   setName?: string;
   /** Left out where the count is fixed at one: a commander. */
   setQuantity?: (quantity: number) => void;
+  uses?: readonly DeckCopyUse[];
 }) => (
   <div className="group flex min-w-0 flex-col gap-1">
     <div className="relative">
@@ -1974,6 +2067,12 @@ const DeckTile = ({
           {card.quantity}×
         </span>
       )}
+      {uses && owned != null && !isBasicLand(card.name) ? (
+        <span className="absolute right-1 top-1">
+          <CopyCoverage hereFrozen={hereFrozen} owned={owned} uses={uses} />
+        </span>
+      ) : null}
+      {!locked ? (
       <div className="absolute inset-x-1 bottom-1 flex items-center justify-center gap-0.5 rounded border border-line-strong bg-panel p-0.5 opacity-0 shadow-pop transition-opacity focus-within:opacity-100 group-hover:opacity-100">
         {setQuantity && (
           <>
@@ -2003,6 +2102,7 @@ const DeckTile = ({
           tone="danger"
         />
       </div>
+      ) : null}
     </div>
     <span className="truncate px-0.5 text-2xs text-ink" title={card.name}>
       {card.name}
@@ -2080,6 +2180,7 @@ const AddCardBox = ({
   trailing?: ReactNode;
 }) => {
   const [text, setText] = useState('');
+  const [oracle, setOracle] = useState(false);
   const [resp, setResp] = useState<CardSearchResponse | null>(null);
   const [searching, setSearching] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -2115,11 +2216,12 @@ const AddCardBox = ({
       cmcMin: filters ? num(cmcMin) : undefined,
       format: deckFormat,
       identity: filters && useIdentity ? sortWubrg([...identity]) : undefined,
+      oracle: filters ? oracle : undefined,
       subtype: filters ? subtype : undefined,
       text,
       types: filters ? [...types] : undefined,
     }),
-    [cmcMax, cmcMin, deckFormat, filters, identity, subtype, text, types, useIdentity],
+    [cmcMax, cmcMin, deckFormat, filters, identity, oracle, subtype, text, types, useIdentity],
   );
 
   const runnable = hasSearchCriteria(query);
@@ -2198,7 +2300,7 @@ const AddCardBox = ({
   // ("t:wolf") there's no name to add, so take the top result instead.
   const submit = (): void => {
     const typed = text.trim();
-    if (typed && !looksLikeSyntax(typed)) {
+    if (typed && !looksLikeSyntax(typed) && !oracle) {
       add(typed);
       return;
     }
@@ -2223,7 +2325,7 @@ const AddCardBox = ({
   /** True when the box is a filter/syntax harvest, not a one-off name add. */
   function keepSearchOpen(q: string): boolean {
     if (!filters) return false;
-    if (looksLikeSyntax(q.trim())) return true;
+    if (oracle || looksLikeSyntax(q.trim())) return true;
     return types.size > 0 || !!subtype.trim() || !!cmcMin || !!cmcMax;
   }
 
@@ -2239,14 +2341,25 @@ const AddCardBox = ({
           onKeyDown={e => {
             if (e.key === 'Enter') submit();
           }}
-          placeholder={placeholder}
+          placeholder={oracle ? 'Oracle text, exact spelling…' : placeholder}
           title={
-            filters
-              ? 'Type a name, or use Scryfall syntax — t:wolf, o:"draw a card", mv<3, -t:land'
-              : undefined
+            oracle
+              ? 'Matches this exact spelling in the rules text'
+              : filters
+                ? 'Type a name, or use Scryfall syntax — t:wolf, o:"draw a card", mv<3, -t:land'
+                : undefined
           }
           value={text}
         />
+        {filters && (
+          <Button
+            active={oracle}
+            onClick={() => setOracle(v => !v)}
+            title="Search the rules text for this exact spelling"
+          >
+            Oracle
+          </Button>
+        )}
         {filters && (
           <Button
             active={showFilters}

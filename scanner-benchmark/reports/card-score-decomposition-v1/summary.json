@@ -1,0 +1,2519 @@
+{
+  "decision": {
+    "verdict": "SELECTION_MIXED",
+    "wins": {
+      "area": 4
+    },
+    "topKey": "area",
+    "topCount": 4
+  },
+  "weights": {
+    "aspect": 0.4,
+    "parallel": 0.25,
+    "area": 0.25,
+    "center": 0.1
+  },
+  "frames": [
+    {
+      "slug": "island-cq",
+      "card": "Island cq-120629",
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+      "outlineScale": 1,
+      "outlineSpace": "image",
+      "width": 960,
+      "height": 1280,
+      "previewScale": 0.5,
+      "accepted": [
+        {
+          "index": 28,
+          "method": "chroma@18",
+          "score": 0.984832637084146,
+          "iou": 0.15840811912907654,
+          "areaRatio": 6.31280773673706,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.7412585440853856,
+          "aspectScore": 0.9645912400077153,
+          "parallelRaw": 0.0030778725572323754,
+          "parallel": 0.9969221274427676,
+          "area": 1209129.5559143953,
+          "areaRaw": 2.8114061474944085,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 1.8751262370564385,
+          "centerScore": 0.9976560922036795,
+          "frameFraction": 0.983992151623043,
+          "weighted": {
+            "aspect": 0.38583649600308617,
+            "parallel": 0.2492305318606919,
+            "area": 0.25,
+            "center": 0.09976560922036795
+          },
+          "total": 0.984832637084146,
+          "rank": 1,
+          "nestedOuter": true,
+          "nestedInner": false,
+          "areaVsLargest": 1
+        },
+        {
+          "index": 16,
+          "method": "luma@12",
+          "score": 0.8511945859366479,
+          "iou": 0.19008815481034272,
+          "areaRatio": 5.260717065709502,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.6019661527628364,
+          "aspectScore": 0.8408416102084063,
+          "parallelRaw": 0.3002221378417403,
+          "parallel": 0.6997778621582598,
+          "area": 1007616.3816039807,
+          "areaRaw": 2.342858030143184,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 80.69218949023745,
+          "centerScore": 0.8991347631372032,
+          "frameFraction": 0.8200003105501145,
+          "weighted": {
+            "aspect": 0.33633664408336256,
+            "parallel": 0.17494446553956494,
+            "area": 0.25,
+            "center": 0.08991347631372032
+          },
+          "total": 0.8511945859366479,
+          "rank": 2,
+          "nestedOuter": false,
+          "nestedInner": true,
+          "areaVsLargest": 0.8333402956492766
+        },
+        {
+          "index": 0,
+          "method": "luma×2.5",
+          "score": 0.8409326190448357,
+          "iou": 0.9814877221096797,
+          "areaRatio": 0.9928904578648466,
+          "containsHuman": true,
+          "humanContains": true,
+          "storedEdge": null,
+          "aspect": 0.7193435207387494,
+          "aspectScore": 0.9952027011903183,
+          "parallelRaw": 0.03967515466684268,
+          "parallel": 0.9603248453331573,
+          "area": 190174.2059089368,
+          "areaRaw": 0.4421833284713002,
+          "areaScore": 0.4421833284713002,
+          "areaSaturated": false,
+          "centerDist": 62.20403905924832,
+          "centerScore": 0.9222449511759396,
+          "frameFraction": 0.15476416496495507,
+          "weighted": {
+            "aspect": 0.39808108047612734,
+            "parallel": 0.24008121133328933,
+            "area": 0.11054583211782505,
+            "center": 0.09222449511759397
+          },
+          "total": 0.8409326190448357,
+          "rank": 3,
+          "nestedOuter": false,
+          "nestedInner": true,
+          "areaVsLargest": 0.15728190993157798
+        },
+        {
+          "index": 4,
+          "method": "luma×3.5",
+          "score": 0.8407000560409695,
+          "iou": 0.9796281963771337,
+          "areaRatio": 0.982920085424259,
+          "containsHuman": true,
+          "humanContains": true,
+          "storedEdge": null,
+          "aspect": 0.7153208991494515,
+          "aspectScore": 0.9991783988119323,
+          "parallelRaw": 0.0421796049461423,
+          "parallel": 0.9578203950538577,
+          "area": 188264.52126398357,
+          "areaRaw": 0.4377430274925213,
+          "areaScore": 0.4377430274925213,
+          "areaSaturated": false,
+          "centerDist": 62.89727296318638,
+          "centerScore": 0.9213784087960171,
+          "frameFraction": 0.15321005962238246,
+          "weighted": {
+            "aspect": 0.39967135952477295,
+            "parallel": 0.23945509876346444,
+            "area": 0.10943575687313033,
+            "center": 0.09213784087960171
+          },
+          "total": 0.8407000560409695,
+          "rank": 4,
+          "nestedOuter": false,
+          "nestedInner": true,
+          "areaVsLargest": 0.15570252198624812
+        },
+        {
+          "index": 32,
+          "method": "chroma@28",
+          "score": 0.8242048637071118,
+          "iou": 0.22627481903081031,
+          "areaRatio": 4.41940470567269,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.8961902050558473,
+          "aspectScore": 0.7481787611918324,
+          "parallelRaw": 0.21942648615764432,
+          "parallel": 0.7805735138423557,
+          "area": 846474.8289543195,
+          "areaRaw": 1.9681799408350062,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 161.68015384168075,
+          "centerScore": 0.797899807697899,
+          "frameFraction": 0.6888629792922522,
+          "weighted": {
+            "aspect": 0.29927150447673295,
+            "parallel": 0.19514337846058893,
+            "area": 0.25,
+            "center": 0.07978998076978991
+          },
+          "total": 0.8242048637071118,
+          "rank": 5,
+          "nestedOuter": false,
+          "nestedInner": false,
+          "areaVsLargest": 0.7000695870958006
+        },
+        {
+          "index": 24,
+          "method": "luma@28",
+          "score": 0.820302646916137,
+          "iou": 0.9437505281798443,
+          "areaRatio": 1.0167963520546943,
+          "containsHuman": false,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.7544721537772966,
+          "aspectScore": 0.9461341344063159,
+          "parallelRaw": 0.05345967765663374,
+          "parallel": 0.9465403223433663,
+          "area": 194753.0437939074,
+          "areaRaw": 0.4528298079285421,
+          "areaScore": 0.4528298079285421,
+          "areaSaturated": false,
+          "centerDist": 63.9483153149327,
+          "centerScore": 0.9200646058563341,
+          "frameFraction": 0.15849043277498973,
+          "weighted": {
+            "aspect": 0.3784536537625264,
+            "parallel": 0.23663508058584157,
+            "area": 0.11320745198213553,
+            "center": 0.09200646058563342
+          },
+          "total": 0.820302646916137,
+          "rank": 6,
+          "nestedOuter": true,
+          "nestedInner": true,
+          "areaVsLargest": 0.16106879766629048
+        },
+        {
+          "index": 37,
+          "method": "chroma@40",
+          "score": 0.8084526578574331,
+          "iou": 0.9017582012253594,
+          "areaRatio": 1.085178676826226,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.7664940655639966,
+          "aspectScore": 0.9293416227042588,
+          "parallelRaw": 0.10697574036710585,
+          "parallel": 0.8930242596328941,
+          "area": 207850.71656195726,
+          "areaRaw": 0.4832838461727057,
+          "areaScore": 0.4832838461727057,
+          "areaSaturated": false,
+          "centerDist": 58.88814140536421,
+          "centerScore": 0.9263898232432948,
+          "frameFraction": 0.169149346160447,
+          "weighted": {
+            "aspect": 0.37173664908170356,
+            "parallel": 0.22325606490822353,
+            "area": 0.12082096154317643,
+            "center": 0.09263898232432949
+          },
+          "total": 0.8084526578574331,
+          "rank": 7,
+          "nestedOuter": true,
+          "nestedInner": false,
+          "areaVsLargest": 0.1719011131150224
+        },
+        {
+          "index": 40,
+          "method": "edge",
+          "score": 0.7468556983377728,
+          "iou": 0.6133062036145444,
+          "areaRatio": 1.5013553169084146,
+          "containsHuman": false,
+          "humanContains": false,
+          "storedEdge": 0.5,
+          "aspect": 0.8778871184099482,
+          "aspectScore": 0.7737449774591201,
+          "parallelRaw": 0.2840007758890433,
+          "parallel": 0.7159992241109567,
+          "area": 287563.5,
+          "areaRaw": 0.6686279296875,
+          "areaScore": 0.6686279296875,
+          "areaSaturated": false,
+          "centerDist": 70.39264876391569,
+          "centerScore": 0.9120091890451054,
+          "frameFraction": 0.234019775390625,
+          "weighted": {
+            "aspect": 0.30949799098364805,
+            "parallel": 0.17899980602773918,
+            "area": 0.167156982421875,
+            "center": 0.09120091890451054
+          },
+          "total": 0.7468556983377728,
+          "rank": 8,
+          "nestedOuter": false,
+          "nestedInner": false,
+          "areaVsLargest": 0.23782687189590054
+        },
+        {
+          "index": 20,
+          "method": "luma@18",
+          "score": 0.6348298240483605,
+          "iou": 0.21303748200923184,
+          "areaRatio": 2.93127247703524,
+          "containsHuman": false,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 1.1560145809007483,
+          "aspectScore": 0.38524947429736756,
+          "parallelRaw": 0.3230170472603693,
+          "parallel": 0.6769829527396307,
+          "area": 561444.0255792849,
+          "areaRaw": 1.3054409076899296,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 308.12563084395407,
+          "centerScore": 0.6148429614450575,
+          "frameFraction": 0.4569043176914753,
+          "weighted": {
+            "aspect": 0.15409978971894703,
+            "parallel": 0.16924573818490768,
+            "area": 0.25,
+            "center": 0.06148429614450575
+          },
+          "total": 0.6348298240483605,
+          "rank": 9,
+          "nestedOuter": false,
+          "nestedInner": false,
+          "areaVsLargest": 0.4643373597419815
+        }
+      ],
+      "best": {
+        "index": 0,
+        "method": "luma×2.5",
+        "score": 0.8409326190448357,
+        "iou": 0.9814877221096797,
+        "areaRatio": 0.9928904578648466,
+        "containsHuman": true,
+        "humanContains": true,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            322.29382757766416,
+            446.35912555835614
+          ],
+          "tr": [
+            681.1336418832299,
+            427.3390592440552
+          ],
+          "br": [
+            711.1372462923189,
+            946.4195554665266
+          ],
+          "bl": [
+            330.7208706016626,
+            954.8543543300281
+          ]
+        },
+        "aspect": 0.7193435207387494,
+        "aspectScore": 0.9952027011903183,
+        "parallelRaw": 0.03967515466684268,
+        "parallel": 0.9603248453331573,
+        "area": 190174.2059089368,
+        "areaRaw": 0.4421833284713002,
+        "areaScore": 0.4421833284713002,
+        "areaSaturated": false,
+        "centerDist": 62.20403905924832,
+        "centerScore": 0.9222449511759396,
+        "frameFraction": 0.15476416496495507,
+        "weighted": {
+          "aspect": 0.39808108047612734,
+          "parallel": 0.24008121133328933,
+          "area": 0.11054583211782505,
+          "center": 0.09222449511759397
+        },
+        "total": 0.8409326190448357,
+        "rank": 3,
+        "nestedOuter": false,
+        "nestedInner": true,
+        "areaVsLargest": 0.15728190993157798
+      },
+      "maxScore": {
+        "index": 28,
+        "method": "chroma@18",
+        "score": 0.984832637084146,
+        "iou": 0.15840811912907654,
+        "areaRatio": 6.31280773673706,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            1.5799204487321374,
+            0.16878494912700148
+          ],
+          "tr": [
+            945.8807689427267,
+            1.5013378429945259
+          ],
+          "br": [
+            957.2885499041803,
+            1278
+          ],
+          "bl": [
+            8.121297423400193,
+            1278
+          ]
+        },
+        "aspect": 0.7412585440853856,
+        "aspectScore": 0.9645912400077153,
+        "parallelRaw": 0.0030778725572323754,
+        "parallel": 0.9969221274427676,
+        "area": 1209129.5559143953,
+        "areaRaw": 2.8114061474944085,
+        "areaScore": 1,
+        "areaSaturated": true,
+        "centerDist": 1.8751262370564385,
+        "centerScore": 0.9976560922036795,
+        "frameFraction": 0.983992151623043,
+        "weighted": {
+          "aspect": 0.38583649600308617,
+          "parallel": 0.2492305318606919,
+          "area": 0.25,
+          "center": 0.09976560922036795
+        },
+        "total": 0.984832637084146,
+        "rank": 1,
+        "nestedOuter": true,
+        "nestedInner": false,
+        "areaVsLargest": 1
+      },
+      "final": {
+        "index": 16,
+        "method": "luma@12",
+        "score": 0.8511945859366479,
+        "iou": 0.19008815481034272,
+        "areaRatio": 5.260717065709502,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            2.8305278231980338,
+            -1.3274472588981325
+          ],
+          "tr": [
+            575.7723155238883,
+            5.067962224381636
+          ],
+          "br": [
+            1012.9823882484704,
+            1278
+          ],
+          "bl": [
+            5.646114748034108,
+            1278
+          ]
+        },
+        "aspect": 0.6019661527628364,
+        "aspectScore": 0.8408416102084063,
+        "parallelRaw": 0.3002221378417403,
+        "parallel": 0.6997778621582598,
+        "area": 1007616.3816039807,
+        "areaRaw": 2.342858030143184,
+        "areaScore": 1,
+        "areaSaturated": true,
+        "centerDist": 80.69218949023745,
+        "centerScore": 0.8991347631372032,
+        "frameFraction": 0.8200003105501145,
+        "weighted": {
+          "aspect": 0.33633664408336256,
+          "parallel": 0.17494446553956494,
+          "area": 0.25,
+          "center": 0.08991347631372032
+        },
+        "total": 0.8511945859366479,
+        "rank": 2,
+        "nestedOuter": false,
+        "nestedInner": true,
+        "areaVsLargest": 0.8333402956492766
+      },
+      "traced": {
+        "max": {
+          "index": 28,
+          "score": 0.984832637084146,
+          "corners": {
+            "bottomLeft": {
+              "x": 8.121297423400193,
+              "y": 1278
+            },
+            "bottomRight": {
+              "x": 957.2885499041803,
+              "y": 1278
+            },
+            "topLeft": {
+              "x": 1.5799204487321374,
+              "y": 0.16878494912700148
+            },
+            "topRight": {
+              "x": 945.8807689427267,
+              "y": 1.5013378429945259
+            }
+          },
+          "areaRatio": 0.983992151623043
+        },
+        "nested": [
+          {
+            "outer": 28,
+            "inner": 16,
+            "outerScore": 0.984832637084146,
+            "innerScore": 0.8511945859366479,
+            "areaFraction": 0.8333402956492767,
+            "centerDistNorm": 0.07176353994979172
+          },
+          {
+            "outer": 24,
+            "inner": 4,
+            "outerScore": 0.820302646916137,
+            "innerScore": 0.8407000560409695,
+            "areaFraction": 0.9666833318569843,
+            "centerDistNorm": 0.008885661982741131
+          },
+          {
+            "outer": 37,
+            "inner": 0,
+            "outerScore": 0.8084526578574331,
+            "innerScore": 0.8409326190448357,
+            "areaFraction": 0.9149557386887747,
+            "centerDistNorm": 0.017414180780626485
+          },
+          {
+            "outer": 37,
+            "inner": 4,
+            "outerScore": 0.8084526578574331,
+            "innerScore": 0.8407000560409695,
+            "areaFraction": 0.9057679683671651,
+            "centerDistNorm": 0.01889482107450709
+          },
+          {
+            "outer": 37,
+            "inner": 24,
+            "outerScore": 0.8084526578574331,
+            "innerScore": 0.820302646916137,
+            "areaFraction": 0.9369851931006179,
+            "centerDistNorm": 0.014197537879856283
+          }
+        ],
+        "chosen": {
+          "index": 16,
+          "score": 0.8511945859366479,
+          "corners": {
+            "bottomLeft": {
+              "x": 5.646114748034108,
+              "y": 1278
+            },
+            "bottomRight": {
+              "x": 1012.9823882484704,
+              "y": 1278
+            },
+            "topLeft": {
+              "x": 2.8305278231980338,
+              "y": -1.3274472588981325
+            },
+            "topRight": {
+              "x": 575.7723155238883,
+              "y": 5.067962224381636
+            }
+          },
+          "areaRatio": 0.8200003105501146
+        },
+        "changed": true,
+        "reason": "inner.score >= 0.28",
+        "pair": {
+          "outer": 28,
+          "inner": 16,
+          "outerScore": 0.984832637084146,
+          "innerScore": 0.8511945859366479,
+          "areaFraction": 0.8333402956492767,
+          "centerDistNorm": 0.07176353994979172
+        },
+        "innerGate": true,
+        "ratioGate": true
+      },
+      "nestedClass": "IMPROVED",
+      "maxOnlyIou": 0.15840811912907654,
+      "currentIou": 0.19008815481034272
+    },
+    {
+      "slug": "wand",
+      "card": "Wand cq-120751",
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+      "outlineScale": 0.6666666666666666,
+      "outlineSpace": "capture",
+      "width": 960,
+      "height": 1280,
+      "previewScale": 0.5,
+      "accepted": [
+        {
+          "index": 28,
+          "method": "chroma@18",
+          "score": 0.9506118648080355,
+          "iou": 0.23856215823822916,
+          "areaRatio": 4.191779649316366,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.6884941361612644,
+          "aspectScore": 0.9617060949554169,
+          "parallelRaw": 0.12134545638833277,
+          "parallel": 0.8786545436116673,
+          "area": 1126762.0726561672,
+          "areaRaw": 2.6198894918530673,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 29.873672616385235,
+          "centerScore": 0.9626579092295184,
+          "frameFraction": 0.9169613221485736,
+          "weighted": {
+            "aspect": 0.3846824379821668,
+            "parallel": 0.21966363590291682,
+            "area": 0.25,
+            "center": 0.09626579092295184
+          },
+          "total": 0.9506118648080355,
+          "rank": 1,
+          "nestedOuter": true,
+          "nestedInner": false,
+          "areaVsLargest": 1
+        },
+        {
+          "index": 16,
+          "method": "luma@12",
+          "score": 0.9186749239673988,
+          "iou": 0.2507856718304822,
+          "areaRatio": 3.9874686328808564,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.6557004731906753,
+          "aspectScore": 0.9158990736631654,
+          "parallelRaw": 0.16680672897310403,
+          "parallel": 0.833193271026896,
+          "area": 1071842.7010277212,
+          "areaRaw": 2.4921937802913905,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 47.86418603673123,
+          "centerScore": 0.940169767454086,
+          "frameFraction": 0.8722678231019866,
+          "weighted": {
+            "aspect": 0.3663596294652662,
+            "parallel": 0.208298317756724,
+            "area": 0.25,
+            "center": 0.0940169767454086
+          },
+          "total": 0.9186749239673988,
+          "rank": 2,
+          "nestedOuter": false,
+          "nestedInner": true,
+          "areaVsLargest": 0.9512591229672985
+        },
+        {
+          "index": 32,
+          "method": "chroma@28",
+          "score": 0.9168300998375303,
+          "iou": 0.2513703934444034,
+          "areaRatio": 3.978193240251959,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.6556978980386706,
+          "aspectScore": 0.9158954766254447,
+          "parallelRaw": 0.17305123833714936,
+          "parallel": 0.8269487616628506,
+          "area": 1069349.4495933475,
+          "areaRaw": 2.486396599686913,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 50.12224982688258,
+          "centerScore": 0.9373471877163968,
+          "frameFraction": 0.8702388098904195,
+          "weighted": {
+            "aspect": 0.3663581906501779,
+            "parallel": 0.20673719041571265,
+            "area": 0.25,
+            "center": 0.09373471877163969
+          },
+          "total": 0.9168300998375303,
+          "rank": 3,
+          "nestedOuter": false,
+          "nestedInner": true,
+          "areaVsLargest": 0.9490463652832418
+        },
+        {
+          "index": 40,
+          "method": "edge",
+          "score": 0.8994236260969638,
+          "iou": 0.9053803714546896,
+          "areaRatio": 1.1044579297146568,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": 0.5,
+          "aspect": 0.7382354490355065,
+          "aspectScore": 0.9688139759504036,
+          "parallelRaw": 0.03412851396344911,
+          "parallel": 0.9658714860365509,
+          "area": 296881.37501449644,
+          "areaRaw": 0.690293375684748,
+          "areaScore": 0.690293375684748,
+          "areaSaturated": false,
+          "centerDist": 17.145437708178438,
+          "centerScore": 0.978568202864777,
+          "frameFraction": 0.24160268148966182,
+          "weighted": {
+            "aspect": 0.3875255903801615,
+            "parallel": 0.24146787150913773,
+            "area": 0.172573343921187,
+            "center": 0.0978568202864777
+          },
+          "total": 0.8994236260969638,
+          "rank": 4,
+          "nestedOuter": true,
+          "nestedInner": false,
+          "areaVsLargest": 0.2634818673960551
+        },
+        {
+          "index": 4,
+          "method": "luma×3.5",
+          "score": 0.8937136670993674,
+          "iou": 0.9609660387498684,
+          "areaRatio": 1.0122574951694088,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.7093558083346506,
+          "aspectScore": 0.9908462084674484,
+          "parallelRaw": 0.03662407867033244,
+          "parallel": 0.9633759213296675,
+          "area": 272097.6407967529,
+          "areaRaw": 0.6326675055728072,
+          "areaScore": 0.6326675055728072,
+          "areaSaturated": false,
+          "centerDist": 13.085384105846,
+          "centerScore": 0.9836432698676925,
+          "frameFraction": 0.2214336269504825,
+          "weighted": {
+            "aspect": 0.3963384833869794,
+            "parallel": 0.24084398033241688,
+            "area": 0.1581668763932018,
+            "center": 0.09836432698676925
+          },
+          "total": 0.8937136670993674,
+          "rank": 5,
+          "nestedOuter": true,
+          "nestedInner": true,
+          "areaVsLargest": 0.2414863327404381
+        },
+        {
+          "index": 8,
+          "method": "luma×5",
+          "score": 0.889177232097131,
+          "iou": 0.958319554972188,
+          "areaRatio": 0.9806535574966004,
+          "containsHuman": false,
+          "humanContains": true,
+          "storedEdge": null,
+          "aspect": 0.7048626182333709,
+          "aspectScore": 0.9845700064212165,
+          "parallelRaw": 0.024467013859820502,
+          "parallel": 0.9755329861401795,
+          "area": 263602.41411609517,
+          "areaRaw": 0.612914839369641,
+          "areaScore": 0.612914839369641,
+          "areaSaturated": false,
+          "centerDist": 14.101814790485985,
+          "centerScore": 0.9823727315118925,
+          "frameFraction": 0.2145201937793743,
+          "weighted": {
+            "aspect": 0.3938280025684866,
+            "parallel": 0.24388324653504487,
+            "area": 0.15322870984241024,
+            "center": 0.09823727315118926
+          },
+          "total": 0.889177232097131,
+          "rank": 6,
+          "nestedOuter": false,
+          "nestedInner": true,
+          "areaVsLargest": 0.23394682916038634
+        },
+        {
+          "index": 0,
+          "method": "luma×2.5",
+          "score": 0.8840535268539252,
+          "iou": 0.8993661117074397,
+          "areaRatio": 1.103609275226227,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.6785026767518467,
+          "aspectScore": 0.9477497707009922,
+          "parallelRaw": 0.06039679240452139,
+          "parallel": 0.9396032075954786,
+          "area": 296653.25431867025,
+          "areaRaw": 0.68976296112042,
+          "areaScore": 0.68976296112042,
+          "areaSaturated": false,
+          "centerDist": 19.1033888435711,
+          "centerScore": 0.9761207639455362,
+          "frameFraction": 0.241417036392147,
+          "weighted": {
+            "aspect": 0.3790999082803969,
+            "parallel": 0.23490080189886964,
+            "area": 0.172440740280105,
+            "center": 0.09761207639455362
+          },
+          "total": 0.8840535268539252,
+          "rank": 7,
+          "nestedOuter": true,
+          "nestedInner": false,
+          "areaVsLargest": 0.2632794105496967
+        },
+        {
+          "index": 24,
+          "method": "luma@28",
+          "score": 0.8839296101002672,
+          "iou": 0.8895239698435085,
+          "areaRatio": 1.1016150178187953,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.7272218972102473,
+          "aspectScore": 0.9841979848491784,
+          "parallelRaw": 0.11881105005739237,
+          "parallel": 0.8811889499426077,
+          "area": 296117.1923598375,
+          "areaRaw": 0.6885165372950092,
+          "areaScore": 0.6885165372950092,
+          "areaSaturated": false,
+          "centerDist": 17.40764519046789,
+          "centerScore": 0.9782404435119152,
+          "frameFraction": 0.2409807880532532,
+          "weighted": {
+            "aspect": 0.3936791939396714,
+            "parallel": 0.22029723748565191,
+            "area": 0.1721291343237523,
+            "center": 0.09782404435119152
+          },
+          "total": 0.8839296101002672,
+          "rank": 8,
+          "nestedOuter": true,
+          "nestedInner": false,
+          "areaVsLargest": 0.2628036561984972
+        },
+        {
+          "index": 20,
+          "method": "luma@18",
+          "score": 0.836816534431822,
+          "iou": 0.3254608971863375,
+          "areaRatio": 3.0725657326123144,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.854547819910354,
+          "aspectScore": 0.8063459023474421,
+          "parallelRaw": 0.2650670514246182,
+          "parallel": 0.7349329485753817,
+          "area": 825914.2471420674,
+          "areaRaw": 1.9203735285111314,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 155.64050920800221,
+          "centerScore": 0.8054493634899973,
+          "frameFraction": 0.672130734978896,
+          "weighted": {
+            "aspect": 0.32253836093897686,
+            "parallel": 0.18373323714384543,
+            "area": 0.25,
+            "center": 0.08054493634899973
+          },
+          "total": 0.836816534431822,
+          "rank": 9,
+          "nestedOuter": false,
+          "nestedInner": false,
+          "areaVsLargest": 0.7329979125008196
+        },
+        {
+          "index": 36,
+          "method": "chroma@40",
+          "score": 0.7391184916750232,
+          "iou": 0.36958799647880725,
+          "areaRatio": 2.4651443514846094,
+          "containsHuman": false,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.5870706313559555,
+          "aspectScore": 0.8200351676083187,
+          "parallelRaw": 0.6911474000824391,
+          "parallel": 0.30885259991756087,
+          "area": 662637.6840510793,
+          "areaRaw": 1.5407312222169813,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 128.86980278155715,
+          "centerScore": 0.8389127465230536,
+          "frameFraction": 0.5392559277759434,
+          "weighted": {
+            "aspect": 0.32801406704332753,
+            "parallel": 0.07721314997939022,
+            "area": 0.25,
+            "center": 0.08389127465230536
+          },
+          "total": 0.7391184916750232,
+          "rank": 10,
+          "nestedOuter": false,
+          "nestedInner": false,
+          "areaVsLargest": 0.5880901568589485
+        }
+      ],
+      "best": {
+        "index": 4,
+        "method": "luma×3.5",
+        "score": 0.8937136670993674,
+        "iou": 0.9609660387498684,
+        "areaRatio": 1.0122574951694088,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            294.1074934949384,
+            328.5814535765387
+          ],
+          "tr": [
+            731.2515437653523,
+            345.80669200204187
+          ],
+          "br": [
+            689.2497045588016,
+            983.8546535894418
+          ],
+          "bl": [
+            251.24000958036186,
+            927.0065261748753
+          ]
+        },
+        "aspect": 0.7093558083346506,
+        "aspectScore": 0.9908462084674484,
+        "parallelRaw": 0.03662407867033244,
+        "parallel": 0.9633759213296675,
+        "area": 272097.6407967529,
+        "areaRaw": 0.6326675055728072,
+        "areaScore": 0.6326675055728072,
+        "areaSaturated": false,
+        "centerDist": 13.085384105846,
+        "centerScore": 0.9836432698676925,
+        "frameFraction": 0.2214336269504825,
+        "weighted": {
+          "aspect": 0.3963384833869794,
+          "parallel": 0.24084398033241688,
+          "area": 0.1581668763932018,
+          "center": 0.09836432698676925
+        },
+        "total": 0.8937136670993674,
+        "rank": 5,
+        "nestedOuter": true,
+        "nestedInner": true,
+        "areaVsLargest": 0.2414863327404381
+      },
+      "maxScore": {
+        "index": 28,
+        "method": "chroma@18",
+        "score": 0.9506118648080355,
+        "iou": 0.23856215823822916,
+        "areaRatio": 4.191779649316366,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            3.9235241375967624,
+            -0.8662183314959577
+          ],
+          "tr": [
+            784.2862949278984,
+            6.8725976911426825
+          ],
+          "br": [
+            1000.0520096268723,
+            1278
+          ],
+          "bl": [
+            12.260326117318641,
+            1278
+          ]
+        },
+        "aspect": 0.6884941361612644,
+        "aspectScore": 0.9617060949554169,
+        "parallelRaw": 0.12134545638833277,
+        "parallel": 0.8786545436116673,
+        "area": 1126762.0726561672,
+        "areaRaw": 2.6198894918530673,
+        "areaScore": 1,
+        "areaSaturated": true,
+        "centerDist": 29.873672616385235,
+        "centerScore": 0.9626579092295184,
+        "frameFraction": 0.9169613221485736,
+        "weighted": {
+          "aspect": 0.3846824379821668,
+          "parallel": 0.21966363590291682,
+          "area": 0.25,
+          "center": 0.09626579092295184
+        },
+        "total": 0.9506118648080355,
+        "rank": 1,
+        "nestedOuter": true,
+        "nestedInner": false,
+        "areaVsLargest": 1
+      },
+      "final": {
+        "index": 16,
+        "method": "luma@12",
+        "score": 0.9186749239673988,
+        "iou": 0.2507856718304822,
+        "areaRatio": 3.9874686328808564,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            12.205516646152228,
+            -5.284017323176471
+          ],
+          "tr": [
+            717.2929625187825,
+            16.784989527945466
+          ],
+          "br": [
+            990.7000910750395,
+            1278
+          ],
+          "bl": [
+            8.49168015137576,
+            1278
+          ]
+        },
+        "aspect": 0.6557004731906753,
+        "aspectScore": 0.9158990736631654,
+        "parallelRaw": 0.16680672897310403,
+        "parallel": 0.833193271026896,
+        "area": 1071842.7010277212,
+        "areaRaw": 2.4921937802913905,
+        "areaScore": 1,
+        "areaSaturated": true,
+        "centerDist": 47.86418603673123,
+        "centerScore": 0.940169767454086,
+        "frameFraction": 0.8722678231019866,
+        "weighted": {
+          "aspect": 0.3663596294652662,
+          "parallel": 0.208298317756724,
+          "area": 0.25,
+          "center": 0.0940169767454086
+        },
+        "total": 0.9186749239673988,
+        "rank": 2,
+        "nestedOuter": false,
+        "nestedInner": true,
+        "areaVsLargest": 0.9512591229672985
+      },
+      "traced": {
+        "max": {
+          "index": 28,
+          "score": 0.9506118648080355,
+          "corners": {
+            "bottomLeft": {
+              "x": 12.260326117318641,
+              "y": 1278
+            },
+            "bottomRight": {
+              "x": 1000.0520096268723,
+              "y": 1278
+            },
+            "topLeft": {
+              "x": 3.9235241375967624,
+              "y": -0.8662183314959577
+            },
+            "topRight": {
+              "x": 784.2862949278984,
+              "y": 6.8725976911426825
+            }
+          },
+          "areaRatio": 0.9169613221485737
+        },
+        "nested": [
+          {
+            "outer": 28,
+            "inner": 16,
+            "outerScore": 0.9506118648080355,
+            "innerScore": 0.9186749239673988,
+            "areaFraction": 0.9512591229672984,
+            "centerDistNorm": 0.016967119683637694
+          },
+          {
+            "outer": 28,
+            "inner": 32,
+            "outerScore": 0.9506118648080355,
+            "innerScore": 0.9168300998375303,
+            "areaFraction": 0.9490463652832416,
+            "centerDistNorm": 0.019117913608989467
+          },
+          {
+            "outer": 40,
+            "inner": 4,
+            "outerScore": 0.8994236260969638,
+            "innerScore": 0.8937136670993674,
+            "areaFraction": 0.9165197405309331,
+            "centerDistNorm": 0.007877516602912284
+          },
+          {
+            "outer": 40,
+            "inner": 8,
+            "outerScore": 0.8994236260969638,
+            "innerScore": 0.889177232097131,
+            "areaFraction": 0.88790485460135,
+            "centerDistNorm": 0.005609677185639913
+          },
+          {
+            "outer": 4,
+            "inner": 8,
+            "outerScore": 0.8937136670993674,
+            "innerScore": 0.889177232097131,
+            "areaFraction": 0.9687787565677454,
+            "centerDistNorm": 0.0027576701053014098
+          },
+          {
+            "outer": 0,
+            "inner": 4,
+            "outerScore": 0.8840535268539252,
+            "innerScore": 0.8937136670993674,
+            "areaFraction": 0.9172245267347068,
+            "centerDistNorm": 0.03761356296191826
+          },
+          {
+            "outer": 0,
+            "inner": 8,
+            "outerScore": 0.8840535268539252,
+            "innerScore": 0.889177232097131,
+            "areaFraction": 0.8885876365034879,
+            "centerDistNorm": 0.04013576759478074
+          },
+          {
+            "outer": 24,
+            "inner": 4,
+            "outerScore": 0.8839296101002672,
+            "innerScore": 0.8937136670993674,
+            "areaFraction": 0.9188849814100075,
+            "centerDistNorm": 0.018961379755600773
+          },
+          {
+            "outer": 24,
+            "inner": 8,
+            "outerScore": 0.8839296101002672,
+            "innerScore": 0.889177232097131,
+            "areaFraction": 0.8901962497191629,
+            "centerDistNorm": 0.020818227683199627
+          }
+        ],
+        "chosen": {
+          "index": 16,
+          "score": 0.9186749239673988,
+          "corners": {
+            "bottomLeft": {
+              "x": 8.49168015137576,
+              "y": 1278
+            },
+            "bottomRight": {
+              "x": 990.7000910750395,
+              "y": 1278
+            },
+            "topLeft": {
+              "x": 12.205516646152228,
+              "y": -5.284017323176471
+            },
+            "topRight": {
+              "x": 717.2929625187825,
+              "y": 16.784989527945466
+            }
+          },
+          "areaRatio": 0.8722678231019866
+        },
+        "changed": true,
+        "reason": "inner.score >= 0.28",
+        "pair": {
+          "outer": 28,
+          "inner": 16,
+          "outerScore": 0.9506118648080355,
+          "innerScore": 0.9186749239673988,
+          "areaFraction": 0.9512591229672984,
+          "centerDistNorm": 0.016967119683637694
+        },
+        "innerGate": true,
+        "ratioGate": true
+      },
+      "nestedClass": "IMPROVED",
+      "maxOnlyIou": 0.23856215823822916,
+      "currentIou": 0.2507856718304822
+    },
+    {
+      "slug": "livaan",
+      "card": "Livaan cq-120813",
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+      "outlineScale": 0.6666666666666666,
+      "outlineSpace": "capture",
+      "width": 960,
+      "height": 1280,
+      "previewScale": 0.5,
+      "accepted": [
+        {
+          "index": 28,
+          "method": "chroma@18",
+          "score": 0.9766448142175682,
+          "iou": 0.21831765232781328,
+          "areaRatio": 4.580481648357308,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.7179852881330867,
+          "aspectScore": 0.9970999149887043,
+          "parallelRaw": 0.07958671540222567,
+          "parallel": 0.9204132845977744,
+          "area": 1171717.8830585512,
+          "areaRaw": 2.7244184408913488,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 18.387783418857612,
+          "centerScore": 0.977015270726428,
+          "frameFraction": 0.953546454311972,
+          "weighted": {
+            "aspect": 0.39883996599548177,
+            "parallel": 0.2301033211494436,
+            "area": 0.25,
+            "center": 0.0977015270726428
+          },
+          "total": 0.9766448142175682,
+          "rank": 1,
+          "nestedOuter": true,
+          "nestedInner": false,
+          "areaVsLargest": 1
+        },
+        {
+          "index": 16,
+          "method": "luma@12",
+          "score": 0.9622641105383217,
+          "iou": 0.2262133626865165,
+          "areaRatio": 4.420605344105099,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.7000514912196306,
+          "aspectScore": 0.9778497020210712,
+          "parallelRaw": 0.10115648543772425,
+          "parallel": 0.8988435145622757,
+          "area": 1130820.453672101,
+          "areaRaw": 2.62932583164086,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 28.693191285406165,
+          "centerScore": 0.9641335108932423,
+          "frameFraction": 0.9202640410743009,
+          "weighted": {
+            "aspect": 0.39113988080842854,
+            "parallel": 0.22471087864056893,
+            "area": 0.25,
+            "center": 0.09641335108932424
+          },
+          "total": 0.9622641105383217,
+          "rank": 2,
+          "nestedOuter": false,
+          "nestedInner": true,
+          "areaVsLargest": 0.9650961805928103
+        },
+        {
+          "index": 20,
+          "method": "luma@18",
+          "score": 0.8921782014453852,
+          "iou": 0.6113650887805787,
+          "areaRatio": 1.6356838464469525,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.6285668131603408,
+          "aspectScore": 0.8779980882239681,
+          "parallelRaw": 0.11285776264159568,
+          "parallel": 0.8871422373584044,
+          "area": 418418.8827826053,
+          "areaRaw": 0.9728861671842571,
+          "areaScore": 0.9728861671842571,
+          "areaSaturated": false,
+          "centerDist": 192.22507983893965,
+          "centerScore": 0.7597186502013255,
+          "frameFraction": 0.34051015851449,
+          "weighted": {
+            "aspect": 0.35119923528958724,
+            "parallel": 0.2217855593396011,
+            "area": 0.24322154179606428,
+            "center": 0.07597186502013255
+          },
+          "total": 0.8921782014453852,
+          "rank": 3,
+          "nestedOuter": true,
+          "nestedInner": false,
+          "areaVsLargest": 0.3570986573068261
+        },
+        {
+          "index": 4,
+          "method": "luma×3.5",
+          "score": 0.8819614344584084,
+          "iou": 0.930204713943525,
+          "areaRatio": 1.073522625317715,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.7089409042451055,
+          "aspectScore": 0.9902666598979251,
+          "parallelRaw": 0.04285538391789877,
+          "parallel": 0.9571446160821012,
+          "area": 274614.2773880204,
+          "areaRaw": 0.6385190601469969,
+          "areaScore": 0.6385190601469969,
+          "areaSaturated": false,
+          "centerDist": 104.4891884642893,
+          "centerScore": 0.8693885144196384,
+          "frameFraction": 0.22348167105144892,
+          "weighted": {
+            "aspect": 0.39610666395917005,
+            "parallel": 0.2392861540205253,
+            "area": 0.15962976503674922,
+            "center": 0.08693885144196384
+          },
+          "total": 0.8819614344584084,
+          "rank": 4,
+          "nestedOuter": true,
+          "nestedInner": true,
+          "areaVsLargest": 0.2343689392801542
+        },
+        {
+          "index": 40,
+          "method": "edge",
+          "score": 0.8807419962991552,
+          "iou": 0.7127122963887724,
+          "areaRatio": 1.4030907072417298,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": 0.5,
+          "aspect": 0.6706512505804256,
+          "aspectScore": 0.9367826992234516,
+          "parallelRaw": 0.18390199168444693,
+          "parallel": 0.8160980083155531,
+          "area": 358920,
+          "areaRaw": 0.8345424107142857,
+          "areaScore": 0.8345424107142857,
+          "areaSaturated": false,
+          "centerDist": 53.049505181481194,
+          "centerScore": 0.9336881185231485,
+          "frameFraction": 0.29208984375,
+          "weighted": {
+            "aspect": 0.37471307968938067,
+            "parallel": 0.20402450207888828,
+            "area": 0.20863560267857142,
+            "center": 0.09336881185231485
+          },
+          "total": 0.8807419962991552,
+          "rank": 5,
+          "nestedOuter": true,
+          "nestedInner": false,
+          "areaVsLargest": 0.30631946920798564
+        },
+        {
+          "index": 8,
+          "method": "luma×5",
+          "score": 0.8763475038708596,
+          "iou": 0.942990012975909,
+          "areaRatio": 1.0461366773005853,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.6974391804763819,
+          "aspectScore": 0.9742007600305016,
+          "parallelRaw": 0.02368105642731301,
+          "parallel": 0.976318943572687,
+          "area": 267608.7684700467,
+          "areaRaw": 0.6222302094262618,
+          "areaScore": 0.6222302094262618,
+          "areaSaturated": false,
+          "centerDist": 103.76070712862672,
+          "centerScore": 0.8702991160892166,
+          "frameFraction": 0.21778057329919165,
+          "weighted": {
+            "aspect": 0.38968030401220066,
+            "parallel": 0.24407973589317175,
+            "area": 0.15555755235656546,
+            "center": 0.08702991160892166
+          },
+          "total": 0.8763475038708596,
+          "rank": 6,
+          "nestedOuter": true,
+          "nestedInner": true,
+          "areaVsLargest": 0.22839010340228302
+        },
+        {
+          "index": 0,
+          "method": "luma×2.5",
+          "score": 0.8728401462208781,
+          "iou": 0.831669202514877,
+          "areaRatio": 1.2024011433585717,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.6937793281312796,
+          "aspectScore": 0.9690885853262318,
+          "parallelRaw": 0.11296472598897336,
+          "parallel": 0.8870352740110267,
+          "area": 307582.2654564177,
+          "areaRaw": 0.7151745383566259,
+          "areaScore": 0.7151745383566259,
+          "areaSaturated": false,
+          "centerDist": 122.78192801222312,
+          "centerScore": 0.8465225899847211,
+          "frameFraction": 0.2503110884248191,
+          "weighted": {
+            "aspect": 0.38763543413049273,
+            "parallel": 0.22175881850275667,
+            "area": 0.17879363458915648,
+            "center": 0.08465225899847212
+          },
+          "total": 0.8728401462208781,
+          "rank": 7,
+          "nestedOuter": true,
+          "nestedInner": true,
+          "areaVsLargest": 0.2625053947743219
+        },
+        {
+          "index": 12,
+          "method": "luma×7",
+          "score": 0.8266034717546812,
+          "iou": 0.8811586731813524,
+          "areaRatio": 0.9216796529102739,
+          "containsHuman": false,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.651723313735793,
+          "aspectScore": 0.9103436763293615,
+          "parallelRaw": 0.045312763604980794,
+          "parallel": 0.9546872363950192,
+          "area": 235771.8280900584,
+          "areaRaw": 0.5482045854028516,
+          "areaScore": 0.5482045854028516,
+          "areaSaturated": false,
+          "centerDist": 106.05563381224863,
+          "centerScore": 0.8674304577346892,
+          "frameFraction": 0.19187160489099805,
+          "weighted": {
+            "aspect": 0.3641374705317446,
+            "parallel": 0.2386718090987548,
+            "area": 0.1370511463507129,
+            "center": 0.08674304577346892
+          },
+          "total": 0.8266034717546812,
+          "rank": 8,
+          "nestedOuter": false,
+          "nestedInner": true,
+          "areaVsLargest": 0.20121893802168486
+        },
+        {
+          "index": 32,
+          "method": "chroma@28",
+          "score": 0.7613625254822827,
+          "iou": 0.4103060705895093,
+          "areaRatio": 2.2293415526333646,
+          "containsHuman": false,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.9869864937113182,
+          "aspectScore": 0.621352199260381,
+          "parallelRaw": 0.2126448450202031,
+          "parallel": 0.7873551549797969,
+          "area": 570280.5,
+          "areaRaw": 1.3259870256696429,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 272.1371437345516,
+          "centerScore": 0.6598285703318105,
+          "frameFraction": 0.464095458984375,
+          "weighted": {
+            "aspect": 0.2485408797041524,
+            "parallel": 0.19683878874494923,
+            "area": 0.25,
+            "center": 0.06598285703318106
+          },
+          "total": 0.7613625254822827,
+          "rank": 9,
+          "nestedOuter": false,
+          "nestedInner": false,
+          "areaVsLargest": 0.48670461400775844
+        },
+        {
+          "index": 36,
+          "method": "chroma@40",
+          "score": 0.7570777965133155,
+          "iou": 0.516411450345663,
+          "areaRatio": 1.5270749512818464,
+          "containsHuman": false,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.9954187338474302,
+          "aspectScore": 0.6095738320861293,
+          "parallelRaw": 0.1511613479354253,
+          "parallel": 0.8488386520645748,
+          "area": 390636,
+          "areaRaw": 0.9082868303571429,
+          "areaScore": 0.9082868303571429,
+          "areaSaturated": false,
+          "centerDist": 208.26485541252515,
+          "centerScore": 0.7396689307343436,
+          "frameFraction": 0.317900390625,
+          "weighted": {
+            "aspect": 0.24382953283445172,
+            "parallel": 0.2122096630161437,
+            "area": 0.22707170758928572,
+            "center": 0.07396689307343436
+          },
+          "total": 0.7570777965133155,
+          "rank": 10,
+          "nestedOuter": false,
+          "nestedInner": false,
+          "areaVsLargest": 0.3333874182924626
+        },
+        {
+          "index": 24,
+          "method": "luma@28",
+          "score": 0.620584336588528,
+          "iou": 0.565356934540109,
+          "areaRatio": 1.2308532308800977,
+          "containsHuman": false,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 1.1390603610278414,
+          "aspectScore": 0.40893155919920576,
+          "parallelRaw": 0.20184239122338524,
+          "parallel": 0.7981576087766148,
+          "area": 314860.5,
+          "areaRaw": 0.7320975167410714,
+          "areaScore": 0.7320975167410714,
+          "areaSaturated": false,
+          "centerDist": 204.41654776460734,
+          "centerScore": 0.7444793152942408,
+          "frameFraction": 0.256234130859375,
+          "weighted": {
+            "aspect": 0.1635726236796823,
+            "parallel": 0.1995394021941537,
+            "area": 0.18302437918526784,
+            "center": 0.07444793152942408
+          },
+          "total": 0.620584336588528,
+          "rank": 11,
+          "nestedOuter": false,
+          "nestedInner": false,
+          "areaVsLargest": 0.2687169877258469
+        }
+      ],
+      "best": {
+        "index": 8,
+        "method": "luma×5",
+        "score": 0.8763475038708596,
+        "iou": 0.942990012975909,
+        "areaRatio": 1.0461366773005853,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            254.05342673305455,
+            220.35051025615533
+          ],
+          "tr": [
+            693.9162766436755,
+            237.7600865201856
+          ],
+          "br": [
+            655.5382382760779,
+            859.0124133959793
+          ],
+          "bl": [
+            232.25755497273653,
+            836.4718988869026
+          ]
+        },
+        "aspect": 0.6974391804763819,
+        "aspectScore": 0.9742007600305016,
+        "parallelRaw": 0.02368105642731301,
+        "parallel": 0.976318943572687,
+        "area": 267608.7684700467,
+        "areaRaw": 0.6222302094262618,
+        "areaScore": 0.6222302094262618,
+        "areaSaturated": false,
+        "centerDist": 103.76070712862672,
+        "centerScore": 0.8702991160892166,
+        "frameFraction": 0.21778057329919165,
+        "weighted": {
+          "aspect": 0.38968030401220066,
+          "parallel": 0.24407973589317175,
+          "area": 0.15555755235656546,
+          "center": 0.08702991160892166
+        },
+        "total": 0.8763475038708596,
+        "rank": 6,
+        "nestedOuter": true,
+        "nestedInner": true,
+        "areaVsLargest": 0.22839010340228302
+      },
+      "maxScore": {
+        "index": 28,
+        "method": "chroma@18",
+        "score": 0.9766448142175682,
+        "iou": 0.21831765232781328,
+        "areaRatio": 4.580481648357308,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            5.430198238217752,
+            -2.2680635342366884
+          ],
+          "tr": [
+            851.490562143653,
+            6.740250360394878
+          ],
+          "br": [
+            990.4128596668509,
+            1278
+          ],
+          "bl": [
+            -0.8832380255829264,
+            1278
+          ]
+        },
+        "aspect": 0.7179852881330867,
+        "aspectScore": 0.9970999149887043,
+        "parallelRaw": 0.07958671540222567,
+        "parallel": 0.9204132845977744,
+        "area": 1171717.8830585512,
+        "areaRaw": 2.7244184408913488,
+        "areaScore": 1,
+        "areaSaturated": true,
+        "centerDist": 18.387783418857612,
+        "centerScore": 0.977015270726428,
+        "frameFraction": 0.953546454311972,
+        "weighted": {
+          "aspect": 0.39883996599548177,
+          "parallel": 0.2301033211494436,
+          "area": 0.25,
+          "center": 0.0977015270726428
+        },
+        "total": 0.9766448142175682,
+        "rank": 1,
+        "nestedOuter": true,
+        "nestedInner": false,
+        "areaVsLargest": 1
+      },
+      "final": {
+        "index": 16,
+        "method": "luma@12",
+        "score": 0.9622641105383217,
+        "iou": 0.2262133626865165,
+        "areaRatio": 4.420605344105099,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            15.674963143672537,
+            -11.348592801489701
+          ],
+          "tr": [
+            827.252627728722,
+            27.427850489076583
+          ],
+          "br": [
+            967.0333658987644,
+            1278
+          ],
+          "bl": [
+            -4.09631129363558,
+            1278
+          ]
+        },
+        "aspect": 0.7000514912196306,
+        "aspectScore": 0.9778497020210712,
+        "parallelRaw": 0.10115648543772425,
+        "parallel": 0.8988435145622757,
+        "area": 1130820.453672101,
+        "areaRaw": 2.62932583164086,
+        "areaScore": 1,
+        "areaSaturated": true,
+        "centerDist": 28.693191285406165,
+        "centerScore": 0.9641335108932423,
+        "frameFraction": 0.9202640410743009,
+        "weighted": {
+          "aspect": 0.39113988080842854,
+          "parallel": 0.22471087864056893,
+          "area": 0.25,
+          "center": 0.09641335108932424
+        },
+        "total": 0.9622641105383217,
+        "rank": 2,
+        "nestedOuter": false,
+        "nestedInner": true,
+        "areaVsLargest": 0.9650961805928103
+      },
+      "traced": {
+        "max": {
+          "index": 28,
+          "score": 0.9766448142175682,
+          "corners": {
+            "bottomLeft": {
+              "x": -0.8832380255829264,
+              "y": 1278
+            },
+            "bottomRight": {
+              "x": 990.4128596668509,
+              "y": 1278
+            },
+            "topLeft": {
+              "x": 5.430198238217752,
+              "y": -2.2680635342366884
+            },
+            "topRight": {
+              "x": 851.490562143653,
+              "y": 6.740250360394878
+            }
+          },
+          "areaRatio": 0.953546454311972
+        },
+        "nested": [
+          {
+            "outer": 28,
+            "inner": 16,
+            "outerScore": 0.9766448142175682,
+            "innerScore": 0.9622641105383217,
+            "areaFraction": 0.9650961805928105,
+            "centerDistNorm": 0.009749297534670711
+          },
+          {
+            "outer": 20,
+            "inner": 0,
+            "outerScore": 0.8921782014453852,
+            "innerScore": 0.8728401462208781,
+            "areaFraction": 0.7351060817592828,
+            "centerDistNorm": 0.10769076753793924
+          },
+          {
+            "outer": 4,
+            "inner": 12,
+            "outerScore": 0.8819614344584084,
+            "innerScore": 0.8266034717546812,
+            "areaFraction": 0.8585563370287586,
+            "centerDistNorm": 0.03048700083286735
+          },
+          {
+            "outer": 40,
+            "inner": 4,
+            "outerScore": 0.8807419962991552,
+            "innerScore": 0.8819614344584084,
+            "areaFraction": 0.7651127755154924,
+            "centerDistNorm": 0.08586368589983627
+          },
+          {
+            "outer": 40,
+            "inner": 8,
+            "outerScore": 0.8807419962991552,
+            "innerScore": 0.8763475038708596,
+            "areaFraction": 0.7455944736154204,
+            "centerDistNorm": 0.0846481174685797
+          },
+          {
+            "outer": 40,
+            "inner": 0,
+            "outerScore": 0.8807419962991552,
+            "innerScore": 0.8728401462208781,
+            "areaFraction": 0.8569660800635732,
+            "centerDistNorm": 0.1169956519270358
+          },
+          {
+            "outer": 40,
+            "inner": 12,
+            "outerScore": 0.8807419962991552,
+            "innerScore": 0.8266034717546812,
+            "areaFraction": 0.656892421960488,
+            "centerDistNorm": 0.09059913372149757
+          },
+          {
+            "outer": 8,
+            "inner": 12,
+            "outerScore": 0.8763475038708596,
+            "innerScore": 0.8266034717546812,
+            "areaFraction": 0.8810317742501332,
+            "centerDistNorm": 0.030862075025435223
+          },
+          {
+            "outer": 0,
+            "inner": 4,
+            "outerScore": 0.8728401462208781,
+            "innerScore": 0.8819614344584084,
+            "areaFraction": 0.8928157056796615,
+            "centerDistNorm": 0.038016672977829145
+          },
+          {
+            "outer": 0,
+            "inner": 8,
+            "outerScore": 0.8728401462208781,
+            "innerScore": 0.8763475038708596,
+            "areaFraction": 0.8700396561321414,
+            "centerDistNorm": 0.03917151143674697
+          },
+          {
+            "outer": 0,
+            "inner": 12,
+            "outerScore": 0.8728401462208781,
+            "innerScore": 0.8266034717546812,
+            "areaFraction": 0.7665325819100763,
+            "centerDistNorm": 0.05842023978012244
+          }
+        ],
+        "chosen": {
+          "index": 16,
+          "score": 0.9622641105383217,
+          "corners": {
+            "bottomLeft": {
+              "x": -4.09631129363558,
+              "y": 1278
+            },
+            "bottomRight": {
+              "x": 967.0333658987644,
+              "y": 1278
+            },
+            "topLeft": {
+              "x": 15.674963143672537,
+              "y": -11.348592801489701
+            },
+            "topRight": {
+              "x": 827.252627728722,
+              "y": 27.427850489076583
+            }
+          },
+          "areaRatio": 0.9202640410743012
+        },
+        "changed": true,
+        "reason": "inner.score >= 0.28",
+        "pair": {
+          "outer": 28,
+          "inner": 16,
+          "outerScore": 0.9766448142175682,
+          "innerScore": 0.9622641105383217,
+          "areaFraction": 0.9650961805928105,
+          "centerDistNorm": 0.009749297534670711
+        },
+        "innerGate": true,
+        "ratioGate": true
+      },
+      "nestedClass": "NEUTRAL",
+      "maxOnlyIou": 0.21831765232781328,
+      "currentIou": 0.2262133626865165
+    },
+    {
+      "slug": "bulk-up",
+      "card": "Bulk Up",
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+      "outlineScale": 1,
+      "outlineSpace": "image",
+      "width": 1022,
+      "height": 1920,
+      "previewScale": 0.46966731898238745,
+      "accepted": [
+        {
+          "index": 36,
+          "method": "edge",
+          "score": 0.9284025750651211,
+          "iou": 0.8671597521588627,
+          "areaRatio": 1.1531900523639638,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": 0.5,
+          "aspect": 0.7372978716493461,
+          "aspectScore": 0.9701236078548816,
+          "parallelRaw": 0.10663790103428561,
+          "parallel": 0.8933620989657144,
+          "area": 642920.1113937941,
+          "areaRaw": 0.9361314640320597,
+          "areaScore": 0.9361314640320597,
+          "areaSaturated": false,
+          "centerDist": 185.10038161700712,
+          "centerScore": 0.8297974117372482,
+          "frameFraction": 0.3276460124112209,
+          "weighted": {
+            "aspect": 0.38804944314195267,
+            "parallel": 0.2233405247414286,
+            "area": 0.23403286600801493,
+            "center": 0.08297974117372482
+          },
+          "total": 0.9284025750651211,
+          "rank": 1,
+          "nestedOuter": false,
+          "nestedInner": false,
+          "areaVsLargest": 0.3745569039484573
+        },
+        {
+          "index": 16,
+          "method": "luma@18",
+          "score": 0.8977388644160972,
+          "iou": 0.32480067199733503,
+          "areaRatio": 3.0788113640608645,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.5989947607454081,
+          "aspectScore": 0.8366910943745383,
+          "parallelRaw": 0.11267570544225954,
+          "parallel": 0.8873242945577404,
+          "area": 1716481.8072136408,
+          "areaRaw": 2.499303721714019,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 95.36164623359448,
+          "centerScore": 0.9123135302684682,
+          "frameFraction": 0.8747563025999067,
+          "weighted": {
+            "aspect": 0.3346764377498153,
+            "parallel": 0.2218310736394351,
+            "area": 0.25,
+            "center": 0.09123135302684682
+          },
+          "total": 0.8977388644160972,
+          "rank": 2,
+          "nestedOuter": true,
+          "nestedInner": false,
+          "areaVsLargest": 1
+        },
+        {
+          "index": 32,
+          "method": "chroma@40",
+          "score": 0.8627834884769693,
+          "iou": 0.34400161115367806,
+          "areaRatio": 2.9069631291734375,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.5656379239862548,
+          "aspectScore": 0.790097417631594,
+          "parallelRaw": 0.17402269845405716,
+          "parallel": 0.8259773015459428,
+          "area": 1620673.9340099439,
+          "areaRaw": 2.359801530044299,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 106.03202057654362,
+          "centerScore": 0.9025019603784603,
+          "frameFraction": 0.8259305355155047,
+          "weighted": {
+            "aspect": 0.3160389670526376,
+            "parallel": 0.2064943253864857,
+            "area": 0.25,
+            "center": 0.09025019603784604
+          },
+          "total": 0.8627834884769693,
+          "rank": 3,
+          "nestedOuter": true,
+          "nestedInner": true,
+          "areaVsLargest": 0.9441835778270079
+        },
+        {
+          "index": 20,
+          "method": "luma@28",
+          "score": 0.8597489425970508,
+          "iou": 0.41785483354047953,
+          "areaRatio": 2.39317561921448,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.6150559450580257,
+          "aspectScore": 0.8591257645254963,
+          "parallelRaw": 0.26085152182423477,
+          "parallel": 0.7391484781757652,
+          "area": 1334229.975827674,
+          "areaRaw": 1.9427214026938222,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 203.24281348999156,
+          "centerScore": 0.8131151724291101,
+          "frameFraction": 0.6799524909428377,
+          "weighted": {
+            "aspect": 0.3436503058101985,
+            "parallel": 0.1847871195439413,
+            "area": 0.25,
+            "center": 0.08131151724291102
+          },
+          "total": 0.8597489425970508,
+          "rank": 4,
+          "nestedOuter": false,
+          "nestedInner": true,
+          "areaVsLargest": 0.7773050493285012
+        }
+      ],
+      "best": {
+        "index": 36,
+        "method": "edge",
+        "score": 0.9284025750651211,
+        "iou": 0.8671597521588627,
+        "areaRatio": 1.1531900523639638,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": 0.5,
+        "quad": {
+          "tl": [
+            234.52051648946707,
+            630.9915436671139
+          ],
+          "tr": [
+            851.2622601765482,
+            725.3591662645578
+          ],
+          "br": [
+            735.0129782258465,
+            1664.1357617064198
+          ],
+          "bl": [
+            -6.7803826824806865,
+            1523.2901203115105
+          ]
+        },
+        "aspect": 0.7372978716493461,
+        "aspectScore": 0.9701236078548816,
+        "parallelRaw": 0.10663790103428561,
+        "parallel": 0.8933620989657144,
+        "area": 642920.1113937941,
+        "areaRaw": 0.9361314640320597,
+        "areaScore": 0.9361314640320597,
+        "areaSaturated": false,
+        "centerDist": 185.10038161700712,
+        "centerScore": 0.8297974117372482,
+        "frameFraction": 0.3276460124112209,
+        "weighted": {
+          "aspect": 0.38804944314195267,
+          "parallel": 0.2233405247414286,
+          "area": 0.23403286600801493,
+          "center": 0.08297974117372482
+        },
+        "total": 0.9284025750651211,
+        "rank": 1,
+        "nestedOuter": false,
+        "nestedInner": false,
+        "areaVsLargest": 0.3745569039484573
+      },
+      "maxScore": {
+        "index": 36,
+        "method": "edge",
+        "score": 0.9284025750651211,
+        "iou": 0.8671597521588627,
+        "areaRatio": 1.1531900523639638,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": 0.5,
+        "quad": {
+          "tl": [
+            234.52051648946707,
+            630.9915436671139
+          ],
+          "tr": [
+            851.2622601765482,
+            725.3591662645578
+          ],
+          "br": [
+            735.0129782258465,
+            1664.1357617064198
+          ],
+          "bl": [
+            -6.7803826824806865,
+            1523.2901203115105
+          ]
+        },
+        "aspect": 0.7372978716493461,
+        "aspectScore": 0.9701236078548816,
+        "parallelRaw": 0.10663790103428561,
+        "parallel": 0.8933620989657144,
+        "area": 642920.1113937941,
+        "areaRaw": 0.9361314640320597,
+        "areaScore": 0.9361314640320597,
+        "areaSaturated": false,
+        "centerDist": 185.10038161700712,
+        "centerScore": 0.8297974117372482,
+        "frameFraction": 0.3276460124112209,
+        "weighted": {
+          "aspect": 0.38804944314195267,
+          "parallel": 0.2233405247414286,
+          "area": 0.23403286600801493,
+          "center": 0.08297974117372482
+        },
+        "total": 0.9284025750651211,
+        "rank": 1,
+        "nestedOuter": false,
+        "nestedInner": false,
+        "areaVsLargest": 0.3745569039484573
+      },
+      "final": {
+        "index": 32,
+        "method": "chroma@40",
+        "score": 0.8627834884769693,
+        "iou": 0.34400161115367806,
+        "areaRatio": 2.9069631291734375,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            34.90897941793664,
+            350.6485293763896
+          ],
+          "tr": [
+            869.7236860264592,
+            71.36924529363036
+          ],
+          "br": [
+            1051.8608031966849,
+            1916.25
+          ],
+          "bl": [
+            -2.268992495456143,
+            1916.25
+          ]
+        },
+        "aspect": 0.5656379239862548,
+        "aspectScore": 0.790097417631594,
+        "parallelRaw": 0.17402269845405716,
+        "parallel": 0.8259773015459428,
+        "area": 1620673.9340099439,
+        "areaRaw": 2.359801530044299,
+        "areaScore": 1,
+        "areaSaturated": true,
+        "centerDist": 106.03202057654362,
+        "centerScore": 0.9025019603784603,
+        "frameFraction": 0.8259305355155047,
+        "weighted": {
+          "aspect": 0.3160389670526376,
+          "parallel": 0.2064943253864857,
+          "area": 0.25,
+          "center": 0.09025019603784604
+        },
+        "total": 0.8627834884769693,
+        "rank": 3,
+        "nestedOuter": true,
+        "nestedInner": true,
+        "areaVsLargest": 0.9441835778270079
+      },
+      "traced": {
+        "max": {
+          "index": 36,
+          "score": 0.9284025750651211,
+          "corners": {
+            "bottomLeft": {
+              "x": -6.7803826824806865,
+              "y": 1523.2901203115105
+            },
+            "bottomRight": {
+              "x": 735.0129782258465,
+              "y": 1664.1357617064198
+            },
+            "topLeft": {
+              "x": 234.52051648946707,
+              "y": 630.9915436671139
+            },
+            "topRight": {
+              "x": 851.2622601765482,
+              "y": 725.3591662645578
+            }
+          },
+          "areaRatio": 0.3276460124112208
+        },
+        "nested": [
+          {
+            "outer": 16,
+            "inner": 32,
+            "outerScore": 0.8977388644160972,
+            "innerScore": 0.8627834884769693,
+            "areaFraction": 0.9441835778270078,
+            "centerDistNorm": 0.020202714120041362
+          },
+          {
+            "outer": 16,
+            "inner": 20,
+            "outerScore": 0.8977388644160972,
+            "innerScore": 0.8597489425970508,
+            "areaFraction": 0.7773050493285011,
+            "centerDistNorm": 0.08290748386952765
+          },
+          {
+            "outer": 32,
+            "inner": 20,
+            "outerScore": 0.8627834884769693,
+            "innerScore": 0.8597489425970508,
+            "areaFraction": 0.8232562687834822,
+            "centerDistNorm": 0.07830480620854313
+          }
+        ],
+        "chosen": {
+          "index": 32,
+          "score": 0.8627834884769693,
+          "corners": {
+            "bottomLeft": {
+              "x": -2.268992495456143,
+              "y": 1916.25
+            },
+            "bottomRight": {
+              "x": 1051.8608031966849,
+              "y": 1916.25
+            },
+            "topLeft": {
+              "x": 34.90897941793664,
+              "y": 350.6485293763896
+            },
+            "topRight": {
+              "x": 869.7236860264592,
+              "y": 71.36924529363036
+            }
+          },
+          "areaRatio": 0.8259305355155045
+        },
+        "changed": true,
+        "reason": "inner.score >= 0.28",
+        "pair": {
+          "outer": 16,
+          "inner": 32,
+          "outerScore": 0.8977388644160972,
+          "innerScore": 0.8627834884769693,
+          "areaFraction": 0.9441835778270078,
+          "centerDistNorm": 0.020202714120041362
+        },
+        "innerGate": true,
+        "ratioGate": true
+      },
+      "nestedClass": "DEGRADED",
+      "maxOnlyIou": 0.8671597521588627,
+      "currentIou": 0.34400161115367806
+    },
+    {
+      "slug": "mudbutton",
+      "card": "Mudbutton Torchrunner",
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+      "outlineScale": 1,
+      "outlineSpace": "image",
+      "width": 1019,
+      "height": 1920,
+      "previewScale": 0.47105004906771347,
+      "accepted": [
+        {
+          "index": 12,
+          "method": "luma@28",
+          "score": 0.8891214511854755,
+          "iou": 0.3180193079733222,
+          "areaRatio": 3.1440514850007184,
+          "containsHuman": true,
+          "humanContains": false,
+          "storedEdge": null,
+          "aspect": 0.5832162778755765,
+          "aspectScore": 0.814651308778583,
+          "parallelRaw": 0.1211796731664693,
+          "parallel": 0.8788203268335307,
+          "area": 1795217.6047549234,
+          "areaRaw": 2.62164354168846,
+          "areaScore": 1,
+          "areaSaturated": true,
+          "centerDist": 70.03672657515558,
+          "centerScore": 0.9355584596565958,
+          "frameFraction": 0.917575239590961,
+          "weighted": {
+            "aspect": 0.32586052351143324,
+            "parallel": 0.21970508170838268,
+            "area": 0.25,
+            "center": 0.09355584596565958
+          },
+          "total": 0.8891214511854755,
+          "rank": 1,
+          "nestedOuter": false,
+          "nestedInner": false,
+          "areaVsLargest": 1
+        },
+        {
+          "index": 27,
+          "method": "edge",
+          "score": 0.8707625329783144,
+          "iou": 0.8615981365178127,
+          "areaRatio": 0.8615981365178125,
+          "containsHuman": false,
+          "humanContains": true,
+          "storedEdge": 0.5,
+          "aspect": 0.6923772441047333,
+          "aspectScore": 0.9671301187494687,
+          "parallelRaw": 0.0998656657239643,
+          "parallel": 0.9001343342760357,
+          "area": 491962.72716267523,
+          "areaRaw": 0.7184370869589046,
+          "areaScore": 0.7184370869589046,
+          "areaSaturated": false,
+          "centerDist": 225.32473763282974,
+          "centerScore": 0.792676301697918,
+          "frameFraction": 0.25145298043561665,
+          "weighted": {
+            "aspect": 0.3868520474997875,
+            "parallel": 0.22503358356900893,
+            "area": 0.17960927173972616,
+            "center": 0.07926763016979181
+          },
+          "total": 0.8707625329783144,
+          "rank": 2,
+          "nestedOuter": false,
+          "nestedInner": false,
+          "areaVsLargest": 0.2740407212248992
+        }
+      ],
+      "best": {
+        "index": 27,
+        "method": "edge",
+        "score": 0.8707625329783144,
+        "iou": 0.8615981365178127,
+        "areaRatio": 0.8615981365178125,
+        "containsHuman": false,
+        "humanContains": true,
+        "storedEdge": 0.5,
+        "quad": {
+          "tl": [
+            177.46378850239694,
+            774.0249987027856
+          ],
+          "tr": [
+            720.2280239647619,
+            753.9470322256186
+          ],
+          "br": [
+            829.9853684342888,
+            1565.493115714344
+          ],
+          "bl": [
+            209.34484661891366,
+            1642.1593546426718
+          ]
+        },
+        "aspect": 0.6923772441047333,
+        "aspectScore": 0.9671301187494687,
+        "parallelRaw": 0.0998656657239643,
+        "parallel": 0.9001343342760357,
+        "area": 491962.72716267523,
+        "areaRaw": 0.7184370869589046,
+        "areaScore": 0.7184370869589046,
+        "areaSaturated": false,
+        "centerDist": 225.32473763282974,
+        "centerScore": 0.792676301697918,
+        "frameFraction": 0.25145298043561665,
+        "weighted": {
+          "aspect": 0.3868520474997875,
+          "parallel": 0.22503358356900893,
+          "area": 0.17960927173972616,
+          "center": 0.07926763016979181
+        },
+        "total": 0.8707625329783144,
+        "rank": 2,
+        "nestedOuter": false,
+        "nestedInner": false,
+        "areaVsLargest": 0.2740407212248992
+      },
+      "maxScore": {
+        "index": 12,
+        "method": "luma@28",
+        "score": 0.8891214511854755,
+        "iou": 0.3180193079733222,
+        "areaRatio": 3.1440514850007184,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            -5.0989030562280695e-14,
+            0
+          ],
+          "tr": [
+            1016.7766991514823,
+            0
+          ],
+          "br": [
+            997.9702609961909,
+            1959.0603037124345
+          ],
+          "bl": [
+            9.050538096744275e-14,
+            1601.7594941824814
+          ]
+        },
+        "aspect": 0.5832162778755765,
+        "aspectScore": 0.814651308778583,
+        "parallelRaw": 0.1211796731664693,
+        "parallel": 0.8788203268335307,
+        "area": 1795217.6047549234,
+        "areaRaw": 2.62164354168846,
+        "areaScore": 1,
+        "areaSaturated": true,
+        "centerDist": 70.03672657515558,
+        "centerScore": 0.9355584596565958,
+        "frameFraction": 0.917575239590961,
+        "weighted": {
+          "aspect": 0.32586052351143324,
+          "parallel": 0.21970508170838268,
+          "area": 0.25,
+          "center": 0.09355584596565958
+        },
+        "total": 0.8891214511854755,
+        "rank": 1,
+        "nestedOuter": false,
+        "nestedInner": false,
+        "areaVsLargest": 1
+      },
+      "final": {
+        "index": 12,
+        "method": "luma@28",
+        "score": 0.8891214511854755,
+        "iou": 0.3180193079733222,
+        "areaRatio": 3.1440514850007184,
+        "containsHuman": true,
+        "humanContains": false,
+        "storedEdge": null,
+        "quad": {
+          "tl": [
+            -5.0989030562280695e-14,
+            0
+          ],
+          "tr": [
+            1016.7766991514823,
+            0
+          ],
+          "br": [
+            997.9702609961909,
+            1959.0603037124345
+          ],
+          "bl": [
+            9.050538096744275e-14,
+            1601.7594941824814
+          ]
+        },
+        "aspect": 0.5832162778755765,
+        "aspectScore": 0.814651308778583,
+        "parallelRaw": 0.1211796731664693,
+        "parallel": 0.8788203268335307,
+        "area": 1795217.6047549234,
+        "areaRaw": 2.62164354168846,
+        "areaScore": 1,
+        "areaSaturated": true,
+        "centerDist": 70.03672657515558,
+        "centerScore": 0.9355584596565958,
+        "frameFraction": 0.917575239590961,
+        "weighted": {
+          "aspect": 0.32586052351143324,
+          "parallel": 0.21970508170838268,
+          "area": 0.25,
+          "center": 0.09355584596565958
+        },
+        "total": 0.8891214511854755,
+        "rank": 1,
+        "nestedOuter": false,
+        "nestedInner": false,
+        "areaVsLargest": 1
+      },
+      "traced": {
+        "max": {
+          "index": 12,
+          "score": 0.8891214511854755,
+          "corners": {
+            "bottomLeft": {
+              "x": 9.050538096744275e-14,
+              "y": 1601.7594941824814
+            },
+            "bottomRight": {
+              "x": 997.9702609961909,
+              "y": 1959.0603037124345
+            },
+            "topLeft": {
+              "x": -5.0989030562280695e-14,
+              "y": 0
+            },
+            "topRight": {
+              "x": 1016.7766991514823,
+              "y": 0
+            }
+          },
+          "areaRatio": 0.917575239590961
+        },
+        "nested": [],
+        "chosen": {
+          "index": 12,
+          "score": 0.8891214511854755,
+          "corners": {
+            "bottomLeft": {
+              "x": 9.050538096744275e-14,
+              "y": 1601.7594941824814
+            },
+            "bottomRight": {
+              "x": 997.9702609961909,
+              "y": 1959.0603037124345
+            },
+            "topLeft": {
+              "x": -5.0989030562280695e-14,
+              "y": 0
+            },
+            "topRight": {
+              "x": 1016.7766991514823,
+              "y": 0
+            }
+          },
+          "areaRatio": 0.917575239590961
+        },
+        "changed": false,
+        "reason": "no nested pair; keep max score",
+        "pair": null
+      },
+      "nestedClass": "NEUTRAL",
+      "maxOnlyIou": 0.3180193079733222,
+      "currentIou": 0.3180193079733222
+    }
+  ]
+}

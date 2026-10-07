@@ -1,0 +1,1247 @@
+{
+  "verdict": "PEAKED_AREA_INSUFFICIENT",
+  "rankingGood": 3,
+  "bulkMaxGood": true,
+  "nestedStillDamagesBulk": true,
+  "rules": {
+    "good": 0.8,
+    "iouEpsilon": 0.01,
+    "collateral": "trusted real fixtures other than the five diagnostic images; max-score IoU",
+    "meaningful": "GOOD count drops by >= 2, median drops by >= 0.02, or any GOOD max-score falls below 0.70",
+    "closeupSystematic": ">= 2 GOOD close-ups drop by > 0.05, or any >50% frame card does"
+  },
+  "five": [
+    {
+      "card": "Island cq-120629",
+      "humanFrac": 0.1558723459763793,
+      "currentMax": {
+        "method": "chroma@18",
+        "iou": 0.15840811912907654,
+        "score": 0.984832637084146,
+        "peaked": 0.734832637084146,
+        "frameFrac": 0.983992151623043,
+        "rank": 1,
+        "peakedRank": 6
+      },
+      "peakedMax": {
+        "method": "luma×2.5",
+        "iou": 0.9814877221096797,
+        "score": 0.8409326190448357,
+        "peaked": 0.8409326190448357,
+        "frameFrac": 0.15476416496495507,
+        "rank": 3,
+        "peakedRank": 1
+      },
+      "currentFinal": {
+        "method": "luma@12",
+        "iou": 0.19008815481034272,
+        "score": 0.8511945859366479,
+        "peaked": 0.6011945859366479,
+        "frameFrac": 0.8200003105501145,
+        "rank": 2,
+        "peakedRank": 7
+      },
+      "peakedFinal": {
+        "method": "luma×2.5",
+        "iou": 0.9814877221096797,
+        "score": 0.8409326190448357,
+        "peaked": 0.8409326190448357,
+        "frameFrac": 0.15476416496495507,
+        "rank": 3,
+        "peakedRank": 1
+      },
+      "best": {
+        "method": "luma×2.5",
+        "iou": 0.9814877221096797,
+        "score": 0.8409326190448357,
+        "peaked": 0.8409326190448357,
+        "frameFrac": 0.15476416496495507,
+        "rank": 3,
+        "peakedRank": 1
+      },
+      "nestedPeaked": false,
+      "candidates": [
+        {
+          "method": "chroma@18",
+          "frameFrac": 0.983992151623043,
+          "currentArea": 1,
+          "peakedArea": 0,
+          "currentTotal": 0.984832637084146,
+          "peakedTotal": 0.734832637084146,
+          "currentRank": 1,
+          "peakedRank": 6,
+          "iou": 0.15840811912907654
+        },
+        {
+          "method": "luma@12",
+          "frameFrac": 0.8200003105501145,
+          "currentArea": 1,
+          "peakedArea": 0,
+          "currentTotal": 0.8511945859366479,
+          "peakedTotal": 0.6011945859366479,
+          "currentRank": 2,
+          "peakedRank": 7,
+          "iou": 0.19008815481034272
+        },
+        {
+          "method": "luma×2.5",
+          "frameFrac": 0.15476416496495507,
+          "currentArea": 0.4421833284713002,
+          "peakedArea": 0.4421833284713002,
+          "currentTotal": 0.8409326190448357,
+          "peakedTotal": 0.8409326190448357,
+          "currentRank": 3,
+          "peakedRank": 1,
+          "iou": 0.9814877221096797
+        },
+        {
+          "method": "luma×3.5",
+          "frameFrac": 0.15321005962238246,
+          "currentArea": 0.43774302749252136,
+          "peakedArea": 0.43774302749252136,
+          "currentTotal": 0.8407000560409695,
+          "peakedTotal": 0.8407000560409695,
+          "currentRank": 4,
+          "peakedRank": 2,
+          "iou": 0.9796281963771337
+        },
+        {
+          "method": "chroma@28",
+          "frameFrac": 0.6888629792922522,
+          "currentArea": 1,
+          "peakedArea": 0.03182005916499375,
+          "currentTotal": 0.8242048637071118,
+          "peakedTotal": 0.5821598784983603,
+          "currentRank": 5,
+          "peakedRank": 8,
+          "iou": 0.22627481903081031
+        },
+        {
+          "method": "luma@28",
+          "frameFrac": 0.15849043277498973,
+          "currentArea": 0.4528298079285421,
+          "peakedArea": 0.4528298079285421,
+          "currentTotal": 0.820302646916137,
+          "peakedTotal": 0.820302646916137,
+          "currentRank": 6,
+          "peakedRank": 3,
+          "iou": 0.9437505281798443
+        },
+        {
+          "method": "chroma@40",
+          "frameFrac": 0.169149346160447,
+          "currentArea": 0.48328384617270576,
+          "peakedArea": 0.48328384617270576,
+          "currentTotal": 0.8084526578574331,
+          "peakedTotal": 0.8084526578574331,
+          "currentRank": 7,
+          "peakedRank": 4,
+          "iou": 0.9017582012253594
+        },
+        {
+          "method": "edge",
+          "frameFrac": 0.234019775390625,
+          "currentArea": 0.6686279296875001,
+          "peakedArea": 0.6686279296875001,
+          "currentTotal": 0.7468556983377728,
+          "peakedTotal": 0.7468556983377728,
+          "currentRank": 8,
+          "peakedRank": 5,
+          "iou": 0.6133062036145444
+        },
+        {
+          "method": "luma@18",
+          "frameFrac": 0.4569043176914753,
+          "currentArea": 1,
+          "peakedArea": 0.6945590923100704,
+          "currentTotal": 0.6348298240483605,
+          "peakedTotal": 0.5584695971258781,
+          "currentRank": 9,
+          "peakedRank": 9,
+          "iou": 0.21303748200923184
+        }
+      ]
+    },
+    {
+      "card": "Wand cq-120751",
+      "humanFrac": 0.21875227203274392,
+      "currentMax": {
+        "method": "chroma@18",
+        "iou": 0.23856215823822916,
+        "score": 0.9506118648080355,
+        "peaked": 0.7006118648080355,
+        "frameFrac": 0.9169613221485736,
+        "rank": 1,
+        "peakedRank": 6
+      },
+      "peakedMax": {
+        "method": "edge",
+        "iou": 0.9053803714546896,
+        "score": 0.8994236260969639,
+        "peaked": 0.8994236260969639,
+        "frameFrac": 0.24160268148966182,
+        "rank": 4,
+        "peakedRank": 1
+      },
+      "currentFinal": {
+        "method": "luma@12",
+        "iou": 0.2507856718304822,
+        "score": 0.9186749239673988,
+        "peaked": 0.6686749239673988,
+        "frameFrac": 0.8722678231019866,
+        "rank": 2,
+        "peakedRank": 7
+      },
+      "peakedFinal": {
+        "method": "luma×3.5",
+        "iou": 0.9609660387498684,
+        "score": 0.8937136670993674,
+        "peaked": 0.8937136670993674,
+        "frameFrac": 0.2214336269504825,
+        "rank": 5,
+        "peakedRank": 2
+      },
+      "best": {
+        "method": "luma×3.5",
+        "iou": 0.9609660387498684,
+        "score": 0.8937136670993674,
+        "peaked": 0.8937136670993674,
+        "frameFrac": 0.2214336269504825,
+        "rank": 5,
+        "peakedRank": 2
+      },
+      "nestedPeaked": true,
+      "candidates": [
+        {
+          "method": "chroma@18",
+          "frameFrac": 0.9169613221485736,
+          "currentArea": 1,
+          "peakedArea": 0,
+          "currentTotal": 0.9506118648080355,
+          "peakedTotal": 0.7006118648080355,
+          "currentRank": 1,
+          "peakedRank": 6,
+          "iou": 0.23856215823822916
+        },
+        {
+          "method": "luma@12",
+          "frameFrac": 0.8722678231019866,
+          "currentArea": 1,
+          "peakedArea": 0,
+          "currentTotal": 0.9186749239673988,
+          "peakedTotal": 0.6686749239673988,
+          "currentRank": 2,
+          "peakedRank": 7,
+          "iou": 0.2507856718304822
+        },
+        {
+          "method": "chroma@28",
+          "frameFrac": 0.8702388098904195,
+          "currentArea": 1,
+          "peakedArea": 0,
+          "currentTotal": 0.9168300998375303,
+          "peakedTotal": 0.6668300998375303,
+          "currentRank": 3,
+          "peakedRank": 8,
+          "iou": 0.2513703934444034
+        },
+        {
+          "method": "edge",
+          "frameFrac": 0.24160268148966182,
+          "currentArea": 0.6902933756847481,
+          "peakedArea": 0.6902933756847481,
+          "currentTotal": 0.8994236260969639,
+          "peakedTotal": 0.8994236260969639,
+          "currentRank": 4,
+          "peakedRank": 1,
+          "iou": 0.9053803714546896
+        },
+        {
+          "method": "luma×3.5",
+          "frameFrac": 0.2214336269504825,
+          "currentArea": 0.6326675055728072,
+          "peakedArea": 0.6326675055728072,
+          "currentTotal": 0.8937136670993674,
+          "peakedTotal": 0.8937136670993674,
+          "currentRank": 5,
+          "peakedRank": 2,
+          "iou": 0.9609660387498684
+        },
+        {
+          "method": "luma×5",
+          "frameFrac": 0.2145201937793743,
+          "currentArea": 0.612914839369641,
+          "peakedArea": 0.612914839369641,
+          "currentTotal": 0.889177232097131,
+          "peakedTotal": 0.889177232097131,
+          "currentRank": 6,
+          "peakedRank": 3,
+          "iou": 0.958319554972188
+        },
+        {
+          "method": "luma×2.5",
+          "frameFrac": 0.241417036392147,
+          "currentArea": 0.6897629611204201,
+          "peakedArea": 0.6897629611204201,
+          "currentTotal": 0.8840535268539252,
+          "peakedTotal": 0.8840535268539252,
+          "currentRank": 7,
+          "peakedRank": 4,
+          "iou": 0.8993661117074397
+        },
+        {
+          "method": "luma@28",
+          "frameFrac": 0.2409807880532532,
+          "currentArea": 0.6885165372950092,
+          "peakedArea": 0.6885165372950092,
+          "currentTotal": 0.8839296101002672,
+          "peakedTotal": 0.8839296101002672,
+          "currentRank": 8,
+          "peakedRank": 5,
+          "iou": 0.8895239698435085
+        },
+        {
+          "method": "luma@18",
+          "frameFrac": 0.672130734978896,
+          "currentArea": 1,
+          "peakedArea": 0.07962647148886848,
+          "currentTotal": 0.836816534431822,
+          "peakedTotal": 0.6067231523040392,
+          "currentRank": 9,
+          "peakedRank": 9,
+          "iou": 0.3254608971863375
+        },
+        {
+          "method": "chroma@40",
+          "frameFrac": 0.5392559277759434,
+          "currentArea": 1,
+          "peakedArea": 0.45926877778301867,
+          "currentTotal": 0.7391184916750232,
+          "peakedTotal": 0.6039356861207777,
+          "currentRank": 10,
+          "peakedRank": 10,
+          "iou": 0.36958799647880725
+        }
+      ]
+    },
+    {
+      "card": "Livaan cq-120813",
+      "humanFrac": 0.2081760232909002,
+      "currentMax": {
+        "method": "chroma@18",
+        "iou": 0.21831765232781328,
+        "score": 0.9766448142175682,
+        "peaked": 0.7266448142175682,
+        "frameFrac": 0.953546454311972,
+        "rank": 1,
+        "peakedRank": 8
+      },
+      "peakedMax": {
+        "method": "luma@18",
+        "iou": 0.6113650887805787,
+        "score": 0.8921782014453853,
+        "peaked": 0.8921782014453853,
+        "frameFrac": 0.34051015851449,
+        "rank": 3,
+        "peakedRank": 1
+      },
+      "currentFinal": {
+        "method": "luma@12",
+        "iou": 0.2262133626865165,
+        "score": 0.9622641105383217,
+        "peaked": 0.7122641105383217,
+        "frameFrac": 0.9202640410743009,
+        "rank": 2,
+        "peakedRank": 9
+      },
+      "peakedFinal": {
+        "method": "luma×3.5",
+        "iou": 0.930204713943525,
+        "score": 0.8819614344584084,
+        "peaked": 0.8819614344584084,
+        "frameFrac": 0.22348167105144892,
+        "rank": 4,
+        "peakedRank": 2
+      },
+      "best": {
+        "method": "luma×5",
+        "iou": 0.942990012975909,
+        "score": 0.8763475038708596,
+        "peaked": 0.8763475038708596,
+        "frameFrac": 0.21778057329919165,
+        "rank": 6,
+        "peakedRank": 4
+      },
+      "nestedPeaked": true,
+      "candidates": [
+        {
+          "method": "chroma@18",
+          "frameFrac": 0.953546454311972,
+          "currentArea": 1,
+          "peakedArea": 0,
+          "currentTotal": 0.9766448142175682,
+          "peakedTotal": 0.7266448142175682,
+          "currentRank": 1,
+          "peakedRank": 8,
+          "iou": 0.21831765232781328
+        },
+        {
+          "method": "luma@12",
+          "frameFrac": 0.9202640410743009,
+          "currentArea": 1,
+          "peakedArea": 0,
+          "currentTotal": 0.9622641105383217,
+          "peakedTotal": 0.7122641105383217,
+          "currentRank": 2,
+          "peakedRank": 9,
+          "iou": 0.2262133626865165
+        },
+        {
+          "method": "luma@18",
+          "frameFrac": 0.34051015851449,
+          "currentArea": 0.9728861671842572,
+          "peakedArea": 0.9728861671842572,
+          "currentTotal": 0.8921782014453853,
+          "peakedTotal": 0.8921782014453853,
+          "currentRank": 3,
+          "peakedRank": 1,
+          "iou": 0.6113650887805787
+        },
+        {
+          "method": "luma×3.5",
+          "frameFrac": 0.22348167105144892,
+          "currentArea": 0.638519060146997,
+          "peakedArea": 0.638519060146997,
+          "currentTotal": 0.8819614344584084,
+          "peakedTotal": 0.8819614344584084,
+          "currentRank": 4,
+          "peakedRank": 2,
+          "iou": 0.930204713943525
+        },
+        {
+          "method": "edge",
+          "frameFrac": 0.29208984375,
+          "currentArea": 0.8345424107142858,
+          "peakedArea": 0.8345424107142858,
+          "currentTotal": 0.8807419962991552,
+          "peakedTotal": 0.8807419962991552,
+          "currentRank": 5,
+          "peakedRank": 3,
+          "iou": 0.7127122963887724
+        },
+        {
+          "method": "luma×5",
+          "frameFrac": 0.21778057329919165,
+          "currentArea": 0.6222302094262618,
+          "peakedArea": 0.6222302094262618,
+          "currentTotal": 0.8763475038708596,
+          "peakedTotal": 0.8763475038708596,
+          "currentRank": 6,
+          "peakedRank": 4,
+          "iou": 0.942990012975909
+        },
+        {
+          "method": "luma×2.5",
+          "frameFrac": 0.2503110884248191,
+          "currentArea": 0.715174538356626,
+          "peakedArea": 0.715174538356626,
+          "currentTotal": 0.8728401462208781,
+          "peakedTotal": 0.8728401462208781,
+          "currentRank": 7,
+          "peakedRank": 5,
+          "iou": 0.831669202514877
+        },
+        {
+          "method": "luma×7",
+          "frameFrac": 0.19187160489099805,
+          "currentArea": 0.5482045854028517,
+          "peakedArea": 0.5482045854028517,
+          "currentTotal": 0.8266034717546812,
+          "peakedTotal": 0.8266034717546812,
+          "currentRank": 8,
+          "peakedRank": 6,
+          "iou": 0.8811586731813524
+        },
+        {
+          "method": "chroma@28",
+          "frameFrac": 0.464095458984375,
+          "currentArea": 1,
+          "peakedArea": 0.6740129743303571,
+          "currentTotal": 0.7613625254822827,
+          "peakedTotal": 0.679865769064872,
+          "currentRank": 9,
+          "peakedRank": 10,
+          "iou": 0.4103060705895093
+        },
+        {
+          "method": "chroma@40",
+          "frameFrac": 0.317900390625,
+          "currentArea": 0.9082868303571429,
+          "peakedArea": 0.9082868303571429,
+          "currentTotal": 0.7570777965133155,
+          "peakedTotal": 0.7570777965133155,
+          "currentRank": 10,
+          "peakedRank": 7,
+          "iou": 0.516411450345663
+        },
+        {
+          "method": "luma@28",
+          "frameFrac": 0.256234130859375,
+          "currentArea": 0.7320975167410715,
+          "peakedArea": 0.7320975167410715,
+          "currentTotal": 0.620584336588528,
+          "peakedTotal": 0.620584336588528,
+          "currentRank": 11,
+          "peakedRank": 11,
+          "iou": 0.565356934540109
+        }
+      ]
+    },
+    {
+      "card": "Bulk Up",
+      "humanFrac": 0.2841214349183537,
+      "currentMax": {
+        "method": "edge",
+        "iou": 0.8671597521588627,
+        "score": 0.9284025750651211,
+        "peaked": 0.9284025750651211,
+        "frameFrac": 0.3276460124112209,
+        "rank": 1,
+        "peakedRank": 1
+      },
+      "peakedMax": {
+        "method": "edge",
+        "iou": 0.8671597521588627,
+        "score": 0.9284025750651211,
+        "peaked": 0.9284025750651211,
+        "frameFrac": 0.3276460124112209,
+        "rank": 1,
+        "peakedRank": 1
+      },
+      "currentFinal": {
+        "method": "chroma@40",
+        "iou": 0.34400161115367806,
+        "score": 0.8627834884769693,
+        "peaked": 0.6127834884769693,
+        "frameFrac": 0.8259305355155047,
+        "rank": 3,
+        "peakedRank": 4
+      },
+      "peakedFinal": {
+        "method": "luma@28",
+        "iou": 0.41785483354047953,
+        "score": 0.8597489425970508,
+        "peaked": 0.6240685919235953,
+        "frameFrac": 0.6799524909428377,
+        "rank": 4,
+        "peakedRank": 3
+      },
+      "best": {
+        "method": "edge",
+        "iou": 0.8671597521588627,
+        "score": 0.9284025750651211,
+        "peaked": 0.9284025750651211,
+        "frameFrac": 0.3276460124112209,
+        "rank": 1,
+        "peakedRank": 1
+      },
+      "nestedPeaked": true,
+      "candidates": [
+        {
+          "method": "edge",
+          "frameFrac": 0.3276460124112209,
+          "currentArea": 0.9361314640320597,
+          "peakedArea": 0.9361314640320597,
+          "currentTotal": 0.9284025750651211,
+          "peakedTotal": 0.9284025750651211,
+          "currentRank": 1,
+          "peakedRank": 1,
+          "iou": 0.8671597521588627
+        },
+        {
+          "method": "luma@18",
+          "frameFrac": 0.8747563025999067,
+          "currentArea": 1,
+          "peakedArea": 0,
+          "currentTotal": 0.8977388644160972,
+          "peakedTotal": 0.6477388644160972,
+          "currentRank": 2,
+          "peakedRank": 2,
+          "iou": 0.32480067199733503
+        },
+        {
+          "method": "chroma@40",
+          "frameFrac": 0.8259305355155047,
+          "currentArea": 1,
+          "peakedArea": 0,
+          "currentTotal": 0.8627834884769693,
+          "peakedTotal": 0.6127834884769693,
+          "currentRank": 3,
+          "peakedRank": 4,
+          "iou": 0.34400161115367806
+        },
+        {
+          "method": "luma@28",
+          "frameFrac": 0.6799524909428377,
+          "currentArea": 1,
+          "peakedArea": 0.05727859730617779,
+          "currentTotal": 0.8597489425970508,
+          "peakedTotal": 0.6240685919235953,
+          "currentRank": 4,
+          "peakedRank": 3,
+          "iou": 0.41785483354047953
+        }
+      ]
+    },
+    {
+      "card": "Mudbutton Torchrunner",
+      "humanFrac": 0.29184485176798924,
+      "currentMax": {
+        "method": "luma@28",
+        "iou": 0.3180193079733222,
+        "score": 0.8891214511854755,
+        "peaked": 0.6391214511854755,
+        "frameFrac": 0.917575239590961,
+        "rank": 1,
+        "peakedRank": 2
+      },
+      "peakedMax": {
+        "method": "edge",
+        "iou": 0.8615981365178127,
+        "score": 0.8707625329783144,
+        "peaked": 0.8707625329783144,
+        "frameFrac": 0.25145298043561665,
+        "rank": 2,
+        "peakedRank": 1
+      },
+      "currentFinal": {
+        "method": "luma@28",
+        "iou": 0.3180193079733222,
+        "score": 0.8891214511854755,
+        "peaked": 0.6391214511854755,
+        "frameFrac": 0.917575239590961,
+        "rank": 1,
+        "peakedRank": 2
+      },
+      "peakedFinal": {
+        "method": "edge",
+        "iou": 0.8615981365178127,
+        "score": 0.8707625329783144,
+        "peaked": 0.8707625329783144,
+        "frameFrac": 0.25145298043561665,
+        "rank": 2,
+        "peakedRank": 1
+      },
+      "best": {
+        "method": "edge",
+        "iou": 0.8615981365178127,
+        "score": 0.8707625329783144,
+        "peaked": 0.8707625329783144,
+        "frameFrac": 0.25145298043561665,
+        "rank": 2,
+        "peakedRank": 1
+      },
+      "nestedPeaked": false,
+      "candidates": [
+        {
+          "method": "luma@28",
+          "frameFrac": 0.917575239590961,
+          "currentArea": 1,
+          "peakedArea": 0,
+          "currentTotal": 0.8891214511854755,
+          "peakedTotal": 0.6391214511854755,
+          "currentRank": 1,
+          "peakedRank": 2,
+          "iou": 0.3180193079733222
+        },
+        {
+          "method": "edge",
+          "frameFrac": 0.25145298043561665,
+          "currentArea": 0.7184370869589047,
+          "peakedArea": 0.7184370869589047,
+          "currentTotal": 0.8707625329783144,
+          "peakedTotal": 0.8707625329783144,
+          "currentRank": 2,
+          "peakedRank": 1,
+          "iou": 0.8615981365178127
+        }
+      ]
+    }
+  ],
+  "trusted": {
+    "n": 43,
+    "currentGood": 33,
+    "peakedGood": 37,
+    "currentMedian": 0.9219416863393674,
+    "peakedMedian": 0.9275731000405651,
+    "currentP10": 0.27865687637094555,
+    "peakedP10": 0.7685023208667299,
+    "currentMaxGood": 31,
+    "peakedMaxGood": 37,
+    "currentMaxMedian": 0.898000861995512,
+    "peakedMaxMedian": 0.8929171324273169,
+    "currentMaxP10": 0.2381066974882392,
+    "peakedMaxP10": 0.7674342905836545,
+    "changed": 19,
+    "improved": 10,
+    "unchanged": 27,
+    "regressed": 6,
+    "maxImproved": 14,
+    "maxUnchanged": 21,
+    "maxRegressed": 8
+  },
+  "collateral": {
+    "n": 38,
+    "currentGood": 33,
+    "peakedGood": 33,
+    "currentMedian": 0.9293740616099824,
+    "peakedMedian": 0.9221877665667344,
+    "currentP10": 0.7819408588170755,
+    "peakedP10": 0.781953163127098,
+    "currentMaxGood": 30,
+    "peakedMaxGood": 33,
+    "currentMaxMedian": 0.905900281711734,
+    "peakedMaxMedian": 0.8944014673653531,
+    "currentMaxP10": 0.3553190790791225,
+    "peakedMaxP10": 0.7782150571363343,
+    "changed": 14,
+    "improved": 5,
+    "unchanged": 27,
+    "regressed": 6,
+    "maxImproved": 10,
+    "maxUnchanged": 20,
+    "maxRegressed": 8,
+    "goodDrop": -3,
+    "medianDrop": 0.011498814346380892,
+    "meaningful": true,
+    "severeDrops": 1
+  },
+  "bootstrap": {
+    "n": 73,
+    "currentGood": 45,
+    "peakedGood": 46,
+    "currentMedian": 0.8530105494314363,
+    "peakedMedian": 0.8593359900727743,
+    "currentP10": 0.24859661973019276,
+    "peakedP10": 0.2694734519218696,
+    "currentMaxGood": 44,
+    "peakedMaxGood": 44,
+    "currentMaxMedian": 0.8285232172155919,
+    "peakedMaxMedian": 0.8530105494314363,
+    "currentMaxP10": 0.1829397133253891,
+    "peakedMaxP10": 0.27103953997358976,
+    "changed": 30,
+    "improved": 8,
+    "unchanged": 53,
+    "regressed": 12,
+    "maxImproved": 18,
+    "maxUnchanged": 38,
+    "maxRegressed": 17
+  },
+  "synthetic": {
+    "n": 212,
+    "currentGood": 211,
+    "peakedGood": 211,
+    "currentMedian": 0.9830654511921884,
+    "peakedMedian": 0.9830654511921884,
+    "currentP10": 0.906437084802626,
+    "peakedP10": 0.906437084802626,
+    "currentMaxGood": 212,
+    "peakedMaxGood": 212,
+    "currentMaxMedian": 0.9675834314273745,
+    "peakedMaxMedian": 0.9675834314273745,
+    "currentMaxP10": 0.8702206716110754,
+    "peakedMaxP10": 0.8702206716110754,
+    "changed": 0,
+    "improved": 0,
+    "unchanged": 212,
+    "regressed": 0,
+    "maxImproved": 0,
+    "maxUnchanged": 212,
+    "maxRegressed": 0
+  },
+  "errors": {
+    "trusted": [
+      {
+        "id": "focus-series__focus-series-20260908T132626__t000-source",
+        "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t000-source.png",
+        "error": "missing image or capture dimension (960 vs null)"
+      },
+      {
+        "id": "replay__maddening-hex-alt-art-20260908T082448",
+        "image": ".scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+        "error": "missing image or capture dimension (1006 vs null)"
+      }
+    ],
+    "bootstrap": 3,
+    "synthetic": 0
+  },
+  "excluded": {
+    "frozen": 20,
+    "multi": 0,
+    "skip": 10,
+    "syntheticMultiOmitted": true
+  },
+  "closeups": [
+    {
+      "id": "focus-series__focus-series-20260908T132712",
+      "label": "Livaan, Cultist of Tiamat foil",
+      "humanFrac": 0.45609870518890566,
+      "currentMaxIou": 0.8960795171079514,
+      "peakedMaxIou": 0.8868251452384108,
+      "currentFinalIou": 0.8960795171079514,
+      "peakedFinalIou": 0.8868251452384108,
+      "closeupDrop": false
+    },
+    {
+      "id": "focus-series__focus-series-20260908T132801__t500-source",
+      "label": "Excalibur, Sword of Eden French foil",
+      "humanFrac": 0.37933990077022334,
+      "currentMaxIou": 0.9000295383541275,
+      "peakedMaxIou": 0.9000295383541275,
+      "currentFinalIou": 0.9000295383541275,
+      "peakedFinalIou": 0.9000295383541275,
+      "closeupDrop": false
+    },
+    {
+      "id": "replay__livaan-cultist-of-tiamat-foil-20260908T111916",
+      "label": "Livaan, Cultist of Tiamat (foil)",
+      "humanFrac": 0.4141744652667649,
+      "currentMaxIou": 0.8921387136753873,
+      "peakedMaxIou": 0.9305053688162497,
+      "currentFinalIou": 0.9305053688162497,
+      "peakedFinalIou": 0.9305053688162497,
+      "closeupDrop": false
+    },
+    {
+      "id": "replay__lizard-blades-french-20260908T111833",
+      "label": "Lizard Blades (french)",
+      "humanFrac": 0.420669030722432,
+      "currentMaxIou": 0.9358825464058015,
+      "peakedMaxIou": 0.8834238181499934,
+      "currentFinalIou": 0.9358825464058015,
+      "peakedFinalIou": 0.8834238181499934,
+      "closeupDrop": true
+    },
+    {
+      "id": "replay__p-e-d-tre-et-de-foyer-french-goo-20260908T082303",
+      "label": "épée d'âtre et de foyer (French good capture)",
+      "humanFrac": 0.4021281967616122,
+      "currentMaxIou": 0.7630809695958414,
+      "peakedMaxIou": 0.7631219839625826,
+      "currentFinalIou": 0.7630809695958414,
+      "peakedFinalIou": 0.7631219839625826,
+      "closeupDrop": false
+    },
+    {
+      "id": "scan-fixtures_real-photos_maddening-hex-afc-showcase-glare",
+      "label": "Maddening Hex",
+      "humanFrac": 0.43560756972111553,
+      "currentMaxIou": 0.9106375851165952,
+      "peakedMaxIou": 0.8994262775034151,
+      "currentFinalIou": 0.9106375851165952,
+      "peakedFinalIou": 0.8994262775034151,
+      "closeupDrop": false
+    },
+    {
+      "id": "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c008_deck-011-source",
+      "label": null,
+      "humanFrac": 0.4021437098212444,
+      "currentMaxIou": 0.9390616679831956,
+      "peakedMaxIou": 0.8787019745966571,
+      "currentFinalIou": 0.9390616679831956,
+      "peakedFinalIou": 0.8787019745966571,
+      "closeupDrop": true
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260910-164005_geom-001-source_geom-001-source",
+      "label": null,
+      "humanFrac": 0.36959219438911206,
+      "currentMaxIou": 0.9452459022729566,
+      "peakedMaxIou": 0.9668156151422413,
+      "currentFinalIou": 0.9452459022729566,
+      "peakedFinalIou": 0.9668156151422413,
+      "closeupDrop": false
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260910-165339_geom-001-source_geom-001-source",
+      "label": null,
+      "humanFrac": 0.3687336472264794,
+      "currentMaxIou": 0.9458468829271961,
+      "peakedMaxIou": 0.9559718240779266,
+      "currentFinalIou": 0.9458468829271961,
+      "peakedFinalIou": 0.9559718240779266,
+      "closeupDrop": false
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source",
+      "label": null,
+      "humanFrac": 0.39637194475368476,
+      "currentMaxIou": 0.9343395379836887,
+      "peakedMaxIou": 0.8619243410465672,
+      "currentFinalIou": 0.9343395379836887,
+      "peakedFinalIou": 0.8619243410465672,
+      "closeupDrop": true
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260911-085827_geom-001-source_geom-001-source",
+      "label": null,
+      "humanFrac": 0.38240314425890537,
+      "currentMaxIou": 0.920151431009098,
+      "peakedMaxIou": 0.9429970235029859,
+      "currentFinalIou": 0.920151431009098,
+      "peakedFinalIou": 0.9429970235029859,
+      "closeupDrop": false
+    },
+    {
+      "id": "scan-real__maddening-hex-afc-showcase-glare",
+      "label": "Maddening Hex",
+      "humanFrac": 0.477521014691235,
+      "currentMaxIou": 0.9999784351239146,
+      "peakedMaxIou": 0.8815040065957892,
+      "currentFinalIou": 0.9999784351239146,
+      "peakedFinalIou": 0.8815040065957892,
+      "closeupDrop": true
+    },
+    {
+      "id": "scan-real__maddening-hex-afc-showcase-glare__maddening-hex-afc-showcase-glare",
+      "label": "Maddening Hex",
+      "humanFrac": 0.477521014691235,
+      "currentMaxIou": 0.9999784351239146,
+      "peakedMaxIou": 0.8815040065957892,
+      "currentFinalIou": 0.9999784351239146,
+      "peakedFinalIou": 0.8815040065957892,
+      "closeupDrop": true
+    },
+    {
+      "id": "scanner-lab__livaan-foil-20260908T105241",
+      "label": "livaan (foil)",
+      "humanFrac": 0.4637848866589893,
+      "currentMaxIou": 0.8758363537202635,
+      "peakedMaxIou": 0.5838896917635921,
+      "currentFinalIou": 0.8758363537202635,
+      "peakedFinalIou": 0.8758363537202635,
+      "closeupDrop": true
+    },
+    {
+      "id": "swap-test__swap-test-20260908-171149__swap-03-source",
+      "label": "Command Beacon",
+      "humanFrac": 0.7161572052401747,
+      "currentMaxIou": 0.29655389801514753,
+      "peakedMaxIou": 0.29655389801514753,
+      "currentFinalIou": 0.29655389801514753,
+      "peakedFinalIou": 0.29655389801514753,
+      "closeupDrop": false
+    },
+    {
+      "id": "swap-test__swap-test-20260908-171306__swap-03-source",
+      "label": "Command Beacon",
+      "humanFrac": 0.7161572052401747,
+      "currentMaxIou": 0.7703124058183559,
+      "peakedMaxIou": 0.27418262095989504,
+      "currentFinalIou": 0.27418262095989504,
+      "peakedFinalIou": 0.27418262095989504,
+      "closeupDrop": false
+    }
+  ],
+  "buckets": {
+    "trusted": [
+      {
+        "bucket": "<0.10",
+        "accepted": 16,
+        "currentSelected": 0,
+        "peakedSelected": 0,
+        "medianIou": 0,
+        "medianSelectedCurrent": null,
+        "medianSelectedPeaked": null
+      },
+      {
+        "bucket": "0.10–0.20",
+        "accepted": 12,
+        "currentSelected": 1,
+        "peakedSelected": 2,
+        "medianIou": 0.9150004778145373,
+        "medianSelectedCurrent": 0.9282427544037151,
+        "medianSelectedPeaked": 0.9548652382566973
+      },
+      {
+        "bucket": "0.20–0.35",
+        "accepted": 99,
+        "currentSelected": 19,
+        "peakedSelected": 23,
+        "medianIou": 0.8840844681729688,
+        "medianSelectedCurrent": 0.9450761309243038,
+        "medianSelectedPeaked": 0.9410756043118832
+      },
+      {
+        "bucket": "0.35–0.50",
+        "accepted": 98,
+        "currentSelected": 16,
+        "peakedSelected": 15,
+        "medianIou": 0.8739195135339797,
+        "medianSelectedCurrent": 0.9262235275778086,
+        "medianSelectedPeaked": 0.8994262775034151
+      },
+      {
+        "bucket": "0.50–0.70",
+        "accepted": 83,
+        "currentSelected": 1,
+        "peakedSelected": 2,
+        "medianIou": 0.6039497170971645,
+        "medianSelectedCurrent": 0.8758363537202635,
+        "medianSelectedPeaked": 0.6468455936303715
+      },
+      {
+        "bucket": ">0.70",
+        "accepted": 96,
+        "currentSelected": 6,
+        "peakedSelected": 1,
+        "medianIou": 0.3429334850992497,
+        "medianSelectedCurrent": 0.23849951725849938,
+        "medianSelectedPeaked": 0.1894136455000195
+      }
+    ],
+    "collateral": [
+      {
+        "bucket": "<0.10",
+        "accepted": 16,
+        "currentSelected": 0,
+        "peakedSelected": 0,
+        "medianIou": 0,
+        "medianSelectedCurrent": null,
+        "medianSelectedPeaked": null
+      },
+      {
+        "bucket": "0.10–0.20",
+        "accepted": 7,
+        "currentSelected": 1,
+        "peakedSelected": 1,
+        "medianIou": 0.8929171324273169,
+        "medianSelectedCurrent": 0.9282427544037151,
+        "medianSelectedPeaked": 0.9282427544037151
+      },
+      {
+        "bucket": "0.20–0.35",
+        "accepted": 84,
+        "currentSelected": 19,
+        "peakedSelected": 20,
+        "medianIou": 0.8842466056816891,
+        "medianSelectedCurrent": 0.9450761309243038,
+        "medianSelectedPeaked": 0.9430758676180935
+      },
+      {
+        "bucket": "0.35–0.50",
+        "accepted": 96,
+        "currentSelected": 16,
+        "peakedSelected": 15,
+        "medianIou": 0.8739985060636111,
+        "medianSelectedCurrent": 0.9262235275778086,
+        "medianSelectedPeaked": 0.8994262775034151
+      },
+      {
+        "bucket": "0.50–0.70",
+        "accepted": 79,
+        "currentSelected": 1,
+        "peakedSelected": 1,
+        "medianIou": 0.6049839309242698,
+        "medianSelectedCurrent": 0.8758363537202635,
+        "medianSelectedPeaked": 0.8758363537202635
+      },
+      {
+        "bucket": ">0.70",
+        "accepted": 86,
+        "currentSelected": 1,
+        "peakedSelected": 1,
+        "medianIou": 0.36500620920335614,
+        "medianSelectedCurrent": 0.1894136455000195,
+        "medianSelectedPeaked": 0.1894136455000195
+      }
+    ],
+    "synthetic": [
+      {
+        "bucket": "<0.10",
+        "accepted": 4,
+        "currentSelected": 0,
+        "peakedSelected": 0,
+        "medianIou": 0.268910682300497,
+        "medianSelectedCurrent": null,
+        "medianSelectedPeaked": null
+      },
+      {
+        "bucket": "0.10–0.20",
+        "accepted": 70,
+        "currentSelected": 1,
+        "peakedSelected": 1,
+        "medianIou": 0.7632480588749452,
+        "medianSelectedCurrent": 0.7632480588749452,
+        "medianSelectedPeaked": 0.7632480588749452
+      },
+      {
+        "bucket": "0.20–0.35",
+        "accepted": 2240,
+        "currentSelected": 211,
+        "peakedSelected": 211,
+        "medianIou": 0.9803801422400938,
+        "medianSelectedCurrent": 0.9831725857573193,
+        "medianSelectedPeaked": 0.9831725857573193
+      },
+      {
+        "bucket": "0.35–0.50",
+        "accepted": 0,
+        "currentSelected": 0,
+        "peakedSelected": 0,
+        "medianIou": null,
+        "medianSelectedCurrent": null,
+        "medianSelectedPeaked": null
+      },
+      {
+        "bucket": "0.50–0.70",
+        "accepted": 0,
+        "currentSelected": 0,
+        "peakedSelected": 0,
+        "medianIou": null,
+        "medianSelectedCurrent": null,
+        "medianSelectedPeaked": null
+      },
+      {
+        "bucket": ">0.70",
+        "accepted": 0,
+        "currentSelected": 0,
+        "peakedSelected": 0,
+        "medianIou": null,
+        "medianSelectedCurrent": null,
+        "medianSelectedPeaked": null
+      }
+    ]
+  },
+  "collateralRegressions": [
+    {
+      "id": "replay__lizard-blades-french-20260908T111833",
+      "label": "Lizard Blades (french)",
+      "humanFrac": 0.420669030722432,
+      "currentMaxIou": 0.9358825464058015,
+      "peakedMaxIou": 0.8834238181499934,
+      "currentFinalIou": 0.9358825464058015,
+      "peakedFinalIou": 0.8834238181499934
+    },
+    {
+      "id": "scan-fixtures_real-photos_maddening-hex-afc-showcase-glare",
+      "label": "Maddening Hex",
+      "humanFrac": 0.43560756972111553,
+      "currentMaxIou": 0.9106375851165952,
+      "peakedMaxIou": 0.8994262775034151,
+      "currentFinalIou": 0.9106375851165952,
+      "peakedFinalIou": 0.8994262775034151
+    },
+    {
+      "id": "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c008_deck-011-source",
+      "label": null,
+      "humanFrac": 0.4021437098212444,
+      "currentMaxIou": 0.9390616679831956,
+      "peakedMaxIou": 0.8787019745966571,
+      "currentFinalIou": 0.9390616679831956,
+      "peakedFinalIou": 0.8787019745966571
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source",
+      "label": null,
+      "humanFrac": 0.39637194475368476,
+      "currentMaxIou": 0.9343395379836887,
+      "peakedMaxIou": 0.8619243410465672,
+      "currentFinalIou": 0.9343395379836887,
+      "peakedFinalIou": 0.8619243410465672
+    },
+    {
+      "id": "scan-real__maddening-hex-afc-showcase-glare",
+      "label": "Maddening Hex",
+      "humanFrac": 0.477521014691235,
+      "currentMaxIou": 0.9999784351239146,
+      "peakedMaxIou": 0.8815040065957892,
+      "currentFinalIou": 0.9999784351239146,
+      "peakedFinalIou": 0.8815040065957892
+    },
+    {
+      "id": "scan-real__maddening-hex-afc-showcase-glare__maddening-hex-afc-showcase-glare",
+      "label": "Maddening Hex",
+      "humanFrac": 0.477521014691235,
+      "currentMaxIou": 0.9999784351239146,
+      "peakedMaxIou": 0.8815040065957892,
+      "currentFinalIou": 0.9999784351239146,
+      "peakedFinalIou": 0.8815040065957892
+    },
+    {
+      "id": "scanner-lab__livaan-foil-20260908T105241",
+      "label": "livaan (foil)",
+      "humanFrac": 0.4637848866589893,
+      "currentMaxIou": 0.8758363537202635,
+      "peakedMaxIou": 0.5838896917635921,
+      "currentFinalIou": 0.8758363537202635,
+      "peakedFinalIou": 0.8758363537202635
+    },
+    {
+      "id": "swap-test__swap-test-20260908-171306__swap-03-source",
+      "label": "Command Beacon",
+      "humanFrac": 0.7161572052401747,
+      "currentMaxIou": 0.7703124058183559,
+      "peakedMaxIou": 0.27418262095989504,
+      "currentFinalIou": 0.27418262095989504,
+      "peakedFinalIou": 0.27418262095989504
+    }
+  ],
+  "selectedRegressions": [
+    {
+      "id": "replay__lizard-blades-french-20260908T111833",
+      "label": "Lizard Blades (french)",
+      "humanFrac": 0.420669030722432,
+      "currentFinalIou": 0.9358825464058015,
+      "peakedFinalIou": 0.8834238181499934,
+      "currentMaxIou": 0.9358825464058015,
+      "peakedMaxIou": 0.8834238181499934
+    },
+    {
+      "id": "scan-fixtures_real-photos_maddening-hex-afc-showcase-glare",
+      "label": "Maddening Hex",
+      "humanFrac": 0.43560756972111553,
+      "currentFinalIou": 0.9106375851165952,
+      "peakedFinalIou": 0.8994262775034151,
+      "currentMaxIou": 0.9106375851165952,
+      "peakedMaxIou": 0.8994262775034151
+    },
+    {
+      "id": "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c008_deck-011-source",
+      "label": null,
+      "humanFrac": 0.4021437098212444,
+      "currentFinalIou": 0.9390616679831956,
+      "peakedFinalIou": 0.8787019745966571,
+      "currentMaxIou": 0.9390616679831956,
+      "peakedMaxIou": 0.8787019745966571
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source",
+      "label": null,
+      "humanFrac": 0.39637194475368476,
+      "currentFinalIou": 0.9343395379836887,
+      "peakedFinalIou": 0.8619243410465672,
+      "currentMaxIou": 0.9343395379836887,
+      "peakedMaxIou": 0.8619243410465672
+    },
+    {
+      "id": "scan-real__maddening-hex-afc-showcase-glare",
+      "label": "Maddening Hex",
+      "humanFrac": 0.477521014691235,
+      "currentFinalIou": 0.9999784351239146,
+      "peakedFinalIou": 0.8815040065957892,
+      "currentMaxIou": 0.9999784351239146,
+      "peakedMaxIou": 0.8815040065957892
+    },
+    {
+      "id": "scan-real__maddening-hex-afc-showcase-glare__maddening-hex-afc-showcase-glare",
+      "label": "Maddening Hex",
+      "humanFrac": 0.477521014691235,
+      "currentFinalIou": 0.9999784351239146,
+      "peakedFinalIou": 0.8815040065957892,
+      "currentMaxIou": 0.9999784351239146,
+      "peakedMaxIou": 0.8815040065957892
+    }
+  ]
+}

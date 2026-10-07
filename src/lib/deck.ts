@@ -17,6 +17,22 @@ import {
 /** Which zone a card belongs to. */
 export type DeckSection = 'commander' | 'main' | 'sideboard';
 
+/**
+ * A paper deck's main list and command zone stay as built. The sideboard is
+ * the place for cards you might swap in later, so it stays editable.
+ */
+export const isPaperLocked = (deck: { frozen?: boolean }, section: DeckSection): boolean =>
+  deck.frozen === true && section !== 'sideboard';
+
+/** New cards in a paper deck are ideas, so every add lands in the sideboard. */
+export const paperAddSection = (
+  deck: { frozen?: boolean },
+  section: DeckSection = 'main',
+): DeckSection => (deck.frozen ? 'sideboard' : section);
+
+export const PAPER_LOCK_TITLE =
+  'This deck is built in paper. Cards already in it stay as they are. Anything you add goes to the sideboard.';
+
 /** Deck formats we let the user pick. 'freeform' imposes no size/zone rules. */
 export type DeckFormat =
   'commander' | 'standard' | 'pioneer' | 'modern' | 'legacy' | 'vintage' | 'pauper' | 'freeform';
@@ -88,6 +104,12 @@ export interface Deck {
   createdAt: number;
   /** The deck's format; drives zones (Commander) and target size. */
   format: DeckFormat;
+  /**
+   * Built in paper, exactly as listed. Its copies are set aside: other decks
+   * see them as already used, the way a card leaves the collection once it is
+   * sleeved into a real deck.
+   */
+  frozen?: boolean;
   id: string;
   /** Lands this deck should run; falls back to the format's usual count. */
   landTarget?: number;
@@ -95,17 +117,17 @@ export interface Deck {
   /** Where it came from: an uploaded filename, or 'manual'. */
   source: string;
   /**
-   * Overview sections that auto-bucket main-deck cards by deck-building tags
-   * (ids from `DECK_TAGS`). Order is priority — a card lands in the first
-   * matching section. Empty / absent = no tag sections.
-   */
-  tagSections?: string[];
-  /**
    * Manual placement of main-deck cards into tag sections. Keys are cardKeys;
    * values are `DECK_TAGS` ids, or `""` to force the card into Main (skip
    * Scryfall auto-match). Absent key = automatic assignment.
    */
   tagOverrides?: Record<string, string>;
+  /**
+   * Overview sections that auto-bucket main-deck cards by deck-building tags
+   * (ids from `DECK_TAGS`). Order is priority — a card lands in the first
+   * matching section. Empty / absent = no tag sections.
+   */
+  tagSections?: string[];
   updatedAt: number;
 }
 
@@ -393,6 +415,229 @@ export const deckShortfall = (
     if (need > 0) out.push({ idProduct, name, need, owned });
   }
   return out;
+};
+
+/** One deck's claim on a card: its name, and how many copies it plays. */
+export interface DeckCopyUse {
+  /** This deck is built in paper, so its copies are set aside. */
+  frozen: boolean;
+  name: string;
+  quantity: number;
+}
+
+/**
+ * Every deck that plays this card, and how many copies it commits (main,
+ * command zone, and sideboard added together). Basics are skipped: they are
+ * not held against the collection.
+ */
+export const copiesAcrossDecks = (
+  name: string,
+  decks: readonly {
+    cards: readonly { name: string; quantity: number }[];
+    frozen?: boolean;
+    name: string;
+  }[],
+): DeckCopyUse[] => {
+  const key = cardKey(name);
+  if (!key || isBasicLand(name)) return [];
+  const uses: DeckCopyUse[] = [];
+  for (const deck of decks) {
+    let quantity = 0;
+    for (const card of deck.cards) {
+      if (cardKey(card.name) === key) quantity += card.quantity;
+    }
+    if (quantity > 0) uses.push({ frozen: deck.frozen === true, name: deck.name, quantity });
+  }
+  return uses;
+};
+
+export const copiesUsed = (uses: readonly DeckCopyUse[]): number =>
+  uses.reduce((sum, use) => sum + use.quantity, 0);
+
+const joinDeckNames = (names: readonly string[]): string => {
+  if (names.length <= 1) return names[0] ?? '';
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+};
+
+const useLabel = (use: DeckCopyUse): string =>
+  use.quantity > 1 ? `${use.name} (${use.quantity})` : use.name;
+
+const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** Hover text for a card that more decks play than you own. */
+export const copyCoverageTitle = (owned: number, uses: readonly DeckCopyUse[]): string => {
+  const labels = uses.map(useLabel);
+  return `used in deck ${joinDeckNames(labels)} but you own only ${owned}`;
+};
+
+const paperKeeps = (paper: readonly DeckCopyUse[]): string => {
+  const names = joinDeckNames(paper.map(useLabel));
+  const n = copiesUsed(paper);
+  return paper.length === 1
+    ? `deck ${names} is built in paper and keeps ${n}`
+    : `decks ${names} are built in paper and keep ${n}`;
+};
+
+/** What the ownership badge should say once paper decks have taken their copies. */
+export interface CoverageMark {
+  check: boolean;
+  fraction: string | null;
+  title: string;
+  tone: 'accent' | 'neg' | 'pos' | 'warn';
+}
+
+/**
+ * Owned copies against every deck that plays the card.
+ *
+ * Lists that are only ideas share the collection, so 2 owned and 3 ideas is
+ * `2/3`. A deck built in paper takes its copies out first: what is left is what
+ * the ideas can still use, and the badge is no longer the plain ownership mark.
+ */
+export const coverageView = (
+  owned: number,
+  uses: readonly DeckCopyUse[],
+  hereFrozen = false,
+): CoverageMark | null => {
+  if (uses.length === 0) return null;
+  const paper = uses.filter(use => use.frozen);
+  const theory = uses.filter(use => !use.frozen);
+  const paperN = copiesUsed(paper);
+  const ideaN = copiesUsed(theory);
+  if (paperN === 0) {
+    if (owned >= ideaN) {
+      return { check: true, fraction: null, title: `You own ${owned}`, tone: 'pos' };
+    }
+    return {
+      check: false,
+      fraction: `${owned}/${ideaN}`,
+      title: copyCoverageTitle(owned, theory),
+      tone: owned > 0 ? 'warn' : 'neg',
+    };
+  }
+  const available = Math.max(0, owned - paperN);
+  const keeps = paperKeeps(paper);
+  if (ideaN === 0) {
+    if (owned >= paperN) {
+      return { check: true, fraction: null, title: 'Built in paper.', tone: 'accent' };
+    }
+    return {
+      check: false,
+      fraction: `${owned}/${paperN}`,
+      title: copyCoverageTitle(owned, paper),
+      tone: 'neg',
+    };
+  }
+  if (available >= ideaN) {
+    return {
+      check: true,
+      fraction: null,
+      title: `You have ${available} left. ${capitalize(keeps)}.`,
+      tone: 'accent',
+    };
+  }
+  const left = available === 0 ? 'none' : `only ${available}`;
+  const ideaTitle = `used in deck ${joinDeckNames(theory.map(useLabel))} but you have ${left} left — ${keeps}`;
+  return {
+    check: false,
+    fraction: `${available}/${ideaN}`,
+    title: hereFrozen
+      ? `This deck is built in paper and keeps its copy. ${capitalize(ideaTitle)}.`
+      : ideaTitle,
+    tone: available === 0 ? 'neg' : 'accent',
+  };
+};
+
+/** Why a list cannot be marked as built in paper. */
+export interface PaperFreezeBlocker {
+  /** Copies other paper decks already keep. */
+  held: number;
+  heldBy: string[];
+  name: string;
+  need: number;
+  owned: number;
+}
+
+export interface PaperFreezeState {
+  blockers: PaperFreezeBlocker[];
+  /** Checked decks can always be unchecked. An unchecked deck needs every copy free. */
+  canMark: boolean;
+  title: string;
+}
+
+const freezeReason = (blocker: PaperFreezeBlocker): string => {
+  if (blocker.held > 0) {
+    return `${blocker.name} is already in your paper deck ${joinDeckNames(blocker.heldBy)}`;
+  }
+  if (blocker.owned === 0) return `${blocker.name} isn’t in your collection`;
+  return `you own ${blocker.owned} ${blocker.name} and this deck plays ${blocker.need}`;
+};
+
+/**
+ * Whether this list can be marked as a paper deck. Basics are ignored. Copies
+ * already kept by other paper decks do not count as still in the collection.
+ */
+export const paperFreezeState = (
+  deck: {
+    cards: readonly { name: string; quantity: number }[];
+    frozen?: boolean;
+    id: string;
+  },
+  decks: readonly {
+    cards: readonly { name: string; quantity: number }[];
+    frozen?: boolean;
+    id: string;
+    name: string;
+  }[],
+  ownedByKey: Record<string, { total: number }>,
+): PaperFreezeState => {
+  const wanted = new Map<string, { copies: number; name: string }>();
+  for (const card of deck.cards) {
+    if (isBasicLand(card.name)) continue;
+    const key = cardKey(card.name);
+    if (!key) continue;
+    const row = wanted.get(key);
+    if (row) row.copies += card.quantity;
+    else wanted.set(key, { copies: card.quantity, name: card.name });
+  }
+  const frozen = deck.frozen === true;
+  if (wanted.size === 0) {
+    return {
+      blockers: [],
+      canMark: frozen,
+      title: frozen
+        ? 'This deck is built in paper, exactly as listed. Its copies are set aside for it.'
+        : 'Add cards before marking this deck as built in paper.',
+    };
+  }
+  const others = decks.filter(other => other.frozen && other.id !== deck.id);
+  const blockers: PaperFreezeBlocker[] = [];
+  for (const [key, { copies, name }] of wanted) {
+    const owned = ownedByKey[key]?.total ?? 0;
+    const heldBy = copiesAcrossDecks(name, others);
+    const held = copiesUsed(heldBy);
+    if (Math.max(0, owned - held) >= copies) continue;
+    blockers.push({ held, heldBy: heldBy.map(use => use.name), name, need: copies, owned });
+  }
+  if (blockers.length === 0) {
+    return {
+      blockers,
+      canMark: true,
+      title: frozen
+        ? 'This deck is built in paper, exactly as listed. Its copies are set aside for it.'
+        : 'Mark this deck as built in paper, exactly as listed.',
+    };
+  }
+  const shown = blockers.slice(0, 3).map(freezeReason);
+  const more = blockers.length > 3 ? ` and ${blockers.length - 3} more` : '';
+  const because = `${capitalize(joinDeckNames(shown))}${more}`;
+  return {
+    blockers,
+    canMark: frozen,
+    title: frozen
+      ? `This deck is marked as built in paper, but ${because}.`
+      : `You can’t mark this deck as built in paper. ${because}.`,
+  };
 };
 
 // ---------------------------------------------------------------------------

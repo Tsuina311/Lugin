@@ -1,0 +1,873 @@
+{
+  "verdict": "TRY_STRONGER_AUGMENTATION",
+  "rule": "PHONE_DOMAIN_DAMAGE when the best existing degradation gains at least 0.04 cosine and closes at least half the gap to the top wrong card. REPRESENTATION_MISMATCH when the gain is under 0.03, or it closes under a quarter of that gap and stays at least 0.05 behind the wrong card. MIXED otherwise.",
+  "views": [
+    "crop3-in",
+    "crop3-out",
+    "crop5-in",
+    "crop5-out",
+    "crop10-in",
+    "crop10-out",
+    "perspective",
+    "blur",
+    "motion",
+    "glare",
+    "dark",
+    "partial",
+    "background",
+    "train-crop3",
+    "train-crop8",
+    "train-crop12",
+    "train-perspective",
+    "train-blur-glare",
+    "train-mixed"
+  ],
+  "counts": {
+    "MIXED": 1,
+    "PHONE_DOMAIN_DAMAGE": 6
+  },
+  "rows": [
+    {
+      "cardName": "Deadly Rollick",
+      "label": "geometry-test-20261006-152155 geom-041",
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-041-source_geom-041-source",
+      "oracleId": "0456ec64-2c81-4763-a352-8ff64a4c3d6b",
+      "printing": "tle 33ace025-c949-482d-bb6a-b3ad13bc981c",
+      "clean": 0.253,
+      "best": 0.4047,
+      "bestDegradation": "train-mixed",
+      "improvement": 0.1517,
+      "topWrong": 0.6167,
+      "topWrongName": "Minions",
+      "gap": 0.3637,
+      "fraction": 0.417,
+      "cleanArtRank": 14693,
+      "bestArtRank": 1079,
+      "oracleRankIfAdded": 1010,
+      "class": "MIXED"
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "label": "geometry-test-20261006-150559 geom-001",
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-001-source_geom-001-source",
+      "oracleId": "a7043fbd-1dfd-42cf-be4b-cc343d0949e5",
+      "printing": "c18 3bd81ae6-e628-447a-a36b-597e63ede295",
+      "clean": 0.3857,
+      "best": 0.5704,
+      "bestDegradation": "motion",
+      "improvement": 0.1847,
+      "topWrong": 0.5349,
+      "topWrongName": "Famished Foragers",
+      "gap": 0.1492,
+      "fraction": 1.2378,
+      "cleanArtRank": 588,
+      "bestArtRank": 1,
+      "oracleRankIfAdded": 1,
+      "class": "PHONE_DOMAIN_DAMAGE"
+    },
+    {
+      "cardName": "Agent of the Shadow Thieves",
+      "label": "geometry-test-20261006-150559 geom-013",
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-013-source_geom-013-source",
+      "oracleId": "b2142d8b-ea53-443e-bd60-9e70d9da9bd7",
+      "printing": "clb ae796b5c-1979-4dd2-9539-4b9e18903834",
+      "clean": 0.4682,
+      "best": 0.6456,
+      "bestDegradation": "motion",
+      "improvement": 0.1774,
+      "topWrong": 0.6149,
+      "topWrongName": "Double-Faced Substitute Card",
+      "gap": 0.1467,
+      "fraction": 1.2093,
+      "cleanArtRank": 550,
+      "bestArtRank": 1,
+      "oracleRankIfAdded": 1,
+      "class": "PHONE_DOMAIN_DAMAGE"
+    },
+    {
+      "cardName": "Kaito, Bane of Nightmares",
+      "label": "geometry-test-20261006-152155 geom-003",
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-003-source_geom-003-source",
+      "oracleId": "fa43077b-5d8b-4fb1-8dda-2a9185e6715e",
+      "printing": "pdsk 24bd788f-72a9-42ba-9a69-ef6111fee40b",
+      "clean": 0.4141,
+      "best": 0.6693,
+      "bestDegradation": "blur",
+      "improvement": 0.2553,
+      "topWrong": 0.5558,
+      "topWrongName": "Myrkul's Invoker",
+      "gap": 0.1418,
+      "fraction": 1.8003,
+      "cleanArtRank": 295,
+      "bestArtRank": 1,
+      "oracleRankIfAdded": 1,
+      "class": "PHONE_DOMAIN_DAMAGE"
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "label": "geometry-test-20261006-150559 geom-004",
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-004-source_geom-004-source",
+      "oracleId": "a7043fbd-1dfd-42cf-be4b-cc343d0949e5",
+      "printing": "c18 3bd81ae6-e628-447a-a36b-597e63ede295",
+      "clean": 0.4673,
+      "best": 0.5319,
+      "bestDegradation": "perspective",
+      "improvement": 0.0646,
+      "topWrong": 0.5258,
+      "topWrongName": "Restless Bloodseeker",
+      "gap": 0.0585,
+      "fraction": 1.1042,
+      "cleanArtRank": 61,
+      "bestArtRank": 1,
+      "oracleRankIfAdded": 1,
+      "class": "PHONE_DOMAIN_DAMAGE"
+    },
+    {
+      "cardName": "The Spear of Leonidas",
+      "label": null,
+      "frameId": "scan-inbox_sessions_geometry-test-20260910-153114_geom-007-source_geom-007-source",
+      "oracleId": "dac3a263-cc02-446a-88ec-882a21096b6c",
+      "printing": "acr 160d6ce7-2452-41a2-aa70-41e1b8045c54",
+      "clean": 0.497,
+      "best": 0.672,
+      "bestDegradation": "train-perspective",
+      "improvement": 0.175,
+      "topWrong": 0.6287,
+      "topWrongName": "Case of the Burning Masks",
+      "gap": 0.1317,
+      "fraction": 1.3287,
+      "cleanArtRank": 41,
+      "bestArtRank": 1,
+      "oracleRankIfAdded": 1,
+      "class": "PHONE_DOMAIN_DAMAGE"
+    },
+    {
+      "cardName": "Excalibur, Sword of Eden",
+      "label": "Excalibur, Sword of Eden French foil",
+      "frameId": "focus-series__focus-series-20260908T132801__t500-source",
+      "oracleId": "9fb6bd72-031b-40a1-83c5-8a1c82f84e12",
+      "printing": "acr 26dbf574-3193-413e-a982-4b9d27dafaf5",
+      "clean": 0.6294,
+      "best": 0.6743,
+      "bestDegradation": "blur",
+      "improvement": 0.0449,
+      "topWrong": 0.7044,
+      "topWrongName": "Revoke Existence",
+      "gap": 0.075,
+      "fraction": 0.5985,
+      "cleanArtRank": 32,
+      "bestArtRank": 6,
+      "oracleRankIfAdded": 6,
+      "class": "PHONE_DOMAIN_DAMAGE"
+    }
+  ],
+  "viewScores": [
+    {
+      "cardName": "Deadly Rollick",
+      "label": "geometry-test-20261006-152155 geom-041",
+      "views": [
+        {
+          "id": "train-mixed",
+          "score": 0.4047,
+          "artRank": 1079
+        },
+        {
+          "id": "motion",
+          "score": 0.3661,
+          "artRank": 2589
+        },
+        {
+          "id": "blur",
+          "score": 0.3426,
+          "artRank": 4077
+        },
+        {
+          "id": "perspective",
+          "score": 0.311,
+          "artRank": 6890
+        },
+        {
+          "id": "train-perspective",
+          "score": 0.3039,
+          "artRank": 7652
+        },
+        {
+          "id": "train-blur-glare",
+          "score": 0.3004,
+          "artRank": 8067
+        },
+        {
+          "id": "crop5-in",
+          "score": 0.297,
+          "artRank": 8467
+        },
+        {
+          "id": "dark",
+          "score": 0.2896,
+          "artRank": 9369
+        },
+        {
+          "id": "crop5-out",
+          "score": 0.2837,
+          "artRank": 10149
+        },
+        {
+          "id": "train-crop3",
+          "score": 0.2718,
+          "artRank": 11852
+        },
+        {
+          "id": "crop10-out",
+          "score": 0.2579,
+          "artRank": 13948
+        },
+        {
+          "id": "crop3-in",
+          "score": 0.2525,
+          "artRank": 14759
+        },
+        {
+          "id": "background",
+          "score": 0.2493,
+          "artRank": 15276
+        },
+        {
+          "id": "partial",
+          "score": 0.2443,
+          "artRank": 16095
+        },
+        {
+          "id": "crop3-out",
+          "score": 0.2356,
+          "artRank": 17546
+        },
+        {
+          "id": "train-crop12",
+          "score": 0.2313,
+          "artRank": 18243
+        },
+        {
+          "id": "glare",
+          "score": 0.2272,
+          "artRank": 18928
+        },
+        {
+          "id": "crop10-in",
+          "score": 0.1968,
+          "artRank": 24100
+        },
+        {
+          "id": "train-crop8",
+          "score": 0.1953,
+          "artRank": 24375
+        }
+      ]
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "label": "geometry-test-20261006-150559 geom-001",
+      "views": [
+        {
+          "id": "motion",
+          "score": 0.5704,
+          "artRank": 1
+        },
+        {
+          "id": "train-mixed",
+          "score": 0.5372,
+          "artRank": 1
+        },
+        {
+          "id": "perspective",
+          "score": 0.5076,
+          "artRank": 8
+        },
+        {
+          "id": "blur",
+          "score": 0.5052,
+          "artRank": 9
+        },
+        {
+          "id": "train-perspective",
+          "score": 0.5034,
+          "artRank": 9
+        },
+        {
+          "id": "train-crop8",
+          "score": 0.5011,
+          "artRank": 11
+        },
+        {
+          "id": "train-blur-glare",
+          "score": 0.4953,
+          "artRank": 12
+        },
+        {
+          "id": "glare",
+          "score": 0.4843,
+          "artRank": 17
+        },
+        {
+          "id": "crop10-in",
+          "score": 0.4841,
+          "artRank": 17
+        },
+        {
+          "id": "train-crop3",
+          "score": 0.4791,
+          "artRank": 22
+        },
+        {
+          "id": "crop5-out",
+          "score": 0.4574,
+          "artRank": 53
+        },
+        {
+          "id": "crop3-in",
+          "score": 0.4518,
+          "artRank": 68
+        },
+        {
+          "id": "crop5-in",
+          "score": 0.4342,
+          "artRank": 125
+        },
+        {
+          "id": "partial",
+          "score": 0.434,
+          "artRank": 126
+        },
+        {
+          "id": "crop10-out",
+          "score": 0.4278,
+          "artRank": 156
+        },
+        {
+          "id": "background",
+          "score": 0.4189,
+          "artRank": 211
+        },
+        {
+          "id": "train-crop12",
+          "score": 0.4126,
+          "artRank": 256
+        },
+        {
+          "id": "dark",
+          "score": 0.4053,
+          "artRank": 323
+        },
+        {
+          "id": "crop3-out",
+          "score": 0.4026,
+          "artRank": 353
+        }
+      ]
+    },
+    {
+      "cardName": "Agent of the Shadow Thieves",
+      "label": "geometry-test-20261006-150559 geom-013",
+      "views": [
+        {
+          "id": "motion",
+          "score": 0.6456,
+          "artRank": 1
+        },
+        {
+          "id": "train-blur-glare",
+          "score": 0.6149,
+          "artRank": 1
+        },
+        {
+          "id": "blur",
+          "score": 0.5799,
+          "artRank": 13
+        },
+        {
+          "id": "train-mixed",
+          "score": 0.5143,
+          "artRank": 140
+        },
+        {
+          "id": "background",
+          "score": 0.4843,
+          "artRank": 336
+        },
+        {
+          "id": "dark",
+          "score": 0.4765,
+          "artRank": 421
+        },
+        {
+          "id": "crop3-out",
+          "score": 0.4737,
+          "artRank": 455
+        },
+        {
+          "id": "crop5-in",
+          "score": 0.4586,
+          "artRank": 743
+        },
+        {
+          "id": "train-perspective",
+          "score": 0.4581,
+          "artRank": 757
+        },
+        {
+          "id": "train-crop3",
+          "score": 0.4567,
+          "artRank": 795
+        },
+        {
+          "id": "train-crop8",
+          "score": 0.4547,
+          "artRank": 844
+        },
+        {
+          "id": "crop10-in",
+          "score": 0.4544,
+          "artRank": 848
+        },
+        {
+          "id": "perspective",
+          "score": 0.4394,
+          "artRank": 1330
+        },
+        {
+          "id": "train-crop12",
+          "score": 0.4324,
+          "artRank": 1576
+        },
+        {
+          "id": "crop3-in",
+          "score": 0.407,
+          "artRank": 2730
+        },
+        {
+          "id": "crop5-out",
+          "score": 0.4047,
+          "artRank": 2846
+        },
+        {
+          "id": "partial",
+          "score": 0.4028,
+          "artRank": 2954
+        },
+        {
+          "id": "glare",
+          "score": 0.3848,
+          "artRank": 4211
+        },
+        {
+          "id": "crop10-out",
+          "score": 0.3212,
+          "artRank": 12004
+        }
+      ]
+    },
+    {
+      "cardName": "Kaito, Bane of Nightmares",
+      "label": "geometry-test-20261006-152155 geom-003",
+      "views": [
+        {
+          "id": "blur",
+          "score": 0.6693,
+          "artRank": 1
+        },
+        {
+          "id": "train-blur-glare",
+          "score": 0.605,
+          "artRank": 1
+        },
+        {
+          "id": "motion",
+          "score": 0.5722,
+          "artRank": 1
+        },
+        {
+          "id": "train-mixed",
+          "score": 0.5715,
+          "artRank": 1
+        },
+        {
+          "id": "perspective",
+          "score": 0.5129,
+          "artRank": 6
+        },
+        {
+          "id": "crop3-in",
+          "score": 0.5025,
+          "artRank": 10
+        },
+        {
+          "id": "crop5-out",
+          "score": 0.4768,
+          "artRank": 30
+        },
+        {
+          "id": "crop5-in",
+          "score": 0.4767,
+          "artRank": 30
+        },
+        {
+          "id": "train-perspective",
+          "score": 0.4708,
+          "artRank": 37
+        },
+        {
+          "id": "glare",
+          "score": 0.4702,
+          "artRank": 38
+        },
+        {
+          "id": "dark",
+          "score": 0.4683,
+          "artRank": 42
+        },
+        {
+          "id": "background",
+          "score": 0.4638,
+          "artRank": 50
+        },
+        {
+          "id": "partial",
+          "score": 0.4634,
+          "artRank": 50
+        },
+        {
+          "id": "crop10-in",
+          "score": 0.4566,
+          "artRank": 65
+        },
+        {
+          "id": "train-crop3",
+          "score": 0.4535,
+          "artRank": 71
+        },
+        {
+          "id": "crop3-out",
+          "score": 0.4481,
+          "artRank": 86
+        },
+        {
+          "id": "train-crop8",
+          "score": 0.4169,
+          "artRank": 278
+        },
+        {
+          "id": "crop10-out",
+          "score": 0.3981,
+          "artRank": 463
+        },
+        {
+          "id": "train-crop12",
+          "score": 0.395,
+          "artRank": 510
+        }
+      ]
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "label": "geometry-test-20261006-150559 geom-004",
+      "views": [
+        {
+          "id": "perspective",
+          "score": 0.5319,
+          "artRank": 1
+        },
+        {
+          "id": "glare",
+          "score": 0.4925,
+          "artRank": 12
+        },
+        {
+          "id": "motion",
+          "score": 0.4873,
+          "artRank": 16
+        },
+        {
+          "id": "blur",
+          "score": 0.485,
+          "artRank": 22
+        },
+        {
+          "id": "train-perspective",
+          "score": 0.4816,
+          "artRank": 33
+        },
+        {
+          "id": "train-mixed",
+          "score": 0.4748,
+          "artRank": 43
+        },
+        {
+          "id": "crop5-in",
+          "score": 0.4733,
+          "artRank": 48
+        },
+        {
+          "id": "crop10-in",
+          "score": 0.4685,
+          "artRank": 61
+        },
+        {
+          "id": "crop3-in",
+          "score": 0.4622,
+          "artRank": 73
+        },
+        {
+          "id": "crop3-out",
+          "score": 0.4394,
+          "artRank": 180
+        },
+        {
+          "id": "background",
+          "score": 0.4384,
+          "artRank": 186
+        },
+        {
+          "id": "partial",
+          "score": 0.4371,
+          "artRank": 194
+        },
+        {
+          "id": "train-crop8",
+          "score": 0.4347,
+          "artRank": 214
+        },
+        {
+          "id": "crop5-out",
+          "score": 0.4341,
+          "artRank": 216
+        },
+        {
+          "id": "crop10-out",
+          "score": 0.434,
+          "artRank": 219
+        },
+        {
+          "id": "dark",
+          "score": 0.4293,
+          "artRank": 266
+        },
+        {
+          "id": "train-crop3",
+          "score": 0.4236,
+          "artRank": 346
+        },
+        {
+          "id": "train-blur-glare",
+          "score": 0.416,
+          "artRank": 459
+        },
+        {
+          "id": "train-crop12",
+          "score": 0.4136,
+          "artRank": 501
+        }
+      ]
+    },
+    {
+      "cardName": "The Spear of Leonidas",
+      "label": null,
+      "views": [
+        {
+          "id": "train-perspective",
+          "score": 0.672,
+          "artRank": 1
+        },
+        {
+          "id": "background",
+          "score": 0.6456,
+          "artRank": 1
+        },
+        {
+          "id": "crop10-out",
+          "score": 0.6421,
+          "artRank": 1
+        },
+        {
+          "id": "partial",
+          "score": 0.6191,
+          "artRank": 2
+        },
+        {
+          "id": "dark",
+          "score": 0.6152,
+          "artRank": 2
+        },
+        {
+          "id": "crop3-out",
+          "score": 0.6078,
+          "artRank": 2
+        },
+        {
+          "id": "train-blur-glare",
+          "score": 0.5854,
+          "artRank": 4
+        },
+        {
+          "id": "perspective",
+          "score": 0.5768,
+          "artRank": 5
+        },
+        {
+          "id": "glare",
+          "score": 0.5705,
+          "artRank": 5
+        },
+        {
+          "id": "crop5-in",
+          "score": 0.5657,
+          "artRank": 5
+        },
+        {
+          "id": "train-crop8",
+          "score": 0.5646,
+          "artRank": 5
+        },
+        {
+          "id": "blur",
+          "score": 0.5519,
+          "artRank": 7
+        },
+        {
+          "id": "train-crop3",
+          "score": 0.5456,
+          "artRank": 10
+        },
+        {
+          "id": "crop5-out",
+          "score": 0.5438,
+          "artRank": 11
+        },
+        {
+          "id": "crop3-in",
+          "score": 0.5374,
+          "artRank": 11
+        },
+        {
+          "id": "crop10-in",
+          "score": 0.5214,
+          "artRank": 17
+        },
+        {
+          "id": "train-crop12",
+          "score": 0.5087,
+          "artRank": 26
+        },
+        {
+          "id": "motion",
+          "score": 0.5041,
+          "artRank": 30
+        },
+        {
+          "id": "train-mixed",
+          "score": 0.3575,
+          "artRank": 1765
+        }
+      ]
+    },
+    {
+      "cardName": "Excalibur, Sword of Eden",
+      "label": "Excalibur, Sword of Eden French foil",
+      "views": [
+        {
+          "id": "blur",
+          "score": 0.6743,
+          "artRank": 6
+        },
+        {
+          "id": "crop5-in",
+          "score": 0.6742,
+          "artRank": 6
+        },
+        {
+          "id": "train-mixed",
+          "score": 0.6698,
+          "artRank": 7
+        },
+        {
+          "id": "dark",
+          "score": 0.6662,
+          "artRank": 7
+        },
+        {
+          "id": "crop10-out",
+          "score": 0.6657,
+          "artRank": 7
+        },
+        {
+          "id": "motion",
+          "score": 0.662,
+          "artRank": 7
+        },
+        {
+          "id": "crop3-out",
+          "score": 0.654,
+          "artRank": 10
+        },
+        {
+          "id": "background",
+          "score": 0.6499,
+          "artRank": 12
+        },
+        {
+          "id": "glare",
+          "score": 0.6421,
+          "artRank": 18
+        },
+        {
+          "id": "crop10-in",
+          "score": 0.6395,
+          "artRank": 23
+        },
+        {
+          "id": "crop5-out",
+          "score": 0.6296,
+          "artRank": 32
+        },
+        {
+          "id": "crop3-in",
+          "score": 0.6289,
+          "artRank": 35
+        },
+        {
+          "id": "partial",
+          "score": 0.6201,
+          "artRank": 44
+        },
+        {
+          "id": "train-blur-glare",
+          "score": 0.6091,
+          "artRank": 66
+        },
+        {
+          "id": "train-crop3",
+          "score": 0.5824,
+          "artRank": 152
+        },
+        {
+          "id": "train-crop8",
+          "score": 0.5786,
+          "artRank": 166
+        },
+        {
+          "id": "perspective",
+          "score": 0.5582,
+          "artRank": 285
+        },
+        {
+          "id": "train-crop12",
+          "score": 0.5392,
+          "artRank": 477
+        },
+        {
+          "id": "train-perspective",
+          "score": 0.5281,
+          "artRank": 613
+        }
+      ]
+    }
+  ]
+}

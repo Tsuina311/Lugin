@@ -1,0 +1,2011 @@
+[
+  {
+    "frameId": "capture-quality__cq-20260908T120539",
+    "image": ".scan-inbox/sessions/phone-20260908/cq-20260908T120539/photo-source.png",
+    "label": "Lizard Blades French",
+    "tags": [
+      "sleeved",
+      "language-fr"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Lizard Blades",
+    "oracleId": "f6314e50-a610-4fff-8f60-803d23460ff0",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "capture-quality__cq-20260908T120629",
+    "image": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+    "label": "island unsleeved",
+    "tags": [
+      "unsleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "capture-quality__cq-20260908T120722",
+    "image": ".scan-inbox/sessions/phone-20260908/cq-20260908T120722/photo-source.png",
+    "label": "Teferi's Veil old edition",
+    "tags": [
+      "sleeved",
+      "classic-frame"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Teferi's Veil",
+    "oracleId": "c6db2ea4-954c-443b-9603-c41596555c31",
+    "printingId": "1021e097-a595-48d7-9780-bbc8ebbc07e8",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "capture-quality__cq-20260908T120751",
+    "image": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+    "label": "Wand of Wonder",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Wand of Wonder",
+    "oracleId": "8f1123dd-19b7-402b-8ecd-ab62494c9fd5",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "capture-quality__cq-20260908T120813",
+    "image": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+    "label": "Livaan, Cultist of Tiamat foil",
+    "tags": [
+      "sleeved",
+      "foil"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Livaan, Cultist of Tiamat",
+    "oracleId": "ee565d5c-7a3a-481c-91aa-b982cf384220",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "focus-series__focus-series-20260908T124234__t500-source",
+    "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t500-source.png",
+    "label": "livaan foil",
+    "tags": [
+      "foil",
+      "frozen-quad-series"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Livaan, Cultist of Tiamat",
+    "oracleId": "ee565d5c-7a3a-481c-91aa-b982cf384220",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "focus-series__focus-series-20260908T124408__t500-source",
+    "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124408/t500-source.png",
+    "label": "teferi old",
+    "tags": [
+      "classic-frame",
+      "frozen-quad-series"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Teferi's Veil",
+    "oracleId": "c6db2ea4-954c-443b-9603-c41596555c31",
+    "printingId": "1021e097-a595-48d7-9780-bbc8ebbc07e8",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "focus-series__focus-series-20260908T132626__t000-source",
+    "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t000-source.png",
+    "label": "Wand of Wonder",
+    "tags": [
+      "per-snapshot-series"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Wand of Wonder",
+    "oracleId": "8f1123dd-19b7-402b-8ecd-ab62494c9fd5",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "focus-series__focus-series-20260908T132626__t500-source",
+    "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t500-source.png",
+    "label": "Wand of Wonder",
+    "tags": [
+      "per-snapshot-series"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Wand of Wonder",
+    "oracleId": "8f1123dd-19b7-402b-8ecd-ab62494c9fd5",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "focus-series__focus-series-20260908T132712",
+    "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132712/t800-source.png",
+    "label": "Livaan, Cultist of Tiamat foil",
+    "tags": [
+      "foil",
+      "per-snapshot-series"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Livaan, Cultist of Tiamat",
+    "oracleId": "ee565d5c-7a3a-481c-91aa-b982cf384220",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "focus-series__focus-series-20260908T132801__t500-source",
+    "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132801/t500-source.png",
+    "label": "Excalibur, Sword of Eden French foil",
+    "tags": [
+      "foil",
+      "language-fr",
+      "per-snapshot-series"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Excalibur, Sword of Eden",
+    "oracleId": "9fb6bd72-031b-40a1-83c5-8a1c82f84e12",
+    "printingId": "26dbf574-3193-413e-a982-4b9d27dafaf5",
+    "nonEnglish": true,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "replay__basilisk-collar-20260908T111744",
+    "image": ".scan-fixtures/replay/basilisk-collar-20260908T111744/source-highres.png",
+    "label": "Basilisk Collar",
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Basilisk Collar",
+    "oracleId": "f5f4dd28-f4ae-4d39-b9b8-6ebfd63c93fe",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "EXISTING_FIXTURE"
+  },
+  {
+    "frameId": "replay__livaan-cultist-of-tiamat-foil-20260908T111916",
+    "image": ".scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png",
+    "label": "Livaan, Cultist of Tiamat (foil)",
+    "tags": [
+      "foil"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Livaan, Cultist of Tiamat",
+    "oracleId": "ee565d5c-7a3a-481c-91aa-b982cf384220",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "EXISTING_FIXTURE"
+  },
+  {
+    "frameId": "replay__lizard-blades-french-20260908T111833",
+    "image": ".scan-fixtures/replay/lizard-blades-french-20260908T111833/source-highres.png",
+    "label": "Lizard Blades (french)",
+    "tags": [
+      "language-fr"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Lizard Blades",
+    "oracleId": "f6314e50-a610-4fff-8f60-803d23460ff0",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "EXISTING_FIXTURE"
+  },
+  {
+    "frameId": "replay__maddening-hex-alt-art-20260908T082448",
+    "image": ".scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+    "label": "maddening hex (alt art)",
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Maddening Hex",
+    "oracleId": "5d96170f-14dd-496e-a485-bd3b9eedfe02",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "EXISTING_FIXTURE"
+  },
+  {
+    "frameId": "replay__negate-unsleeved-20260908T082746",
+    "image": ".scan-fixtures/replay/negate-unsleeved-20260908T082746/source-highres.png",
+    "label": "negate unsleeved",
+    "tags": [
+      "unsleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Negate",
+    "oracleId": "3407fe41-fdd3-4119-8f70-4bc4590a379f",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "replay__p-e-d-tre-et-de-foyer-french-goo-20260908T082303",
+    "image": ".scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+    "label": "épée d'âtre et de foyer (French good capture)",
+    "tags": [
+      "language-fr"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Sword of Hearth and Home",
+    "oracleId": "913e6182-706a-4872-8c8a-e146b0ae0738",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "EXISTING_FIXTURE"
+  },
+  {
+    "frameId": "replay__slip-out-the-back-italian-20260908T111643",
+    "image": ".scan-fixtures/replay/slip-out-the-back-italian-20260908T111643/source-highres.png",
+    "label": "Slip Out the Back (Italian)",
+    "tags": [
+      "language-it"
+    ],
+    "frameFamily": "modern_standard",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Slip Out the Back",
+    "oracleId": "82506e51-3fe1-446f-83c9-69e67583cefc",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "EXISTING_FIXTURE"
+  },
+  {
+    "frameId": "replay__teferi-veil-old-edition-good-cap-20260908T111548",
+    "image": ".scan-fixtures/replay/teferi-veil-old-edition-good-cap-20260908T111548/source-highres.png",
+    "label": "teferi veil (old edition, good capture)",
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Teferi's Veil",
+    "oracleId": "c6db2ea4-954c-443b-9603-c41596555c31",
+    "printingId": "1021e097-a595-48d7-9780-bbc8ebbc07e8",
+    "nonEnglish": false,
+    "source": "EXISTING_FIXTURE"
+  },
+  {
+    "frameId": "replay__wand-of-wonder-20260908T073958",
+    "image": ".scan-fixtures/replay/wand-of-wonder-20260908T073958/source-highres.png",
+    "label": "Wand of Wonder",
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Wand of Wonder",
+    "oracleId": "8f1123dd-19b7-402b-8ecd-ab62494c9fd5",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "EXISTING_FIXTURE"
+  },
+  {
+    "frameId": "scan-fixtures_real-photos_maddening-hex-afc-showcase-glare",
+    "image": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+    "label": "Maddening Hex",
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Maddening Hex",
+    "oracleId": "5d96170f-14dd-496e-a485-bd3b9eedfe02",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "EXISTING_FIXTURE"
+  },
+  {
+    "frameId": "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c000_deck-001-source",
+    "image": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c000/deck-001-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Sword of Feast and Famine",
+    "oracleId": "d0901053-6de0-46d0-9ee3-8d40510236c1",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c008_deck-011-source",
+    "image": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c008/deck-011-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Feywild Trickster",
+    "oracleId": "b385edc3-c897-48e3-b251-242c77159fa0",
+    "printingId": "c93e0296-69e0-45e0-a1c2-0214a53c52d0",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-153114_geom-001-source_geom-001-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-001-source/geom-001-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-153114_geom-007-source_geom-007-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-007-source/geom-007-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "The Spear of Leonidas",
+    "oracleId": "dac3a263-cc02-446a-88ec-882a21096b6c",
+    "printingId": "160d6ce7-2452-41a2-aa70-41e1b8045c54",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-154646_geom-001-source_geom-001-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-001-source/geom-001-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Mask of Memory",
+    "oracleId": "d6b2c998-a226-426c-a40d-6e6007041bfe",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-154646_geom-007-source_geom-007-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-007-source/geom-007-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "showcase",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-155241_geom-006-source_geom-006-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-155241/geom-006-source/geom-006-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Blacksmith's Talent",
+    "oracleId": "9fdad42a-9db5-4d91-9e80-9d5ce19038b8",
+    "printingId": "4bb318fa-481d-40a7-978e-f01b49101ae0",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-162108_geom-001-source_geom-001-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "borderless",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Bulk Up",
+    "oracleId": "fade8af0-5fdb-4237-9dd6-48bfd1d62767",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-164005_geom-001-source_geom-001-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-164005/geom-001-source/geom-001-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "The Ozolith",
+    "oracleId": "1946ded1-5f53-409f-b0a6-5433bb0357d2",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-165339_geom-001-source_geom-001-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-001-source/geom-001-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "showcase",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-006-source/geom-006-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Sword of the Animist",
+    "oracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-001-source/geom-001-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Critical Hit",
+    "oracleId": "992e6845-1c6c-4b74-839c-317823bde15b",
+    "printingId": "d2e9aaaf-0b51-4721-b75c-923892a41743",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-173530_geom-006-source_geom-006-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-006-source/geom-006-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "borderless",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Netherese Puzzle-Ward",
+    "oracleId": "561e8ecc-1f2b-4fd4-8f92-a0acea449816",
+    "printingId": "26bd3a70-3154-44a4-8705-1eac01cde8fd",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-192617_geom-001-source_geom-001-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-001-source/geom-001-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Swiftfoot Boots",
+    "oracleId": "c8b143ad-43ec-4e0d-a440-e348daa31391",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-192617_geom-005-source_geom-005-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-005-source/geom-005-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Sword of the Animist",
+    "oracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260911-085827_geom-001-source_geom-001-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260911-085827/geom-001-source/geom-001-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "borderless",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Havi, the All-Father",
+    "oracleId": "3f58e0f2-7cb5-4a82-b794-071f433fe583",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260911-100459_geom-003-source_geom-003-source",
+    "image": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Mudbutton Torchrunner",
+    "oracleId": "045b2b84-96bd-46fb-8aae-a33968e741c7",
+    "printingId": "20c19ccf-999b-4c7d-ae5b-f93555d08a7a",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-001-source_geom-001-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-001-source/geom-001-source.png",
+    "label": "geometry-test-20261006-150559 geom-001",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Yuriko, the Tiger's Shadow",
+    "oracleId": "a7043fbd-1dfd-42cf-be4b-cc343d0949e5",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-002-source_geom-002-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-002-source/geom-002-source.png",
+    "label": "geometry-test-20261006-150559 geom-002",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Yuriko, the Tiger's Shadow",
+    "oracleId": "a7043fbd-1dfd-42cf-be4b-cc343d0949e5",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-003-source_geom-003-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-003-source/geom-003-source.png",
+    "label": "geometry-test-20261006-150559 geom-003",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Swamp",
+    "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-004-source_geom-004-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-004-source/geom-004-source.png",
+    "label": "geometry-test-20261006-150559 geom-004",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Yuriko, the Tiger's Shadow",
+    "oracleId": "a7043fbd-1dfd-42cf-be4b-cc343d0949e5",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-005-source_geom-005-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-005-source/geom-005-source.png",
+    "label": "geometry-test-20261006-150559 geom-005",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Yuriko, the Tiger's Shadow",
+    "oracleId": "a7043fbd-1dfd-42cf-be4b-cc343d0949e5",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-006-source_geom-006-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-006-source/geom-006-source.png",
+    "label": "geometry-test-20261006-150559 geom-006",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-007-source_geom-007-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-007-source/geom-007-source.png",
+    "label": "geometry-test-20261006-150559 geom-007",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Moonsnare Specialist",
+    "oracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-008-source_geom-008-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-008-source/geom-008-source.png",
+    "label": "geometry-test-20261006-150559 geom-008",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Moonsnare Specialist",
+    "oracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-009-source_geom-009-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-009-source/geom-009-source.png",
+    "label": "geometry-test-20261006-150559 geom-009",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Moonsnare Specialist",
+    "oracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-010-source_geom-010-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-010-source/geom-010-source.png",
+    "label": "geometry-test-20261006-150559 geom-010",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Kaito, Bane of Nightmares",
+    "oracleId": "fa43077b-5d8b-4fb1-8dda-2a9185e6715e",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-011-source_geom-011-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-011-source/geom-011-source.png",
+    "label": "geometry-test-20261006-150559 geom-011",
+    "tags": [
+      "sleeved",
+      "classic-frame"
+    ],
+    "frameFamily": "old",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-012-source_geom-012-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-012-source/geom-012-source.png",
+    "label": "geometry-test-20261006-150559 geom-012",
+    "tags": [
+      "sleeved",
+      "classic-frame"
+    ],
+    "frameFamily": "old",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-013-source_geom-013-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-013-source/geom-013-source.png",
+    "label": "geometry-test-20261006-150559 geom-013",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Agent of the Shadow Thieves",
+    "oracleId": "b2142d8b-ea53-443e-bd60-9e70d9da9bd7",
+    "printingId": "ae796b5c-1979-4dd2-9539-4b9e18903834",
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-014-source_geom-014-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-014-source/geom-014-source.png",
+    "label": "geometry-test-20261006-150559 geom-014",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Darkwater Catacombs",
+    "oracleId": "4869a530-757f-4364-8d8e-4dc8001f433c",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-015-source_geom-015-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-015-source/geom-015-source.png",
+    "label": "geometry-test-20261006-150559 geom-015",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Drowned Catacomb",
+    "oracleId": "819fc966-434e-470f-91e9-a38df974ad17",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-016-source_geom-016-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-150559/geom-016-source/geom-016-source.png",
+    "label": "geometry-test-20261006-150559 geom-016",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-001-source_geom-001-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-001-source/geom-001-source.png",
+    "label": "geometry-test-20261006-152155 geom-001",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Drowned Catacomb",
+    "oracleId": "819fc966-434e-470f-91e9-a38df974ad17",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-002-source_geom-002-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-002-source/geom-002-source.png",
+    "label": "geometry-test-20261006-152155 geom-002",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Darkwater Catacombs",
+    "oracleId": "4869a530-757f-4364-8d8e-4dc8001f433c",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-003-source_geom-003-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-003-source/geom-003-source.png",
+    "label": "geometry-test-20261006-152155 geom-003",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Kaito, Bane of Nightmares",
+    "oracleId": "fa43077b-5d8b-4fb1-8dda-2a9185e6715e",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-004-source_geom-004-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-004-source/geom-004-source.png",
+    "label": "geometry-test-20261006-152155 geom-004",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Moonsnare Specialist",
+    "oracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-005-source_geom-005-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-005-source/geom-005-source.png",
+    "label": "geometry-test-20261006-152155 geom-005",
+    "tags": [
+      "sleeved",
+      "classic-frame"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Swamp",
+    "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-006-source_geom-006-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-006-source/geom-006-source.png",
+    "label": "geometry-test-20261006-152155 geom-006",
+    "tags": [
+      "sleeved",
+      "borderless"
+    ],
+    "frameFamily": "borderless",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Swamp",
+    "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-007-source_geom-007-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-007-source/geom-007-source.png",
+    "label": "geometry-test-20261006-152155 geom-007",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-008-source_geom-008-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-008-source/geom-008-source.png",
+    "label": "geometry-test-20261006-152155 geom-008",
+    "tags": [
+      "sleeved",
+      "classic-frame"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Index",
+    "oracleId": "613b824e-39d1-4c6e-a19c-c915abdc860b",
+    "printingId": "01491b39-283b-438f-8c7c-8df1285e9a83",
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-009-source_geom-009-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-009-source/geom-009-source.png",
+    "label": "geometry-test-20261006-152155 geom-009",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Chasm Skulker",
+    "oracleId": "69facbc7-3859-4716-b627-5199571fb3cf",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-010-source_geom-010-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-010-source/geom-010-source.png",
+    "label": "geometry-test-20261006-152155 geom-010",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Daze",
+    "oracleId": "70486bee-6ee7-41ea-b834-8caf4699302b",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-011-source_geom-011-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-011-source/geom-011-source.png",
+    "label": "geometry-test-20261006-152155 geom-011",
+    "tags": [
+      "sleeved",
+      "borderless"
+    ],
+    "frameFamily": "borderless",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Silver-Fur Master",
+    "oracleId": "60ec735d-c9be-4776-beb7-f603ae22edbf",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-012-source_geom-012-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-012-source/geom-012-source.png",
+    "label": "geometry-test-20261006-152155 geom-012",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Wingcrafter",
+    "oracleId": "55d1f44f-8554-49e7-b36f-92682926e6d0",
+    "printingId": "04a3059f-92f2-4163-b79a-154118a4e36d",
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-013-source_geom-013-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-013-source/geom-013-source.png",
+    "label": "geometry-test-20261006-152155 geom-013",
+    "tags": [
+      "sleeved",
+      "partial",
+      "classic-frame"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-014-source_geom-014-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-014-source/geom-014-source.png",
+    "label": "geometry-test-20261006-152155 geom-014",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Saiba Cryptomancer",
+    "oracleId": "15f89b06-5025-4c9f-bf51-e25bc5c2dd6b",
+    "printingId": "3934d535-740d-471a-bbf1-c3b26b1cd596",
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-015-source_geom-015-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-015-source/geom-015-source.png",
+    "label": "geometry-test-20261006-152155 geom-015",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Command Tower",
+    "oracleId": "0895c9b7-ae7d-4bb3-af17-3b75deb50a25",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-016-source_geom-016-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-016-source/geom-016-source.png",
+    "label": "geometry-test-20261006-152155 geom-016",
+    "tags": [
+      "sleeved",
+      "perspective",
+      "partial"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": true,
+    "status": "known",
+    "reason": null,
+    "cardName": "Pilgrim's Eye",
+    "oracleId": "66155010-cc2c-449a-85d5-92c95aade514",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-017-source_geom-017-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-017-source/geom-017-source.png",
+    "label": "geometry-test-20261006-152155 geom-017",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Mist-Syndicate Naga",
+    "oracleId": "08109241-690f-4d09-ad2f-1cddab9b3c64",
+    "printingId": "65c8f074-e260-4f8e-85d1-1904ca928b51",
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-018-source_geom-018-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-018-source/geom-018-source.png",
+    "label": "geometry-test-20261006-152155 geom-018",
+    "tags": [
+      "sleeved",
+      "borderless"
+    ],
+    "frameFamily": "borderless",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-019-source_geom-019-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-019-source/geom-019-source.png",
+    "label": "geometry-test-20261006-152155 geom-019",
+    "tags": [
+      "sleeved",
+      "foil",
+      "borderless"
+    ],
+    "frameFamily": "borderless",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Sword Coast Sailor",
+    "oracleId": "71248bf6-a6a2-440e-9313-a7abce05a84b",
+    "printingId": "704f8ab7-63fd-4963-bacd-0076fffb34a1",
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-020-source_geom-020-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-020-source/geom-020-source.png",
+    "label": "geometry-test-20261006-152155 geom-020",
+    "tags": [
+      "sleeved",
+      "borderless"
+    ],
+    "frameFamily": "borderless",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Eliminate",
+    "oracleId": "cf307f81-488c-4df5-8b08-ba46e3e7f3d9",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-021-source_geom-021-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-021-source/geom-021-source.png",
+    "label": "geometry-test-20261006-152155 geom-021",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Sakashima's Student",
+    "oracleId": "afcc68e2-3634-43ce-ae99-dd2ec735d146",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-022-source_geom-022-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-022-source/geom-022-source.png",
+    "label": "geometry-test-20261006-152155 geom-022",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-023-source_geom-023-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-023-source/geom-023-source.png",
+    "label": "geometry-test-20261006-152155 geom-023",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Distortion Strike",
+    "oracleId": "4c7f3fbf-6b68-492f-893d-853c73cfa463",
+    "printingId": "315f1cf8-7bde-4592-a14e-ef9e2e3e7ac0",
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-024-source_geom-024-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-024-source/geom-024-source.png",
+    "label": "geometry-test-20261006-152155 geom-024",
+    "tags": [
+      "sleeved",
+      "perspective",
+      "classic-frame"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Sage Owl",
+    "oracleId": "d47fc902-51f7-4ad1-8ee4-c973e32192b8",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-025-source_geom-025-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-025-source/geom-025-source.png",
+    "label": "geometry-test-20261006-152155 geom-025",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Deep-Cavern Bat",
+    "oracleId": "e46f6644-6bf1-47b1-817c-906bd3eca99f",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-026-source_geom-026-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-026-source/geom-026-source.png",
+    "label": "geometry-test-20261006-152155 geom-026",
+    "tags": [
+      "sleeved",
+      "borderless"
+    ],
+    "frameFamily": "borderless",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Swamp",
+    "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-027-source_geom-027-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-027-source/geom-027-source.png",
+    "label": "geometry-test-20261006-152155 geom-027",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Throatseeker",
+    "oracleId": "edb7bd88-971a-4fcc-9d76-d73f21a4926a",
+    "printingId": "b07b3736-25e7-46f2-bea5-543ec13995b1",
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-028-source_geom-028-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-028-source/geom-028-source.png",
+    "label": "geometry-test-20261006-152155 geom-028",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Swamp",
+    "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-029-source_geom-029-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-029-source/geom-029-source.png",
+    "label": "geometry-test-20261006-152155 geom-029",
+    "tags": [
+      "sleeved",
+      "borderless"
+    ],
+    "frameFamily": "borderless",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Satoru Umezawa",
+    "oracleId": "ed1d21ba-ddfe-4f82-9e37-93f9e2c7ba33",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-030-source_geom-030-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-030-source/geom-030-source.png",
+    "label": "geometry-test-20261006-152155 geom-030",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Swamp",
+    "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-031-source_geom-031-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-031-source/geom-031-source.png",
+    "label": "geometry-test-20261006-152155 geom-031",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Dirge of Dread",
+    "oracleId": "be7b16ef-32aa-40d5-b287-c5e79d52d6b9",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-032-source_geom-032-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-032-source/geom-032-source.png",
+    "label": "geometry-test-20261006-152155 geom-032",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Ulamog's Crusher",
+    "oracleId": "597bce51-af89-4d13-9a97-667b4f4f4694",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-033-source_geom-033-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-033-source/geom-033-source.png",
+    "label": "geometry-test-20261006-152155 geom-033",
+    "tags": [
+      "sleeved",
+      "partial"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Whiplash Trap",
+    "oracleId": "1bd26692-c030-4493-883e-2d26b3a1d025",
+    "printingId": "0a80e6ae-13e0-46f7-baef-5fa7dfcedcec",
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-034-source_geom-034-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-034-source/geom-034-source.png",
+    "label": "geometry-test-20261006-152155 geom-034",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Vela the Night-Clad",
+    "oracleId": "185e34f0-60ae-4b07-94ac-96cef11b1604",
+    "printingId": "610737cd-d1ef-49c0-8010-988320ed64d5",
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-035-source_geom-035-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-035-source/geom-035-source.png",
+    "label": "geometry-test-20261006-152155 geom-035",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Lightning Greaves",
+    "oracleId": "ca204b66-8d0c-431a-8d34-282f7c2d17da",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-036-source_geom-036-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-036-source/geom-036-source.png",
+    "label": "geometry-test-20261006-152155 geom-036",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Ornithopter",
+    "oracleId": "a3a98bc9-caa0-49b7-951c-fe4e4f54e4ba",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-037-source_geom-037-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-037-source/geom-037-source.png",
+    "label": "geometry-test-20261006-152155 geom-037",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Swamp",
+    "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-038-source_geom-038-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-038-source/geom-038-source.png",
+    "label": "geometry-test-20261006-152155 geom-038",
+    "tags": [
+      "sleeved",
+      "borderless"
+    ],
+    "frameFamily": "borderless",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-039-source_geom-039-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-039-source/geom-039-source.png",
+    "label": "geometry-test-20261006-152155 geom-039",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Crafty Pathmage",
+    "oracleId": "c4020178-71d9-4363-a0bd-b9a7eecd5d02",
+    "printingId": "1e0ab433-35ab-4e7d-a78e-e4b11fee773d",
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-040-source_geom-040-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-040-source/geom-040-source.png",
+    "label": "geometry-test-20261006-152155 geom-040",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Brainstorm",
+    "oracleId": "36cd2364-d113-47d1-b2c4-b088d9eb88dd",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-041-source_geom-041-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-041-source/geom-041-source.png",
+    "label": "geometry-test-20261006-152155 geom-041",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Deadly Rollick",
+    "oracleId": "0456ec64-2c81-4763-a352-8ff64a4c3d6b",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-042-source_geom-042-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-042-source/geom-042-source.png",
+    "label": "geometry-test-20261006-152155 geom-042",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Commandeer",
+    "oracleId": "ad7d854b-d303-40eb-acd6-03a8023e05e7",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-043-source_geom-043-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-043-source/geom-043-source.png",
+    "label": "geometry-test-20261006-152155 geom-043",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Darkslick Shores",
+    "oracleId": "a2b48695-f7d7-42ce-a8a0-2a723428542a",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-044-source_geom-044-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-044-source/geom-044-source.png",
+    "label": "geometry-test-20261006-152155 geom-044",
+    "tags": [
+      "sleeved",
+      "partial",
+      "borderless"
+    ],
+    "frameFamily": "borderless",
+    "hardRegression": true,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-045-source_geom-045-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-045-source/geom-045-source.png",
+    "label": "geometry-test-20261006-152155 geom-045",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Ingenious Prodigy",
+    "oracleId": "6f498ff7-38c9-44ea-9cb5-994a003825ee",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-046-source_geom-046-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-046-source/geom-046-source.png",
+    "label": "geometry-test-20261006-152155 geom-046",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Kaito, Dancing Shadow",
+    "oracleId": "17fd42f6-f388-4ffc-8fec-ca9ada2506ee",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-047-source_geom-047-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-047-source/geom-047-source.png",
+    "label": "geometry-test-20261006-152155 geom-047",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Swamp",
+    "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-048-source_geom-048-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-048-source/geom-048-source.png",
+    "label": "geometry-test-20261006-152155 geom-048",
+    "tags": [
+      "sleeved",
+      "foil"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-049-source_geom-049-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-049-source/geom-049-source.png",
+    "label": "geometry-test-20261006-152155 geom-049",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Fallen Shinobi",
+    "oracleId": "4fc5f871-a809-4a4a-adfb-eb4cd52837c8",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-050-source_geom-050-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-152155/geom-050-source/geom-050-source.png",
+    "label": "geometry-test-20261006-152155 geom-050",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Deluge",
+    "oracleId": "cd271e61-0135-484f-ae02-5aaca57c1124",
+    "printingId": "22e64f32-0436-4f07-b2b5-a622e3f59d65",
+    "nonEnglish": true,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-001-source_geom-001-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-153936/geom-001-source/geom-001-source.png",
+    "label": "geometry-test-20261006-153936 geom-001",
+    "tags": [
+      "unsleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Glamdring, Foe-hammer",
+    "oracleId": "2802069f-201e-43a7-b5d3-43a95951a2ec",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-002-source_geom-002-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-153936/geom-002-source/geom-002-source.png",
+    "label": "geometry-test-20261006-153936 geom-002",
+    "tags": [
+      "unsleeved",
+      "foil"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Bilbo, Luckwearer",
+    "oracleId": "a73d9109-36e0-40ea-ab06-5c5f7eb4ac54",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-003-source_geom-003-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-153936/geom-003-source/geom-003-source.png",
+    "label": "geometry-test-20261006-153936 geom-003",
+    "tags": [
+      "sleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "The Queen of Dale",
+    "oracleId": "a2ec1dd0-86c7-423d-b562-ed95b79bf8f7",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-004-source_geom-004-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-153936/geom-004-source/geom-004-source.png",
+    "label": "geometry-test-20261006-153936 geom-004",
+    "tags": [
+      "unsleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Dáin Ironfoot",
+    "oracleId": "9924c189-3c82-431a-b570-7805b2a406f0",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-005-source_geom-005-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-153936/geom-005-source/geom-005-source.png",
+    "label": "geometry-test-20261006-153936 geom-005",
+    "tags": [
+      "unsleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Treasure",
+    "oracleId": "3365a79e-3e2d-4f4b-861c-a970ae23345b",
+    "printingId": "5e138adb-32ba-4b63-8964-5447bc353161",
+    "nonEnglish": false,
+    "source": "printed-title"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-006-source_geom-006-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-153936/geom-006-source/geom-006-source.png",
+    "label": "geometry-test-20261006-153936 geom-006",
+    "tags": [
+      "unsleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "missing",
+    "reason": "Adventure reminder token. No single gallery card.",
+    "cardName": null,
+    "oracleId": null,
+    "nonEnglish": false
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-007-source_geom-007-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-153936/geom-007-source/geom-007-source.png",
+    "label": "geometry-test-20261006-153936 geom-007",
+    "tags": [
+      "unsleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "missing",
+    "reason": "Stone Boulder token is not in the gallery.",
+    "cardName": null,
+    "oracleId": null,
+    "nonEnglish": false
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-008-source_geom-008-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-153936/geom-008-source/geom-008-source.png",
+    "label": "geometry-test-20261006-153936 geom-008",
+    "tags": [
+      "unsleeved",
+      "multi-card"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "missing",
+    "reason": "Robot Villain token is not in the gallery.",
+    "cardName": null,
+    "oracleId": null,
+    "nonEnglish": false
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-009-source_geom-009-source",
+    "image": ".scan-inbox/sessions/geometry-test-20261006-153936/geom-009-source/geom-009-source.png",
+    "label": "geometry-test-20261006-153936 geom-009",
+    "tags": [
+      "unsleeved"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "missing",
+    "reason": "Goblin token matches two different gallery oracle ids.",
+    "cardName": null,
+    "oracleId": null,
+    "nonEnglish": false
+  },
+  {
+    "frameId": "scan-inbox_sessions_normal-scan-session-20260911-111516--card-007_source-highres_source-highres",
+    "image": ".scan-inbox/sessions/normal-scan-session-20260911-111516--card-007/source-highres/source-highres.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Sprouting Goblin",
+    "oracleId": "b0871e12-b156-4fa6-b01c-acaae222b3a5",
+    "printingId": "602f5370-d096-4765-b612-16bcec3aafa7",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_normal-scan-session-20260911-113049--card-001_source-highres_source-highres",
+    "image": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-001/source-highres/source-highres.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Goblin Blastronauts",
+    "oracleId": "d6581fa6-d2a2-4a19-8a7a-1de7e236e3bf",
+    "printingId": "10fee86e-3916-436a-8e18-85cdd5215f7e",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_normal-scan-session-20260911-113049--card-006_source-highres_source-highres",
+    "image": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-006/source-highres/source-highres.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Goblin Lookout",
+    "oracleId": "e4ac0c25-cdfa-49a4-9b2c-b848f50c604d",
+    "printingId": "23bbe84a-8857-467a-a4a1-e57086cc9501",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scan-inbox_sessions_normal-scan-session-20260911-120703--card-005_source-highres_source-highres",
+    "image": ".scan-inbox/sessions/normal-scan-session-20260911-120703--card-005/source-highres/source-highres.png",
+    "label": null,
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Elder Auntie",
+    "oracleId": "079f0d7f-57a5-4101-a9e3-c5a57148b3fb",
+    "printingId": "84678e98-2258-4ea1-aaf0-8ac4cc2ecf8d",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "scanner-lab__livaan-foil-20260908T105241",
+    "image": ".scan-inbox/sessions/phone-20260908/livaan-foil-20260908T105241/source-highres.png",
+    "label": "livaan (foil)",
+    "tags": [
+      "foil"
+    ],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Livaan, Cultist of Tiamat",
+    "oracleId": "ee565d5c-7a3a-481c-91aa-b982cf384220",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "swap-test__swap-test-20260908-171149__swap-03-source",
+    "image": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-03-source.png",
+    "label": "Command Beacon",
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Octopus Form",
+    "oracleId": "6fec368d-374d-4318-861b-ff478ba51a3c",
+    "printingId": "ce96a826-53a0-4029-bf34-46779d133b13",
+    "nonEnglish": false,
+    "source": "MANUAL"
+  },
+  {
+    "frameId": "swap-test__swap-test-20260908-171306__swap-03-source",
+    "image": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-03-source.png",
+    "label": "Command Beacon",
+    "tags": [],
+    "frameFamily": "unknown",
+    "hardRegression": false,
+    "status": "known",
+    "reason": null,
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "printingId": null,
+    "nonEnglish": false,
+    "source": "MANUAL"
+  }
+]

@@ -46,9 +46,9 @@ await writeFile(
    export { shouldWelcome } from '${root}src/ui/firstRun';
    export * from '${root}src/lib/table';
    export * from '${root}src/lib/deckTags';
-   export { applyDefaultSearchFilters } from '${root}src/lib/search';
+   export { applyDefaultSearchFilters, buildScryfallQuery } from '${root}src/lib/search';
    export { commanderQuery } from '${root}src/lib/commanders';
-   export { goldfishArchetypeSlug } from '${root}src/lib/mtggoldfish';`,
+   export { goldfishArchetypeSlug, goldfishDeckCount, goldfishSampleSize, goldfishZoomUrl } from '${root}src/lib/mtggoldfish';`,
 );
 
 const bundle = join(out, 'import.mjs');
@@ -74,7 +74,14 @@ const {
   collectionToCsv,
   collectionValue,
   deckFile,
+  copiesAcrossDecks,
+  copiesUsed,
+  copyCoverageTitle,
+  coverageView,
   deckFromImport,
+  isPaperLocked,
+  paperAddSection,
+  paperFreezeState,
   deckToText,
   mergeDeckCards,
   newDeck,
@@ -125,10 +132,15 @@ const {
   timelineFrom,
   filterDeckTags,
   buildTagsQuery,
+  customOracleQuery,
   deckTagById,
   applyDefaultSearchFilters,
+  buildScryfallQuery,
   commanderQuery,
   goldfishArchetypeSlug,
+  goldfishDeckCount,
+  goldfishSampleSize,
+  goldfishZoomUrl,
   expansionOptionsFrom,
   inventoryIdsFromHtml,
   isChallengeResponse,
@@ -1445,6 +1457,71 @@ check('a pasted list becomes a deck through the same parser the desktop uses', (
   );
 });
 
+check('a card is covered only when you own every copy the decks play', () => {
+  const decks = [
+    { cards: [{ name: 'Sol Ring', quantity: 1 }], name: '2' },
+    { cards: [{ name: 'Sol Ring', quantity: 1 }], name: '4' },
+    {
+      cards: [
+        { name: 'Sol Ring', quantity: 1 },
+        { name: 'Island', quantity: 10 },
+      ],
+      name: '5',
+    },
+  ];
+  const uses = copiesAcrossDecks('Sol Ring', decks);
+  assert.deepEqual(uses, [
+    { frozen: false, name: '2', quantity: 1 },
+    { frozen: false, name: '4', quantity: 1 },
+    { frozen: false, name: '5', quantity: 1 },
+  ]);
+  assert.equal(copiesUsed(uses), 3);
+  assert.equal(copyCoverageTitle(2, uses), 'used in deck 2, 4 and 5 but you own only 2');
+  const heavy = copiesAcrossDecks('Sol Ring', [
+    {
+      cards: [
+        { name: 'Sol Ring', quantity: 1 },
+        { name: 'Sol Ring', quantity: 1 },
+      ],
+      name: 'A',
+    },
+    { cards: [{ name: 'Sol Ring', quantity: 1 }], name: 'B' },
+  ]);
+  assert.deepEqual(heavy, [
+    { frozen: false, name: 'A', quantity: 2 },
+    { frozen: false, name: 'B', quantity: 1 },
+  ]);
+  assert.equal(copyCoverageTitle(2, heavy), 'used in deck A (2) and B but you own only 2');
+  assert.equal(copiesAcrossDecks('Island', decks).length, 0);
+  const withIds = decks.map((entry, index) => ({ ...entry, id: String(index) }));
+  const paper = { ...withIds[0], frozen: true };
+  const mixed = [paper, withIds[1], withIds[2]];
+  const mixedUses = copiesAcrossDecks('Sol Ring', mixed);
+  const marked = coverageView(2, mixedUses, false);
+  assert.equal(marked.fraction, '1/2');
+  assert.equal(marked.tone, 'accent');
+  assert.equal(
+    marked.title,
+    'used in deck 4 and 5 but you have only 1 left — deck 2 is built in paper and keeps 1',
+  );
+  const onPaper = coverageView(2, mixedUses, true);
+  assert.equal(
+    onPaper.title,
+    'This deck is built in paper and keeps its copy. Used in deck 4 and 5 but you have only 1 left — deck 2 is built in paper and keeps 1.',
+  );
+  const owned = { [cardKey('Sol Ring')]: { total: 1 } };
+  const blocked = paperFreezeState(withIds[1], mixed, owned);
+  assert.equal(blocked.canMark, false);
+  assert.match(blocked.title, /Sol Ring is already in your paper deck 2/);
+  const free = paperFreezeState(withIds[1], withIds, { [cardKey('Sol Ring')]: { total: 1 } });
+  assert.equal(free.canMark, true);
+  assert.equal(isPaperLocked({ frozen: true }, 'main'), true);
+  assert.equal(isPaperLocked({ frozen: true }, 'commander'), true);
+  assert.equal(isPaperLocked({ frozen: true }, 'sideboard'), false);
+  assert.equal(paperAddSection({ frozen: true }, 'commander'), 'sideboard');
+  assert.equal(paperAddSection({}, 'main'), 'main');
+});
+
 // --- speaking Cardmarket's search protocol -----------------------------------
 //
 // Every check below is anchored to one real request captured from the site's own
@@ -1807,7 +1884,15 @@ check('deck tags filter by label, category, and synonyms', () => {
   assert.ok(filterDeckTags('storied').some(t => t.id === 'storied'));
   assert.ok(filterDeckTags("city's blessing").some(t => t.id === 'city-blessing'));
   assert.ok(filterDeckTags('dungeon').some(t => t.id === 'dungeon'));
-  assert.ok(filterDeckTags('initiative').some(t => t.id === 'dungeon'));
+  assert.ok(filterDeckTags('initiative').some(t => t.id === 'initiative'));
+  assert.equal(deckTagById('initiative')?.query, 'o:initiative');
+  assert.equal(deckTagById('pacify')?.category, 'Removal');
+  assert.ok(filterDeckTags('pacifism').some(t => t.id === 'pacify'));
+  assert.ok(filterDeckTags('stun').some(t => t.id === 'stun'));
+  assert.ok(filterDeckTags('edict').some(t => t.id === 'edict'));
+  assert.match(deckTagById('exile')?.query ?? '', /exile target creature/);
+  assert.match(deckTagById('bounce')?.query ?? '', /owner's hand/);
+  assert.doesNotMatch(deckTagById('destroy-any')?.query ?? '', /destroy target creature/);
 });
 
 check('Commander picker asks for legal commanders with rules text', () => {
@@ -1821,6 +1906,30 @@ check('Commander picker asks for legal commanders with rules text', () => {
   const draw = deckTagById('draw');
   assert.ok(draw);
   assert.match(commanderQuery({ tagIds: ['draw'] }), /o:"draw"/);
+  assert.equal(
+    commanderQuery({ extraQueries: ['(t:kobold or o:kobold)'], tagIds: ['draw'] }),
+    'is:commander legal:commander o:/./ game:paper (o:"draw") ((t:kobold or o:kobold))',
+  );
+  assert.equal(
+    commanderQuery({ extraQueries: ['  ', '(t:goad or o:goad)'] }),
+    'is:commander legal:commander o:/./ game:paper ((t:goad or o:goad))',
+  );
+});
+
+check('oracle search matches the spelling that was typed', () => {
+  assert.equal(buildScryfallQuery({ text: 'bolt' }), 'name:bolt');
+  assert.equal(
+    buildScryfallQuery({ oracle: true, text: 'draw a card' }),
+    'o:/(?<!\\w)draw a card(?!\\w)/',
+  );
+  assert.equal(
+    buildScryfallQuery({ oracle: true, text: 'can\'t attack you' }),
+    'o:/(?<!\\w)can\'t attack you(?!\\w)/',
+  );
+  assert.equal(
+    buildScryfallQuery({ oracle: true, text: 't:instant counter' }),
+    't:instant o:/(?<!\\w)counter(?!\\w)/',
+  );
 });
 
 check('Scryfall search excludes Arena-only cards by default', () => {
@@ -1851,8 +1960,27 @@ check('deck tags combine into a Scryfall query with optional identity', () => {
     buildTagsQuery(['rooms']),
     '((t:room or o:"a room" or o:"rooms you" or o:"unlock a door" or o:unlock or o:"that door"))',
   );
+  assert.equal(deckTagById('goad')?.query, 'keyword:goad');
+  assert.equal(deckTagById('recruit')?.query, 'keyword:recruit');
+  assert.equal(
+    deckTagById('prevent-attack')?.query,
+    '(keyword:goad or o:"can\'t attack you")',
+  );
+  assert.equal(deckTagById('prevent-damage'), undefined);
+  assert.match(deckTagById('prevent-damage-players')?.query ?? '', /to you\\b/);
+  assert.match(deckTagById('prevent-damage-players')?.query ?? '', /is dealt to/);
+  assert.match(deckTagById('prevent-damage-creatures')?.query ?? '', /creatures\?\\b/);
+  assert.match(deckTagById('prevent-damage-creatures')?.query ?? '', /instead/);
   assert.equal(deckTagById('battles')?.category, 'Types & themes');
   assert.equal(deckTagById('gates')?.category, 'Types & themes');
+  assert.equal(customOracleQuery('goad'), '(t:goad or o:goad)');
+  assert.equal(customOracleQuery('kobold'), '(t:kobold or o:kobold)');
+  assert.equal(customOracleQuery('can\'t attack you'), '(t:"can\'t attack you" or o:"can\'t attack you")');
+  assert.equal(customOracleQuery('o:goad'), '(t:goad or o:goad)');
+  assert.equal(customOracleQuery('t:kobold'), '(t:kobold or o:kobold)');
+  assert.equal(customOracleQuery('a'), null);
+  assert.equal(buildTagsQuery(['draw'], undefined, ['o:goad']), '(o:"draw") (o:goad)');
+  assert.equal(buildTagsQuery([], undefined, ['o:goad']), '(o:goad)');
   assert.equal(buildTagsQuery(['draw'], ['U', 'R']), '(o:"draw") id<=ur');
   assert.equal(buildTagsQuery(['draw'], []), '(o:"draw") id=c');
   assert.equal(deckTagById('nope'), undefined);
@@ -1862,6 +1990,31 @@ check('goldfish slugs keep possessive s', () => {
   assert.equal(
     goldfishArchetypeSlug(["Caesar, Legion's Emperor"]),
     'commander-caesar-legion-s-emperor',
+  );
+});
+
+check('goldfish quarters are a four-deck sample', () => {
+  assert.equal(goldfishSampleSize([25, 50, 75, 100]), 4);
+  assert.equal(goldfishDeckCount(25, 4), 1);
+  assert.equal(goldfishDeckCount(50, 4), 2);
+  assert.equal(goldfishDeckCount(75, 4), 3);
+  assert.equal(goldfishDeckCount(100, 4), 4);
+  assert.equal(goldfishSampleSize([17, 33, 50, 67, 83, 100]), 6);
+  assert.equal(goldfishDeckCount(17, 6), 1);
+  assert.equal(goldfishDeckCount(67, 6), 4);
+  assert.ok((goldfishSampleSize([6, 8, 9, 11, 86]) ?? 0) > 12);
+});
+
+check('goldfish zoom uses the full card scan', () => {
+  const small =
+    'https://cards.mtggoldfish.com/images/019ce2f0-2196-7ad1-86d5-fca95d6d7335/variants/265/370/card_image.webp';
+  const large =
+    'https://cards.mtggoldfish.com/images/019ce2f0-2196-7ad1-86d5-fca95d6d7335/variants/672/938/card_image.webp';
+  assert.equal(goldfishZoomUrl(small), large);
+  assert.equal(goldfishZoomUrl(large), large);
+  assert.equal(
+    goldfishZoomUrl('https://cards.scryfall.io/normal/front/a/b/x.jpg'),
+    'https://cards.scryfall.io/normal/front/a/b/x.jpg',
   );
 });
 

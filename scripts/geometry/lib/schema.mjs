@@ -26,6 +26,22 @@ export const FIXTURE_SOURCES = [
   'unknown',
 ];
 
+/** Per-card frame family. Missing on old fixtures means `unknown` — never infer modern. */
+export const FRAME_FAMILIES = [
+  'modern_standard',
+  'borderless',
+  'showcase',
+  'retro',
+  'old',
+  'other',
+  'unknown',
+];
+
+/** Internal structural regions. The outer card stays on groundTruthQuad. */
+export const FRAME_REGION_KEYS = ['titleBand', 'artBox', 'typeLine', 'textBox', 'footer'];
+
+export const REGION_SOURCES = ['auto', 'auto-accepted', 'auto-edited', 'manual'];
+
 export const ALLOWED_TAGS = [
   'sleeved',
   'unsleeved',
@@ -124,6 +140,8 @@ export const createCard = partial => ({
   groundTruthSource: partial.groundTruthSource ?? 'none',
   bootstrapQuadKind: partial.bootstrapQuadKind ?? null,
   label: partial.label ?? null,
+  frameFamily: FRAME_FAMILIES.includes(partial.frameFamily) ? partial.frameFamily : 'unknown',
+  ...(partial.regions ? { regions: partial.regions } : {}),
 });
 
 export const validateFixture = fixture => {
@@ -145,6 +163,35 @@ export const validateFixture = fixture => {
     }
     if (card.groundTruthQuad && !isCompleteQuad(card.groundTruthQuad)) {
       errors.push(`card ${card.id}: incomplete groundTruthQuad`);
+    }
+    if (card.frameFamily != null && !FRAME_FAMILIES.includes(card.frameFamily)) {
+      errors.push(`card ${card.id}: bad frameFamily`);
+    }
+    if (card.regions != null) {
+      if (typeof card.regions !== 'object' || Array.isArray(card.regions)) {
+        errors.push(`card ${card.id}: regions must be an object`);
+      } else {
+        for (const key of FRAME_REGION_KEYS) {
+          const region = card.regions[key];
+          if (region == null) continue;
+          if (!REGION_SOURCES.includes(region.source)) {
+            errors.push(`card ${card.id}: ${key} source invalid`);
+          }
+          if (!isCompleteQuad(region.quad)) errors.push(`card ${card.id}: ${key} quad incomplete`);
+          if (region.autoQuad && !isCompleteQuad(region.autoQuad)) {
+            errors.push(`card ${card.id}: ${key} autoQuad incomplete`);
+          }
+          if (region.reviewed != null && typeof region.reviewed !== 'boolean') {
+            errors.push(`card ${card.id}: ${key} reviewed must be boolean`);
+          }
+          if (
+            region.confidence != null &&
+            (typeof region.confidence !== 'number' || region.confidence < 0 || region.confidence > 1)
+          ) {
+            errors.push(`card ${card.id}: ${key} confidence out of range`);
+          }
+        }
+      }
     }
   }
   return errors;

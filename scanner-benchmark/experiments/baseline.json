@@ -1,0 +1,11 @@
+{
+  "id": "baseline",
+  "datasetVersion": "stills-v1",
+  "detector": "shared-js-detectCardQuad",
+  "quadSource": "current-detector",
+  "cropMode": "current-art-primary",
+  "visualModel": "CLIP_VIT_B32",
+  "gallery": "full",
+  "ocrMode": "recorded",
+  "fusionMode": "fuseEvidence"
+}

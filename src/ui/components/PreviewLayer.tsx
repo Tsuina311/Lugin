@@ -25,12 +25,16 @@ const KEEP_HOVER = 16;
 const KEEP_PINNED = 32;
 
 /**
- * Scryfall's JPG is a rectangle with the card's corners filled white, so the
- * preview clips that fill off. A Cardmarket photo is already the card, corners
- * included, and the same clip cuts into the frame.
+ * Scryfall's JPG and Goldfish's card scan are rectangles with the card's
+ * corners filled in, so the preview clips that fill off. A Cardmarket photo is
+ * already the card, corners included, and the same clip cuts into the frame.
  */
 const cornerClip = (url: string): string =>
-  url.includes('scryfall.io') || url.includes('api.scryfall.com') ? 'card-frame' : '';
+  url.includes('scryfall.io') ||
+  url.includes('api.scryfall.com') ||
+  url.includes('cards.mtggoldfish.com/images/')
+    ? 'card-frame'
+    : '';
 
 const isCardmarketPhoto = (url: string): boolean => /cardmarket\.com/i.test(url);
 
@@ -206,7 +210,13 @@ const PinnedPreview = ({ shown }: { shown: PreviewState | null }) => {
       >
         {market ? (
           <div className="card-zoom card-zoom-market shadow-pop">
-            <img alt="" className="card-zoom-base pointer-events-none" decoding="sync" draggable={false} src={active} />
+            <img
+              alt=""
+              className="card-zoom-base pointer-events-none"
+              decoding="sync"
+              draggable={false}
+              src={active}
+            />
             {sharp ? <SharpCover key={sharp} src={sharp} /> : null}
           </div>
         ) : (

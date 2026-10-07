@@ -1,0 +1,71 @@
+<!doctype html><meta charset="utf-8"><title>Card candidate audit</title>
+<style>
+body{font:14px/1.4 sans-serif;background:#111;color:#eee;margin:24px}
+.frame{position:relative;display:inline-block}
+.frame img,.frame svg{width:100%;height:auto;display:block}
+.frame svg{position:absolute;inset:0}
+text{paint-order:stroke;stroke:#000;stroke-width:6px}
+</style>
+<h1>CARD_CANDIDATE_SELECTION_PRIMARY</h1>
+<p>Green = human card. Blue = best IoU accepted candidate. Red = selected quad. Other colors are the next score-ranked candidates. Rank is the detector score order, not IoU order.</p>
+<section>
+      <h2>Island cq-120629</h2>
+      <p>SELECTION_FAILURE. Selected IoU 0.190. Best IoU 0.981 at score rank 3. Lost at score-ranking. TRACKING_NOT_MEASURABLE.</p>
+      <div class="frame" style="width:520px">
+        <img src="island-cq.png" alt="">
+        <svg viewBox="0 0 960 1280">
+          <polygon points="322.3,446.4 681.1,427.3 711.1,946.4 330.7,954.9" fill="none" stroke="none"/>
+          <polygon points="1.6,0.2 945.9,1.5 957.3,1278.0 8.1,1278.0" fill="none" stroke="#ffb020" stroke-width="4"/><text x="1.5799204487321374" y="16" fill="#ffb020" font-size="28" font-family="sans-serif">#1 IoU 0.158 score 0.985 area 6.31</text><polygon points="324.6,447.4 679.8,428.3 710.9,946.3 332.7,954.6" fill="none" stroke="#f472b6" stroke-width="4"/><text x="324.60153657609044" y="439.4108749712571" fill="#f472b6" font-size="28" font-family="sans-serif">#4 IoU 0.980 score 0.841 area 0.98</text><polygon points="10.0,373.5 750.7,256.6 1000.2,1278.0 -2.8,1278.0" fill="none" stroke="#a3e635" stroke-width="4"/><text x="9.98677688213256" y="365.50102919135384" fill="#a3e635" font-size="28" font-family="sans-serif">#5 IoU 0.226 score 0.824 area 4.42</text><polygon points="322.3,446.4 681.1,427.3 711.1,946.4 330.7,954.9" fill="none" stroke="#4da3ff" stroke-width="4"/><text x="322.29382757766416" y="438.35912555835614" fill="#4da3ff" font-size="28" font-family="sans-serif">best #3 IoU 0.981 score 0.841 area 0.99</text><polygon points="2.8,-1.3 575.8,5.1 1013.0,1278.0 5.6,1278.0" fill="none" stroke="#ff4d4d" stroke-width="4"/><text x="2.8305278231980338" y="16" fill="#ff4d4d" font-size="28" font-family="sans-serif">selected #2 IoU 0.190 score 0.851 area 5.26</text>
+          <polygon points="322.0,440.4 679.5,427.7 717.4,948.5 333.7,952.2" fill="none" stroke="#3dd68c" stroke-width="4"/>
+          <text x="12" y="36" fill="#3dd68c" font-size="28" font-family="sans-serif">human</text>
+        </svg>
+      </div>
+    </section><section>
+      <h2>Wand cq-120751</h2>
+      <p>SELECTION_FAILURE. Selected IoU 0.251. Best IoU 0.961 at score rank 5. Lost at score-ranking. TRACKING_NOT_MEASURABLE.</p>
+      <div class="frame" style="width:520px">
+        <img src="wand.png" alt="">
+        <svg viewBox="0 0 960 1280">
+          <polygon points="294.1,328.6 731.3,345.8 689.2,983.9 251.2,927.0" fill="none" stroke="none"/>
+          <polygon points="3.9,-0.9 784.3,6.9 1000.1,1278.0 12.3,1278.0" fill="none" stroke="#ffb020" stroke-width="4"/><text x="3.9235241375967624" y="16" fill="#ffb020" font-size="28" font-family="sans-serif">#1 IoU 0.239 score 0.951 area 4.19</text><polygon points="13.8,-8.7 710.8,23.0 992.2,1278.0 2.9,1278.0" fill="none" stroke="#38bdf8" stroke-width="4"/><text x="13.79449495109165" y="16" fill="#38bdf8" font-size="28" font-family="sans-serif">#3 IoU 0.251 score 0.917 area 3.98</text><polygon points="281.9,317.6 758.8,349.7 696.0,989.2 240.0,942.0" fill="none" stroke="#f472b6" stroke-width="4"/><text x="281.86608984048905" y="309.5536359931172" fill="#f472b6" font-size="28" font-family="sans-serif">#4 IoU 0.905 score 0.899 area 1.10</text><polygon points="294.1,328.6 731.3,345.8 689.2,983.9 251.2,927.0" fill="none" stroke="#4da3ff" stroke-width="4"/><text x="294.1074934949384" y="320.5814535765387" fill="#4da3ff" font-size="28" font-family="sans-serif">best #5 IoU 0.961 score 0.894 area 1.01</text><polygon points="12.2,-5.3 717.3,16.8 990.7,1278.0 8.5,1278.0" fill="none" stroke="#ff4d4d" stroke-width="4"/><text x="12.205516646152228" y="16" fill="#ff4d4d" font-size="28" font-family="sans-serif">selected #2 IoU 0.251 score 0.919 area 3.99</text>
+          <polygon points="302.9,328.4 737.2,347.7 695.2,980.5 258.4,922.4" fill="none" stroke="#3dd68c" stroke-width="4"/>
+          <text x="12" y="36" fill="#3dd68c" font-size="28" font-family="sans-serif">human</text>
+        </svg>
+      </div>
+    </section><section>
+      <h2>Livaan cq-120813</h2>
+      <p>SELECTION_FAILURE. Selected IoU 0.226. Best IoU 0.943 at score rank 6. Lost at score-ranking. TRACKING_NOT_MEASURABLE.</p>
+      <div class="frame" style="width:520px">
+        <img src="livaan.png" alt="">
+        <svg viewBox="0 0 960 1280">
+          <polygon points="254.1,220.4 693.9,237.8 655.5,859.0 232.3,836.5" fill="none" stroke="none"/>
+          <polygon points="5.4,-2.3 851.5,6.7 990.4,1278.0 -0.9,1278.0" fill="none" stroke="#ffb020" stroke-width="4"/><text x="5.430198238217752" y="16" fill="#ffb020" font-size="28" font-family="sans-serif">#1 IoU 0.218 score 0.977 area 4.58</text><polygon points="187.4,-23.0 721.7,96.8 719.7,875.0 233.1,844.5" fill="none" stroke="#38bdf8" stroke-width="4"/><text x="187.38515587545547" y="16" fill="#38bdf8" font-size="28" font-family="sans-serif">#3 IoU 0.611 score 0.892 area 1.64</text><polygon points="248.4,222.5 702.4,231.3 656.2,860.9 228.3,836.0" fill="none" stroke="#f472b6" stroke-width="4"/><text x="248.44922493678985" y="214.52629770876848" fill="#f472b6" font-size="28" font-family="sans-serif">#4 IoU 0.930 score 0.882 area 1.07</text><polygon points="255.0,204.0 714.0,231.0 705.0,1053.0 204.0,864.0" fill="none" stroke="#a3e635" stroke-width="4"/><text x="255" y="196" fill="#a3e635" font-size="28" font-family="sans-serif">#5 IoU 0.713 score 0.881 area 1.40</text><polygon points="254.1,220.4 693.9,237.8 655.5,859.0 232.3,836.5" fill="none" stroke="#4da3ff" stroke-width="4"/><text x="254.05342673305455" y="212.35051025615533" fill="#4da3ff" font-size="28" font-family="sans-serif">best #6 IoU 0.943 score 0.876 area 1.05</text><polygon points="15.7,-11.3 827.3,27.4 967.0,1278.0 -4.1,1278.0" fill="none" stroke="#ff4d4d" stroke-width="4"/><text x="15.674963143672537" y="16" fill="#ff4d4d" font-size="28" font-family="sans-serif">selected #2 IoU 0.226 score 0.962 area 4.42</text>
+          <polygon points="262.3,237.1 699.8,249.8 652.9,858.9 247.0,838.9" fill="none" stroke="#3dd68c" stroke-width="4"/>
+          <text x="12" y="36" fill="#3dd68c" font-size="28" font-family="sans-serif">human</text>
+        </svg>
+      </div>
+    </section><section>
+      <h2>Bulk Up</h2>
+      <p>SELECTION_FAILURE. Selected IoU 0.344. Best IoU 0.867 at score rank 1. Lost at nested-selection. TRACKING_NOT_MEASURABLE.</p>
+      <div class="frame" style="width:520px">
+        <img src="bulk-up.png" alt="">
+        <svg viewBox="0 0 1022 1920">
+          <polygon points="234.5,631.0 851.3,725.4 735.0,1664.1 -6.8,1523.3" fill="none" stroke="none"/>
+          <polygon points="37.3,375.0 1012.4,13.8 1014.2,1916.3 -9.1,1916.3" fill="none" stroke="#c084fc" stroke-width="4"/><text x="37.26443367434949" y="366.99710587860903" fill="#c084fc" font-size="28" font-family="sans-serif">#2 IoU 0.325 score 0.898 area 3.08</text><polygon points="154.5,594.5 865.3,224.4 1019.5,1916.3 -46.3,1916.3" fill="none" stroke="#f472b6" stroke-width="4"/><text x="154.49009640497627" y="586.4513900214522" fill="#f472b6" font-size="28" font-family="sans-serif">#4 IoU 0.418 score 0.860 area 2.39</text><polygon points="234.5,631.0 851.3,725.4 735.0,1664.1 -6.8,1523.3" fill="none" stroke="#4da3ff" stroke-width="4"/><text x="234.52051648946707" y="622.9915436671139" fill="#4da3ff" font-size="28" font-family="sans-serif">best #1 IoU 0.867 score 0.928 area 1.15</text><polygon points="34.9,350.6 869.7,71.4 1051.9,1916.3 -2.3,1916.3" fill="none" stroke="#ff4d4d" stroke-width="4"/><text x="34.90897941793664" y="342.6485293763896" fill="#ff4d4d" font-size="28" font-family="sans-serif">selected #3 IoU 0.344 score 0.863 area 2.91</text>
+          <polygon points="249.1,663.7 821.3,740.0 711.9,1630.1 30.4,1497.9" fill="none" stroke="#3dd68c" stroke-width="4"/>
+          <text x="12" y="36" fill="#3dd68c" font-size="28" font-family="sans-serif">human</text>
+        </svg>
+      </div>
+    </section><section>
+      <h2>Mudbutton Torchrunner</h2>
+      <p>SELECTION_FAILURE. Selected IoU 0.318. Best IoU 0.862 at score rank 2. Lost at score-ranking. TRACKING_NOT_MEASURABLE.</p>
+      <div class="frame" style="width:520px">
+        <img src="mudbutton.png" alt="">
+        <svg viewBox="0 0 1019 1920">
+          <polygon points="177.5,774.0 720.2,753.9 830.0,1565.5 209.3,1642.2" fill="none" stroke="none"/>
+          <polygon points="177.5,774.0 720.2,753.9 830.0,1565.5 209.3,1642.2" fill="none" stroke="#4da3ff" stroke-width="4"/><text x="177.46378850239694" y="766.0249987027856" fill="#4da3ff" font-size="28" font-family="sans-serif">best #2 IoU 0.862 score 0.871 area 0.86</text><polygon points="-0.0,0.0 1016.8,0.0 998.0,1959.1 0.0,1601.8" fill="none" stroke="#ff4d4d" stroke-width="4"/><text x="-5.0989030562280695e-14" y="16" fill="#ff4d4d" font-size="28" font-family="sans-serif">selected #1 IoU 0.318 score 0.889 area 3.14</text>
+          <polygon points="153.5,755.3 743.5,729.9 868.1,1591.9 186.5,1675.9" fill="none" stroke="#3dd68c" stroke-width="4"/>
+          <text x="12" y="36" fill="#3dd68c" font-size="28" font-family="sans-serif">human</text>
+        </svg>
+      </div>
+    </section>

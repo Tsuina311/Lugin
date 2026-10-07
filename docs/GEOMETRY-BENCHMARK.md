@@ -14,6 +14,9 @@ yarn geometry:inventory     # discover real images + metadata
 yarn geometry:bootstrap     # fixture JSON from existing quads (bootstrap only)
 yarn geometry:queue         # rank untrusted fixtures for manual review
 yarn geometry:lab           # annotate / review quads in the browser
+yarn geometry:lab --queue=stills-v1
+yarn geometry:artbox-status # human-reviewed art boxes on the 46 stills
+yarn geometry:frame-report  # frame-region auto vs final polygons
 yarn geometry:split         # deterministic train/val/test by capture series
 yarn geometry:benchmark     # shared-js detector metrics vs fixtures
 yarn geometry:benchmark --engine=native
@@ -134,6 +137,8 @@ yarn geometry:lab
 - Polygon overlay, undo / reset / save
 - Tags, trusted, hard-regression, provenance
 - **Add Card** for multi-card images
+- Frame family plus internal regions (title band, art box, type line, text box, footer)
+- **Auto detect frame** proposes those regions from the card quad. It does not overwrite manual edits. **Redetect all** does.
 
 ## Benchmark metrics
 

@@ -1,0 +1,390 @@
+[
+  {
+    "imageId": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+    "cardName": "Maddening Hex",
+    "status": "CONFIRMED",
+    "source": "EXISTING_FIXTURE",
+    "notes": "explicit real-photo label"
+  },
+  {
+    "imageId": ".scan-fixtures/replay/basilisk-collar-20260908T111744/source-highres.png",
+    "cardName": "Basilisk Collar",
+    "status": "CONFIRMED",
+    "source": "EXISTING_FIXTURE",
+    "notes": "explicit replay fixture"
+  },
+  {
+    "imageId": ".scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png",
+    "cardName": "Livaan, Cultist of Tiamat",
+    "status": "CONFIRMED",
+    "source": "EXISTING_FIXTURE",
+    "notes": "explicit replay fixture"
+  },
+  {
+    "imageId": ".scan-fixtures/replay/lizard-blades-french-20260908T111833/source-highres.png",
+    "cardName": "Lizard Blades",
+    "status": "CONFIRMED",
+    "source": "EXISTING_FIXTURE",
+    "notes": "explicit replay fixture"
+  },
+  {
+    "imageId": ".scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+    "cardName": "Maddening Hex",
+    "status": "CONFIRMED",
+    "source": "EXISTING_FIXTURE",
+    "notes": "explicit replay fixture"
+  },
+  {
+    "imageId": ".scan-fixtures/replay/negate-20260908T082630/source-highres.png",
+    "cardName": "Negate",
+    "status": "CONFIRMED",
+    "source": "EXISTING_FIXTURE",
+    "notes": "explicit replay fixture"
+  },
+  {
+    "imageId": ".scan-fixtures/replay/negate-unsleeved-20260908T082746/source-highres.png",
+    "cardName": "Negate",
+    "oracleId": "3407fe41-fdd3-4119-8f70-4bc4590a379f",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+    "cardName": "Sword of Hearth and Home",
+    "status": "CONFIRMED",
+    "source": "EXISTING_FIXTURE",
+    "notes": "explicit replay fixture"
+  },
+  {
+    "imageId": ".scan-fixtures/replay/slip-out-the-back-italian-20260908T111643/source-highres.png",
+    "cardName": "Slip Out the Back",
+    "status": "CONFIRMED",
+    "source": "EXISTING_FIXTURE",
+    "notes": "explicit replay fixture"
+  },
+  {
+    "imageId": ".scan-fixtures/replay/teferi-veil-old-edition-good-cap-20260908T111548/source-highres.png",
+    "cardName": "Teferi's Veil",
+    "status": "CONFIRMED",
+    "source": "EXISTING_FIXTURE",
+    "notes": "explicit replay fixture"
+  },
+  {
+    "imageId": ".scan-fixtures/replay/wand-of-wonder-20260908T073958/source-highres.png",
+    "cardName": "Wand of Wonder",
+    "status": "CONFIRMED",
+    "source": "EXISTING_FIXTURE",
+    "notes": "explicit replay fixture"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c000/deck-001-source.png",
+    "cardName": "Sword of Feast and Famine",
+    "oracleId": "d0901053-6de0-46d0-9ee3-8d40510236c1",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c008/deck-011-source.png",
+    "cardName": "Feywild Trickster",
+    "oracleId": "b385edc3-c897-48e3-b251-242c77159fa0",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-001-source/geom-001-source.png",
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-007-source/geom-007-source.png",
+    "cardName": "The Spear of Leonidas",
+    "oracleId": "dac3a263-cc02-446a-88ec-882a21096b6c",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-001-source/geom-001-source.png",
+    "cardName": "Mask of Memory",
+    "oracleId": "d6b2c998-a226-426c-a40d-6e6007041bfe",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-007-source/geom-007-source.png",
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-155241/geom-006-source/geom-006-source.png",
+    "cardName": "Blacksmith's Talent",
+    "oracleId": "9fdad42a-9db5-4d91-9e80-9d5ce19038b8",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+    "cardName": "Bulk Up",
+    "oracleId": "fade8af0-5fdb-4237-9dd6-48bfd1d62767",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-008-source/geom-008-source.png",
+    "status": "UNKNOWN",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-164005/geom-001-source/geom-001-source.png",
+    "cardName": "The Ozolith",
+    "oracleId": "1946ded1-5f53-409f-b0a6-5433bb0357d2",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-001-source/geom-001-source.png",
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-006-source/geom-006-source.png",
+    "cardName": "Sword of the Animist",
+    "oracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-001-source/geom-001-source.png",
+    "cardName": "Critical Hit",
+    "oracleId": "992e6845-1c6c-4b74-839c-317823bde15b",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-006-source/geom-006-source.png",
+    "cardName": "Netherese Puzzle-Ward",
+    "oracleId": "561e8ecc-1f2b-4fd4-8f92-a0acea449816",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-001-source/geom-001-source.png",
+    "cardName": "Swiftfoot Boots",
+    "oracleId": "c8b143ad-43ec-4e0d-a440-e348daa31391",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-005-source/geom-005-source.png",
+    "cardName": "Sword of the Animist",
+    "oracleId": "d79cbc61-6c15-48ea-bbba-3cffb819ccba",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260911-085827/geom-001-source/geom-001-source.png",
+    "cardName": "Havi, the All-Father",
+    "oracleId": "3f58e0f2-7cb5-4a82-b794-071f433fe583",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+    "cardName": "Mudbutton Torchrunner",
+    "oracleId": "045b2b84-96bd-46fb-8aae-a33968e741c7",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-111516--card-007/source-highres/source-highres.png",
+    "cardName": "Sprouting Goblin",
+    "oracleId": "b0871e12-b156-4fa6-b01c-acaae222b3a5",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-001/source-highres/source-highres.png",
+    "cardName": "Goblin Blastronauts",
+    "oracleId": "d6581fa6-d2a2-4a19-8a7a-1de7e236e3bf",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-006/source-highres/source-highres.png",
+    "cardName": "Goblin Lookout",
+    "oracleId": "e4ac0c25-cdfa-49a4-9b2c-b848f50c604d",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-120703--card-001/source-highres/source-highres.png",
+    "status": "UNKNOWN",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-120703--card-005/source-highres/source-highres.png",
+    "cardName": "Elder Auntie",
+    "oracleId": "079f0d7f-57a5-4101-a9e3-c5a57148b3fb",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120539/photo-source.png",
+    "cardName": "Lizard Blades",
+    "oracleId": "f6314e50-a610-4fff-8f60-803d23460ff0",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120722/photo-source.png",
+    "cardName": "Teferi's Veil",
+    "oracleId": "c6db2ea4-954c-443b-9603-c41596555c31",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+    "cardName": "Wand of Wonder",
+    "oracleId": "8f1123dd-19b7-402b-8ecd-ab62494c9fd5",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+    "cardName": "Livaan, Cultist of Tiamat",
+    "oracleId": "ee565d5c-7a3a-481c-91aa-b982cf384220",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-lizard-blade-french-20260908T115149/photo-source.png",
+    "status": "UNKNOWN",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-lizard-blade-french-20260908T115203/photo-source.png",
+    "status": "UNKNOWN",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t500-source.png",
+    "cardName": "Livaan, Cultist of Tiamat",
+    "oracleId": "ee565d5c-7a3a-481c-91aa-b982cf384220",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124408/t500-source.png",
+    "cardName": "Teferi's Veil",
+    "oracleId": "c6db2ea4-954c-443b-9603-c41596555c31",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t000-source.png",
+    "cardName": "Wand of Wonder",
+    "oracleId": "8f1123dd-19b7-402b-8ecd-ab62494c9fd5",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t500-source.png",
+    "cardName": "Wand of Wonder",
+    "oracleId": "8f1123dd-19b7-402b-8ecd-ab62494c9fd5",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132712/t800-source.png",
+    "cardName": "Livaan, Cultist of Tiamat",
+    "oracleId": "ee565d5c-7a3a-481c-91aa-b982cf384220",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132801/t500-source.png",
+    "cardName": "Excalibur, Sword of Eden",
+    "oracleId": "9fb6bd72-031b-40a1-83c5-8a1c82f84e12",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/lames-l-zard-french-20260908T105353/source-highres.png",
+    "status": "UNKNOWN",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/livaan-foil-20260908T105241/source-highres.png",
+    "cardName": "Livaan, Cultist of Tiamat",
+    "oracleId": "ee565d5c-7a3a-481c-91aa-b982cf384220",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-01-source.png",
+    "status": "UNKNOWN",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-03-source.png",
+    "cardName": "Octopus Form",
+    "oracleId": "6fec368d-374d-4318-861b-ff478ba51a3c",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-03-source.png",
+    "cardName": "Island",
+    "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "notes": null
+  }
+]

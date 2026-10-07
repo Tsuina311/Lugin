@@ -1,0 +1,205 @@
+{
+  "note": "Human review queue. These rows are not labels.",
+  "queue": [
+    {
+      "id": "capture-quality__cq-20260908T120629__photo-source",
+      "image": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+      "label": "island unsleeved",
+      "captureGroup": "cq-20260908T120629",
+      "disagree": true,
+      "margin": 0,
+      "weak": false,
+      "ambiguousDetector": false
+    },
+    {
+      "id": "focus-series__focus-series-20260908T132801__t000-source",
+      "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132801/t000-source.png",
+      "label": "Excalibur, Sword of Eden French foil",
+      "captureGroup": "focus-series-20260908T132801",
+      "disagree": true,
+      "margin": 0,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "focus-series__focus-series-20260908T132801__t250-source",
+      "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132801/t250-source.png",
+      "label": "Excalibur, Sword of Eden French foil",
+      "captureGroup": "focus-series-20260908T132801",
+      "disagree": true,
+      "margin": 0,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "replay__wand-of-wonder-20260908T073958__source-highres",
+      "image": ".scan-fixtures/replay/wand-of-wonder-20260908T073958/source-highres.png",
+      "label": "Wand of Wonder",
+      "captureGroup": "wand-of-wonder-20260908T073958",
+      "disagree": true,
+      "margin": 0,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "scanner-lab__wand-of-wonder-20260908T073958",
+      "image": ".scan-inbox/sessions/phone-20260908/wand-of-wonder-20260908T073958/source-highres.png",
+      "label": "Wand of Wonder",
+      "captureGroup": "wand-of-wonder-20260908T073958",
+      "disagree": true,
+      "margin": 0,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "scanner-lab__wand-of-wonder-20260908T073958__source-highres",
+      "image": ".scan-inbox/sessions/phone-20260908/wand-of-wonder-20260908T073958/source-highres.png",
+      "label": "Wand of Wonder",
+      "captureGroup": "wand-of-wonder-20260908T073958",
+      "disagree": true,
+      "margin": 0,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "scanner-lab__wand-of-wonder-20260908T081951",
+      "image": ".scan-inbox/sessions/phone-20260908/wand-of-wonder-20260908T081951/source-highres.png",
+      "label": "Wand of Wonder",
+      "captureGroup": "wand-of-wonder-20260908T081951",
+      "disagree": true,
+      "margin": 0,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "scanner-lab__wand-of-wonder-20260908T081951__source-highres",
+      "image": ".scan-inbox/sessions/phone-20260908/wand-of-wonder-20260908T081951/source-highres.png",
+      "label": "Wand of Wonder",
+      "captureGroup": "wand-of-wonder-20260908T081951",
+      "disagree": true,
+      "margin": 0,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "focus-series__focus-series-20260908T132852__t000-source",
+      "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132852/t000-source.png",
+      "label": "les cartes merveilleuses french",
+      "captureGroup": "focus-series-20260908T132852",
+      "disagree": true,
+      "margin": 0.0035364447790939835,
+      "weak": false,
+      "ambiguousDetector": false
+    },
+    {
+      "id": "focus-series__focus-series-20260908T133053__t250-source",
+      "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T133053/t250-source.png",
+      "label": "Octopus Form",
+      "captureGroup": "focus-series-20260908T133053",
+      "disagree": true,
+      "margin": 0.0035364447790939835,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "replay__negate-unsleeved-20260908T082746__source-highres",
+      "image": ".scan-fixtures/replay/negate-unsleeved-20260908T082746/source-highres.png",
+      "label": "negate unsleeved",
+      "captureGroup": "negate-unsleeved-20260908T082746",
+      "disagree": true,
+      "margin": 0.0035364447790939835,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "scanner-lab__negate-unsleeved-20260908T082746",
+      "image": ".scan-inbox/sessions/phone-20260908/negate-unsleeved-20260908T082746/source-highres.png",
+      "label": "negate unsleeved",
+      "captureGroup": "negate-unsleeved-20260908T082746",
+      "disagree": true,
+      "margin": 0.0035364447790939835,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "scanner-lab__negate-unsleeved-20260908T082746__source-highres",
+      "image": ".scan-inbox/sessions/phone-20260908/negate-unsleeved-20260908T082746/source-highres.png",
+      "label": "negate unsleeved",
+      "captureGroup": "negate-unsleeved-20260908T082746",
+      "disagree": true,
+      "margin": 0.0035364447790939835,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "focus-series__focus-series-20260908T132626",
+      "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t800-source.png",
+      "label": "Wand of Wonder",
+      "captureGroup": "focus-series-20260908T132626",
+      "disagree": true,
+      "margin": 0.00483085114558246,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "focus-series__focus-series-20260908T132626__t800-source",
+      "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t800-source.png",
+      "label": "Wand of Wonder",
+      "captureGroup": "focus-series-20260908T132626",
+      "disagree": true,
+      "margin": 0.00483085114558246,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "capture-quality__cq-20260908T120722__photo-source",
+      "image": ".scan-inbox/sessions/phone-20260908/cq-20260908T120722/photo-source.png",
+      "label": "Teferi's Veil old edition",
+      "captureGroup": "cq-20260908T120722",
+      "disagree": true,
+      "margin": 0.0070411915114190204,
+      "weak": false,
+      "ambiguousDetector": false
+    },
+    {
+      "id": "scanner-lab__livaan-foil-20260908T105241__source-highres",
+      "image": ".scan-inbox/sessions/phone-20260908/livaan-foil-20260908T105241/source-highres.png",
+      "label": "livaan (foil)",
+      "captureGroup": "livaan-foil-20260908T105241",
+      "disagree": true,
+      "margin": 0.008839941748569169,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "focus-series__focus-series-20260908T132626__t250-source",
+      "image": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t250-source.png",
+      "label": "Wand of Wonder",
+      "captureGroup": "focus-series-20260908T132626",
+      "disagree": true,
+      "margin": 0.010652653877953777,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "replay__p-e-d-tre-et-de-foyer-french-goo-20260908T082303__source-highres",
+      "image": ".scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+      "label": "épée d'âtre et de foyer (French good capture)",
+      "captureGroup": "p-e-d-tre-et-de-foyer-french-goo-20260908T082303",
+      "disagree": true,
+      "margin": 0.015099759027661697,
+      "weak": false,
+      "ambiguousDetector": true
+    },
+    {
+      "id": "scanner-lab__p-e-d-tre-et-de-foyer-french-goo-20260908T082303",
+      "image": ".scan-inbox/sessions/phone-20260908/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+      "label": "épée d'âtre et de foyer (French good capture)",
+      "captureGroup": "p-e-d-tre-et-de-foyer-french-goo-20260908T082303",
+      "disagree": true,
+      "margin": 0.015099759027661697,
+      "weak": false,
+      "ambiguousDetector": true
+    }
+  ]
+}

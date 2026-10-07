@@ -1,0 +1,1343 @@
+[
+  {
+    "imageId": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "uncertain": true,
+    "notes": "251×480 glare photo. Corners are the black card edge inside the orange sleeve. The sleeve and glare make the right edge soft.",
+    "corners": {
+      "topLeft": {
+        "x": 30,
+        "y": 116
+      },
+      "topRight": {
+        "x": 218,
+        "y": 114
+      },
+      "bottomRight": {
+        "x": 216,
+        "y": 386
+      },
+      "bottomLeft": {
+        "x": 18,
+        "y": 388
+      }
+    }
+  },
+  {
+    "imageId": ".scan-fixtures/replay/basilisk-collar-20260908T111744/source-highres.png",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "uncertain": false,
+    "notes": "Outer black border inside the orange sleeve.",
+    "corners": {
+      "topLeft": {
+        "x": 161.6,
+        "y": 473.5
+      },
+      "topRight": {
+        "x": 850.7,
+        "y": 442.6
+      },
+      "bottomRight": {
+        "x": 901,
+        "y": 1427.7
+      },
+      "bottomLeft": {
+        "x": 179.9,
+        "y": 1441.6
+      }
+    }
+  },
+  {
+    "imageId": ".scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "uncertain": false,
+    "notes": "Outer black border inside the orange sleeve. Foil.",
+    "corners": {
+      "topLeft": {
+        "x": 36.5,
+        "y": 648
+      },
+      "topRight": {
+        "x": 844.1,
+        "y": 634.8
+      },
+      "bottomRight": {
+        "x": 839.5,
+        "y": 1732.5
+      },
+      "bottomLeft": {
+        "x": 55.8,
+        "y": 1764.5
+      }
+    }
+  },
+  {
+    "imageId": ".scan-fixtures/replay/lizard-blades-french-20260908T111833/source-highres.png",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "uncertain": true,
+    "notes": "Bottom-left of the physical card meets the image edge. The corner is estimated on the visible black border, about 2px inside the frame.",
+    "corners": {
+      "topLeft": {
+        "x": 32.5,
+        "y": 348.8
+      },
+      "topRight": {
+        "x": 742.5,
+        "y": 369.2
+      },
+      "bottomRight": {
+        "x": 710.7,
+        "y": 1449.7
+      },
+      "bottomLeft": {
+        "x": 1,
+        "y": 1425.2
+      }
+    }
+  },
+  {
+    "imageId": ".scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "uncertain": false,
+    "notes": "Outer black border inside the orange sleeve. Showcase frame.",
+    "corners": {
+      "topLeft": {
+        "x": 26.8,
+        "y": 551.9
+      },
+      "topRight": {
+        "x": 817.5,
+        "y": 532.4
+      },
+      "bottomRight": {
+        "x": 800.1,
+        "y": 1576.9
+      },
+      "bottomLeft": {
+        "x": 72.7,
+        "y": 1580.4
+      }
+    }
+  },
+  {
+    "imageId": ".scan-fixtures/replay/negate-20260908T082630/source-highres.png",
+    "corners": {
+      "topLeft": {
+        "x": 253.78145695364248,
+        "y": 678.9933774834436
+      },
+      "topRight": {
+        "x": 991.2649006622518,
+        "y": 638.3046357615893
+      },
+      "bottomRight": {
+        "x": 1034.496688741722,
+        "y": 1673.3245033112582
+      },
+      "bottomLeft": {
+        "x": 309.2,
+        "y": 1687.4
+      }
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-fixtures/replay/negate-unsleeved-20260908T082746/source-highres.png",
+    "corners": {
+      "topLeft": {
+        "x": 78.31125827814579,
+        "y": 729.8543046357615
+      },
+      "topRight": {
+        "x": 792.907284768212,
+        "y": 666.2781456953642
+      },
+      "bottomRight": {
+        "x": 866.6556291390729,
+        "y": 1632.635761589404
+      },
+      "bottomLeft": {
+        "x": 178,
+        "y": 1672
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": "Unsleeved on dark wood. Corners follow the black card edge; the wood makes that edge soft.",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "uncertain": false,
+    "notes": "Outer black border inside the orange sleeve. Sword of Hearth and Home.",
+    "corners": {
+      "topLeft": {
+        "x": 156.6,
+        "y": 492.9
+      },
+      "topRight": {
+        "x": 907.9,
+        "y": 462.8
+      },
+      "bottomRight": {
+        "x": 930.8,
+        "y": 1475.9
+      },
+      "bottomLeft": {
+        "x": 207,
+        "y": 1499
+      }
+    }
+  },
+  {
+    "imageId": ".scan-fixtures/replay/slip-out-the-back-italian-20260908T111643/source-highres.png",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "uncertain": false,
+    "notes": "Outer black border inside the orange sleeve.",
+    "corners": {
+      "topLeft": {
+        "x": 147,
+        "y": 465.1
+      },
+      "topRight": {
+        "x": 840.2,
+        "y": 414.7
+      },
+      "bottomRight": {
+        "x": 920.3,
+        "y": 1402.8
+      },
+      "bottomLeft": {
+        "x": 196.6,
+        "y": 1442.2
+      }
+    }
+  },
+  {
+    "imageId": ".scan-fixtures/replay/teferi-veil-old-edition-good-cap-20260908T111548/source-highres.png",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "uncertain": false,
+    "notes": "Outer black border inside the orange sleeve. Old frame.",
+    "corners": {
+      "topLeft": {
+        "x": 209.7,
+        "y": 678.6
+      },
+      "topRight": {
+        "x": 832.9,
+        "y": 652.2
+      },
+      "bottomRight": {
+        "x": 884.3,
+        "y": 1523.7
+      },
+      "bottomLeft": {
+        "x": 252.2,
+        "y": 1560.1
+      }
+    }
+  },
+  {
+    "imageId": ".scan-fixtures/replay/wand-of-wonder-20260908T073958/source-highres.png",
+    "status": "CONFIRMED",
+    "source": "MANUAL",
+    "uncertain": false,
+    "notes": "Outer black border inside the orange sleeve.",
+    "corners": {
+      "topLeft": {
+        "x": 108.9,
+        "y": 699.5
+      },
+      "topRight": {
+        "x": 732.2,
+        "y": 667
+      },
+      "bottomRight": {
+        "x": 784.4,
+        "y": 1515.5
+      },
+      "bottomLeft": {
+        "x": 153.9,
+        "y": 1541
+      }
+    }
+  },
+  {
+    "imageId": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c000/deck-001-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 197.8344370860928,
+        "y": 559.4701986754967
+      },
+      "topRight": {
+        "x": 759.8476821192054,
+        "y": 478.0927152317881
+      },
+      "bottomRight": {
+        "x": 932.7748344370862,
+        "y": 1276.6092715231787
+      },
+      "bottomLeft": {
+        "x": 309.72847682119215,
+        "y": 1385.9602649006622
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c008/deck-011-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 195.2913907284769,
+        "y": 569.6423841059602
+      },
+      "topRight": {
+        "x": 892.0860927152319,
+        "y": 615.4172185430464
+      },
+      "bottomRight": {
+        "x": 846.3112582781457,
+        "y": 1675.867549668874
+      },
+      "bottomLeft": {
+        "x": 57.966887417218636,
+        "y": 1584.317880794702
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/deck-test-20260910-101639/deck-test-20260910-101639-c001/deck-001-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 27.778145695364334,
+        "y": 673.9072847682119
+      },
+      "topRight": {
+        "x": 765.2615894039735,
+        "y": 684.0794701986755
+      },
+      "bottomRight": {
+        "x": 767.8046357615895,
+        "y": 1800.476821192053
+      },
+      "bottomLeft": {
+        "x": -38.34105960264891,
+        "y": 1762.3311258278145
+      }
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/deck-test-20260910-101639/deck-test-20260910-101639-c013/deck-013-source.png",
+    "corners": {
+      "topLeft": {
+        "x": -79.02980132450321,
+        "y": 732.3973509933775
+      },
+      "topRight": {
+        "x": 683.884105960265,
+        "y": 666.2781456953642
+      },
+      "bottomRight": {
+        "x": 780.5198675496689,
+        "y": 1828.4503311258277
+      },
+      "bottomLeft": {
+        "x": -73.94370860927143,
+        "y": 1851.3377483443708
+      }
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-001-source/geom-001-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 238.89403973509937,
+        "y": 722.2251655629138
+      },
+      "topRight": {
+        "x": 844.1390728476821,
+        "y": 643.3907284768212
+      },
+      "bottomRight": {
+        "x": 989.0927152317881,
+        "y": 1571.6026490066224
+      },
+      "bottomLeft": {
+        "x": 294.84105960264907,
+        "y": 1625.0066225165563
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-007-source/geom-007-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 116.82781456953647,
+        "y": 808.6887417218543
+      },
+      "topRight": {
+        "x": 663.5827814569536,
+        "y": 806.1456953642383
+      },
+      "bottomRight": {
+        "x": 681.384105960265,
+        "y": 1594.4900662251655
+      },
+      "bottomLeft": {
+        "x": 124.45695364238415,
+        "y": 1589.4039735099336
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-001-source/geom-001-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 177.8609271523179,
+        "y": 864.635761589404
+      },
+      "topRight": {
+        "x": 839.0529801324503,
+        "y": 857.0066225165563
+      },
+      "bottomRight": {
+        "x": 846.682119205298,
+        "y": 1879.3112582781457
+      },
+      "bottomLeft": {
+        "x": 129.54304635761594,
+        "y": 1820.82119205298
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-007-source/geom-007-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 182.9470198675497,
+        "y": 645.933774834437
+      },
+      "topRight": {
+        "x": 678.841059602649,
+        "y": 694.251655629139
+      },
+      "bottomRight": {
+        "x": 612.7218543046358,
+        "y": 1393.58940397351
+      },
+      "bottomLeft": {
+        "x": 114.28476821192058,
+        "y": 1340.185430463576
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": "f",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-155241/geom-006-source/geom-006-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 251.60927152317885,
+        "y": 605.2450331125827
+      },
+      "topRight": {
+        "x": 836.5099337748344,
+        "y": 673.9072847682119
+      },
+      "bottomRight": {
+        "x": 750.0463576158941,
+        "y": 1515.6556291390727
+      },
+      "bottomLeft": {
+        "x": 139.7152317880795,
+        "y": 1441.9072847682119
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 249.06622516556294,
+        "y": 663.7350993377484
+      },
+      "topRight": {
+        "x": 821.2516556291391,
+        "y": 740.0264900662252
+      },
+      "bottomRight": {
+        "x": 711.9006622516556,
+        "y": 1630.092715231788
+      },
+      "bottomLeft": {
+        "x": 30.364238410596073,
+        "y": 1497.8543046357615
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-164005/geom-001-source/geom-001-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 208.37748344370866,
+        "y": 562.0132450331125
+      },
+      "topRight": {
+        "x": 900.0860927152318,
+        "y": 500.9801324503311
+      },
+      "bottomRight": {
+        "x": 922.9735099337748,
+        "y": 1576.6887417218543
+      },
+      "bottomLeft": {
+        "x": 190.5761589403974,
+        "y": 1523.2847682119204
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-164005/geom-006-source/geom-006-source.png",
+    "corners": {
+      "topLeft": {
+        "x": -7.781456953642335,
+        "y": 386.5430463576159
+      },
+      "topRight": {
+        "x": 589.8344370860927,
+        "y": 419.60264900662247
+      },
+      "bottomRight": {
+        "x": 536.430463576159,
+        "y": 1332.5562913907283
+      },
+      "bottomLeft": {
+        "x": -53.556291390728425,
+        "y": 1299.4966887417218
+      }
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-001-source/geom-001-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 2.39072847682124,
+        "y": 709.5099337748344
+      },
+      "topRight": {
+        "x": 714.4437086092715,
+        "y": 620.5033112582781
+      },
+      "bottomRight": {
+        "x": 828.8807947019868,
+        "y": 1642.8079470198675
+      },
+      "bottomLeft": {
+        "x": 114.28476821192058,
+        "y": 1693.6688741721853
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-006-source/geom-006-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 129.54304635761594,
+        "y": 745.1125827814569
+      },
+      "topRight": {
+        "x": 724.6158940397352,
+        "y": 712.0529801324503
+      },
+      "bottomRight": {
+        "x": 775.476821192053,
+        "y": 1563.9735099337747
+      },
+      "bottomLeft": {
+        "x": 162.60264900662256,
+        "y": 1594.4900662251655
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-001-source/geom-001-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 106.65562913907289,
+        "y": 734.9403973509933
+      },
+      "topRight": {
+        "x": 813.6225165562914,
+        "y": 722.2251655629138
+      },
+      "bottomRight": {
+        "x": 846.682119205298,
+        "y": 1787.7615894039734
+      },
+      "bottomLeft": {
+        "x": 76.13907284768216,
+        "y": 1775.046357615894
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-006-source/geom-006-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 195.66225165562918,
+        "y": 722.2251655629138
+      },
+      "topRight": {
+        "x": 704.2715231788079,
+        "y": 678.9933774834436
+      },
+      "bottomRight": {
+        "x": 790.7350993377484,
+        "y": 1396.1324503311257
+      },
+      "bottomLeft": {
+        "x": 236.3509933774835,
+        "y": 1449.5364238410596
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-001-source/geom-001-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 200.74834437086096,
+        "y": 676.4503311258278
+      },
+      "topRight": {
+        "x": 831.4238410596026,
+        "y": 630.6754966887416
+      },
+      "bottomRight": {
+        "x": 874.6556291390729,
+        "y": 1617.3774834437086
+      },
+      "bottomLeft": {
+        "x": 170.23178807947025,
+        "y": 1586.8609271523178
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-005-source/geom-005-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 279.5827814569537,
+        "y": 386.5430463576159
+      },
+      "topRight": {
+        "x": 821.2516556291391,
+        "y": 401.80132450331126
+      },
+      "bottomRight": {
+        "x": 823.794701986755,
+        "y": 1174.887417218543
+      },
+      "bottomLeft": {
+        "x": 238.89403973509937,
+        "y": 1162.1721854304635
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260911-085827/geom-001-source/geom-001-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 242.48013245033115,
+        "y": 663.7350993377484
+      },
+      "topRight": {
+        "x": 949.4470198675497,
+        "y": 684.0794701986755
+      },
+      "bottomRight": {
+        "x": 939.274834437086,
+        "y": 1721.6423841059602
+      },
+      "bottomLeft": {
+        "x": 191.61920529801327,
+        "y": 1680.953642384106
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260911-085827/geom-004-source/geom-004-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 8.519867549668922,
+        "y": 663.7350993377484
+      },
+      "topRight": {
+        "x": 746.0033112582781,
+        "y": 643.3907284768212
+      },
+      "bottomRight": {
+        "x": 776.5198675496689,
+        "y": 1640.2649006622516
+      },
+      "bottomLeft": {
+        "x": 59.3807947019868,
+        "y": 1688.5827814569536
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 153.47350993377486,
+        "y": 755.2847682119206
+      },
+      "topRight": {
+        "x": 743.4602649006623,
+        "y": 729.8543046357615
+      },
+      "bottomRight": {
+        "x": 868.0695364238411,
+        "y": 1591.9470198675497
+      },
+      "bottomLeft": {
+        "x": 186.53311258278148,
+        "y": 1675.867549668874
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-111516--card-001/source-highres/source-highres.png",
+    "corners": {
+      "topLeft": null,
+      "topRight": null,
+      "bottomRight": null,
+      "bottomLeft": null
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-111516--card-007/source-highres/source-highres.png",
+    "corners": {
+      "topLeft": {
+        "x": 267.9105960264901,
+        "y": 539.1258278145696
+      },
+      "topRight": {
+        "x": 817.2086092715232,
+        "y": 579.8145695364238
+      },
+      "bottomRight": {
+        "x": 756.1754966887418,
+        "y": 1340.185430463576
+      },
+      "bottomLeft": {
+        "x": 196.70529801324508,
+        "y": 1281.6953642384105
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-001/source-highres/source-highres.png",
+    "corners": {
+      "topLeft": {
+        "x": 194.16225165562918,
+        "y": 523.8675496688742
+      },
+      "topRight": {
+        "x": 829.9238410596026,
+        "y": 528.9536423841059
+      },
+      "bottomRight": {
+        "x": 827.3807947019868,
+        "y": 1426.6490066225165
+      },
+      "bottomLeft": {
+        "x": 176.3609271523179,
+        "y": 1411.390728476821
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-006/source-highres/source-highres.png",
+    "corners": {
+      "topLeft": {
+        "x": 300.9701986754967,
+        "y": 574.728476821192
+      },
+      "topRight": {
+        "x": 868.0695364238411,
+        "y": 706.9668874172185
+      },
+      "bottomRight": {
+        "x": 667.1688741721855,
+        "y": 1536
+      },
+      "bottomLeft": {
+        "x": 72.09602649006627,
+        "y": 1375.7880794701987
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-120703--card-005/source-highres/source-highres.png",
+    "corners": {
+      "topLeft": {
+        "x": 186.53311258278148,
+        "y": 500.9801324503311
+      },
+      "topRight": {
+        "x": 870.6125827814569,
+        "y": 549.2980132450331
+      },
+      "bottomRight": {
+        "x": 807.0364238410596,
+        "y": 1474.9668874172185
+      },
+      "bottomLeft": {
+        "x": 135.67218543046363,
+        "y": 1454.6225165562914
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/basilisk-collar-20260908T105457/source-highres.png",
+    "corners": {
+      "topLeft": {
+        "x": 32.536423841059694,
+        "y": 27.97350993377483
+      },
+      "topRight": {
+        "x": 818.3377483443709,
+        "y": 0
+      },
+      "bottomRight": {
+        "x": 879.3708609271524,
+        "y": 1040.1059602649007
+      },
+      "bottomLeft": {
+        "x": 2.0198675496689704,
+        "y": 1085.8807947019868
+      }
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120539/photo-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 225.6953642384106,
+        "y": 303.4701986754967
+      },
+      "topRight": {
+        "x": 722.4370860927153,
+        "y": 325.50993377483445
+      },
+      "bottomRight": {
+        "x": 703.7880794701987,
+        "y": 1024
+      },
+      "bottomLeft": {
+        "x": 195.17880794701986,
+        "y": 1003.6556291390729
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 322.33112582781456,
+        "y": 442.49006622516555
+      },
+      "topRight": {
+        "x": 683.4437086092715,
+        "y": 427.2317880794702
+      },
+      "bottomRight": {
+        "x": 713.9602649006622,
+        "y": 951.0993377483444
+      },
+      "bottomLeft": {
+        "x": 332.50331125827813,
+        "y": 956.1854304635762
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120722/photo-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 281.6423841059603,
+        "y": 593.3774834437086
+      },
+      "topRight": {
+        "x": 659.7086092715232,
+        "y": 581.5099337748344
+      },
+      "bottomRight": {
+        "x": 680.0529801324503,
+        "y": 1127.4172185430464
+      },
+      "bottomLeft": {
+        "x": 293.50993377483445,
+        "y": 1127.4172185430464
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 300.2913907284768,
+        "y": 339.07284768211923
+      },
+      "topRight": {
+        "x": 742.7814569536424,
+        "y": 362.8079470198675
+      },
+      "bottomRight": {
+        "x": 680.0529801324503,
+        "y": 986.7019867549669
+      },
+      "bottomLeft": {
+        "x": 257.9072847682119,
+        "y": 927.364238410596
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 256.2119205298013,
+        "y": 230.56953642384107
+      },
+      "topRight": {
+        "x": 698.7019867549669,
+        "y": 245.82781456953643
+      },
+      "bottomRight": {
+        "x": 668.1854304635762,
+        "y": 862.9403973509934
+      },
+      "bottomLeft": {
+        "x": 232.47682119205297,
+        "y": 840.9006622516556
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/federica-veil-old-edition-20260908T105754/source-highres.png",
+    "corners": {
+      "topLeft": null,
+      "topRight": null,
+      "bottomRight": null,
+      "bottomLeft": null
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t000-source.png",
+    "corners": {
+      "topLeft": null,
+      "topRight": null,
+      "bottomRight": null,
+      "bottomLeft": null
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t500-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 50.51125827814573,
+        "y": 305.73774834437086
+      },
+      "topRight": {
+        "x": 795.4437086092717,
+        "y": 252.35496688741722
+      },
+      "bottomRight": {
+        "x": 868.2384105960266,
+        "y": 1317.5841059602649
+      },
+      "bottomLeft": {
+        "x": 79.62913907284772,
+        "y": 1358.8344370860927
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124327/t000-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 281.0278145695365,
+        "y": 390.6649006622517
+      },
+      "topRight": {
+        "x": 989.5629139072848,
+        "y": 322.723178807947
+      },
+      "bottomRight": {
+        "x": 1018.6807947019869,
+        "y": 1390.37880794702
+      },
+      "bottomLeft": {
+        "x": 295.5867549668875,
+        "y": 1368.5403973509935
+      }
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124327/t500-source.png",
+    "corners": {
+      "topLeft": null,
+      "topRight": null,
+      "bottomRight": null,
+      "bottomLeft": null
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124408/t500-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 147.57086092715235,
+        "y": 359.12052980132455
+      },
+      "topRight": {
+        "x": 858.5324503311259,
+        "y": 300.8847682119206
+      },
+      "bottomRight": {
+        "x": 945.8860927152318,
+        "y": 1363.687417218543
+      },
+      "bottomLeft": {
+        "x": 157.27682119205303,
+        "y": 1378.246357615894
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124507/t250-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 154.85033112582786,
+        "y": 487.72450331125833
+      },
+      "topRight": {
+        "x": 795.4437086092717,
+        "y": 363.97350993377484
+      },
+      "bottomRight": {
+        "x": 989.5629139072848,
+        "y": 1310.3046357615895
+      },
+      "bottomLeft": {
+        "x": 261.61589403973517,
+        "y": 1412.2172185430463
+      }
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t000-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 171.83576158940403,
+        "y": 402.7973509933775
+      },
+      "topRight": {
+        "x": 768.7523178807947,
+        "y": 368.8264900662252
+      },
+      "bottomRight": {
+        "x": 802.7231788079471,
+        "y": 1235.0834437086094
+      },
+      "bottomLeft": {
+        "x": 152.4238410596027,
+        "y": 1244.78940397351
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t500-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 162.12980132450335,
+        "y": 422.2092715231788
+      },
+      "topRight": {
+        "x": 759.0463576158941,
+        "y": 395.517880794702
+      },
+      "bottomRight": {
+        "x": 802.7231788079471,
+        "y": 1261.7748344370862
+      },
+      "bottomLeft": {
+        "x": 154.85033112582786,
+        "y": 1266.6278145695364
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132712/t800-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 123.3059602649007,
+        "y": 371.2529801324504
+      },
+      "topRight": {
+        "x": 875.517880794702,
+        "y": 376.10596026490066
+      },
+      "bottomRight": {
+        "x": 829.414569536424,
+        "y": 1443.7615894039736
+      },
+      "bottomLeft": {
+        "x": 94.18807947019872,
+        "y": 1387.9523178807947
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132801/t500-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 166.9827814569537,
+        "y": 611.4754966887417
+      },
+      "topRight": {
+        "x": 826.9880794701987,
+        "y": 592.0635761589405
+      },
+      "bottomRight": {
+        "x": 834.2675496688743,
+        "y": 1548.1006622516556
+      },
+      "bottomLeft": {
+        "x": 164.55629139072852,
+        "y": 1523.835761589404
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/livaan-foil-20260908T105241/source-highres.png",
+    "corners": {
+      "topLeft": {
+        "x": 106.28476821192062,
+        "y": 437.40397350993373
+      },
+      "topRight": {
+        "x": 851.3973509933776,
+        "y": 452.6622516556291
+      },
+      "bottomRight": {
+        "x": 831.0529801324504,
+        "y": 1485.139072847682
+      },
+      "bottomLeft": {
+        "x": 83.39735099337757,
+        "y": 1472.4238410596026
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-03-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 154.85033112582786,
+        "y": 281.4728476821192
+      },
+      "topRight": {
+        "x": 669.266225165563,
+        "y": 303.3112582781457
+      },
+      "bottomRight": {
+        "x": 642.5748344370861,
+        "y": 1011.8463576158941
+      },
+      "bottomLeft": {
+        "x": 106.32052980132454,
+        "y": 992.4344370860928
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-01-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 26.246357615894077,
+        "y": 16.98543046357616
+      },
+      "topRight": {
+        "x": 763.8993377483445,
+        "y": 16.98543046357616
+      },
+      "bottomRight": {
+        "x": 737.2079470198677,
+        "y": 1048.2437086092716
+      },
+      "bottomLeft": {
+        "x": -15.00397350993374,
+        "y": 1016.6993377483444
+      }
+    },
+    "status": "UNUSABLE",
+    "source": "MANUAL"
+  },
+  {
+    "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-03-source.png",
+    "corners": {
+      "topLeft": {
+        "x": 99.04105960264904,
+        "y": 218.38410596026492
+      },
+      "topRight": {
+        "x": 589.1920529801325,
+        "y": 242.64900662251657
+      },
+      "bottomRight": {
+        "x": 577.0596026490067,
+        "y": 929.3456953642385
+      },
+      "bottomLeft": {
+        "x": 48.08476821192057,
+        "y": 907.507284768212
+      }
+    },
+    "status": "CONFIRMED",
+    "notes": null,
+    "source": "MANUAL"
+  }
+]

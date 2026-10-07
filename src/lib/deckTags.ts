@@ -112,6 +112,35 @@ export const DECK_TAGS: DeckTag[] = [
   { category: 'Combat', id: 'flash', label: 'Flash', query: 'keyword:flash', terms: ['instant speed'] },
   { category: 'Combat', id: 'fight', label: 'Fight / bite', query: '(keyword:fight or keyword:bite)' },
   { category: 'Combat', id: 'prowess', label: 'Prowess', query: 'keyword:prowess', terms: ['spells'] },
+  { category: 'Combat', id: 'goad', label: 'Goad', query: 'keyword:goad', terms: ['forced attack'] },
+  { category: 'Combat', id: 'recruit', label: 'Recruit', query: 'keyword:recruit', terms: ['soldier'] },
+  {
+    category: 'Combat',
+    id: 'prevent-attack',
+    label: 'Preventing attack',
+    // Goad keeps them off you, and so does every "can't attack you" effect.
+    query: '(keyword:goad or o:"can\'t attack you")',
+    terms: ['propaganda', 'ghostly prison', 'pillow fort'],
+  },
+  {
+    category: 'Combat',
+    id: 'prevent-damage-players',
+    label: 'Preventing damage to players',
+    // Oracle lines from Scryfall: "to you", "any target", Fog, and redirects
+    // such as "dealt to you … is dealt to … instead". Damage that is merely
+    // increased ("damage plus", "double that damage") stays out.
+    query:
+      '(o:/prevent.*(to you\\b|players?\\b|any target|any number of targets|dealt by|would be dealt by|would deal)/ or o:/(to you\\b|damage to you\\b|players?\\b|any target).*prevent/ or o:/would deal(?:(?!creature).)*prevent/ or o:/(to you\\b|to you and|damage to you\\b|or player).*(is dealt to|deals that damage to|deal that damage to).*instead/ or o:/(excess damage is dealt to|that damage is dealt to|deals that damage to).*instead/ or o:"prevent all combat damage that would be dealt this turn" or o:"prevent all damage that would be dealt this turn" or o:"that much damage minus") -o:"can\'t be prevented" -o:"damage plus" -o:"double that damage"',
+    terms: ['fog', 'redirect', 'pariah'],
+  },
+  {
+    category: 'Combat',
+    id: 'prevent-damage-creatures',
+    label: 'Preventing damage to creatures',
+    query:
+      '(o:/prevent.*(creatures?\\b|any target|any number of targets|you control|would deal)/ or o:/creatures?\\b.*prevent/ or o:/damage[^.]*creatures you control[^.]*instead/ or o:"prevent all combat damage that would be dealt this turn" or o:"prevent all damage that would be dealt this turn" or ((o:"dealt to ~" or o:"dealt by ~") (o:prevent or o:instead)) or (o:/would be dealt (this turn )?to (?!you\\b).{0,50}creatures?/ (o:prevent or o:instead)) or o:/excess damage is dealt to.*instead/ or o:"that much damage minus") -o:"can\'t be prevented" -o:"damage plus" -o:"double that damage"',
+    terms: ['fog', 'redirect', 'vigor'],
+  },
 
   // Tokens
   { category: 'Tokens & wide', id: 'tokens', label: 'Create tokens', query: 'o:"create" o:"token"', terms: ['go wide'] },
@@ -205,15 +234,110 @@ export const DECK_TAGS: DeckTag[] = [
   { category: 'Graveyard', id: 'delve', label: 'Delve', query: 'keyword:delve' },
   { category: 'Graveyard', id: 'grave-hate', label: 'Graveyard hate', query: 'o:"exile target" o:"graveyard"', terms: ['rest in peace'] },
 
-  // Removal
-  { category: 'Removal', id: 'destroy-creature', label: 'Destroy creature', query: 'o:"destroy target creature"' },
-  { category: 'Removal', id: 'destroy-any', label: 'Destroy permanent', query: 'o:"destroy target"' },
-  { category: 'Removal', id: 'exile', label: 'Exile', query: 'o:"exile target"' },
-  { category: 'Removal', id: 'bounce', label: 'Bounce to hand', query: 'o:"return" o:"to" o:"hand"', terms: ['tempo'] },
-  { category: 'Removal', id: 'board-wipe', label: 'Board wipe', query: 'o:"destroy all creatures"', terms: ['sweeper'] },
+  // Removal — each tag is one way a card answers something. Phrases stay
+  // specific so blink, graveyard recursion, and stax don't land in here.
+  {
+    category: 'Removal',
+    id: 'destroy-creature',
+    label: 'Destroy creature',
+    query: 'o:/destroy (another |up to (one|two|three|four) )?target [^.]*creature/',
+    terms: ['murder', 'doom blade'],
+  },
+  {
+    category: 'Removal',
+    id: 'destroy-any',
+    label: 'Destroy noncreature',
+    query:
+      '(o:"destroy target artifact" or o:"destroy target enchantment" or o:"destroy target permanent" or o:"destroy target nonland" or o:"destroy target noncreature" or o:"destroy target land" or o:"destroy target planeswalker")',
+    terms: ['naturalize', 'disenchant', 'beast within'],
+  },
+  {
+    category: 'Removal',
+    id: 'exile',
+    label: 'Exile',
+    query:
+      '(o:"exile target creature" or o:"exile target permanent" or o:"exile target artifact" or o:"exile target enchantment" or o:"exile target nonland" or o:"exile target planeswalker" or o:"exile another target creature" or o:"exile another target permanent" or o:"exile up to one target" or o:"exile up to two target") -o:"you control" -o:graveyard',
+    terms: ['swords', 'path', 'unmaking'],
+  },
+  {
+    category: 'Removal',
+    id: 'pacify',
+    label: 'Pacifism',
+    query:
+      '(o:"enchanted creature can\'t attack" or o:"enchanted permanent can\'t attack" or o:"target creature can\'t attack or block" or o:"loses all abilities" or o:"loses all other abilities" or o:"lose all abilities" or o:"loses all other card types")',
+    terms: ['pacifism', 'arrest', 'prison', 'frogify'],
+  },
+  {
+    category: 'Removal',
+    id: 'stun',
+    label: 'Stun',
+    query:
+      '(keyword:stun or o:"stun counter" or o:"doesn\'t untap during its controller" or o:"doesn\'t untap during your untap" or o:"don\'t untap during that player" or o:"don\'t untap during their controller" or o:"enchanted creature doesn\'t untap" or o:"enchanted permanent doesn\'t untap")',
+    terms: ['freeze', 'sleep', 'claustrophobia', 'tap down'],
+  },
+  {
+    category: 'Removal',
+    id: 'bounce',
+    label: 'Bounce to hand',
+    query:
+      '(o:"to its owner\'s hand" or o:"to their owners\' hands" or o:"to their owner\'s hand") -o:graveyard',
+    terms: ['unsummon', 'boomerang', 'tempo'],
+  },
+  {
+    category: 'Removal',
+    id: 'tuck',
+    label: 'Put on library',
+    query:
+      '(o:"owner\'s library" or o:"owners\' libraries" or o:"shuffles it into their library" or o:"shuffle it into their library") -o:graveyard',
+    terms: ['tuck', 'condemn', 'chaos warp'],
+  },
+  {
+    category: 'Removal',
+    id: 'edict',
+    label: 'Edict',
+    query:
+      '(o:"target player sacrifices" or o:"that player sacrifices" or o:"each opponent sacrifices" or o:"each other player sacrifices" or o:"each player sacrifices" or o:"opponent sacrifices a" or o:"an opponent sacrifices")',
+    terms: ['sacrifice', 'grave pact', 'sheoldred'],
+  },
+  {
+    category: 'Removal',
+    id: 'shrink',
+    label: '-X/-X',
+    query:
+      '(o:"target creature gets -" or o:"all creatures get -" or o:"each creature gets -" or o:"-1/-1 counter on target" or o:"-1/-1 counters on each" or o:"-1/-1 counter on each")',
+    terms: ['shrink', 'toxic deluge', 'grasp', 'toughness'],
+  },
+  {
+    category: 'Removal',
+    id: 'phase-out',
+    label: 'Phase out',
+    query: '(o:"phase out target" or (o:"phases out" (o:"target creature" or o:"target permanent" or o:enchanted)))',
+    terms: ['oubliette', 'phasing'],
+  },
+  {
+    category: 'Removal',
+    id: 'board-wipe',
+    label: 'Board wipe',
+    query:
+      '(o:"destroy all creatures" or o:"destroy all nonland permanents" or o:"destroy all permanents" or o:"exile all creatures" or o:"exile all nonland permanents" or o:"exile all permanents" or o:"all creatures get -" or o:"each creature gets -" or o:"damage to each creature" or o:"damage to all creatures")',
+    terms: ['sweeper', 'wrath', 'farewell'],
+  },
   { category: 'Removal', id: 'counterspell', label: 'Counterspell', query: 'o:"counter target"', terms: ['stack'] },
   { category: 'Removal', id: 'burn', label: 'Direct damage', query: 'o:"damage" o:"any target"', terms: ['burn', 'bolt'] },
-  { category: 'Removal', id: 'fight-removal', label: 'Fight as removal', query: 'keyword:fight', terms: ['prey upon'] },
+  {
+    category: 'Removal',
+    id: 'damage-creature',
+    label: 'Damage creature',
+    query: 'o:"damage to target creature"',
+    terms: ['flame slash', 'bolt'],
+  },
+  {
+    category: 'Removal',
+    id: 'fight-removal',
+    label: 'Fight / bite',
+    query: '(keyword:fight or keyword:bite)',
+    terms: ['prey upon'],
+  },
 
   // Mana
   { category: 'Mana', id: 'ramp', label: 'Ramp', query: 'o:"add {"', terms: ['mana dork', 'mana rock'] },
@@ -367,6 +491,13 @@ export const DECK_TAGS: DeckTag[] = [
   },
   {
     category: 'Permanent effects',
+    id: 'initiative',
+    label: 'Initiative',
+    query: 'o:initiative',
+    terms: ['undercity'],
+  },
+  {
+    category: 'Permanent effects',
     id: 'day-night',
     label: 'Day / night',
     query: '(o:daybound or o:nightbound or o:"it becomes day" or o:"it becomes night")',
@@ -438,14 +569,40 @@ export const deckTagsByCategory = (
 };
 
 /**
- * Build a Scryfall query from selected tag ids. Tags are AND-ed. Optional
- * commander identity restricts to legal cards.
+ * Type-or-oracle search for a tag the catalogue doesn't have yet.
+ * `kobold` becomes `(t:kobold or o:kobold)`: cards of that type, and cards
+ * that name it in rules text. A phrase is quoted on both sides so the spaces
+ * survive. Returns null until there are two characters to search for.
  */
-export const buildTagsQuery = (tagIds: readonly string[], identity?: string[]): string => {
+export const customOracleQuery = (text: string): string | null => {
+  const value = text
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/"/g, '')
+    .replace(/^(?:o:|t:)/i, '');
+  if (value.length < 2) return null;
+  const term = /\s/.test(value) ? `"${value}"` : value;
+  return `(t:${term} or o:${term})`;
+};
+
+/**
+ * Build a Scryfall query from selected tag ids. Tags are AND-ed. Optional
+ * commander identity restricts to legal cards. `extraQueries` are the same
+ * kind of clause for tags that aren't in the built-in catalogue.
+ */
+export const buildTagsQuery = (
+  tagIds: readonly string[],
+  identity?: string[],
+  extraQueries: readonly string[] = [],
+): string => {
   const parts: string[] = [];
   for (const id of tagIds) {
     const tag = BY_ID.get(id);
     if (tag) parts.push(`(${tag.query})`);
+  }
+  for (const query of extraQueries) {
+    const trimmed = query.trim();
+    if (trimmed) parts.push(`(${trimmed})`);
   }
   if (identity) {
     parts.push(identity.length === 0 ? 'id=c' : `id<=${sortWubrg([...identity]).join('').toLowerCase()}`);

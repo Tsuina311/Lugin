@@ -1,0 +1,222 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Scanner annotate</title>
+<style>
+body { margin: 0; font: 14px sans-serif; background: #111; color: #eee; display: grid; grid-template-columns: 1fr 320px; height: 100vh; }
+canvas { width: 100%; height: 100%; background: #000; }
+aside { padding: 12px; overflow: auto; border-left: 1px solid #333; }
+button, input { font: inherit; }
+input { width: 100%; margin: 4px 0; }
+.hits button { display: block; width: 100%; text-align: left; margin: 2px 0; }
+label { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<aside>
+  <div id="meta"></div>
+  <p id="help">Mark the physical card’s outer corners, in order: top-left, top-right, bottom-right, bottom-left. Inside a sleeve, estimate the card edge, not the sleeve and not the artwork.</p>
+  <p id="warn"></p>
+  <p id="helpkeys">1–4 corners · Enter save+next · U unknown · R reset · G glare · B blur · S sleeve · ← →</p>
+  <input id="q" placeholder="card name" autocomplete="off">
+  <div class="hits" id="hits"></div>
+  <p id="chosen"></p>
+  <input id="notes" placeholder="note if the edge is uncertain">
+  <label><input type="checkbox" data-tag="GLARE"> glare</label>
+  <label><input type="checkbox" data-tag="BLUR"> blur</label>
+  <label><input type="checkbox" data-tag="SLEEVED"> sleeved</label>
+  <label><input type="checkbox" data-tag="UNSLEEVED"> unsleeved</label>
+  <label><input type="checkbox" data-tag="FOIL"> foil</label>
+  <label><input type="checkbox" data-tag="FOREIGN_LANGUAGE"> foreign</label>
+  <label><input type="checkbox" data-tag="OLD_FRAME"> old frame</label>
+  <label><input type="checkbox" data-tag="ALT_ART"> alt art</label>
+  <label><input type="checkbox" data-tag="DARK"> dark</label>
+  <label><input type="checkbox" data-tag="OVEREXPOSED"> overexposed</label>
+  <p>
+    <button id="save">Save + next</button>
+    <button id="anyway" hidden>Save anyway</button>
+    <button id="unknown">Unknown</button>
+    <button id="unusable">Unusable corners</button>
+  </p>
+</aside>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const keys = ['topLeft', 'topRight', 'bottomRight', 'bottomLeft'];
+let items = [], identities = [], corners = [], tags = [], index = 0;
+let img = new Image();
+let pts = { topLeft: null, topRight: null, bottomRight: null, bottomLeft: null };
+let nextKey = 0;
+let chosen = null;
+let drag = null;
+let forceSave = false;
+
+const byId = (rows, id) => rows.find(r => r.imageId === id);
+const item = () => items[index];
+
+const resize = () => { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; draw(); };
+window.addEventListener('resize', resize);
+
+const fit = () => {
+  const s = Math.min(canvas.width / img.width, canvas.height / img.height);
+  const w = img.width * s, h = img.height * s;
+  return { s, x: (canvas.width - w) / 2, y: (canvas.height - h) / 2, w, h };
+};
+
+const toImage = (p, box) => ({ x: (p.x - box.x) / box.s, y: (p.y - box.y) / box.s });
+const toScreen = (p, box) => ({ x: box.x + p.x * box.s, y: box.y + p.y * box.s });
+
+const draw = () => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!img.width) return;
+  const box = fit();
+  ctx.drawImage(img, box.x, box.y, box.w, box.h);
+  ctx.strokeStyle = '#4ade80';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  keys.forEach((k, i) => {
+    const p = pts[k];
+    if (!p) return;
+    const s = toScreen(p, box);
+    if (i === 0) ctx.moveTo(s.x, s.y); else ctx.lineTo(s.x, s.y);
+    ctx.fillStyle = '#4ade80';
+    ctx.fillRect(s.x - 4, s.y - 4, 8, 8);
+    ctx.fillText(String(i + 1), s.x + 6, s.y - 6);
+  });
+  ctx.closePath();
+  ctx.stroke();
+};
+
+const loadItem = () => {
+  const it = item();
+  if (!it) return;
+  const ident = byId(identities, it.imageId);
+  const corner = byId(corners, it.imageId);
+  const tagRows = tags.filter(t => t.imageId === it.imageId);
+  const tagSet = new Set(tagRows.flatMap(t => t.tags || []));
+  chosen = ident?.status === 'CONFIRMED' ? ident.cardName : null;
+  pts = { topLeft: null, topRight: null, bottomRight: null, bottomLeft: null };
+  nextKey = 0;
+  if (corner?.corners) {
+    pts = { ...corner.corners };
+    nextKey = keys.findIndex(k => !pts[k]);
+    if (nextKey < 0) nextKey = 0;
+  }
+  document.querySelectorAll('[data-tag]').forEach(el => { el.checked = tagSet.has(el.dataset.tag); });
+  document.getElementById('meta').textContent = `${index + 1}/${items.length}  ${it.sessionId}  ${it.split}  identity ${it.identityStatus}  ${it.imageId}`;
+  document.getElementById('chosen').textContent = chosen ? `Chosen: ${chosen}` : 'No card chosen';
+  document.getElementById('notes').value = corner?.notes || '';
+  document.getElementById('warn').textContent = '';
+  document.getElementById('anyway').hidden = true;
+  forceSave = false;
+  img = new Image();
+  img.onload = () => { resize(); };
+  img.src = `/media?path=${encodeURIComponent(it.path)}`;
+};
+
+const selectedTags = () => [...document.querySelectorAll('[data-tag]:checked')].map(el => el.dataset.tag);
+
+const save = async (identity, force) => {
+  const it = item();
+  const complete = keys.every(k => pts[k]);
+  const body = {
+    imageId: it.imageId,
+    identity,
+    tags: selectedTags(),
+    force: Boolean(force),
+    corners: complete ? { corners: pts, status: 'CONFIRMED', notes: document.getElementById('notes').value || null } : null,
+  };
+  const res = await fetch('/api/save', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const payload = await res.json().catch(() => ({}));
+  const warn = document.getElementById('warn');
+  if (res.status === 400) {
+    warn.textContent = (payload.errors || ['Could not save corners.']).join(' ');
+    document.getElementById('anyway').hidden = true;
+    return;
+  }
+  if (res.status === 409) {
+    warn.textContent = (payload.warnings || []).join(' ');
+    document.getElementById('anyway').hidden = false;
+    forceSave = true;
+    return;
+  }
+  if (!res.ok) {
+    warn.textContent = 'Save failed.';
+    return;
+  }
+  warn.textContent = '';
+  document.getElementById('anyway').hidden = true;
+  forceSave = false;
+  const queue = await (await fetch('/api/queue')).json();
+  identities = queue.identities; corners = queue.corners; tags = queue.tags; items = queue.items;
+  index = Math.min(items.length - 1, index + 1);
+  loadItem();
+};
+
+document.getElementById('save').onclick = () => save(chosen ? { cardName: chosen, status: 'CONFIRMED' } : null, false);
+document.getElementById('anyway').onclick = () => save(chosen ? { cardName: chosen, status: 'CONFIRMED' } : null, true);
+document.getElementById('unknown').onclick = () => save({ status: 'UNKNOWN' });
+document.getElementById('unusable').onclick = async () => {
+  await fetch('/api/save', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageId: item().imageId, corners: { corners: pts, status: 'UNUSABLE' }, tags: selectedTags() }) });
+  index = Math.min(items.length - 1, index + 1);
+  const queue = await (await fetch('/api/queue')).json();
+  corners = queue.corners; tags = queue.tags;
+  loadItem();
+};
+
+document.getElementById('q').addEventListener('input', async (e) => {
+  const hits = await (await fetch(`/api/cards?q=${encodeURIComponent(e.target.value)}`)).json();
+  const box = document.getElementById('hits');
+  box.innerHTML = '';
+  hits.forEach(name => {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.onclick = () => { chosen = name; document.getElementById('chosen').textContent = `Chosen: ${name}`; };
+    box.appendChild(b);
+  });
+});
+
+canvas.addEventListener('mousedown', (e) => {
+  const box = fit();
+  const p = toImage({ x: e.offsetX, y: e.offsetY }, box);
+  const hit = keys.find(k => pts[k] && Math.hypot(pts[k].x - p.x, pts[k].y - p.y) < 20 / box.s);
+  if (hit) { drag = hit; return; }
+  const key = keys[nextKey % 4];
+  pts[key] = p;
+  nextKey = (nextKey + 1) % 4;
+  draw();
+});
+canvas.addEventListener('mousemove', (e) => {
+  if (!drag) return;
+  pts[drag] = toImage({ x: e.offsetX, y: e.offsetY }, fit());
+  draw();
+});
+window.addEventListener('mouseup', () => { drag = null; });
+
+window.addEventListener('keydown', (e) => {
+  if (e.target.id === 'q') return;
+  if (e.key >= '1' && e.key <= '4') { nextKey = Number(e.key) - 1; }
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('save').click(); }
+  if (e.key === 'u' || e.key === 'U') document.getElementById('unknown').click();
+  if (e.key === 'r' || e.key === 'R') { pts = { topLeft: null, topRight: null, bottomRight: null, bottomLeft: null }; nextKey = 0; draw(); }
+  const toggle = tag => { const el = document.querySelector(`[data-tag="${tag}"]`); el.checked = !el.checked; };
+  if (e.key === 'g' || e.key === 'G') toggle('GLARE');
+  if (e.key === 'b' || e.key === 'B') toggle('BLUR');
+  if (e.key === 's' || e.key === 'S') toggle('SLEEVED');
+  if (e.key === 'ArrowRight') { index = Math.min(items.length - 1, index + 1); loadItem(); }
+  if (e.key === 'ArrowLeft') { index = Math.max(0, index - 1); loadItem(); }
+});
+
+const boot = async () => {
+  const queue = await (await fetch('/api/queue')).json();
+  items = queue.items; identities = queue.identities; corners = queue.corners; tags = queue.tags;
+  const pending = items.findIndex(it => !corners.some(c => c.imageId === it.imageId && c.status === 'CONFIRMED'));
+  index = pending >= 0 ? pending : 0;
+  loadItem();
+};
+boot();
+</script>
+</body>
+</html>

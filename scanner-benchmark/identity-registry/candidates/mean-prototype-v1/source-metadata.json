@@ -1,0 +1,18 @@
+{
+  "visualIndexVersion": 2,
+  "encoderId": "CLIP_VIT_B32",
+  "encoderVersion": "Xenova/clip-vit-base-patch32@q1",
+  "preprocessVersion": 1,
+  "galleryTag": "full",
+  "dims": 512,
+  "count": 49968,
+  "dtype": "f32",
+  "float32Bytes": 102334464,
+  "float16Bytes": 51167232,
+  "oracleIdentities": 34082,
+  "artworkReferences": 49968,
+  "averageArtsPerOracle": 1.4661111437122234,
+  "maxArtsPerOracle": 394,
+  "generated": "2026-09-11T15:37:36.863Z",
+  "collapseBy": "oracleId"
+}

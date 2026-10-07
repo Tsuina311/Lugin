@@ -5,8 +5,9 @@
 // A search combines free text with structured filters. Bare words match card
 // names, but anything that looks like Scryfall syntax (`t:wolf`, `o:"draw a
 // card"`, `mv<3`, `-t:land`) is passed through untouched, so the box doubles as
-// a full Scryfall query field. `total` is surfaced so the UI can decide when the
-// result set is small enough to show card images.
+// a full Scryfall query field. With the oracle toggle on, bare text matches
+// rules text at that exact spelling (`draw` stays `draw`). `total` is surfaced
+// so the UI can decide when the result set is small enough to show card images.
 
 import type { DeckFormat } from './deck';
 import { fetchRemote } from './fetchRemote';
@@ -54,6 +55,11 @@ export interface CardQuery {
    * `undefined` means no restriction.
    */
   identity?: string[];
+  /**
+   * Match the free text against oracle text at that exact spelling. Scryfall's
+   * plain `o:` search stems words (`draw` hits `draws`); a regex does not.
+   */
+  oracle?: boolean;
   /** A subtype — creature type, land type, … ("Wolf"). */
   subtype?: string;
   /** Free text: bare words match names, Scryfall operators pass through. */
@@ -142,16 +148,20 @@ export const looksLikeSyntax = (text: string): boolean =>
 
 const quoted = (value: string): string => (/\s/.test(value) ? `"${value}"` : value);
 
-/**
- * A bare word (or quoted phrase) becomes a name filter, keeping phrases intact.
- * Punctuation-only tokens (the `//` in "Fire // Ice") are dropped — they'd make
- * the query invalid without narrowing it.
- */
-const nameTerm = (token: string): string | null => {
+/** The words inside a token, or null when it has nothing searchable in it. */
+const bareValue = (token: string): string | null => {
   const phrase = token.match(/^"([^"]*)"$/);
   const value = (phrase ? phrase[1] : token.replace(/"/g, '')).trim();
-  return /[a-z0-9]/i.test(value) ? `name:${quoted(value)}` : null;
+  return /[a-z0-9]/i.test(value) ? value : null;
 };
+
+// Scryfall's `o:` index stems, so `o:draw` also matches "draws". A regex matches
+// the characters as typed. The lookaround keeps a word from matching inside a
+// longer one, and still allows text that starts with a symbol (`{T}`).
+const ORACLE_REGEX_ESCAPE = /[\\/^$.*+?()[\]{}|]/g;
+
+const oracleExact = (value: string): string =>
+  `o:/(?<!\\w)${value.replace(ORACLE_REGEX_ESCAPE, '\\$&')}(?!\\w)/`;
 
 /**
  * Turn the UI's query into Scryfall search syntax. Exported so the box can show
@@ -159,10 +169,21 @@ const nameTerm = (token: string): string | null => {
  */
 export const buildScryfallQuery = (q: CardQuery): string => {
   const parts: string[] = [];
+  const text = (q.text ?? '').trim().replace(/\s+/g, ' ');
 
-  for (const token of (q.text ?? '').trim().match(TOKEN_RE) ?? []) {
-    const term = isSyntax(token) ? token : nameTerm(token);
-    if (term) parts.push(term);
+  if (q.oracle && text && !looksLikeSyntax(text)) {
+    const value = bareValue(text);
+    if (value) parts.push(oracleExact(value));
+  } else {
+    for (const token of text.match(TOKEN_RE) ?? []) {
+      if (isSyntax(token)) {
+        parts.push(token);
+        continue;
+      }
+      const value = bareValue(token);
+      if (!value) continue;
+      parts.push(q.oracle ? oracleExact(value) : `name:${quoted(value)}`);
+    }
   }
 
   if (q.identity) {

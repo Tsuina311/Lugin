@@ -1,0 +1,6 @@
+{
+  "role": "champion",
+  "kind": "heuristic",
+  "id": "current-selector",
+  "note": "Approved selector until a human promotes a passing challenger. Training does not promote."
+}

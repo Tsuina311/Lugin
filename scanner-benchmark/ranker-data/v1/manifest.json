@@ -1,0 +1,113 @@
+{
+  "featureSchema": "ranker-features-v1",
+  "datasetVersion": "v1",
+  "createdAt": "2026-10-06T14:42:33.036Z",
+  "datasetHash": "2dd2ec36b8332eb5ed2449ad720f349a66becfaf55063b66de6f1838bb38308c",
+  "git": {
+    "rev": "9c89f6f5f6de72f3c205dd80295fe629467a1c08",
+    "dirty": true
+  },
+  "detectorFiles": {
+    "src/lib/scan/detectCard.ts": "f46186be951f0d64",
+    "src/lib/scan/geometry.ts": "77acdb649f1fdda3",
+    "src/lib/scan/detection/multi.ts": "2b0b4c0df8f9d383"
+  },
+  "labelRule": "Human-reviewed or existing-annotation card quads on trusted fixtures. Bootstrap quads are stored as untrusted and are not training labels.",
+  "frames": 190,
+  "trustedFrames": 117,
+  "bootstrapFrames": 73,
+  "candidates": 1799,
+  "trustedCandidates": 1085,
+  "captureGroups": [
+    "basilisk-collar-20260908T111744",
+    "cq-20260908T120539",
+    "cq-20260908T120629",
+    "cq-20260908T120722",
+    "cq-20260908T120751",
+    "cq-20260908T120813",
+    "focus-series-20260908T132626",
+    "focus-series-20260908T132712",
+    "focus-series-20260908T132801",
+    "geometry-test-20261006-150559",
+    "geometry-test-20261006-152155",
+    "geometry-test-20261006-153936",
+    "livaan-cultist-of-tiamat-foil-20260908T111916",
+    "livaan-foil-20260908T105241",
+    "lizard-blades-french-20260908T111833",
+    "maddening-hex-afc-showcase-glare",
+    "negate-unsleeved-20260908T082746",
+    "p-e-d-tre-et-de-foyer-french-goo-20260908T082303",
+    "scan-fixtures_real-photos_maddening-hex-afc-showcase-glare",
+    "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c000_deck-001-source",
+    "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c008_deck-011-source",
+    "scan-inbox_sessions_geometry-test-20260910-153114_geom-001-source_geom-001-source",
+    "scan-inbox_sessions_geometry-test-20260910-153114_geom-007-source_geom-007-source",
+    "scan-inbox_sessions_geometry-test-20260910-154646_geom-001-source_geom-001-source",
+    "scan-inbox_sessions_geometry-test-20260910-154646_geom-007-source_geom-007-source",
+    "scan-inbox_sessions_geometry-test-20260910-155241_geom-006-source_geom-006-source",
+    "scan-inbox_sessions_geometry-test-20260910-162108_geom-001-source_geom-001-source",
+    "scan-inbox_sessions_geometry-test-20260910-164005_geom-001-source_geom-001-source",
+    "scan-inbox_sessions_geometry-test-20260910-165339_geom-001-source_geom-001-source",
+    "scan-inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source",
+    "scan-inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source",
+    "scan-inbox_sessions_geometry-test-20260910-173530_geom-006-source_geom-006-source",
+    "scan-inbox_sessions_geometry-test-20260910-192617_geom-001-source_geom-001-source",
+    "scan-inbox_sessions_geometry-test-20260910-192617_geom-005-source_geom-005-source",
+    "scan-inbox_sessions_geometry-test-20260911-085827_geom-001-source_geom-001-source",
+    "scan-inbox_sessions_geometry-test-20260911-100459_geom-003-source_geom-003-source",
+    "scan-inbox_sessions_normal-scan-session-20260911-111516--card-007_source-highres_source-highres",
+    "scan-inbox_sessions_normal-scan-session-20260911-113049--card-001_source-highres_source-highres",
+    "scan-inbox_sessions_normal-scan-session-20260911-113049--card-006_source-highres_source-highres",
+    "scan-inbox_sessions_normal-scan-session-20260911-120703--card-005_source-highres_source-highres",
+    "slip-out-the-back-italian-20260908T111643",
+    "swap-test-20260908-171149",
+    "swap-test-20260908-171306",
+    "teferi-veil-old-edition-good-cap-20260908T111548",
+    "wand-of-wonder-20260908T073958"
+  ],
+  "holdoutGroups": [
+    "cq-20260908T120539",
+    "cq-20260908T120751",
+    "focus-series-20260908T132626",
+    "slip-out-the-back-italian-20260908T111643"
+  ],
+  "foldIds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "errors": [
+    {
+      "id": "focus-series__focus-series-20260908T132626__t000-source",
+      "error": "missing image or capture dimension (960 vs null)"
+    },
+    {
+      "id": "replay__maddening-hex-alt-art-20260908T082448",
+      "error": "missing image or capture dimension (1006 vs null)"
+    },
+    {
+      "id": "replay__maddening-hex-alt-art-20260908T082448__source-highres",
+      "error": "missing image or capture dimension (1006 vs null)"
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-013-source_geom-013-source",
+      "error": "missing image or capture dimension (1019 vs null)"
+    },
+    {
+      "id": "scanner-lab__maddening-hex-alt-art-20260908T082448",
+      "error": "missing image or capture dimension (1006 vs null)"
+    },
+    {
+      "id": "scanner-lab__maddening-hex-alt-art-20260908T082448__source-highres",
+      "error": "missing image or capture dimension (1006 vs null)"
+    }
+  ],
+  "frameStructure": {
+    "warpWidth": 372,
+    "warpHeight": 520,
+    "note": "Optional family. Same fractional frame-region detector on a rectified warp narrower than the 744px production card."
+  },
+  "pipeline": "PIPELINE / EARLY MODEL"
+}

@@ -1,0 +1,722 @@
+{
+  "split": "dev",
+  "margin": 0.05,
+  "rule": "Publish when top1 − top2 is at least 0.05. Agreement also requires the clean gallery to name the same card. AGREEMENT_GATE_VALIDATED when dev publishes no wrong card and correct publications do not fall. AGREEMENT_GATE_UNSAFE when any wrong card is published.",
+  "verdict": "AGREEMENT_GATE_VALIDATED",
+  "clean": {
+    "rawTop1": 15,
+    "correctPublished": 4,
+    "correctWithheld": 11,
+    "wrongPublished": 0,
+    "wrongWithheld": 2,
+    "totalPublished": 4,
+    "precision": 1,
+    "recall": 0.26666666666666666,
+    "safeHitRate": 0.23529411764705882
+  },
+  "prototype": {
+    "rawTop1": 14,
+    "correctPublished": 8,
+    "correctWithheld": 6,
+    "wrongPublished": 0,
+    "wrongWithheld": 3,
+    "totalPublished": 8,
+    "precision": 1,
+    "recall": 0.5714285714285714,
+    "safeHitRate": 0.47058823529411764
+  },
+  "agreement": {
+    "rawTop1": 14,
+    "totalPublished": 7,
+    "correctPublished": 7,
+    "wrongPublished": 0,
+    "correctWithheld": 7,
+    "wrongWithheld": 3,
+    "precision": 1,
+    "safeHitRate": 0.4117647058823529
+  },
+  "frames": [
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "label": "Livaan, Cultist of Tiamat foil",
+      "clean": {
+        "cardName": "Livaan, Cultist of Tiamat",
+        "label": "Livaan, Cultist of Tiamat foil",
+        "top1Name": "True Polymorph",
+        "correct": false,
+        "top1Score": 0.566,
+        "top2Name": "Livaan, Cultist of Tiamat",
+        "top2Score": 0.5324,
+        "margin": 0.0336,
+        "published": false,
+        "rank": 2
+      },
+      "prototype": {
+        "cardName": "Livaan, Cultist of Tiamat",
+        "label": "Livaan, Cultist of Tiamat foil",
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "correct": true,
+        "top1Score": 0.5913,
+        "top2Name": "Circle of Protection: Artifacts",
+        "top2Score": 0.5383,
+        "margin": 0.053,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "label": "livaan foil",
+      "clean": {
+        "cardName": "Livaan, Cultist of Tiamat",
+        "label": "livaan foil",
+        "top1Name": "The Binding of the Titans",
+        "correct": false,
+        "top1Score": 0.5396,
+        "top2Name": "Ancient Stirrings",
+        "top2Score": 0.5342,
+        "margin": 0.0054,
+        "published": false,
+        "rank": 3361
+      },
+      "prototype": {
+        "cardName": "Livaan, Cultist of Tiamat",
+        "label": "livaan foil",
+        "top1Name": "Guff Rewrites History",
+        "correct": false,
+        "top1Score": 0.6138,
+        "top2Name": "Boggart Cursecrafter",
+        "top2Score": 0.6103,
+        "margin": 0.0034,
+        "published": false,
+        "rank": 4864
+      }
+    },
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "label": "Livaan, Cultist of Tiamat foil",
+      "clean": {
+        "cardName": "Livaan, Cultist of Tiamat",
+        "label": "Livaan, Cultist of Tiamat foil",
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "correct": true,
+        "top1Score": 0.586,
+        "top2Name": "Plague Boiler",
+        "top2Score": 0.5459,
+        "margin": 0.0401,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Livaan, Cultist of Tiamat",
+        "label": "Livaan, Cultist of Tiamat foil",
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "correct": true,
+        "top1Score": 0.6416,
+        "top2Name": "Telepathic Spies",
+        "top2Score": 0.6352,
+        "margin": 0.0063,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "label": "Livaan, Cultist of Tiamat (foil)",
+      "clean": {
+        "cardName": "Livaan, Cultist of Tiamat",
+        "label": "Livaan, Cultist of Tiamat (foil)",
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "correct": true,
+        "top1Score": 0.5858,
+        "top2Name": "Goblin Digging Team",
+        "top2Score": 0.5415,
+        "margin": 0.0443,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Livaan, Cultist of Tiamat",
+        "label": "Livaan, Cultist of Tiamat (foil)",
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "correct": true,
+        "top1Score": 0.6127,
+        "top2Name": "Burning Cloak",
+        "top2Score": 0.6114,
+        "margin": 0.0012,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Sword of Feast and Famine",
+      "label": null,
+      "clean": {
+        "cardName": "Sword of Feast and Famine",
+        "label": null,
+        "top1Name": "Sword of Feast and Famine",
+        "correct": true,
+        "top1Score": 0.7372,
+        "top2Name": "Scourge of Nel Toth",
+        "top2Score": 0.5801,
+        "margin": 0.1571,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Sword of Feast and Famine",
+        "label": null,
+        "top1Name": "Sword of Feast and Famine",
+        "correct": true,
+        "top1Score": 0.7778,
+        "top2Name": "Sword of Hearth and Home",
+        "top2Score": 0.5901,
+        "margin": 0.1876,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Bulk Up",
+      "label": null,
+      "clean": {
+        "cardName": "Bulk Up",
+        "label": null,
+        "top1Name": "Bulk Up",
+        "correct": true,
+        "top1Score": 0.6395,
+        "top2Name": "Blue Ward",
+        "top2Score": 0.623,
+        "margin": 0.0165,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Bulk Up",
+        "label": null,
+        "top1Name": "Bulk Up",
+        "correct": true,
+        "top1Score": 0.8314,
+        "top2Name": "Season of Weaving",
+        "top2Score": 0.6827,
+        "margin": 0.1487,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Critical Hit",
+      "label": null,
+      "clean": {
+        "cardName": "Critical Hit",
+        "label": null,
+        "top1Name": "Critical Hit",
+        "correct": true,
+        "top1Score": 0.5744,
+        "top2Name": "Belligerent of the Ball",
+        "top2Score": 0.5281,
+        "margin": 0.0464,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Critical Hit",
+        "label": null,
+        "top1Name": "Critical Hit",
+        "correct": true,
+        "top1Score": 0.6188,
+        "top2Name": "Den Protector",
+        "top2Score": 0.6016,
+        "margin": 0.0172,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Darkwater Catacombs",
+      "label": "geometry-test-20261006-150559 geom-014",
+      "clean": {
+        "cardName": "Darkwater Catacombs",
+        "label": "geometry-test-20261006-150559 geom-014",
+        "top1Name": "Darkwater Catacombs",
+        "correct": true,
+        "top1Score": 0.689,
+        "top2Name": "Island",
+        "top2Score": 0.6625,
+        "margin": 0.0265,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Darkwater Catacombs",
+        "label": "geometry-test-20261006-150559 geom-014",
+        "top1Name": "Darkwater Catacombs",
+        "correct": true,
+        "top1Score": 0.742,
+        "top2Name": "Whirlwind",
+        "top2Score": 0.7109,
+        "margin": 0.0311,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Darkwater Catacombs",
+      "label": "geometry-test-20261006-152155 geom-002",
+      "clean": {
+        "cardName": "Darkwater Catacombs",
+        "label": "geometry-test-20261006-152155 geom-002",
+        "top1Name": "Darkwater Catacombs",
+        "correct": true,
+        "top1Score": 0.7354,
+        "top2Name": "Island",
+        "top2Score": 0.7026,
+        "margin": 0.0328,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Darkwater Catacombs",
+        "label": "geometry-test-20261006-152155 geom-002",
+        "top1Name": "Darkwater Catacombs",
+        "correct": true,
+        "top1Score": 0.7887,
+        "top2Name": "Whirlwind",
+        "top2Score": 0.7068,
+        "margin": 0.0819,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Eliminate",
+      "label": "geometry-test-20261006-152155 geom-020",
+      "clean": {
+        "cardName": "Eliminate",
+        "label": "geometry-test-20261006-152155 geom-020",
+        "top1Name": "Eliminate",
+        "correct": true,
+        "top1Score": 0.6551,
+        "top2Name": "Peer into the Abyss",
+        "top2Score": 0.643,
+        "margin": 0.0121,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Eliminate",
+        "label": "geometry-test-20261006-152155 geom-020",
+        "top1Name": "Eliminate",
+        "correct": true,
+        "top1Score": 0.7698,
+        "top2Name": "Summon: Fenrir",
+        "top2Score": 0.6776,
+        "margin": 0.0922,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Distortion Strike",
+      "label": "geometry-test-20261006-152155 geom-023",
+      "clean": {
+        "cardName": "Distortion Strike",
+        "label": "geometry-test-20261006-152155 geom-023",
+        "top1Name": "Distortion Strike",
+        "correct": true,
+        "top1Score": 0.5212,
+        "top2Name": "Glissa's Scorn",
+        "top2Score": 0.5138,
+        "margin": 0.0074,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Distortion Strike",
+        "label": "geometry-test-20261006-152155 geom-023",
+        "top1Name": "Halimar Depths",
+        "correct": false,
+        "top1Score": 0.5833,
+        "top2Name": "Boil",
+        "top2Score": 0.5831,
+        "margin": 0.0001,
+        "published": false,
+        "rank": 3
+      }
+    },
+    {
+      "cardName": "Sage Owl",
+      "label": "geometry-test-20261006-152155 geom-024",
+      "clean": {
+        "cardName": "Sage Owl",
+        "label": "geometry-test-20261006-152155 geom-024",
+        "top1Name": "Sage Owl",
+        "correct": true,
+        "top1Score": 0.689,
+        "top2Name": "Spellbook Seeker",
+        "top2Score": 0.5744,
+        "margin": 0.1146,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Sage Owl",
+        "label": "geometry-test-20261006-152155 geom-024",
+        "top1Name": "Sage Owl",
+        "correct": true,
+        "top1Score": 0.7798,
+        "top2Name": "Preening Champion",
+        "top2Score": 0.61,
+        "margin": 0.1699,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Throatseeker",
+      "label": "geometry-test-20261006-152155 geom-027",
+      "clean": {
+        "cardName": "Throatseeker",
+        "label": "geometry-test-20261006-152155 geom-027",
+        "top1Name": "Throatseeker",
+        "correct": true,
+        "top1Score": 0.6226,
+        "top2Name": "Minions",
+        "top2Score": 0.5912,
+        "margin": 0.0315,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Throatseeker",
+        "label": "geometry-test-20261006-152155 geom-027",
+        "top1Name": "Torens, Fist of the Angels",
+        "correct": false,
+        "top1Score": 0.7129,
+        "top2Name": "Fell Beast's Shriek",
+        "top2Score": 0.6935,
+        "margin": 0.0195,
+        "published": false,
+        "rank": 3
+      }
+    },
+    {
+      "cardName": "Vela the Night-Clad",
+      "label": "geometry-test-20261006-152155 geom-034",
+      "clean": {
+        "cardName": "Vela the Night-Clad",
+        "label": "geometry-test-20261006-152155 geom-034",
+        "top1Name": "Vela the Night-Clad",
+        "correct": true,
+        "top1Score": 0.6081,
+        "top2Name": "The Tale of Tamiyo",
+        "top2Score": 0.5649,
+        "margin": 0.0432,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Vela the Night-Clad",
+        "label": "geometry-test-20261006-152155 geom-034",
+        "top1Name": "Vela the Night-Clad",
+        "correct": true,
+        "top1Score": 0.6745,
+        "top2Name": "Minwu, White Mage",
+        "top2Score": 0.6366,
+        "margin": 0.0379,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Glamdring, Foe-hammer",
+      "label": "geometry-test-20261006-153936 geom-001",
+      "clean": {
+        "cardName": "Glamdring, Foe-hammer",
+        "label": "geometry-test-20261006-153936 geom-001",
+        "top1Name": "Glamdring, Foe-hammer",
+        "correct": true,
+        "top1Score": 0.6267,
+        "top2Name": "Swamp",
+        "top2Score": 0.6232,
+        "margin": 0.0035,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Glamdring, Foe-hammer",
+        "label": "geometry-test-20261006-153936 geom-001",
+        "top1Name": "Glamdring, Foe-hammer",
+        "correct": true,
+        "top1Score": 0.7606,
+        "top2Name": "Consign",
+        "top2Score": 0.7326,
+        "margin": 0.028,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Goblin Lookout",
+      "label": null,
+      "clean": {
+        "cardName": "Goblin Lookout",
+        "label": null,
+        "top1Name": "Goblin Lookout",
+        "correct": true,
+        "top1Score": 0.6686,
+        "top2Name": "Noxious Ghoul",
+        "top2Score": 0.5856,
+        "margin": 0.083,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Goblin Lookout",
+        "label": null,
+        "top1Name": "Goblin Lookout",
+        "correct": true,
+        "top1Score": 0.7621,
+        "top2Name": "Goblin Fire Fiend",
+        "top2Score": 0.6299,
+        "margin": 0.1322,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "label": "livaan (foil)",
+      "clean": {
+        "cardName": "Livaan, Cultist of Tiamat",
+        "label": "livaan (foil)",
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "correct": true,
+        "top1Score": 0.6538,
+        "top2Name": "Spellshock",
+        "top2Score": 0.5823,
+        "margin": 0.0716,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Livaan, Cultist of Tiamat",
+        "label": "livaan (foil)",
+        "top1Name": "Livaan, Cultist of Tiamat",
+        "correct": true,
+        "top1Score": 0.7444,
+        "top2Name": "Zariel, Archduke of Avernus",
+        "top2Score": 0.6711,
+        "margin": 0.0733,
+        "published": true,
+        "rank": 1
+      }
+    }
+  ],
+  "agreementFrames": [
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "label": "Livaan, Cultist of Tiamat foil",
+      "cleanTop": "True Polymorph",
+      "prototypeTop": "Livaan, Cultist of Tiamat",
+      "cleanCorrect": false,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.053,
+      "cleanPublished": false,
+      "agree": false,
+      "published": false
+    },
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "label": "livaan foil",
+      "cleanTop": "The Binding of the Titans",
+      "prototypeTop": "Guff Rewrites History",
+      "cleanCorrect": false,
+      "prototypeCorrect": false,
+      "prototypeMargin": 0.0034,
+      "cleanPublished": false,
+      "agree": false,
+      "published": false
+    },
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "label": "Livaan, Cultist of Tiamat foil",
+      "cleanTop": "Livaan, Cultist of Tiamat",
+      "prototypeTop": "Livaan, Cultist of Tiamat",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.0063,
+      "cleanPublished": false,
+      "agree": true,
+      "published": false
+    },
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "label": "Livaan, Cultist of Tiamat (foil)",
+      "cleanTop": "Livaan, Cultist of Tiamat",
+      "prototypeTop": "Livaan, Cultist of Tiamat",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.0012,
+      "cleanPublished": false,
+      "agree": true,
+      "published": false
+    },
+    {
+      "cardName": "Sword of Feast and Famine",
+      "label": null,
+      "cleanTop": "Sword of Feast and Famine",
+      "prototypeTop": "Sword of Feast and Famine",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.1876,
+      "cleanPublished": true,
+      "agree": true,
+      "published": true
+    },
+    {
+      "cardName": "Bulk Up",
+      "label": null,
+      "cleanTop": "Bulk Up",
+      "prototypeTop": "Bulk Up",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.1487,
+      "cleanPublished": false,
+      "agree": true,
+      "published": true
+    },
+    {
+      "cardName": "Critical Hit",
+      "label": null,
+      "cleanTop": "Critical Hit",
+      "prototypeTop": "Critical Hit",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.0172,
+      "cleanPublished": false,
+      "agree": true,
+      "published": false
+    },
+    {
+      "cardName": "Darkwater Catacombs",
+      "label": "geometry-test-20261006-150559 geom-014",
+      "cleanTop": "Darkwater Catacombs",
+      "prototypeTop": "Darkwater Catacombs",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.0311,
+      "cleanPublished": false,
+      "agree": true,
+      "published": false
+    },
+    {
+      "cardName": "Darkwater Catacombs",
+      "label": "geometry-test-20261006-152155 geom-002",
+      "cleanTop": "Darkwater Catacombs",
+      "prototypeTop": "Darkwater Catacombs",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.0819,
+      "cleanPublished": false,
+      "agree": true,
+      "published": true
+    },
+    {
+      "cardName": "Eliminate",
+      "label": "geometry-test-20261006-152155 geom-020",
+      "cleanTop": "Eliminate",
+      "prototypeTop": "Eliminate",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.0922,
+      "cleanPublished": false,
+      "agree": true,
+      "published": true
+    },
+    {
+      "cardName": "Distortion Strike",
+      "label": "geometry-test-20261006-152155 geom-023",
+      "cleanTop": "Distortion Strike",
+      "prototypeTop": "Halimar Depths",
+      "cleanCorrect": true,
+      "prototypeCorrect": false,
+      "prototypeMargin": 0.0001,
+      "cleanPublished": false,
+      "agree": false,
+      "published": false
+    },
+    {
+      "cardName": "Sage Owl",
+      "label": "geometry-test-20261006-152155 geom-024",
+      "cleanTop": "Sage Owl",
+      "prototypeTop": "Sage Owl",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.1699,
+      "cleanPublished": true,
+      "agree": true,
+      "published": true
+    },
+    {
+      "cardName": "Throatseeker",
+      "label": "geometry-test-20261006-152155 geom-027",
+      "cleanTop": "Throatseeker",
+      "prototypeTop": "Torens, Fist of the Angels",
+      "cleanCorrect": true,
+      "prototypeCorrect": false,
+      "prototypeMargin": 0.0195,
+      "cleanPublished": false,
+      "agree": false,
+      "published": false
+    },
+    {
+      "cardName": "Vela the Night-Clad",
+      "label": "geometry-test-20261006-152155 geom-034",
+      "cleanTop": "Vela the Night-Clad",
+      "prototypeTop": "Vela the Night-Clad",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.0379,
+      "cleanPublished": false,
+      "agree": true,
+      "published": false
+    },
+    {
+      "cardName": "Glamdring, Foe-hammer",
+      "label": "geometry-test-20261006-153936 geom-001",
+      "cleanTop": "Glamdring, Foe-hammer",
+      "prototypeTop": "Glamdring, Foe-hammer",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.028,
+      "cleanPublished": false,
+      "agree": true,
+      "published": false
+    },
+    {
+      "cardName": "Goblin Lookout",
+      "label": null,
+      "cleanTop": "Goblin Lookout",
+      "prototypeTop": "Goblin Lookout",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.1322,
+      "cleanPublished": true,
+      "agree": true,
+      "published": true
+    },
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "label": "livaan (foil)",
+      "cleanTop": "Livaan, Cultist of Tiamat",
+      "prototypeTop": "Livaan, Cultist of Tiamat",
+      "cleanCorrect": true,
+      "prototypeCorrect": true,
+      "prototypeMargin": 0.0733,
+      "cleanPublished": true,
+      "agree": true,
+      "published": true
+    }
+  ]
+}

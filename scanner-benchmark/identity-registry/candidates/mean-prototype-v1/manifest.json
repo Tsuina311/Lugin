@@ -1,0 +1,69 @@
+{
+  "role": "candidate",
+  "id": "mean-prototype-v1",
+  "promoted": false,
+  "encoderId": "CLIP_VIT_B32",
+  "encoderVersion": "Xenova/clip-vit-base-patch32@q1",
+  "dims": 512,
+  "count": 49968,
+  "dtype": "f32",
+  "bytes": 102334464,
+  "prototypeHash": "7cfb59e52db439239ee4a1af6b22596a539d43eccfe1afb3d7835027d5a683d1",
+  "sourceGalleryHash": "11590af3c688658609b517b52cf4d20ab82d024a2f012ce7efe49dd7e13f67d3",
+  "viewHashes": {
+    "clean": "11590af3c688658609b517b52cf4d20ab82d024a2f012ce7efe49dd7e13f67d3",
+    "blur": "0be9498a732007840b7b1a01437767d005d2f7d708f38aaadfc38d1a907c3544",
+    "motion": "083e1ed03f93f99f6e4049cb9a0409dddbb110aebd2ffb99f7b3ce4eaea551ba",
+    "perspective": "b43f1fb8f5a84e8bfbadcfaf2c25de6c271f05fa0aca353be2cee3576825d2cd"
+  },
+  "refsHash": "a798bfb4e6973aa93e122b13daf0c2ae155b1b547b61b365442eabea4aaeb69d",
+  "adapterPath": "scanner-benchmark/identity-registry/challengers/linear-identity-v1.json",
+  "adapterHash": "afed03d3fbd0b1d0f04dedba07366656941bdcac9bed868550300d031fff44c8",
+  "presets": [
+    {
+      "id": "clean"
+    },
+    {
+      "id": "blur",
+      "blur": 2.4
+    },
+    {
+      "id": "motion",
+      "motion": 9
+    },
+    {
+      "id": "perspective",
+      "perspective": 0.09
+    }
+  ],
+  "codeHash": "f9a96868d58e1480790e724c49ec60110b3de98bb10abd2d0665dfa285975dd8",
+  "collapse": "per-vector L2-normalized mean of four adapted unit vectors",
+  "indexAlignment": "refs.json copied from the clean gallery; row i is the same artwork",
+  "duplicateRefs": 0,
+  "missingIdentityFields": 0,
+  "deterministicReplayDrift": 0,
+  "reloadDrift": 0,
+  "sampleNorms": [
+    0.9999999869978593,
+    0.999999984993919,
+    1.0000000044522495,
+    1.000000002937021,
+    0.9999999965609825,
+    0.9999999955954822,
+    0.999999989747212,
+    0.999999994555702,
+    0.9999999905896352,
+    0.999999991749688,
+    0.9999999989726667
+  ],
+  "nearestNeighborCheck": {
+    "index": 10455,
+    "score": 0.8257261224409848,
+    "oracleId": "ba858b68-ae93-4e1c-8a3a-3e4ac97282e8",
+    "name": "Moonsnare Specialist",
+    "matchesFile": true
+  },
+  "ramBytesIfLoaded": 102334464,
+  "createdAt": "2026-10-07T15:10:01.070Z",
+  "sourceGenerated": "2026-09-11T15:37:36.863Z"
+}

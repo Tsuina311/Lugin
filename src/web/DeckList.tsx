@@ -132,7 +132,9 @@ export const DeckList = ({
 
   const open = decks.find(deck => deck.id === openId);
   if (open)
-    return <DeckEditor collection={collection} deck={open} onBack={() => setOpenId(null)} />;
+    return (
+      <DeckEditor collection={collection} deck={open} decks={decks} onBack={() => setOpenId(null)} />
+    );
 
   const create = async () => {
     setBusy(true);
@@ -266,6 +268,7 @@ export const DeckList = ({
                       </span>
                       <span className="mt-0.5 block text-[11px] capitalize text-ink-faint">
                         {deck.format} · {copies(deck)} cards
+                        {deck.frozen ? ' · paper' : ''}
                         {missing > 0 ? ` · ${missing} missing` : ''}
                       </span>
                     </span>

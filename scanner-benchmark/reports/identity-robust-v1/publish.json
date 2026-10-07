@@ -1,0 +1,757 @@
+{
+  "margin": 0.05,
+  "rule": "Publish when top1 − top2 is at least 0.05. PROTOTYPE_UNSAFE when the prototype publishes more wrong cards. PROTOTYPE_PUBLISH_WIN when it publishes more correct cards without that. PROTOTYPE_RAW_WIN_CONFIDENCE_BLOCKED when raw Top1 rises but published correct cards do not.",
+  "verdict": "PROTOTYPE_UNSAFE",
+  "clean": {
+    "rawTop1": 16,
+    "correctPublished": 8,
+    "correctWithheld": 8,
+    "wrongPublished": 0,
+    "wrongWithheld": 10,
+    "totalPublished": 8,
+    "precision": 1,
+    "recall": 0.5,
+    "safeHitRate": 0.3076923076923077
+  },
+  "prototype": {
+    "rawTop1": 19,
+    "correctPublished": 12,
+    "correctWithheld": 7,
+    "wrongPublished": 2,
+    "wrongWithheld": 5,
+    "totalPublished": 14,
+    "precision": 0.8571428571428571,
+    "recall": 0.631578947368421,
+    "safeHitRate": 0.46153846153846156
+  },
+  "frames": [
+    {
+      "cardName": "Excalibur, Sword of Eden",
+      "label": "Excalibur, Sword of Eden French foil",
+      "clean": {
+        "cardName": "Excalibur, Sword of Eden",
+        "label": "Excalibur, Sword of Eden French foil",
+        "top1Name": "Revoke Existence",
+        "correct": false,
+        "top1Score": 0.7044,
+        "top2Name": "Plains",
+        "top2Score": 0.6927,
+        "margin": 0.0117,
+        "published": false,
+        "rank": 30
+      },
+      "prototype": {
+        "cardName": "Excalibur, Sword of Eden",
+        "label": "Excalibur, Sword of Eden French foil",
+        "top1Name": "Doom Blade",
+        "correct": false,
+        "top1Score": 0.7459,
+        "top2Name": "Prism Ring",
+        "top2Score": 0.7391,
+        "margin": 0.0068,
+        "published": false,
+        "rank": 6
+      }
+    },
+    {
+      "cardName": "Negate",
+      "label": "negate unsleeved",
+      "clean": {
+        "cardName": "Negate",
+        "label": "negate unsleeved",
+        "top1Name": "Negate",
+        "correct": true,
+        "top1Score": 0.7437,
+        "top2Name": "Thunderclap Wyvern",
+        "top2Score": 0.6553,
+        "margin": 0.0884,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Negate",
+        "label": "negate unsleeved",
+        "top1Name": "Negate",
+        "correct": true,
+        "top1Score": 0.8054,
+        "top2Name": "Breakthrough",
+        "top2Score": 0.6808,
+        "margin": 0.1246,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Slip Out the Back",
+      "label": "Slip Out the Back (Italian)",
+      "clean": {
+        "cardName": "Slip Out the Back",
+        "label": "Slip Out the Back (Italian)",
+        "top1Name": "Slip Out the Back",
+        "correct": true,
+        "top1Score": 0.7248,
+        "top2Name": "Errant, Street Artist",
+        "top2Score": 0.6788,
+        "margin": 0.046,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Slip Out the Back",
+        "label": "Slip Out the Back (Italian)",
+        "top1Name": "Slip Out the Back",
+        "correct": true,
+        "top1Score": 0.8107,
+        "top2Name": "Dapper Shieldmate",
+        "top2Score": 0.7011,
+        "margin": 0.1096,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "The Spear of Leonidas",
+      "label": null,
+      "clean": {
+        "cardName": "The Spear of Leonidas",
+        "label": null,
+        "top1Name": "Case of the Burning Masks",
+        "correct": false,
+        "top1Score": 0.6287,
+        "top2Name": "Predator, Flagship",
+        "top2Score": 0.5908,
+        "margin": 0.038,
+        "published": false,
+        "rank": 36
+      },
+      "prototype": {
+        "cardName": "The Spear of Leonidas",
+        "label": null,
+        "top1Name": "Predator, Flagship",
+        "correct": false,
+        "top1Score": 0.6787,
+        "top2Name": "Seismic Assault",
+        "top2Score": 0.6254,
+        "margin": 0.0533,
+        "published": true,
+        "rank": 3
+      }
+    },
+    {
+      "cardName": "Sword of the Animist",
+      "label": null,
+      "clean": {
+        "cardName": "Sword of the Animist",
+        "label": null,
+        "top1Name": "Sword of the Animist",
+        "correct": true,
+        "top1Score": 0.6669,
+        "top2Name": "Snapcaster Mage",
+        "top2Score": 0.617,
+        "margin": 0.0499,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Sword of the Animist",
+        "label": null,
+        "top1Name": "Sword of the Animist",
+        "correct": true,
+        "top1Score": 0.7448,
+        "top2Name": "Stifle",
+        "top2Score": 0.6723,
+        "margin": 0.0724,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Swiftfoot Boots",
+      "label": null,
+      "clean": {
+        "cardName": "Swiftfoot Boots",
+        "label": null,
+        "top1Name": "Swiftfoot Boots",
+        "correct": true,
+        "top1Score": 0.6619,
+        "top2Name": "Scampering Scorcher",
+        "top2Score": 0.6358,
+        "margin": 0.0261,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Swiftfoot Boots",
+        "label": null,
+        "top1Name": "Swiftfoot Boots",
+        "correct": true,
+        "top1Score": 0.7406,
+        "top2Name": "Spitebellows",
+        "top2Score": 0.6814,
+        "margin": 0.0592,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Sword of the Animist",
+      "label": null,
+      "clean": {
+        "cardName": "Sword of the Animist",
+        "label": null,
+        "top1Name": "Sword of the Animist",
+        "correct": true,
+        "top1Score": 0.6859,
+        "top2Name": "Stifle",
+        "top2Score": 0.6313,
+        "margin": 0.0546,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Sword of the Animist",
+        "label": null,
+        "top1Name": "Sword of the Animist",
+        "correct": true,
+        "top1Score": 0.7739,
+        "top2Name": "Stifle",
+        "top2Score": 0.6824,
+        "margin": 0.0915,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "label": "geometry-test-20261006-150559 geom-001",
+      "clean": {
+        "cardName": "Yuriko, the Tiger's Shadow",
+        "label": "geometry-test-20261006-150559 geom-001",
+        "top1Name": "Famished Foragers",
+        "correct": false,
+        "top1Score": 0.5349,
+        "top2Name": "Suspicious Stowaway",
+        "top2Score": 0.5344,
+        "margin": 0.0005,
+        "published": false,
+        "rank": 550
+      },
+      "prototype": {
+        "cardName": "Yuriko, the Tiger's Shadow",
+        "label": "geometry-test-20261006-150559 geom-001",
+        "top1Name": "Skaab Wrangler",
+        "correct": false,
+        "top1Score": 0.6566,
+        "top2Name": "Xantcha, Sleeper Agent",
+        "top2Score": 0.6055,
+        "margin": 0.0512,
+        "published": true,
+        "rank": 25
+      }
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "label": "geometry-test-20261006-150559 geom-002",
+      "clean": {
+        "cardName": "Yuriko, the Tiger's Shadow",
+        "label": "geometry-test-20261006-150559 geom-002",
+        "top1Name": "Yuriko, the Tiger's Shadow",
+        "correct": true,
+        "top1Score": 0.6301,
+        "top2Name": "Jill, Shiva's Dominant",
+        "top2Score": 0.5807,
+        "margin": 0.0495,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Yuriko, the Tiger's Shadow",
+        "label": "geometry-test-20261006-150559 geom-002",
+        "top1Name": "Yuriko, the Tiger's Shadow",
+        "correct": true,
+        "top1Score": 0.7238,
+        "top2Name": "Errant, Street Artist",
+        "top2Score": 0.6764,
+        "margin": 0.0475,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "label": "geometry-test-20261006-150559 geom-004",
+      "clean": {
+        "cardName": "Yuriko, the Tiger's Shadow",
+        "label": "geometry-test-20261006-150559 geom-004",
+        "top1Name": "Restless Bloodseeker",
+        "correct": false,
+        "top1Score": 0.5258,
+        "top2Name": "Double-Faced Substitute Card",
+        "top2Score": 0.5131,
+        "margin": 0.0127,
+        "published": false,
+        "rank": 59
+      },
+      "prototype": {
+        "cardName": "Yuriko, the Tiger's Shadow",
+        "label": "geometry-test-20261006-150559 geom-004",
+        "top1Name": "March from the Black Gate",
+        "correct": false,
+        "top1Score": 0.6181,
+        "top2Name": "Midnight Reaper",
+        "top2Score": 0.6162,
+        "margin": 0.0019,
+        "published": false,
+        "rank": 28
+      }
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "label": "geometry-test-20261006-150559 geom-005",
+      "clean": {
+        "cardName": "Yuriko, the Tiger's Shadow",
+        "label": "geometry-test-20261006-150559 geom-005",
+        "top1Name": "Skaab Wrangler",
+        "correct": false,
+        "top1Score": 0.5568,
+        "top2Name": "Diligent Excavator",
+        "top2Score": 0.5536,
+        "margin": 0.0033,
+        "published": false,
+        "rank": 6
+      },
+      "prototype": {
+        "cardName": "Yuriko, the Tiger's Shadow",
+        "label": "geometry-test-20261006-150559 geom-005",
+        "top1Name": "Robber of the Rich",
+        "correct": false,
+        "top1Score": 0.6662,
+        "top2Name": "Skaab Wrangler",
+        "top2Score": 0.6409,
+        "margin": 0.0253,
+        "published": false,
+        "rank": 3
+      }
+    },
+    {
+      "cardName": "Moonsnare Specialist",
+      "label": "geometry-test-20261006-150559 geom-007",
+      "clean": {
+        "cardName": "Moonsnare Specialist",
+        "label": "geometry-test-20261006-150559 geom-007",
+        "top1Name": "Moonsnare Specialist",
+        "correct": true,
+        "top1Score": 0.6901,
+        "top2Name": "Eldrazi Temple",
+        "top2Score": 0.6566,
+        "margin": 0.0336,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Moonsnare Specialist",
+        "label": "geometry-test-20261006-150559 geom-007",
+        "top1Name": "Moonsnare Specialist",
+        "correct": true,
+        "top1Score": 0.7796,
+        "top2Name": "Eldrazi Temple",
+        "top2Score": 0.7565,
+        "margin": 0.023,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Moonsnare Specialist",
+      "label": "geometry-test-20261006-150559 geom-008",
+      "clean": {
+        "cardName": "Moonsnare Specialist",
+        "label": "geometry-test-20261006-150559 geom-008",
+        "top1Name": "Moonsnare Specialist",
+        "correct": true,
+        "top1Score": 0.7175,
+        "top2Name": "Coward",
+        "top2Score": 0.6512,
+        "margin": 0.0664,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Moonsnare Specialist",
+        "label": "geometry-test-20261006-150559 geom-008",
+        "top1Name": "Moonsnare Specialist",
+        "correct": true,
+        "top1Score": 0.7817,
+        "top2Name": "Mechan Assembler",
+        "top2Score": 0.7204,
+        "margin": 0.0612,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Moonsnare Specialist",
+      "label": "geometry-test-20261006-150559 geom-009",
+      "clean": {
+        "cardName": "Moonsnare Specialist",
+        "label": "geometry-test-20261006-150559 geom-009",
+        "top1Name": "Moonsnare Specialist",
+        "correct": true,
+        "top1Score": 0.7502,
+        "top2Name": "Coward",
+        "top2Score": 0.6519,
+        "margin": 0.0983,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Moonsnare Specialist",
+        "label": "geometry-test-20261006-150559 geom-009",
+        "top1Name": "Moonsnare Specialist",
+        "correct": true,
+        "top1Score": 0.8257,
+        "top2Name": "Eldrazi Temple",
+        "top2Score": 0.7419,
+        "margin": 0.0838,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Kaito, Bane of Nightmares",
+      "label": "geometry-test-20261006-150559 geom-010",
+      "clean": {
+        "cardName": "Kaito, Bane of Nightmares",
+        "label": "geometry-test-20261006-150559 geom-010",
+        "top1Name": "Brazen Upstart",
+        "correct": false,
+        "top1Score": 0.4707,
+        "top2Name": "Kaito, Bane of Nightmares",
+        "top2Score": 0.4565,
+        "margin": 0.0142,
+        "published": false,
+        "rank": 2
+      },
+      "prototype": {
+        "cardName": "Kaito, Bane of Nightmares",
+        "label": "geometry-test-20261006-150559 geom-010",
+        "top1Name": "Kaito, Bane of Nightmares",
+        "correct": true,
+        "top1Score": 0.6358,
+        "top2Name": "Don Andres, the Renegade",
+        "top2Score": 0.5077,
+        "margin": 0.1281,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Agent of the Shadow Thieves",
+      "label": "geometry-test-20261006-150559 geom-013",
+      "clean": {
+        "cardName": "Agent of the Shadow Thieves",
+        "label": "geometry-test-20261006-150559 geom-013",
+        "top1Name": "Double-Faced Substitute Card",
+        "correct": false,
+        "top1Score": 0.6149,
+        "top2Name": "Unearth",
+        "top2Score": 0.6128,
+        "margin": 0.0021,
+        "published": false,
+        "rank": 429
+      },
+      "prototype": {
+        "cardName": "Agent of the Shadow Thieves",
+        "label": "geometry-test-20261006-150559 geom-013",
+        "top1Name": "Mox Tantalite",
+        "correct": false,
+        "top1Score": 0.7063,
+        "top2Name": "Darkbore Pathway",
+        "top2Score": 0.6992,
+        "margin": 0.0071,
+        "published": false,
+        "rank": 74
+      }
+    },
+    {
+      "cardName": "Kaito, Bane of Nightmares",
+      "label": "geometry-test-20261006-152155 geom-003",
+      "clean": {
+        "cardName": "Kaito, Bane of Nightmares",
+        "label": "geometry-test-20261006-152155 geom-003",
+        "top1Name": "Myrkul's Invoker",
+        "correct": false,
+        "top1Score": 0.5558,
+        "top2Name": "Havi, the All-Father",
+        "top2Score": 0.5429,
+        "margin": 0.013,
+        "published": false,
+        "rank": 285
+      },
+      "prototype": {
+        "cardName": "Kaito, Bane of Nightmares",
+        "label": "geometry-test-20261006-152155 geom-003",
+        "top1Name": "Kaito, Bane of Nightmares",
+        "correct": true,
+        "top1Score": 0.6598,
+        "top2Name": "Dauthi Voidwalker",
+        "top2Score": 0.6435,
+        "margin": 0.0163,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Moonsnare Specialist",
+      "label": "geometry-test-20261006-152155 geom-004",
+      "clean": {
+        "cardName": "Moonsnare Specialist",
+        "label": "geometry-test-20261006-152155 geom-004",
+        "top1Name": "Moonsnare Specialist",
+        "correct": true,
+        "top1Score": 0.7588,
+        "top2Name": "Guidelight Matrix",
+        "top2Score": 0.6342,
+        "margin": 0.1246,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Moonsnare Specialist",
+        "label": "geometry-test-20261006-152155 geom-004",
+        "top1Name": "Moonsnare Specialist",
+        "correct": true,
+        "top1Score": 0.8335,
+        "top2Name": "Eldrazi Temple",
+        "top2Score": 0.7116,
+        "margin": 0.1219,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Chasm Skulker",
+      "label": "geometry-test-20261006-152155 geom-009",
+      "clean": {
+        "cardName": "Chasm Skulker",
+        "label": "geometry-test-20261006-152155 geom-009",
+        "top1Name": "Nazgûl",
+        "correct": false,
+        "top1Score": 0.6312,
+        "top2Name": "Chasm Skulker",
+        "top2Score": 0.6014,
+        "margin": 0.0298,
+        "published": false,
+        "rank": 2
+      },
+      "prototype": {
+        "cardName": "Chasm Skulker",
+        "label": "geometry-test-20261006-152155 geom-009",
+        "top1Name": "Chasm Skulker",
+        "correct": true,
+        "top1Score": 0.7154,
+        "top2Name": "Nazgûl",
+        "top2Score": 0.688,
+        "margin": 0.0274,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Command Tower",
+      "label": "geometry-test-20261006-152155 geom-015",
+      "clean": {
+        "cardName": "Command Tower",
+        "label": "geometry-test-20261006-152155 geom-015",
+        "top1Name": "Command Tower",
+        "correct": true,
+        "top1Score": 0.7321,
+        "top2Name": "Sacred Foundry",
+        "top2Score": 0.6142,
+        "margin": 0.1179,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Command Tower",
+        "label": "geometry-test-20261006-152155 geom-015",
+        "top1Name": "Command Tower",
+        "correct": true,
+        "top1Score": 0.8004,
+        "top2Name": "Reliquary Tower",
+        "top2Score": 0.6755,
+        "margin": 0.1249,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Ulamog's Crusher",
+      "label": "geometry-test-20261006-152155 geom-032",
+      "clean": {
+        "cardName": "Ulamog's Crusher",
+        "label": "geometry-test-20261006-152155 geom-032",
+        "top1Name": "Ulamog's Crusher",
+        "correct": true,
+        "top1Score": 0.6123,
+        "top2Name": "Tidal Terror",
+        "top2Score": 0.6083,
+        "margin": 0.004,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Ulamog's Crusher",
+        "label": "geometry-test-20261006-152155 geom-032",
+        "top1Name": "Ulamog's Crusher",
+        "correct": true,
+        "top1Score": 0.7084,
+        "top2Name": "Ashiok's Skulker",
+        "top2Score": 0.6568,
+        "margin": 0.0516,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Whiplash Trap",
+      "label": "geometry-test-20261006-152155 geom-033",
+      "clean": {
+        "cardName": "Whiplash Trap",
+        "label": "geometry-test-20261006-152155 geom-033",
+        "top1Name": "Whiplash Trap",
+        "correct": true,
+        "top1Score": 0.5896,
+        "top2Name": "Akiri, Fearless Voyager",
+        "top2Score": 0.5845,
+        "margin": 0.0051,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Whiplash Trap",
+        "label": "geometry-test-20261006-152155 geom-033",
+        "top1Name": "Whiplash Trap",
+        "correct": true,
+        "top1Score": 0.701,
+        "top2Name": "Phyrexian Colossus",
+        "top2Score": 0.6614,
+        "margin": 0.0396,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Deadly Rollick",
+      "label": "geometry-test-20261006-152155 geom-041",
+      "clean": {
+        "cardName": "Deadly Rollick",
+        "label": "geometry-test-20261006-152155 geom-041",
+        "top1Name": "Minions",
+        "correct": false,
+        "top1Score": 0.6167,
+        "top2Name": "Hitchclaw Recluse",
+        "top2Score": 0.5943,
+        "margin": 0.0224,
+        "published": false,
+        "rank": 11900
+      },
+      "prototype": {
+        "cardName": "Deadly Rollick",
+        "label": "geometry-test-20261006-152155 geom-041",
+        "top1Name": "Crypt Lurker",
+        "correct": false,
+        "top1Score": 0.6966,
+        "top2Name": "Dragonborn Looter",
+        "top2Score": 0.6878,
+        "margin": 0.0088,
+        "published": false,
+        "rank": 13762
+      }
+    },
+    {
+      "cardName": "Bilbo, Luckwearer",
+      "label": "geometry-test-20261006-153936 geom-002",
+      "clean": {
+        "cardName": "Bilbo, Luckwearer",
+        "label": "geometry-test-20261006-153936 geom-002",
+        "top1Name": "Bilbo, Luckwearer",
+        "correct": true,
+        "top1Score": 0.6751,
+        "top2Name": "The Meep",
+        "top2Score": 0.5499,
+        "margin": 0.1252,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Bilbo, Luckwearer",
+        "label": "geometry-test-20261006-153936 geom-002",
+        "top1Name": "Bilbo, Luckwearer",
+        "correct": true,
+        "top1Score": 0.762,
+        "top2Name": "Jeskai Brushmaster",
+        "top2Score": 0.6282,
+        "margin": 0.1338,
+        "published": true,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Sprouting Goblin",
+      "label": null,
+      "clean": {
+        "cardName": "Sprouting Goblin",
+        "label": null,
+        "top1Name": "Sprouting Goblin",
+        "correct": true,
+        "top1Score": 0.5964,
+        "top2Name": "Glorious End",
+        "top2Score": 0.5713,
+        "margin": 0.0251,
+        "published": false,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Sprouting Goblin",
+        "label": null,
+        "top1Name": "Sprouting Goblin",
+        "correct": true,
+        "top1Score": 0.6544,
+        "top2Name": "Ol' Buzzbark",
+        "top2Score": 0.6179,
+        "margin": 0.0364,
+        "published": false,
+        "rank": 1
+      }
+    },
+    {
+      "cardName": "Goblin Blastronauts",
+      "label": null,
+      "clean": {
+        "cardName": "Goblin Blastronauts",
+        "label": null,
+        "top1Name": "Goblin Blastronauts",
+        "correct": true,
+        "top1Score": 0.6957,
+        "top2Name": "Heroes in a Half Shell",
+        "top2Score": 0.6361,
+        "margin": 0.0596,
+        "published": true,
+        "rank": 1
+      },
+      "prototype": {
+        "cardName": "Goblin Blastronauts",
+        "label": null,
+        "top1Name": "Goblin Blastronauts",
+        "correct": true,
+        "top1Score": 0.7041,
+        "top2Name": "Heroes in a Half Shell",
+        "top2Score": 0.6744,
+        "margin": 0.0297,
+        "published": false,
+        "rank": 1
+      }
+    }
+  ]
+}

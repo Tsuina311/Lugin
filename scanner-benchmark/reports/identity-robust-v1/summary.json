@@ -1,0 +1,461 @@
+{
+  "verdict": "ROBUST_GALLERY_WIN",
+  "galleryPick": "prototype",
+  "rule": "A gainer needs holdout Top1 above the current clean gallery and zero regressions. Multi-view must beat the prototype by more than 1 Top1 or the prototype is preferred. Combined wins only when it beats both independent gainers by at least 1 Top1 with zero regressions.",
+  "dev": {
+    "current": {
+      "n": 17,
+      "top1": 15,
+      "top3": 16,
+      "top5": 16,
+      "top10": 16,
+      "wrongConfident": 0,
+      "meanRank": 198.71,
+      "medianRank": 1
+    },
+    "trained": {
+      "n": 17,
+      "top1": 15,
+      "top3": 16,
+      "top5": 16,
+      "top10": 16,
+      "wrongConfident": 0,
+      "meanRank": 166.88,
+      "medianRank": 1
+    },
+    "pairs": {
+      "fixes": 0,
+      "regressions": 0,
+      "fixNames": [],
+      "regressionNames": []
+    }
+  },
+  "systems": {
+    "current": {
+      "n": 26,
+      "top1": 16,
+      "top3": 18,
+      "top5": 18,
+      "top10": 19,
+      "wrongConfident": 0,
+      "meanRank": 512.12,
+      "medianRank": 1,
+      "fixes": 0,
+      "regressions": 0,
+      "fixNames": [],
+      "regressionNames": []
+    },
+    "multiview": {
+      "n": 26,
+      "top1": 15,
+      "top3": 17,
+      "top5": 19,
+      "top10": 21,
+      "wrongConfident": 1,
+      "meanRank": 548.65,
+      "medianRank": 1,
+      "fixes": 2,
+      "regressions": 3,
+      "fixNames": [
+        "Kaito, Bane of Nightmares",
+        "Kaito, Bane of Nightmares"
+      ],
+      "regressionNames": [
+        "Yuriko, the Tiger's Shadow",
+        "Whiplash Trap",
+        "Sprouting Goblin"
+      ]
+    },
+    "prototype": {
+      "n": 26,
+      "top1": 19,
+      "top3": 21,
+      "top5": 21,
+      "top10": 22,
+      "wrongConfident": 2,
+      "meanRank": 535.38,
+      "medianRank": 1,
+      "fixes": 3,
+      "regressions": 0,
+      "fixNames": [
+        "Kaito, Bane of Nightmares",
+        "Kaito, Bane of Nightmares",
+        "Chasm Skulker"
+      ],
+      "regressionNames": []
+    },
+    "adapter": {
+      "n": 26,
+      "top1": 17,
+      "top3": 19,
+      "top5": 19,
+      "top10": 19,
+      "wrongConfident": 0,
+      "meanRank": 577.27,
+      "medianRank": 1,
+      "fixes": 1,
+      "regressions": 0,
+      "fixNames": [
+        "Kaito, Bane of Nightmares"
+      ],
+      "regressionNames": []
+    },
+    "combined": {
+      "n": 26,
+      "top1": 19,
+      "top3": 20,
+      "top5": 21,
+      "top10": 22,
+      "wrongConfident": 2,
+      "meanRank": 555.58,
+      "medianRank": 1,
+      "fixes": 3,
+      "regressions": 0,
+      "fixNames": [
+        "Kaito, Bane of Nightmares",
+        "Kaito, Bane of Nightmares",
+        "Chasm Skulker"
+      ],
+      "regressionNames": []
+    }
+  },
+  "hard": [
+    {
+      "cardName": "Deadly Rollick",
+      "label": "geometry-test-20261006-152155 geom-041",
+      "current": 11900,
+      "multiview": 13654,
+      "prototype": 13762,
+      "adapter": 13443,
+      "combined": 14239,
+      "tops": {
+        "current": "Minions",
+        "multiview": "Dragonborn Looter",
+        "prototype": "Crypt Lurker",
+        "adapter": "Minions",
+        "combined": "Crypt Lurker"
+      }
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "label": "geometry-test-20261006-150559 geom-001",
+      "current": 550,
+      "multiview": 40,
+      "prototype": 25,
+      "adapter": 742,
+      "combined": 39,
+      "tops": {
+        "current": "Famished Foragers",
+        "multiview": "Xantcha, Sleeper Agent",
+        "prototype": "Skaab Wrangler",
+        "adapter": "Sidisi's Pet",
+        "combined": "Skaab Wrangler"
+      }
+    },
+    {
+      "cardName": "Agent of the Shadow Thieves",
+      "label": "geometry-test-20261006-150559 geom-013",
+      "current": 429,
+      "multiview": 274,
+      "prototype": 74,
+      "adapter": 637,
+      "combined": 93,
+      "tops": {
+        "current": "Double-Faced Substitute Card",
+        "multiview": "Imprisoned in the Moon",
+        "prototype": "Mox Tantalite",
+        "adapter": "Mox Tantalite",
+        "combined": "Mox Tantalite"
+      }
+    },
+    {
+      "cardName": "Kaito, Bane of Nightmares",
+      "label": "geometry-test-20261006-152155 geom-003",
+      "current": 285,
+      "multiview": 1,
+      "prototype": 1,
+      "adapter": 58,
+      "combined": 1,
+      "tops": {
+        "current": "Myrkul's Invoker",
+        "multiview": "Kaito, Bane of Nightmares",
+        "prototype": "Kaito, Bane of Nightmares",
+        "adapter": "Myrkul's Invoker",
+        "combined": "Kaito, Bane of Nightmares"
+      }
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "label": "geometry-test-20261006-150559 geom-004",
+      "current": 59,
+      "multiview": 174,
+      "prototype": 28,
+      "adapter": 59,
+      "combined": 39,
+      "tops": {
+        "current": "Restless Bloodseeker",
+        "multiview": "March from the Black Gate",
+        "prototype": "March from the Black Gate",
+        "adapter": "Restless Bloodseeker",
+        "combined": "Griselbrand"
+      }
+    },
+    {
+      "cardName": "The Spear of Leonidas",
+      "label": null,
+      "current": 36,
+      "multiview": 4,
+      "prototype": 3,
+      "adapter": 18,
+      "combined": 3,
+      "tops": {
+        "current": "Case of the Burning Masks",
+        "multiview": "Case of the Burning Masks",
+        "prototype": "Predator, Flagship",
+        "adapter": "Case of the Burning Masks",
+        "combined": "Predator, Flagship"
+      }
+    },
+    {
+      "cardName": "Excalibur, Sword of Eden",
+      "label": "Excalibur, Sword of Eden French foil",
+      "current": 30,
+      "multiview": 82,
+      "prototype": 6,
+      "adapter": 30,
+      "combined": 8,
+      "tops": {
+        "current": "Revoke Existence",
+        "multiview": "Maul of the Skyclaves",
+        "prototype": "Doom Blade",
+        "adapter": "Revoke Existence",
+        "combined": "Doom Blade"
+      }
+    }
+  ],
+  "costs": {
+    "clean": {
+      "embeddings": 49968,
+      "bytes": 102334464,
+      "megabytes": 102.3,
+      "comparisons": 49968
+    },
+    "multiview": {
+      "embeddings": 199872,
+      "bytes": 409337856,
+      "megabytes": 409.3,
+      "comparisons": 199872
+    },
+    "prototype": {
+      "embeddings": 49968,
+      "bytes": 102334464,
+      "megabytes": 102.3,
+      "comparisons": 49968
+    },
+    "adapter": {
+      "embeddings": 49968,
+      "bytes": 102334464,
+      "megabytes": 102.3,
+      "comparisons": 49968
+    },
+    "combined": {
+      "embeddings": 49968,
+      "bytes": 102334464,
+      "megabytes": 102.3,
+      "comparisons": 49968
+    }
+  },
+  "falses": {
+    "multiview": {
+      "changedTop": 12,
+      "newErrors": 10,
+      "examples": [
+        {
+          "card": "Excalibur, Sword of Eden",
+          "from": "Revoke Existence",
+          "to": "Maul of the Skyclaves",
+          "wasCorrect": false
+        },
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Famished Foragers",
+          "to": "Xantcha, Sleeper Agent",
+          "wasCorrect": false
+        },
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Yuriko, the Tiger's Shadow",
+          "to": "Errant, Street Artist",
+          "wasCorrect": true
+        },
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Restless Bloodseeker",
+          "to": "March from the Black Gate",
+          "wasCorrect": false
+        },
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Skaab Wrangler",
+          "to": "Xantcha, Sleeper Agent",
+          "wasCorrect": false
+        },
+        {
+          "card": "Agent of the Shadow Thieves",
+          "from": "Double-Faced Substitute Card",
+          "to": "Imprisoned in the Moon",
+          "wasCorrect": false
+        },
+        {
+          "card": "Chasm Skulker",
+          "from": "Nazgûl",
+          "to": "Nighthowl Pursuer",
+          "wasCorrect": false
+        },
+        {
+          "card": "Whiplash Trap",
+          "from": "Whiplash Trap",
+          "to": "Phyrexian Snowcrusher",
+          "wasCorrect": true
+        },
+        {
+          "card": "Deadly Rollick",
+          "from": "Minions",
+          "to": "Dragonborn Looter",
+          "wasCorrect": false
+        },
+        {
+          "card": "Sprouting Goblin",
+          "from": "Sprouting Goblin",
+          "to": "Goblin Cratermaker",
+          "wasCorrect": true
+        }
+      ]
+    },
+    "prototype": {
+      "changedTop": 10,
+      "newErrors": 7,
+      "examples": [
+        {
+          "card": "Excalibur, Sword of Eden",
+          "from": "Revoke Existence",
+          "to": "Doom Blade",
+          "wasCorrect": false
+        },
+        {
+          "card": "The Spear of Leonidas",
+          "from": "Case of the Burning Masks",
+          "to": "Predator, Flagship",
+          "wasCorrect": false
+        },
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Famished Foragers",
+          "to": "Skaab Wrangler",
+          "wasCorrect": false
+        },
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Restless Bloodseeker",
+          "to": "March from the Black Gate",
+          "wasCorrect": false
+        },
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Skaab Wrangler",
+          "to": "Robber of the Rich",
+          "wasCorrect": false
+        },
+        {
+          "card": "Agent of the Shadow Thieves",
+          "from": "Double-Faced Substitute Card",
+          "to": "Mox Tantalite",
+          "wasCorrect": false
+        },
+        {
+          "card": "Deadly Rollick",
+          "from": "Minions",
+          "to": "Crypt Lurker",
+          "wasCorrect": false
+        }
+      ]
+    },
+    "adapter": {
+      "changedTop": 4,
+      "newErrors": 3,
+      "examples": [
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Famished Foragers",
+          "to": "Sidisi's Pet",
+          "wasCorrect": false
+        },
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Skaab Wrangler",
+          "to": "Diligent Excavator",
+          "wasCorrect": false
+        },
+        {
+          "card": "Agent of the Shadow Thieves",
+          "from": "Double-Faced Substitute Card",
+          "to": "Mox Tantalite",
+          "wasCorrect": false
+        }
+      ]
+    },
+    "combined": {
+      "changedTop": 10,
+      "newErrors": 7,
+      "examples": [
+        {
+          "card": "Excalibur, Sword of Eden",
+          "from": "Revoke Existence",
+          "to": "Doom Blade",
+          "wasCorrect": false
+        },
+        {
+          "card": "The Spear of Leonidas",
+          "from": "Case of the Burning Masks",
+          "to": "Predator, Flagship",
+          "wasCorrect": false
+        },
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Famished Foragers",
+          "to": "Skaab Wrangler",
+          "wasCorrect": false
+        },
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Restless Bloodseeker",
+          "to": "Griselbrand",
+          "wasCorrect": false
+        },
+        {
+          "card": "Yuriko, the Tiger's Shadow",
+          "from": "Skaab Wrangler",
+          "to": "Robber of the Rich",
+          "wasCorrect": false
+        },
+        {
+          "card": "Agent of the Shadow Thieves",
+          "from": "Double-Faced Substitute Card",
+          "to": "Mox Tantalite",
+          "wasCorrect": false
+        },
+        {
+          "card": "Deadly Rollick",
+          "from": "Minions",
+          "to": "Crypt Lurker",
+          "wasCorrect": false
+        }
+      ]
+    }
+  },
+  "training": {
+    "oracles": 677,
+    "dominant": "blur, motion, perspective plus up to two legacy views",
+    "init": "linear-identity-v1"
+  }
+}

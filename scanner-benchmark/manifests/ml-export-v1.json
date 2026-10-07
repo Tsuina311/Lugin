@@ -1,0 +1,806 @@
+{
+  "datasetVersion": "stills-v1",
+  "datasetHash": "639ffc03102b37e37cdac07609d7b2074053fe79fb2018b0f92a4cac3d48d1f0",
+  "generatedAt": "2026-10-05T10:08:12.361Z",
+  "note": "Paths are repo-relative. Image bytes are not duplicated. Do not train from UNKNOWN rows.",
+  "rows": [
+    {
+      "imageId": ".scan-fixtures/replay/basilisk-collar-20260908T111744/source-highres.png",
+      "path": ".scan-fixtures/replay/basilisk-collar-20260908T111744/source-highres.png",
+      "sessionId": "replay:basilisk-collar-20260908T111744",
+      "split": "REGRESSION_SANITY",
+      "identity": {
+        "imageId": ".scan-fixtures/replay/basilisk-collar-20260908T111744/source-highres.png",
+        "cardName": "Basilisk Collar",
+        "status": "CONFIRMED",
+        "source": "EXISTING_FIXTURE",
+        "notes": "explicit replay fixture"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png",
+      "path": ".scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png",
+      "sessionId": "replay:livaan-cultist-of-tiamat-foil-20260908T111916",
+      "split": "REGRESSION_SANITY",
+      "identity": {
+        "imageId": ".scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png",
+        "cardName": "Livaan, Cultist of Tiamat",
+        "status": "CONFIRMED",
+        "source": "EXISTING_FIXTURE",
+        "notes": "explicit replay fixture"
+      },
+      "corners": null,
+      "tags": [
+        "FOIL"
+      ]
+    },
+    {
+      "imageId": ".scan-fixtures/replay/lizard-blades-french-20260908T111833/source-highres.png",
+      "path": ".scan-fixtures/replay/lizard-blades-french-20260908T111833/source-highres.png",
+      "sessionId": "replay:lizard-blades-french-20260908T111833",
+      "split": "REGRESSION_SANITY",
+      "identity": {
+        "imageId": ".scan-fixtures/replay/lizard-blades-french-20260908T111833/source-highres.png",
+        "cardName": "Lizard Blades",
+        "status": "CONFIRMED",
+        "source": "EXISTING_FIXTURE",
+        "notes": "explicit replay fixture"
+      },
+      "corners": null,
+      "tags": [
+        "FOREIGN_LANGUAGE"
+      ]
+    },
+    {
+      "imageId": ".scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+      "path": ".scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+      "sessionId": "replay:maddening-hex-alt-art-20260908T082448",
+      "split": "REGRESSION_SANITY",
+      "identity": {
+        "imageId": ".scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+        "cardName": "Maddening Hex",
+        "status": "CONFIRMED",
+        "source": "EXISTING_FIXTURE",
+        "notes": "explicit replay fixture"
+      },
+      "corners": null,
+      "tags": [
+        "ALT_ART"
+      ]
+    },
+    {
+      "imageId": ".scan-fixtures/replay/negate-20260908T082630/source-highres.png",
+      "path": ".scan-fixtures/replay/negate-20260908T082630/source-highres.png",
+      "sessionId": "replay:negate-20260908T082630",
+      "split": "REGRESSION_SANITY",
+      "identity": {
+        "imageId": ".scan-fixtures/replay/negate-20260908T082630/source-highres.png",
+        "cardName": "Negate",
+        "status": "CONFIRMED",
+        "source": "EXISTING_FIXTURE",
+        "notes": "explicit replay fixture"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-fixtures/replay/negate-unsleeved-20260908T082746/source-highres.png",
+      "path": ".scan-fixtures/replay/negate-unsleeved-20260908T082746/source-highres.png",
+      "sessionId": "replay:negate-unsleeved-20260908T082746",
+      "split": "REGRESSION_SANITY",
+      "identity": {
+        "imageId": ".scan-fixtures/replay/negate-unsleeved-20260908T082746/source-highres.png",
+        "cardName": "Negate",
+        "status": "CONFIRMED",
+        "source": "EXISTING_FIXTURE",
+        "notes": "explicit replay fixture"
+      },
+      "corners": null,
+      "tags": [
+        "UNSLEEVED",
+        "SLEEVED"
+      ]
+    },
+    {
+      "imageId": ".scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+      "path": ".scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+      "sessionId": "replay:p-e-d-tre-et-de-foyer-french-goo-20260908T082303",
+      "split": "REGRESSION_SANITY",
+      "identity": {
+        "imageId": ".scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+        "cardName": "Sword of Hearth and Home",
+        "status": "CONFIRMED",
+        "source": "EXISTING_FIXTURE",
+        "notes": "explicit replay fixture"
+      },
+      "corners": null,
+      "tags": [
+        "FOREIGN_LANGUAGE"
+      ]
+    },
+    {
+      "imageId": ".scan-fixtures/replay/slip-out-the-back-italian-20260908T111643/source-highres.png",
+      "path": ".scan-fixtures/replay/slip-out-the-back-italian-20260908T111643/source-highres.png",
+      "sessionId": "replay:slip-out-the-back-italian-20260908T111643",
+      "split": "REGRESSION_SANITY",
+      "identity": {
+        "imageId": ".scan-fixtures/replay/slip-out-the-back-italian-20260908T111643/source-highres.png",
+        "cardName": "Slip Out the Back",
+        "status": "CONFIRMED",
+        "source": "EXISTING_FIXTURE",
+        "notes": "explicit replay fixture"
+      },
+      "corners": null,
+      "tags": [
+        "FOREIGN_LANGUAGE"
+      ]
+    },
+    {
+      "imageId": ".scan-fixtures/replay/teferi-veil-old-edition-good-cap-20260908T111548/source-highres.png",
+      "path": ".scan-fixtures/replay/teferi-veil-old-edition-good-cap-20260908T111548/source-highres.png",
+      "sessionId": "replay:teferi-veil-old-edition-good-cap-20260908T111548",
+      "split": "REGRESSION_SANITY",
+      "identity": {
+        "imageId": ".scan-fixtures/replay/teferi-veil-old-edition-good-cap-20260908T111548/source-highres.png",
+        "cardName": "Teferi's Veil",
+        "status": "CONFIRMED",
+        "source": "EXISTING_FIXTURE",
+        "notes": "explicit replay fixture"
+      },
+      "corners": null,
+      "tags": [
+        "OLD_FRAME"
+      ]
+    },
+    {
+      "imageId": ".scan-fixtures/replay/wand-of-wonder-20260908T073958/source-highres.png",
+      "path": ".scan-fixtures/replay/wand-of-wonder-20260908T073958/source-highres.png",
+      "sessionId": "replay:wand-of-wonder-20260908T073958",
+      "split": "REGRESSION_SANITY",
+      "identity": {
+        "imageId": ".scan-fixtures/replay/wand-of-wonder-20260908T073958/source-highres.png",
+        "cardName": "Wand of Wonder",
+        "status": "CONFIRMED",
+        "source": "EXISTING_FIXTURE",
+        "notes": "explicit replay fixture"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+      "path": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+      "sessionId": "real-photos",
+      "split": "DEV",
+      "identity": {
+        "imageId": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+        "cardName": "Maddening Hex",
+        "status": "CONFIRMED",
+        "source": "EXISTING_FIXTURE",
+        "notes": "explicit real-photo label"
+      },
+      "corners": null,
+      "tags": [
+        "GLARE",
+        "ALT_ART"
+      ]
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/basilisk-collar-20260908T105457/source-highres.png",
+      "path": ".scan-inbox/sessions/phone-20260908/basilisk-collar-20260908T105457/source-highres.png",
+      "sessionId": "basilisk-collar-20260908T105457",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120539/photo-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/cq-20260908T120539/photo-source.png",
+      "sessionId": "cq-20260908T120539",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+      "sessionId": "cq-20260908T120629",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120722/photo-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/cq-20260908T120722/photo-source.png",
+      "sessionId": "cq-20260908T120722",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+      "sessionId": "cq-20260908T120751",
+      "split": "LOCKED_TEST",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+      "sessionId": "cq-20260908T120813",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-lizard-blade-french-20260908T115149/photo-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/cq-lizard-blade-french-20260908T115149/photo-source.png",
+      "sessionId": "cq-lizard-blade-french-20260908T115149",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": [
+        "FOREIGN_LANGUAGE"
+      ]
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-lizard-blade-french-20260908T115203/photo-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/cq-lizard-blade-french-20260908T115203/photo-source.png",
+      "sessionId": "cq-lizard-blade-french-20260908T115203",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": [
+        "FOREIGN_LANGUAGE"
+      ]
+    },
+    {
+      "imageId": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c008/deck-011-source.png",
+      "path": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c008/deck-011-source.png",
+      "sessionId": "deck-test-20260910-085502",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c000/deck-001-source.png",
+      "path": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c000/deck-001-source.png",
+      "sessionId": "deck-test-20260910-085502",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/deck-test-20260910-101639/deck-test-20260910-101639-c013/deck-013-source.png",
+      "path": ".scan-inbox/sessions/deck-test-20260910-101639/deck-test-20260910-101639-c013/deck-013-source.png",
+      "sessionId": "deck-test-20260910-101639",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/deck-test-20260910-101639/deck-test-20260910-101639-c001/deck-001-source.png",
+      "path": ".scan-inbox/sessions/deck-test-20260910-101639/deck-test-20260910-101639-c001/deck-001-source.png",
+      "sessionId": "deck-test-20260910-101639",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/federica-veil-old-edition-20260908T105754/source-highres.png",
+      "path": ".scan-inbox/sessions/phone-20260908/federica-veil-old-edition-20260908T105754/source-highres.png",
+      "sessionId": "federica-veil-old-edition-20260908T105754",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": [
+        "OLD_FRAME"
+      ]
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t500-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t500-source.png",
+      "sessionId": "focus-series-20260908T124234",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t000-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t000-source.png",
+      "sessionId": "focus-series-20260908T124234",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124327/t500-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124327/t500-source.png",
+      "sessionId": "focus-series-20260908T124327",
+      "split": "LOCKED_TEST",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124327/t000-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124327/t000-source.png",
+      "sessionId": "focus-series-20260908T124327",
+      "split": "LOCKED_TEST",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124408/t500-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124408/t500-source.png",
+      "sessionId": "focus-series-20260908T124408",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124507/t250-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124507/t250-source.png",
+      "sessionId": "focus-series-20260908T124507",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t500-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t500-source.png",
+      "sessionId": "focus-series-20260908T132626",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t000-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t000-source.png",
+      "sessionId": "focus-series-20260908T132626",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132712/t800-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132712/t800-source.png",
+      "sessionId": "focus-series-20260908T132712",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132801/t500-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132801/t500-source.png",
+      "sessionId": "focus-series-20260908T132801",
+      "split": "LOCKED_TEST",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-007-source/geom-007-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-007-source/geom-007-source.png",
+      "sessionId": "geometry-test-20260910-153114",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-001-source/geom-001-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-001-source/geom-001-source.png",
+      "sessionId": "geometry-test-20260910-153114",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-007-source/geom-007-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-007-source/geom-007-source.png",
+      "sessionId": "geometry-test-20260910-154646",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-001-source/geom-001-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-001-source/geom-001-source.png",
+      "sessionId": "geometry-test-20260910-154646",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-155241/geom-006-source/geom-006-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-155241/geom-006-source/geom-006-source.png",
+      "sessionId": "geometry-test-20260910-155241",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-155241/geom-001-source/geom-001-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-155241/geom-001-source/geom-001-source.png",
+      "sessionId": "geometry-test-20260910-155241",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-008-source/geom-008-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-008-source/geom-008-source.png",
+      "sessionId": "geometry-test-20260910-162108",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+      "sessionId": "geometry-test-20260910-162108",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-164005/geom-006-source/geom-006-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-164005/geom-006-source/geom-006-source.png",
+      "sessionId": "geometry-test-20260910-164005",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-164005/geom-001-source/geom-001-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-164005/geom-001-source/geom-001-source.png",
+      "sessionId": "geometry-test-20260910-164005",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-006-source/geom-006-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-006-source/geom-006-source.png",
+      "sessionId": "geometry-test-20260910-165339",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-001-source/geom-001-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-001-source/geom-001-source.png",
+      "sessionId": "geometry-test-20260910-165339",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-006-source/geom-006-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-006-source/geom-006-source.png",
+      "sessionId": "geometry-test-20260910-173530",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-001-source/geom-001-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-001-source/geom-001-source.png",
+      "sessionId": "geometry-test-20260910-173530",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-005-source/geom-005-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-005-source/geom-005-source.png",
+      "sessionId": "geometry-test-20260910-192617",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-001-source/geom-001-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-001-source/geom-001-source.png",
+      "sessionId": "geometry-test-20260910-192617",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-085827/geom-004-source/geom-004-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260911-085827/geom-004-source/geom-004-source.png",
+      "sessionId": "geometry-test-20260911-085827",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-085827/geom-001-source/geom-001-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260911-085827/geom-001-source/geom-001-source.png",
+      "sessionId": "geometry-test-20260911-085827",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+      "sessionId": "geometry-test-20260911-100459",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-001-source/geom-001-source.png",
+      "path": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-001-source/geom-001-source.png",
+      "sessionId": "geometry-test-20260911-100459",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/lames-l-zard-french-20260908T105353/source-highres.png",
+      "path": ".scan-inbox/sessions/phone-20260908/lames-l-zard-french-20260908T105353/source-highres.png",
+      "sessionId": "lames-l-zard-french-20260908T105353",
+      "split": "LOCKED_TEST",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": [
+        "FOREIGN_LANGUAGE"
+      ]
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/livaan-foil-20260908T105241/source-highres.png",
+      "path": ".scan-inbox/sessions/phone-20260908/livaan-foil-20260908T105241/source-highres.png",
+      "sessionId": "livaan-foil-20260908T105241",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": [
+        "FOIL"
+      ]
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-111516--card-007/source-highres/source-highres.png",
+      "path": ".scan-inbox/sessions/normal-scan-session-20260911-111516--card-007/source-highres/source-highres.png",
+      "sessionId": "normal-scan-session-20260911-111516",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-111516--card-001/source-highres/source-highres.png",
+      "path": ".scan-inbox/sessions/normal-scan-session-20260911-111516--card-001/source-highres/source-highres.png",
+      "sessionId": "normal-scan-session-20260911-111516",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-006/source-highres/source-highres.png",
+      "path": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-006/source-highres/source-highres.png",
+      "sessionId": "normal-scan-session-20260911-113049",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-001/source-highres/source-highres.png",
+      "path": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-001/source-highres/source-highres.png",
+      "sessionId": "normal-scan-session-20260911-113049",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-120703--card-005/source-highres/source-highres.png",
+      "path": ".scan-inbox/sessions/normal-scan-session-20260911-120703--card-005/source-highres/source-highres.png",
+      "sessionId": "normal-scan-session-20260911-120703",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-120703--card-001/source-highres/source-highres.png",
+      "path": ".scan-inbox/sessions/normal-scan-session-20260911-120703--card-001/source-highres/source-highres.png",
+      "sessionId": "normal-scan-session-20260911-120703",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-03-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-03-source.png",
+      "sessionId": "swap-test-20260908-171149",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-01-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-01-source.png",
+      "sessionId": "swap-test-20260908-171149",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-03-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-03-source.png",
+      "sessionId": "swap-test-20260908-171306",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-01-source.png",
+      "path": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-01-source.png",
+      "sessionId": "swap-test-20260908-171306",
+      "split": "DEV",
+      "identity": {
+        "status": "UNKNOWN"
+      },
+      "corners": null,
+      "tags": []
+    }
+  ]
+}

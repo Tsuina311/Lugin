@@ -1,0 +1,65 @@
+{
+  "pipeline": "PIPELINE / EARLY MODEL",
+  "recommendation": "LEARNED_RANKER_PROMISING",
+  "trustedFrames": 117,
+  "trustedGroups": 45,
+  "cvFrames": 113,
+  "holdoutFrames": 4,
+  "candidates": 1085,
+  "inferenceMs": 0.013166541415929255,
+  "artifactBytes": 21225,
+  "challengerStatus": "PASS",
+  "kind": "gbm-iou",
+  "ablation": "all",
+  "ablationFamily": "gbm-iou",
+  "anyPass": true,
+  "holdoutOk": false,
+  "diagnostic": [
+    {
+      "card": "Island cq-120629",
+      "image": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+      "membership": "fold 1",
+      "currentIou": 0.19008815481034272,
+      "oracleIou": 0.9814877221096797,
+      "selectedIou": 0.9814877221096797,
+      "oracleRank": 1
+    },
+    {
+      "card": "Wand cq-120751",
+      "image": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+      "membership": "holdout",
+      "currentIou": 0.2507856718304822,
+      "oracleIou": 0.9609660387498684,
+      "selectedIou": 0.9609660387498684,
+      "oracleRank": 1
+    },
+    {
+      "card": "Livaan cq-120813",
+      "image": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+      "membership": "fold 3",
+      "currentIou": 0.2262133626865165,
+      "oracleIou": 0.942990012975909,
+      "selectedIou": 0.942990012975909,
+      "oracleRank": 1
+    },
+    {
+      "card": "Bulk Up",
+      "image": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+      "membership": "fold 0",
+      "currentIou": 0.34400161115367806,
+      "oracleIou": 0.8671597521588627,
+      "selectedIou": 0.8671597521588627,
+      "oracleRank": 1
+    },
+    {
+      "card": "Mudbutton Torchrunner",
+      "image": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+      "membership": "fold 4",
+      "currentIou": 0.3180193079733222,
+      "oracleIou": 0.8615981365178127,
+      "selectedIou": 0.8615981365178127,
+      "oracleRank": 1
+    }
+  ],
+  "queue": 20
+}

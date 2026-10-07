@@ -9,8 +9,10 @@ import { cardKey } from '@/lib/cardName';
 import {
   countCards,
   deckFromImport,
+  isPaperLocked,
   mergeDeckCards,
   newDeck,
+  paperAddSection,
   parseDeckList,
   withFormat,
   type Deck,
@@ -115,10 +117,11 @@ export const deckStore = {
     const key = cardKey(name);
     if (!key) return;
     await mutateDeck(id, d => {
+      const into = paperAddSection(d, section);
       const cards = [...d.cards];
-      const i = cards.findIndex(c => c.section === section && cardKey(c.name) === key);
+      const i = cards.findIndex(c => c.section === into && cardKey(c.name) === key);
       if (i >= 0) cards[i] = { ...cards[i], quantity: cards[i].quantity + qty };
-      else cards.push({ name, quantity: qty, section });
+      else cards.push({ name, quantity: qty, section: into });
       return { ...d, cards };
     });
   },
@@ -129,13 +132,14 @@ export const deckStore = {
    */
   async addCards(id: string, names: string[], section: DeckSection = 'main'): Promise<void> {
     await mutateDeck(id, d => {
+      const into = paperAddSection(d, section);
       const cards = [...d.cards];
       for (const name of names) {
         const key = cardKey(name);
         if (!key) continue;
-        const i = cards.findIndex(c => c.section === section && cardKey(c.name) === key);
+        const i = cards.findIndex(c => c.section === into && cardKey(c.name) === key);
         if (i >= 0) cards[i] = { ...cards[i], quantity: cards[i].quantity + 1 };
-        else cards.push({ name, quantity: 1, section });
+        else cards.push({ name, quantity: 1, section: into });
       }
       return { ...d, cards };
     });
@@ -146,6 +150,7 @@ export const deckStore = {
    * don't come straight back.
    */
   async clearBasicLands(id: string): Promise<void> {
+    if (state.decks.find(d => d.id === id)?.frozen) return;
     await mutateDeck(id, d => ({
       ...d,
       autoLands: false,
@@ -190,7 +195,13 @@ export const deckStore = {
   async mergeText(id: string, text: string): Promise<void> {
     const { cards } = parseDeckList(text);
     if (cards.length === 0) return;
-    await mutateDeck(id, d => ({ ...d, cards: mergeDeckCards(d.cards, cards) }));
+    await mutateDeck(id, d => ({
+      ...d,
+      cards: mergeDeckCards(
+        d.cards,
+        d.frozen ? cards.map(card => ({ ...card, section: 'sideboard' as const })) : cards,
+      ),
+    }));
   },
 
   /**
@@ -198,6 +209,7 @@ export const deckStore = {
    * anything already there. Cards already in `to` are left where they are.
    */
   async moveCards(id: string, cards: DeckCardRef[], to: DeckSection): Promise<void> {
+    if (state.decks.find(d => d.id === id)?.frozen) return;
     const refs = cardRefs(cards).filter(r => r.section !== to);
     if (refs.length === 0) return;
     await mutateDeck(id, d => {
@@ -229,7 +241,7 @@ export const deckStore = {
     if (refs.length === 0) return;
     await mutateDeck(id, d => ({
       ...d,
-      cards: d.cards.filter(c => !refs.some(r => matches(c, r))),
+      cards: d.cards.filter(c => !refs.some(r => matches(c, r)) || isPaperLocked(d, c.section)),
     }));
   },
 
@@ -263,6 +275,7 @@ async replaceAll(decks: Deck[]): Promise<void> {
 
   /** Turn auto-balancing of basic lands on or off (existing lands are kept). */
   async setAutoLands(id: string, on: boolean): Promise<void> {
+    if (state.decks.find(d => d.id === id)?.frozen) return;
     await mutateDeck(id, d => ({ ...d, autoLands: on }));
   },
 
@@ -271,6 +284,7 @@ async replaceAll(decks: Deck[]): Promise<void> {
    * Basics elsewhere (sideboard, command zone) are left alone.
    */
   async setBasicLands(id: string, plan: BasicPlan): Promise<void> {
+    if (state.decks.find(d => d.id === id)?.frozen) return;
     await mutateDeck(id, d => {
       const cards = d.cards.filter(c => !(c.section === 'main' && isBasicLand(c.name)));
       for (const [name, quantity] of Object.entries(plan)) {
@@ -280,44 +294,81 @@ async replaceAll(decks: Deck[]): Promise<void> {
     });
   },
 
+  
   /**
+   * Pin a main-deck card into a tag section (or Main). `tagId` null clears the
+   * override so Scryfall auto-match applies again; `""` forces Main.
+   */
+async setCardTagOverride(id: string, name: string, tagId: string | null): Promise<void> {
+    const key = cardKey(name);
+    await mutateDeck(id, d => {
+      const next = { ...(d.tagOverrides ?? {}) };
+      if (tagId == null) delete next[key];
+      else next[key] = tagId;
+      const tagOverrides = Object.keys(next).length > 0 ? next : undefined;
+      return { ...d, tagOverrides };
+    });
+  },
+
+  
+  
+/**
    * Change a deck's format. Leaving Commander moves any command-zone cards back
    * into the main deck so they aren't stranded in a now-hidden zone.
    */
-  async setFormat(id: string, format: DeckFormat): Promise<void> {
+async setFormat(id: string, format: DeckFormat): Promise<void> {
+    if (state.decks.find(d => d.id === id)?.frozen) return;
     await mutateDeck(id, d => withFormat(d, format));
   },
 
-  /** Set how many lands this deck should run (null returns to the format's). */
-  async setLandTarget(id: string, lands: number | null): Promise<void> {
+  
+  
+/** Mark a deck as built in paper, or put it back among the build ideas. */
+async setFrozen(id: string, frozen: boolean): Promise<void> {
+    await mutateDeck(id, d => ({ ...d, frozen }));
+  },
+
+  
+  
+/** Set how many lands this deck should run (null returns to the format's). */
+async setLandTarget(id: string, lands: number | null): Promise<void> {
+    if (state.decks.find(d => d.id === id)?.frozen) return;
     await mutateDeck(id, d => ({
       ...d,
       landTarget: lands == null ? undefined : Math.max(0, Math.round(lands)),
     }));
   },
 
-  /** Remember which printing a deck line is, or clear it back to the default. */
-  async setPrinting(
+  
+  
+/** Remember which printing a deck line is, or clear it back to the default. */
+async setPrinting(
     id: string,
     name: string,
     section: DeckSection,
     printing: DeckCard['printing'] | null,
   ): Promise<void> {
     const key = cardKey(name);
-    await mutateDeck(id, d => ({
-      ...d,
-      cards: d.cards.map(c =>
-        c.section === section && cardKey(c.name) === key
-          ? { ...c, printing: printing ?? undefined }
-          : c,
-      ),
-    }));
+    await mutateDeck(id, d => {
+      if (isPaperLocked(d, section)) return d;
+      return {
+        ...d,
+        cards: d.cards.map(c =>
+          c.section === section && cardKey(c.name) === key
+            ? { ...c, printing: printing ?? undefined }
+            : c,
+        ),
+      };
+    });
   },
 
-  /** Set a card's quantity (removes it when the quantity drops to 0). */
-  async setQuantity(id: string, name: string, section: DeckSection, qty: number): Promise<void> {
+  
+  
+/** Set a card's quantity (removes it when the quantity drops to 0). */
+async setQuantity(id: string, name: string, section: DeckSection, qty: number): Promise<void> {
     const key = cardKey(name);
     await mutateDeck(id, d => {
+      if (isPaperLocked(d, section)) return d;
       if (qty <= 0) {
         return {
           ...d,
@@ -333,24 +384,10 @@ async replaceAll(decks: Deck[]): Promise<void> {
     });
   },
 
+  
   /** Replace the overview's auto-bucket tag section list (DECK_TAGS ids). */
-  async setTagSections(id: string, tagSections: string[]): Promise<void> {
+async setTagSections(id: string, tagSections: string[]): Promise<void> {
     await mutateDeck(id, d => ({ ...d, tagSections: [...tagSections] }));
-  },
-
-  /**
-   * Pin a main-deck card into a tag section (or Main). `tagId` null clears the
-   * override so Scryfall auto-match applies again; `""` forces Main.
-   */
-  async setCardTagOverride(id: string, name: string, tagId: string | null): Promise<void> {
-    const key = cardKey(name);
-    await mutateDeck(id, d => {
-      const next = { ...(d.tagOverrides ?? {}) };
-      if (tagId == null) delete next[key];
-      else next[key] = tagId;
-      const tagOverrides = Object.keys(next).length > 0 ? next : undefined;
-      return { ...d, tagOverrides };
-    });
   },
 
   subscribe(listener: () => void): () => void {

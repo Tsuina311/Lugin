@@ -120,15 +120,61 @@ const writeCache = async (key: string, value: unknown): Promise<void> => {
 };
 
 /**
- * Best image for a breakdown entry. The <picture> exposes a 265x370 variant as
- * the srcset's 1x candidate — the right size for our thumbnails and hover
- * preview — with the <img> src pointing at a much larger file.
+ * Best image for a row. The <picture> exposes a 265×370 variant as the
+ * srcset's 1x candidate, with the <img> src pointing at the 672×938 scan.
+ * Rows keep the small file; the zoom asks {@link goldfishZoomUrl} for the scan.
  */
 const pickImage = (card: Element): string | undefined => {
   const srcset = card.querySelector('source[srcset]')?.getAttribute('srcset');
   const first = srcset?.split(',')[0]?.trim().split(/\s+/)[0];
   if (first) return first;
   return card.querySelector<HTMLImageElement>('img')?.getAttribute('src') ?? undefined;
+};
+
+/** The 672×938 scan of a Goldfish card image. Other URLs pass through. */
+export const goldfishZoomUrl = (url: string): string =>
+  url.replace(
+    /^(https:\/\/cards\.mtggoldfish\.com\/images\/[^/]+\/variants)\/\d+\/\d+\//i,
+    '$1/672/938/',
+  );
+
+/**
+ * Smallest deck count whose rounded shares can produce every whole-number
+ * percent Goldfish printed. Four decks only ever print 25, 50, 75, and 100;
+ * a percent of 13 means the sample is bigger than four.
+ */
+export const goldfishSampleSize = (percents: readonly number[]): number | undefined => {
+  const seen = [
+    ...new Set(
+      percents.map(percent => Math.round(percent)).filter(percent => percent > 0 && percent <= 100),
+    ),
+  ];
+  if (seen.length === 0) return undefined;
+  for (let sample = 1; sample <= 80; sample++) {
+    const fits = seen.every(percent => {
+      for (let count = 0; count <= sample; count++) {
+        if (Math.round((100 * count) / sample) === percent) return true;
+      }
+      return false;
+    });
+    if (fits) return sample;
+  }
+  return undefined;
+};
+
+/** Deck count behind one printed percent, once the sample size is known. */
+export const goldfishDeckCount = (percent: number, sample: number): number | undefined => {
+  const target = Math.round(percent);
+  let best: number | undefined;
+  let gap = Infinity;
+  for (let count = 0; count <= sample; count++) {
+    const next = Math.abs(Math.round((100 * count) / sample) - target);
+    if (next < gap) {
+      gap = next;
+      best = count;
+    }
+  }
+  return gap === 0 ? best : undefined;
 };
 
 /** "1.0 in 86% of decks" -> { avgCopies: 1, inclusion: 0.86 } */

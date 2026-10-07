@@ -12,6 +12,11 @@ export type CommanderRarity = (typeof COMMANDER_RARITIES)[number];
 export interface CommanderQuery {
   /** Colorless commanders only. Wins over `identity`. */
   colorless?: boolean;
+  /**
+   * Clauses for tags that aren't in the built-in catalogue: a saved custom tag,
+   * or one still being typed. AND-ed with the rest, same as `tagIds`.
+   */
+  extraQueries?: readonly string[];
   /** Colors the commander's identity must fit inside. */
   identity?: string[];
   name?: string;
@@ -34,16 +39,25 @@ export const commanderQuery = (options: CommanderQuery = {}): string => {
 
   if (options.colorless) parts.push('id=c');
   else if (options.identity && options.identity.length > 0) {
-    parts.push(`id<=${sortWubrg([...options.identity]).join('').toLowerCase()}`);
+    parts.push(
+      `id<=${sortWubrg([...options.identity])
+        .join('')
+        .toLowerCase()}`,
+    );
   }
 
   const rarities = RARITY_ORDER.filter(rarity => options.rarities?.includes(rarity));
   if (rarities.length === 1) parts.push(`r:${rarities[0]}`);
-  else if (rarities.length > 1) parts.push(`(${rarities.map(rarity => `r:${rarity}`).join(' or ')})`);
+  else if (rarities.length > 1)
+    parts.push(`(${rarities.map(rarity => `r:${rarity}`).join(' or ')})`);
 
   for (const id of options.tagIds ?? []) {
     const tag = deckTagById(id);
     if (tag) parts.push(`(${tag.query})`);
+  }
+  for (const query of options.extraQueries ?? []) {
+    const trimmed = query.trim();
+    if (trimmed) parts.push(`(${trimmed})`);
   }
 
   return parts.join(' ');

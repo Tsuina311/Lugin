@@ -67,8 +67,45 @@
               "synthetic",
               "none"
             ]
+          },
+          "frameFamily": {
+            "enum": ["modern_standard", "borderless", "showcase", "retro", "old", "other", "unknown"]
+          },
+          "regions": {
+            "type": "object",
+            "description": "Optional internal frame regions in source-image pixels. Missing keys are allowed. Old fixtures omit this.",
+            "properties": {
+              "titleBand": { "$ref": "#/$defs/region" },
+              "artBox": { "$ref": "#/$defs/region" },
+              "typeLine": { "$ref": "#/$defs/region" },
+              "textBox": { "$ref": "#/$defs/region" },
+              "footer": { "$ref": "#/$defs/region" }
+            }
           }
         }
+      }
+    }
+  },
+  "$defs": {
+    "quad": {
+      "type": "object",
+      "required": ["tl", "tr", "br", "bl"],
+      "properties": {
+        "tl": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "tr": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "br": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "bl": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }
+      }
+    },
+    "region": {
+      "type": "object",
+      "required": ["quad", "source"],
+      "properties": {
+        "quad": { "$ref": "#/$defs/quad" },
+        "autoQuad": { "$ref": "#/$defs/quad" },
+        "source": { "enum": ["auto", "auto-accepted", "auto-edited", "manual"] },
+        "reviewed": { "type": "boolean" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     }
   }

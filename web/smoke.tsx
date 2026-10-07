@@ -190,7 +190,7 @@ const deckSays: [string, boolean][] = [
   ['a deck can be started with nothing to start from', emptyDecks.includes('New deck')],
   ['the format is chosen before the deck is made', emptyDecks.includes('Commander')],
   ['a list can be pasted in instead', emptyDecks.includes('>Paste<')],
-  ['a new deck can be filled', editor.includes('Add a card, or paste a list')],
+  ['a new deck can be filled', editor.includes('Search for a card, or paste a list')],
   ['a deck can be thrown away', editor.includes('>Delete<')],
   ['a deck card shows a thumbnail', filled.includes('h-8 w-8') && filled.includes('Sol Ring')],
   ['the whole deck can be seen as images', filled.includes('Show as card images')],

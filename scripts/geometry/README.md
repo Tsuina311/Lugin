@@ -6,6 +6,10 @@ See [`docs/GEOMETRY-BENCHMARK.md`](../../docs/GEOMETRY-BENCHMARK.md).
 yarn geometry:inventory
 yarn geometry:queue
 yarn geometry:lab
+yarn geometry:lab --queue=stills-v1
+yarn geometry:artbox-status
+yarn geometry:frame-report
+yarn geometry:frame-regions-test
 yarn geometry:benchmark --engine=both
 yarn geometry:parity
 yarn geometry:leaderboard --engine=native

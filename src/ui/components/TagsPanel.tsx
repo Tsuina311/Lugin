@@ -2,17 +2,25 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import { forgetCustomDeckTag, saveCustomDeckTag, useCustomDeckTags } from '../customDeckTags';
+
 import { Button } from './Button';
 import { CardResultThumb } from './CardResultThumb';
 import { SelectionBar } from './Selection';
 
 import { cardKey } from '@/lib/cardName';
-import { buildTagsQuery, deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
 import type { DeckFormat } from '@/lib/deck';
+import {
+  buildTagsQuery,
+  customOracleQuery,
+  deckTagById,
+  deckTagsByCategory,
+  filterDeckTags,
+} from '@/lib/deckTags';
 import { sortWubrg } from '@/lib/mtg';
 import { searchScryfallQuery, type CardSearchResult } from '@/lib/search';
-import { useRowSelection, type RowSelection } from '@/ui/useRowSelection';
 import { COLOR_PIPS } from '@/ui/components/colorPips';
+import { useRowSelection, type RowSelection } from '@/ui/useRowSelection';
 
 const PAGE_SIZE = 40;
 const RESULT_LIMIT = 80;
@@ -44,7 +52,9 @@ export const TagsPanel = ({
   onAdd: (names: string[]) => void;
 }) => {
   const [tagSearch, setTagSearch] = useState('');
+  const [customDraft, setCustomDraft] = useState('');
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const customTags = useCustomDeckTags();
   const [useIdentity, setUseIdentity] = useState(false);
   const [identity, setIdentity] = useState<Set<string>>(() => new Set());
   const [hideInDeck, setHideInDeck] = useState(true);
@@ -87,13 +97,24 @@ export const TagsPanel = ({
     });
 
   const selectedIds = useMemo(() => [...selected], [selected]);
+  const draftQuery = customOracleQuery(customDraft);
+  const customById = useMemo(() => new Map(customTags.map(tag => [tag.id, tag])), [customTags]);
   // Stable key so identity array identity changes don't retrigger the effect.
   const selectedKey = selectedIds.slice().sort().join('|');
   const identityFilterKey =
     identityFilter === undefined ? 'off' : identityFilter.length === 0 ? 'c' : identityFilter.join('');
 
   useEffect(() => {
-    if (selectedIds.length === 0) {
+    const extraQueries = [
+      ...selectedIds.flatMap(id => {
+        const query = customById.get(id)?.query;
+        return query ? [query] : [];
+      }),
+      ...(draftQuery && !selectedIds.some(id => customById.get(id)?.query === draftQuery)
+        ? [draftQuery]
+        : []),
+    ];
+    if (selectedIds.length === 0 && extraQueries.length === 0) {
       setResults([]);
       setTotal(0);
       setQueryText('');
@@ -104,7 +125,7 @@ export const TagsPanel = ({
     let cancelled = false;
     setStatus('loading');
     setError(null);
-    const query = buildTagsQuery(selectedIds, identityFilter);
+    const query = buildTagsQuery(selectedIds, identityFilter, extraQueries);
     setQueryText(query);
     // Short debounce: picking a tag and the commander-identity effect settling
     // often land in the same tick burst; one search is enough.
@@ -131,7 +152,7 @@ export const TagsPanel = ({
     };
     // selectedKey / identityFilterKey stand in for the arrays.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deckFormat, identityFilterKey, selectedKey]);
+  }, [customById, deckFormat, draftQuery, identityFilterKey, selectedKey]);
 
   const ownedOf = (name: string): number => collectionByKey[cardKey(name)]?.total ?? 0;
   const deckQtyOf = (name: string): number => inDeck[cardKey(name)] ?? 0;
@@ -146,6 +167,37 @@ export const TagsPanel = ({
 
   const shown = showAll ? visible : visible.slice(0, PAGE_SIZE);
   const selection = useRowSelection(shown.map(c => c.id));
+
+  const labelOf = (id: string): string =>
+    deckTagById(id)?.label ?? customById.get(id)?.label ?? id;
+
+  const saveDraft = (): void => {
+    if (!draftQuery) return;
+    const label = customDraft
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/"/g, '')
+      .replace(/^(?:o:|t:)/i, '');
+    const saved = saveCustomDeckTag(label, draftQuery);
+    if (!saved) return;
+    setSelected(prev => new Set(prev).add(saved.id));
+    setCustomDraft('');
+  };
+
+  const forgetSaved = (id: string): void => {
+    forgetCustomDeckTag(id);
+    setSelected(prev => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const needle = tagSearch.trim().toLowerCase();
+  const visibleCustom = needle
+    ? customTags.filter(tag => tag.label.toLowerCase().includes(needle))
+    : customTags;
 
   const addSelected = (): void => {
     const byId = new Map(shown.map(c => [c.id, c.name] as const));
@@ -164,24 +216,34 @@ export const TagsPanel = ({
           type="search"
           value={tagSearch}
         />
-        {selectedIds.length > 0 ? (
+        {selectedIds.length > 0 || draftQuery ? (
           <div className="flex flex-wrap gap-1">
-            {selectedIds.map(id => {
-              const tag = deckTagById(id);
-              return (
-                <button
-                  key={id}
-                  className="rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-2xs font-medium text-accent"
-                  onClick={() => toggleTag(id)}
-                  type="button"
-                >
-                  {tag?.label ?? id} ×
-                </button>
-              );
-            })}
+            {selectedIds.map(id => (
+              <button
+                key={id}
+                className="rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-2xs font-medium text-accent"
+                onClick={() => toggleTag(id)}
+                type="button"
+              >
+                {labelOf(id)} ×
+              </button>
+            ))}
+            {draftQuery ? (
+              <button
+                className="rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-2xs font-medium text-accent"
+                onClick={() => setCustomDraft('')}
+                title="This search is not saved"
+                type="button"
+              >
+                {customDraft.trim()} ×
+              </button>
+            ) : null}
             <button
               className="rounded px-1.5 py-0.5 text-ink-faint hover:text-ink"
-              onClick={() => setSelected(new Set())}
+              onClick={() => {
+                setSelected(new Set());
+                setCustomDraft('');
+              }}
               type="button"
             >
               clear
@@ -218,6 +280,64 @@ export const TagsPanel = ({
       </div>
 
       <div className="flex-none max-h-40 overflow-auto border-b border-line px-2 py-1">
+        <div className="mb-1.5">
+          <div className="text-[9px] font-semibold uppercase tracking-wide text-ink-faint">
+            Custom
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+            <label className="inline-flex items-center gap-0.5 rounded-full border border-line-strong bg-raised px-2 py-0.5 text-2xs text-ink-muted">
+              <span aria-hidden>t: or o:</span>
+              <input
+                aria-label="Custom type or oracle text"
+                className="w-28 bg-transparent text-ink outline-none placeholder:text-ink-faint"
+                onChange={event => setCustomDraft(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') saveDraft();
+                }}
+                placeholder="kobold, goad…"
+                value={customDraft}
+              />
+            </label>
+            {draftQuery ? (
+              <button
+                className="rounded px-1.5 py-0.5 text-accent hover:underline"
+                onClick={saveDraft}
+                title="Keep this tag for later. Leave it unsaved and it lasts only while the text is in the field."
+                type="button"
+              >
+                Save
+              </button>
+            ) : null}
+            {visibleCustom.map(tag => (
+              <span
+                key={tag.id}
+                className={`inline-flex items-center rounded-full border text-2xs ${
+                  selected.has(tag.id)
+                    ? 'border-accent/50 bg-accent-soft text-accent'
+                    : 'border-line-strong text-ink-muted'
+                }`}
+              >
+                <button
+                  aria-pressed={selected.has(tag.id)}
+                  className="px-2 py-0.5"
+                  onClick={() => toggleTag(tag.id)}
+                  type="button"
+                >
+                  {tag.label}
+                </button>
+                <button
+                  aria-label={`Forget ${tag.label}`}
+                  className="pr-1.5 text-ink-faint hover:text-neg"
+                  onClick={() => forgetSaved(tag.id)}
+                  title="Remove this saved tag"
+                  type="button"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
         {grouped.map(group => (
           <div key={group.category} className="mb-1.5">
             <div className="text-[9px] font-semibold uppercase tracking-wide text-ink-faint">
@@ -289,7 +409,7 @@ export const TagsPanel = ({
         </div>
       </div>
 
-      {selectedIds.length > 0 && visible.length > 0 ? (
+      {(selectedIds.length > 0 || draftQuery) && visible.length > 0 ? (
         <SelectionBar selection={selection}>
           <Button onClick={addSelected} size="xs" title="Add selected cards to the deck" variant="primary">
             Add {selection.count}
@@ -298,7 +418,7 @@ export const TagsPanel = ({
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-auto outline-none" {...selection.listProps}>
-        {selectedIds.length === 0 ? (
+        {selectedIds.length === 0 && !draftQuery ? (
           <p className="px-4 py-6 text-center text-xs text-ink-faint">
             Select tags above to search Scryfall for matching cards.
           </p>

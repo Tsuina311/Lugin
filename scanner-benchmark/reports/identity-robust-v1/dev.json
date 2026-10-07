@@ -1,0 +1,28 @@
+{
+  "current": {
+    "n": 17,
+    "top1": 15,
+    "top3": 16,
+    "top5": 16,
+    "top10": 16,
+    "wrongConfident": 0,
+    "meanRank": 198.71,
+    "medianRank": 1
+  },
+  "trained": {
+    "n": 17,
+    "top1": 15,
+    "top3": 16,
+    "top5": 16,
+    "top10": 16,
+    "wrongConfident": 0,
+    "meanRank": 166.88,
+    "medianRank": 1
+  },
+  "pairs": {
+    "fixes": 0,
+    "regressions": 0,
+    "fixNames": [],
+    "regressionNames": []
+  }
+}

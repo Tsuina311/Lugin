@@ -8,7 +8,8 @@
 //
 // A typed word is a search, not a card. It only goes into the deck when you tap
 // a suggestion — Scryfall, your collection, or (with a commander) EDHREC and
-// MTGGoldfish, sorted A→Z, cards you own tinted green. A pasted list is the
+// MTGGoldfish, sorted A→Z, cards you own tinted green. The Oracle toggle
+// searches rules text for that exact spelling instead. A pasted list is the
 // exception: several lines go through `parseDeckList`, the same parser the
 // desktop uses. Suggested cuts use the same EDHREC play-rate logic as the
 // extension when a commander is set.
@@ -26,14 +27,20 @@ import { candidatesByName, deckCardCandidates } from '@/lib/cardImage';
 import { cardKey } from '@/lib/cardName';
 import type { Collection } from '@/lib/collection';
 import {
+  copiesAcrossDecks,
   DECK_FORMATS,
   deckShortfall,
   formatInfo,
+  isPaperLocked,
   mergeDeckCards,
+  PAPER_LOCK_TITLE,
+  paperAddSection,
+  paperFreezeState,
   parseDeckList,
   withFormat,
   type Deck,
   type DeckCard,
+  type DeckCopyUse,
   type DeckFormat,
   type DeckSection,
 } from '@/lib/deck';
@@ -47,10 +54,12 @@ import { searchCards } from '@/lib/search';
 import { BracketMark } from '@/ui/components/BracketMark';
 import { CollectionThumb } from '@/ui/components/CollectionThumb';
 import { CommanderPicker } from '@/ui/components/CommanderPicker';
+import { CopyCoverage } from '@/ui/components/CopyCoverage';
 import { CutsPanel } from '@/ui/components/CutsPanel';
 import { DeckCardTagMove } from '@/ui/components/DeckCardTagMove';
 import { EdhrecPanel } from '@/ui/components/EdhrecPanel';
 import { GoldfishPanel } from '@/ui/components/GoldfishPanel';
+import { PaperToggle } from '@/ui/components/PaperToggle';
 import { TagsPanel } from '@/ui/components/TagsPanel';
 import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
 
@@ -120,14 +129,18 @@ const Stepper = ({
 export const DeckEditor = ({
   collection,
   deck,
+  decks,
   onBack,
 }: {
   collection: Collection | null;
   deck: Deck;
+  /** Every deck, so a card can be weighed against all of them. Defaults to this deck alone. */
+  decks?: readonly Deck[];
   onBack: () => void;
 }) => {
   const [name, setName] = useState(deck.name);
   const [adding, setAdding] = useState('');
+  const [oracle, setOracle] = useState(false);
   const [into, setInto] = useState<DeckSection>('main');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [panel, setPanel] = useState<DeckPanel>('deck');
@@ -205,6 +218,20 @@ export const DeckEditor = ({
     [commanderRecs],
   );
   const collectionByKey = collection?.byKey ?? {};
+  const allDecks = useMemo(() => decks ?? [deck], [deck, decks]);
+  const paper = useMemo(
+    () => paperFreezeState(deck, allDecks, collectionByKey),
+    [allDecks, collectionByKey, deck],
+  );
+  const coverageOf = useMemo(() => {
+    const map = new Map<string, DeckCopyUse[]>();
+    for (const card of deck.cards) {
+      const key = cardKey(card.name);
+      if (!key || map.has(key)) continue;
+      map.set(key, copiesAcrossDecks(card.name, allDecks));
+    }
+    return map;
+  }, [allDecks, deck.cards]);
 
   useEffect(() => {
     if (!commanderRecs && COMMANDER_PANELS.has(panel)) setPanel('deck');
@@ -321,7 +348,7 @@ export const DeckEditor = ({
     }
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void searchCards({ format: deck.format, text: needle }, SUGGESTIONS)
+      void searchCards({ format: deck.format, oracle, text: needle }, SUGGESTIONS)
         .then(resp => {
           if (!cancelled) setRemote(resp.cards.map(c => c.name));
         })
@@ -333,7 +360,7 @@ export const DeckEditor = ({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [canSuggest, deck.format, needle]);
+  }, [canSuggest, deck.format, needle, oracle]);
 
   // Scryfall, collection, EDHREC and Goldfish — deduped, then sorted A→Z.
   // Owned cards get a green tint in the UI but don't jump to the front.
@@ -341,12 +368,13 @@ export const DeckEditor = ({
     if (!canSuggest) return [];
     const key = cardKey(needle);
     const ownedOf = (name: string): boolean => (collection?.byKey[cardKey(name)]?.total ?? 0) > 0;
-    const local = collection
-      ? Object.values(collection.byKey)
-          .filter(row => cardKey(row.name).includes(key))
-          .map(row => row.name)
-      : [];
-    const staple = recNames.filter(name => cardKey(name).includes(key));
+    const local =
+      oracle || !collection
+        ? []
+        : Object.values(collection.byKey)
+            .filter(row => cardKey(row.name).includes(key))
+            .map(row => row.name);
+    const staple = oracle ? [] : recNames.filter(name => cardKey(name).includes(key));
     const seen = new Set<string>();
     const names: string[] = [];
     for (const name of [...local, ...remote, ...staple]) {
@@ -359,12 +387,13 @@ export const DeckEditor = ({
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
       .slice(0, SUGGESTIONS)
       .map(name => ({ name, owned: ownedOf(name) }));
-  }, [canSuggest, collection, needle, recNames, remote]);
+  }, [canSuggest, collection, needle, oracle, recNames, remote]);
 
   const addCard = (name: string) => {
+    const section = paperAddSection(deck, into);
     void syncStore.updateDeck(deck.id, d => ({
       ...d,
-      cards: mergeDeckCards(d.cards, [{ name, quantity: 1, section: into }]),
+      cards: mergeDeckCards(d.cards, [{ name, quantity: 1, section: paperAddSection(d, section) }]),
     }));
     setAdding('');
   };
@@ -373,22 +402,37 @@ export const DeckEditor = ({
     const { cards } = parseDeckList(text);
     if (cards.length === 0) return;
     // A pasted list can name its own sections; a line it filed as main goes
-    // wherever the zone button says instead.
-    const placed = cards.map(card => (card.section === 'main' ? { ...card, section: into } : card));
-    void syncStore.updateDeck(deck.id, d => ({ ...d, cards: mergeDeckCards(d.cards, placed) }));
+    // wherever the zone button says instead. A paper deck files all of it
+    // in the sideboard.
+    const placed = cards.map(card => ({
+      ...card,
+      section: paperAddSection(deck, card.section === 'main' ? into : card.section),
+    }));
+    void syncStore.updateDeck(deck.id, d => ({
+      ...d,
+      cards: mergeDeckCards(
+        d.cards,
+        placed.map(card => ({ ...card, section: paperAddSection(d, card.section) })),
+      ),
+    }));
     setAdding('');
   };
 
   const pasted = adding.includes('\n');
 
-  const setQuantity = (card: DeckCard, quantity: number) =>
-    void syncStore.updateDeck(deck.id, d => ({
+  const setQuantity = (card: DeckCard, quantity: number) => {
+    if (isPaperLocked(deck, card.section)) return;
+    void syncStore.updateDeck(deck.id, d => {
+      if (isPaperLocked(d, card.section)) return d;
+      return {
       ...d,
       cards:
         quantity <= 0
           ? d.cards.filter(c => !same(c, card))
           : d.cards.map(c => (same(c, card) ? { ...c, quantity } : c)),
-    }));
+    };
+    });
+  };
 
   const setCardTagOverride = (name: string, tagId: string | null) => {
     const key = cardKey(name);
@@ -402,11 +446,22 @@ export const DeckEditor = ({
   };
 
   const addToMain = (names: string[]) => {
-    const placed = names.map(name => ({ name, quantity: 1, section: 'main' as const }));
-    void syncStore.updateDeck(deck.id, d => ({ ...d, cards: mergeDeckCards(d.cards, placed) }));
+    const placed = names.map(name => ({
+      name,
+      quantity: 1,
+      section: paperAddSection(deck, 'main'),
+    }));
+    void syncStore.updateDeck(deck.id, d => ({
+      ...d,
+      cards: mergeDeckCards(
+        d.cards,
+        placed.map(card => ({ ...card, section: paperAddSection(d, card.section) })),
+      ),
+    }));
   };
 
   const cutFromMain = (names: string[]) => {
+    if (deck.frozen) return;
     const doomed = new Set(names.map(cardKey));
     void syncStore.updateDeck(deck.id, d => ({
       ...d,
@@ -423,7 +478,9 @@ export const DeckEditor = ({
           setBrowsingCommanders(false);
           void syncStore.updateDeck(deck.id, d => ({
             ...d,
-            cards: mergeDeckCards(d.cards, [{ name, quantity: 1, section: 'commander' }]),
+            cards: mergeDeckCards(d.cards, [
+              { name, quantity: 1, section: paperAddSection(d, 'commander') },
+            ]),
           }));
         }}
       />
@@ -455,11 +512,14 @@ export const DeckEditor = ({
           <select
             aria-label="Deck format"
             className="rounded-md border border-line-strong bg-raised px-2 py-1.5 text-xs text-ink"
-            onChange={event =>
+            disabled={deck.frozen === true}
+            onChange={event => {
+              if (deck.frozen) return;
               void syncStore.updateDeck(deck.id, d =>
-                withFormat(d, event.target.value as DeckFormat),
-              )
-            }
+                d.frozen ? d : withFormat(d, event.target.value as DeckFormat),
+              );
+            }}
+            title={deck.frozen ? PAPER_LOCK_TITLE : 'Deck format'}
             value={deck.format}
           >
             {DECK_FORMATS.map(format => (
@@ -468,17 +528,25 @@ export const DeckEditor = ({
               </option>
             ))}
           </select>
+          <PaperToggle
+            canMark={paper.canMark}
+            checked={deck.frozen === true}
+            onChange={frozen => void syncStore.updateDeck(deck.id, d => ({ ...d, frozen }))}
+            title={paper.title}
+          />
           <BracketMark
             deck={deck}
-            onRemove={card =>
+            onRemove={card => {
+              if (isPaperLocked(deck, card.section)) return;
               void syncStore.updateDeck(deck.id, current => ({
                 ...current,
                 cards: current.cards.filter(
                   item =>
+                    isPaperLocked(current, item.section) ||
                     !(item.section === card.section && cardKey(item.name) === cardKey(card.name)),
                 ),
-              }))
-            }
+              }));
+            }}
           />
           <span className="min-w-0 flex-1 truncate text-[11px] tabular-nums text-ink-faint">
             {copies(deck, 'main') + copies(deck, 'commander')}
@@ -567,19 +635,27 @@ export const DeckEditor = ({
           onAdd={addToMain}
         />
       ) : panel === 'cuts' ? (
+        deck.frozen ? (
+          <p className="px-6 py-10 text-center text-sm text-ink-muted">{PAPER_LOCK_TITLE}</p>
+        ) : (
         <CutsPanel
           cards={deck.cards}
           commanderNames={commanders}
           metaByKey={{}}
           onCut={cutFromMain}
         />
+        )
       ) : (
         <>
           {/* Adding sits above the cards: it's what this screen is for, and hunting
           for it under a hundred rows would be absurd on a phone. */}
           <section className="border-b border-line px-4 py-3">
             <div className="mb-2 flex items-center gap-1">
-              {zones.length > 1 ? (
+              {deck.frozen ? (
+                <span className="min-w-0 flex-1 text-[11px] text-ink-faint" title={PAPER_LOCK_TITLE}>
+                  New cards go to the sideboard
+                </span>
+              ) : zones.length > 1 ? (
                 <div className="flex min-w-0 flex-1 flex-wrap gap-1">
                   {zones.map(zone => (
                     <button
@@ -703,16 +779,36 @@ export const DeckEditor = ({
                     addPastedList(adding);
                     return;
                   }
-                  const exact = suggestions.find(item => cardKey(item.name) === cardKey(needle));
+                  const exact = oracle
+                    ? undefined
+                    : suggestions.find(item => cardKey(item.name) === cardKey(needle));
                   const only = suggestions.length === 1 ? suggestions[0] : undefined;
                   const pick = exact ?? only;
                   if (!pick) return;
                   event.preventDefault();
                   addCard(pick.name);
                 }}
-                placeholder="Search for a card, or paste a list"
+                placeholder={
+                  oracle
+                    ? 'Oracle text, exact spelling…'
+                    : deck.frozen
+                      ? 'Add a card to the sideboard, or paste a list'
+                      : 'Search for a card, or paste a list'
+                }
                 value={adding}
               />
+              <button
+                aria-pressed={oracle}
+                className={`shrink-0 rounded-lg border px-3 text-sm font-medium ${
+                  oracle
+                    ? 'border-accent bg-accent-soft text-accent'
+                    : 'border-line-strong bg-raised text-ink-muted'
+                }`}
+                onClick={() => setOracle(value => !value)}
+                type="button"
+              >
+                Oracle
+              </button>
               {pasted ? (
                 <button
                   className="shrink-0 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-40"
@@ -768,8 +864,15 @@ export const DeckEditor = ({
                           name={card.name}
                           previewKey={`deck|box|${deck.id}|${rowKey(card)}`}
                         />
-                        <span className="truncate text-xs text-ink" title={card.name}>
-                          {card.name}
+                        <span className="flex items-center gap-1">
+                          <span className="min-w-0 flex-1 truncate text-xs text-ink" title={card.name}>
+                            {card.name}
+                          </span>
+                          <CopyCoverage
+                            hereFrozen={deck.frozen === true}
+                            owned={collectionByKey[key]?.total ?? 0}
+                            uses={coverageOf.get(key) ?? []}
+                          />
                         </span>
                         {allowTagMove && tagSectionIds.length > 0 && (
                           <DeckCardTagMove
@@ -778,20 +881,29 @@ export const DeckEditor = ({
                             tagSectionIds={tagSectionIds}
                           />
                         )}
-                        <div className="flex items-center gap-1">
-                          <Stepper
-                            onChange={quantity => setQuantity(card, quantity)}
-                            quantity={card.quantity}
-                          />
-                          <button
-                            aria-label={`Remove ${card.name}`}
-                            className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
-                            onClick={() => setQuantity(card, 0)}
-                            type="button"
+                        {isPaperLocked(deck, card.section) ? (
+                          <span
+                            className="text-xs font-semibold tabular-nums text-ink-faint"
+                            title={PAPER_LOCK_TITLE}
                           >
-                            ×
-                          </button>
-                        </div>
+                            {card.quantity}
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <Stepper
+                              onChange={quantity => setQuantity(card, quantity)}
+                              quantity={card.quantity}
+                            />
+                            <button
+                              aria-label={`Remove ${card.name}`}
+                              className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
+                              onClick={() => setQuantity(card, 0)}
+                              type="button"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -810,9 +922,22 @@ export const DeckEditor = ({
                           name={card.name}
                           previewKey={`deck|list|${deck.id}|${key}`}
                         />
-                        <span className="min-w-0 flex-1 truncate text-sm text-ink">
-                          {card.name}
-                        </span>
+                        {isPaperLocked(deck, card.section) ? null : (
+                          <button
+                            aria-label={`Remove ${card.name}`}
+                            className="flex h-8 w-7 shrink-0 items-center justify-center rounded text-base leading-none text-ink-muted active:bg-neg-soft active:text-neg"
+                            onClick={() => setQuantity(card, 0)}
+                            type="button"
+                          >
+                            ×
+                          </button>
+                        )}
+                        <span className="min-w-0 flex-1 truncate text-sm text-ink">{card.name}</span>
+                        <CopyCoverage
+                          hereFrozen={deck.frozen === true}
+                          owned={collectionByKey[ck]?.total ?? 0}
+                          uses={coverageOf.get(ck) ?? []}
+                        />
                         {allowTagMove && tagSectionIds.length > 0 && (
                           <DeckCardTagMove
                             onChange={tagId => setCardTagOverride(card.name, tagId)}
@@ -820,18 +945,19 @@ export const DeckEditor = ({
                             tagSectionIds={tagSectionIds}
                           />
                         )}
-                        <Stepper
-                          onChange={quantity => setQuantity(card, quantity)}
-                          quantity={card.quantity}
-                        />
-                        <button
-                          aria-label={`Remove ${card.name}`}
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-faint active:bg-raised"
-                          onClick={() => setQuantity(card, 0)}
-                          type="button"
-                        >
-                          ×
-                        </button>
+                        {isPaperLocked(deck, card.section) ? (
+                          <span
+                            className="w-6 text-center text-sm font-semibold tabular-nums text-ink"
+                            title={PAPER_LOCK_TITLE}
+                          >
+                            {card.quantity}
+                          </span>
+                        ) : (
+                          <Stepper
+                            onChange={quantity => setQuantity(card, quantity)}
+                            quantity={card.quantity}
+                          />
+                        )}
                       </li>
                     );
                   })}

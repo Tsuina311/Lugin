@@ -4,6 +4,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { forgetCustomDeckTag, saveCustomDeckTag, useCustomDeckTags } from '../customDeckTags';
+
 import { Button } from './Button';
 import { CollectionThumb } from './CollectionThumb';
 import { Popover } from './Popover';
@@ -11,7 +13,7 @@ import { COLOR_PIPS } from './colorPips';
 import { ChevronLeft, Loader2 } from './icons';
 
 import { commanderQuery, COMMANDER_RARITIES, type CommanderRarity } from '@/lib/commanders';
-import { deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
+import { customOracleQuery, deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
 import { searchScryfallPage, type CardSearchResult } from '@/lib/search';
 
 const IDENTITY_PIPS = COLOR_PIPS.filter(pip => pip.code !== 'C');
@@ -51,6 +53,8 @@ export const CommanderPicker = ({
   const [rarities, setRarities] = useState<Set<string>>(() => new Set());
   const [tags, setTags] = useState<Set<string>>(() => new Set());
   const [tagSearch, setTagSearch] = useState('');
+  const [customDraft, setCustomDraft] = useState('');
+  const customTags = useCustomDeckTags();
 
   const [cards, setCards] = useState<CardSearchResult[]>([]);
   const [total, setTotal] = useState(0);
@@ -60,17 +64,31 @@ export const CommanderPicker = ({
   const [saving, setSaving] = useState(false);
   const generation = useRef(0);
 
+  const draftQuery = customOracleQuery(customDraft);
+  const customById = useMemo(() => new Map(customTags.map(tag => [tag.id, tag])), [customTags]);
+  const selectedIds = useMemo(() => [...tags], [tags]);
+  const extraQueries = useMemo(() => {
+    const saved = selectedIds.flatMap(id => {
+      const clause = customById.get(id)?.query;
+      return clause ? [clause] : [];
+    });
+    if (draftQuery && !saved.includes(draftQuery)) saved.push(draftQuery);
+    return saved;
+  }, [customById, draftQuery, selectedIds]);
+
   const query = useMemo(
     () =>
       commanderQuery({
         colorless,
+        extraQueries,
         identity: [...colors],
         name,
         rarities: [...rarities],
-        tagIds: [...tags],
+        tagIds: selectedIds,
       }),
-    [colorless, colors, name, rarities, tags],
+    [colorless, colors, extraQueries, name, rarities, selectedIds],
   );
+  const tagQueryVisible = tags.size > 0 || Boolean(draftQuery);
 
   useEffect(() => {
     const mine = generation.current + 1;
@@ -126,6 +144,33 @@ export const CommanderPicker = ({
 
   const groupedTags = useMemo(() => deckTagsByCategory(filterDeckTags(tagSearch)), [tagSearch]);
   const selectedTags = useMemo(() => [...tags].sort(), [tags]);
+  const needle = tagSearch.trim().toLowerCase();
+  const visibleCustom = needle
+    ? customTags.filter(tag => tag.label.toLowerCase().includes(needle))
+    : customTags;
+
+  const labelOf = (id: string): string => deckTagById(id)?.label ?? customById.get(id)?.label ?? id;
+
+  const saveDraft = (): void => {
+    if (!draftQuery) return;
+    const label = customDraft
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/"/g, '')
+      .replace(/^(?:o:|t:)/i, '');
+    const saved = saveCustomDeckTag(label, draftQuery);
+    if (!saved) return;
+    setTags(current => new Set(current).add(saved.id));
+    setCustomDraft('');
+  };
+
+  const forgetSaved = (id: string): void => {
+    forgetCustomDeckTag(id);
+    setTags(current => {
+      if (!current.has(id)) return current;
+      return toggle(current, id);
+    });
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -194,7 +239,11 @@ export const CommanderPicker = ({
                   : 'border-line text-ink-muted'
               }`}
               onClick={() => setRarities(current => toggle(current, rarity))}
-              title={rarity === 'uncommon' ? 'Pauper commander uses an uncommon commander' : RARITY_LABEL[rarity]}
+              title={
+                rarity === 'uncommon'
+                  ? 'Pauper commander uses an uncommon commander'
+                  : RARITY_LABEL[rarity]
+              }
               type="button"
             >
               {RARITY_LABEL[rarity]}
@@ -227,6 +276,64 @@ export const CommanderPicker = ({
                 type="search"
                 value={tagSearch}
               />
+              <div>
+                <div className="text-2xs font-semibold uppercase tracking-wide text-ink-faint">
+                  Custom
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                  <label className="inline-flex items-center gap-0.5 rounded-full border border-line-strong bg-raised px-2 py-0.5 text-2xs text-ink-muted">
+                    <span aria-hidden>t: or o:</span>
+                    <input
+                      aria-label="Custom type or oracle text"
+                      className="w-28 bg-transparent text-ink outline-none placeholder:text-ink-faint"
+                      onChange={event => setCustomDraft(event.target.value)}
+                      onKeyDown={event => {
+                        if (event.key === 'Enter') saveDraft();
+                      }}
+                      placeholder="kobold, goad…"
+                      value={customDraft}
+                    />
+                  </label>
+                  {draftQuery ? (
+                    <button
+                      className="rounded px-1.5 py-0.5 text-accent hover:underline"
+                      onClick={saveDraft}
+                      title="Keep this tag for later. Leave it unsaved and it lasts only while the text is in the field."
+                      type="button"
+                    >
+                      Save
+                    </button>
+                  ) : null}
+                  {visibleCustom.map(tag => (
+                    <span
+                      key={tag.id}
+                      className={`inline-flex items-center rounded-full border text-2xs ${
+                        tags.has(tag.id)
+                          ? 'border-accent/50 bg-accent-soft text-accent'
+                          : 'border-line-strong text-ink-muted'
+                      }`}
+                    >
+                      <button
+                        aria-pressed={tags.has(tag.id)}
+                        className="px-2 py-0.5"
+                        onClick={() => setTags(current => toggle(current, tag.id))}
+                        type="button"
+                      >
+                        {tag.label}
+                      </button>
+                      <button
+                        aria-label={`Forget ${tag.label}`}
+                        className="pr-1.5 text-ink-faint hover:text-neg"
+                        onClick={() => forgetSaved(tag.id)}
+                        title="Remove this saved tag"
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
               <div className="max-h-64 space-y-2 overflow-auto">
                 {groupedTags.map(group => (
                   <div key={group.category}>
@@ -251,11 +358,21 @@ export const CommanderPicker = ({
                     </div>
                   </div>
                 ))}
+                {groupedTags.length === 0 && visibleCustom.length === 0 ? (
+                  <p className="py-2 text-center text-2xs text-ink-faint">
+                    No tags match that search.
+                  </p>
+                ) : null}
               </div>
+              {tagQueryVisible ? (
+                <p className="break-all font-mono text-2xs text-ink-faint" title={query}>
+                  {query}
+                </p>
+              ) : null}
             </div>
           </Popover>
         </div>
-        {selectedTags.length > 0 && (
+        {(selectedTags.length > 0 || draftQuery) && (
           <div className="flex flex-wrap gap-1">
             {selectedTags.map(id => (
               <button
@@ -264,11 +381,26 @@ export const CommanderPicker = ({
                 onClick={() => setTags(current => toggle(current, id))}
                 type="button"
               >
-                {deckTagById(id)?.label ?? id} ×
+                {labelOf(id)} ×
               </button>
             ))}
+            {draftQuery ? (
+              <button
+                className="rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-2xs font-medium text-accent"
+                onClick={() => setCustomDraft('')}
+                title="This search is not saved"
+                type="button"
+              >
+                {customDraft.trim()} ×
+              </button>
+            ) : null}
           </div>
         )}
+        {tagQueryVisible ? (
+          <p className="break-all font-mono text-2xs text-ink-faint" title={query}>
+            {query}
+          </p>
+        ) : null}
         <p className="text-2xs text-ink-faint">
           {status === 'loading' && cards.length === 0
             ? 'Looking up commanders…'

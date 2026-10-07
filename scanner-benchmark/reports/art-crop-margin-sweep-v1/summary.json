@@ -1,0 +1,5023 @@
+{
+  "date": "2026-10-06T07:43:48.048Z",
+  "git": "9c89f6f",
+  "evalHash": "c9470c26eebd80e257f577fa09aae7a5c82cf3dc9fdd8b047922bcf40c182d27",
+  "n": 46,
+  "clip": "Xenova/clip-vit-base-patch32@q1",
+  "adapter": {
+    "sha256": "b0e10ffe2c9c5e387049a407d7ef4a389541422e4efc1f6097543bb057f2971c"
+  },
+  "gallery": {
+    "id": "CLIP_VIT_B32_B1_ART",
+    "sha256": "be0a66141de71f38fb60bae715fa0b40c70d2bc04ca200ddcffbfcd802980f8b",
+    "count": 49968
+  },
+  "table": [
+    {
+      "id": "current",
+      "label": "current",
+      "top1": "32/46",
+      "top3": "35/46",
+      "top5": "36/46",
+      "top10": "37/46",
+      "wrongToCorrect": null,
+      "correctToWrong": null,
+      "top1Text": "32/46",
+      "top3Text": "35/46",
+      "top5Text": "36/46",
+      "top10Text": "37/46",
+      "wrongConfident": "2/46"
+    },
+    {
+      "id": "auto_anchor",
+      "label": "auto_anchor",
+      "top1": "35/46",
+      "top3": "35/46",
+      "top5": "35/46",
+      "top10": "35/46",
+      "wrongToCorrect": 4,
+      "correctToWrong": 1,
+      "top1Text": "35/46",
+      "top3Text": "35/46",
+      "top5Text": "35/46",
+      "top10Text": "35/46",
+      "wrongConfident": "2/46"
+    },
+    {
+      "id": "manual_-10",
+      "label": "manual -10%",
+      "top1": "31/46",
+      "top3": "35/46",
+      "top5": "37/46",
+      "top10": "41/46",
+      "wrongToCorrect": 5,
+      "correctToWrong": 6,
+      "top1Text": "31/46",
+      "top3Text": "35/46",
+      "top5Text": "37/46",
+      "top10Text": "41/46",
+      "wrongConfident": "1/46"
+    },
+    {
+      "id": "manual_-5",
+      "label": "manual -5%",
+      "top1": "37/46",
+      "top3": "39/46",
+      "top5": "39/46",
+      "top10": "39/46",
+      "wrongToCorrect": 8,
+      "correctToWrong": 3,
+      "top1Text": "37/46",
+      "top3Text": "39/46",
+      "top5Text": "39/46",
+      "top10Text": "39/46",
+      "wrongConfident": "0/46"
+    },
+    {
+      "id": "manual_0",
+      "label": "manual 0%",
+      "top1": "37/46",
+      "top3": "41/46",
+      "top5": "42/46",
+      "top10": "42/46",
+      "wrongToCorrect": 6,
+      "correctToWrong": 1,
+      "top1Text": "37/46",
+      "top3Text": "41/46",
+      "top5Text": "42/46",
+      "top10Text": "42/46",
+      "wrongConfident": "0/46"
+    },
+    {
+      "id": "manual_+3",
+      "label": "manual +3%",
+      "top1": "39/46",
+      "top3": "39/46",
+      "top5": "40/46",
+      "top10": "41/46",
+      "wrongToCorrect": 9,
+      "correctToWrong": 2,
+      "top1Text": "39/46",
+      "top3Text": "39/46",
+      "top5Text": "40/46",
+      "top10Text": "41/46",
+      "wrongConfident": "1/46"
+    },
+    {
+      "id": "manual_+5",
+      "label": "manual +5%",
+      "top1": "36/46",
+      "top3": "39/46",
+      "top5": "40/46",
+      "top10": "41/46",
+      "wrongToCorrect": 7,
+      "correctToWrong": 3,
+      "top1Text": "36/46",
+      "top3Text": "39/46",
+      "top5Text": "40/46",
+      "top10Text": "41/46",
+      "wrongConfident": "1/46"
+    },
+    {
+      "id": "manual_+8",
+      "label": "manual +8%",
+      "top1": "34/46",
+      "top3": "37/46",
+      "top5": "39/46",
+      "top10": "40/46",
+      "wrongToCorrect": 5,
+      "correctToWrong": 3,
+      "top1Text": "34/46",
+      "top3Text": "37/46",
+      "top5Text": "39/46",
+      "top10Text": "40/46",
+      "wrongConfident": "1/46"
+    },
+    {
+      "id": "manual_+12",
+      "label": "manual +12%",
+      "top1": "32/46",
+      "top3": "37/46",
+      "top5": "39/46",
+      "top10": "40/46",
+      "wrongToCorrect": 8,
+      "correctToWrong": 8,
+      "top1Text": "32/46",
+      "top3Text": "37/46",
+      "top5Text": "39/46",
+      "top10Text": "40/46",
+      "wrongConfident": "1/46"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "auto_anchor",
+      "n": 46,
+      "wrongToCorrect": 4,
+      "correctToWrong": 1,
+      "unchangedCorrect": 31,
+      "unchangedWrong": 10
+    },
+    {
+      "id": "manual -10%",
+      "n": 46,
+      "wrongToCorrect": 5,
+      "correctToWrong": 6,
+      "unchangedCorrect": 26,
+      "unchangedWrong": 9
+    },
+    {
+      "id": "manual -5%",
+      "n": 46,
+      "wrongToCorrect": 8,
+      "correctToWrong": 3,
+      "unchangedCorrect": 29,
+      "unchangedWrong": 6
+    },
+    {
+      "id": "manual 0%",
+      "n": 46,
+      "wrongToCorrect": 6,
+      "correctToWrong": 1,
+      "unchangedCorrect": 31,
+      "unchangedWrong": 8
+    },
+    {
+      "id": "manual +3%",
+      "n": 46,
+      "wrongToCorrect": 9,
+      "correctToWrong": 2,
+      "unchangedCorrect": 30,
+      "unchangedWrong": 5
+    },
+    {
+      "id": "manual +5%",
+      "n": 46,
+      "wrongToCorrect": 7,
+      "correctToWrong": 3,
+      "unchangedCorrect": 29,
+      "unchangedWrong": 7
+    },
+    {
+      "id": "manual +8%",
+      "n": 46,
+      "wrongToCorrect": 5,
+      "correctToWrong": 3,
+      "unchangedCorrect": 29,
+      "unchangedWrong": 9
+    },
+    {
+      "id": "manual +12%",
+      "n": 46,
+      "wrongToCorrect": 8,
+      "correctToWrong": 8,
+      "unchangedCorrect": 24,
+      "unchangedWrong": 6
+    }
+  ],
+  "optimal": {
+    "tighter": 22,
+    "exact": 11,
+    "padded": 13,
+    "histogram": "manual_-10 8, manual_-5 14, manual_0 11, manual_+3 8, manual_+5 5, manual_+8 0, manual_+12 0"
+  },
+  "groupA": [
+    {
+      "cardName": "Wand of Wonder",
+      "line": "Wand of Wonder [.scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png]: current rank 3679 (Who), exact art rank 1 (Wand of Wonder), best manual_-10 rank 1 (Wand of Wonder)"
+    },
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "line": "Livaan, Cultist of Tiamat [.scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png]: current rank 138 (Temple Garden), exact art rank 1 (Livaan, Cultist of Tiamat), best manual_-5 rank 1 (Livaan, Cultist of Tiamat)"
+    },
+    {
+      "cardName": "Bulk Up",
+      "line": "Bulk Up [.scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png]: current rank 662 (Cauldron Familiar), exact art rank 1 (Bulk Up), best manual_-10 rank 1 (Bulk Up)"
+    },
+    {
+      "cardName": "Havi, the All-Father",
+      "line": "Havi, the All-Father [.scan-inbox/sessions/geometry-test-20260911-085827/geom-001-source/geom-001-source.png]: current rank 3 (Minions), exact art rank 1 (Havi, the All-Father), best manual_+3 rank 1 (Havi, the All-Father)"
+    },
+    {
+      "cardName": "Mudbutton Torchrunner",
+      "line": "Mudbutton Torchrunner [.scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png]: current rank 1698 (That's No Moonmist), exact art rank 1 (Mudbutton Torchrunner), best manual_-5 rank 1 (Mudbutton Torchrunner)"
+    },
+    {
+      "cardName": "Octopus Form",
+      "line": "Octopus Form [.scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-03-source.png]: current rank 2 (Specimen Freighter), exact art rank 1 (Octopus Form), best manual_0 rank 1 (Octopus Form)"
+    }
+  ],
+  "groupB": [
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "line": "Livaan, Cultist of Tiamat [.scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png]: current rank 1 (Livaan, Cultist of Tiamat), exact art rank 1 (Livaan, Cultist of Tiamat), best manual_0 rank 1 (Livaan, Cultist of Tiamat)"
+    },
+    {
+      "cardName": "Maddening Hex",
+      "line": "Maddening Hex [.scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png]: current rank 1 (Maddening Hex), exact art rank 1 (Maddening Hex), best manual_-5 rank 1 (Maddening Hex)"
+    },
+    {
+      "cardName": "Sword of Hearth and Home",
+      "line": "Sword of Hearth and Home [.scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png]: current rank 1 (Sword of Hearth and Home), exact art rank 2 (Immolating Glare), best manual_-10 rank 1 (Sword of Hearth and Home)"
+    },
+    {
+      "cardName": "Maddening Hex",
+      "line": "Maddening Hex [.scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png]: current rank 1 (Maddening Hex), exact art rank 1 (Maddening Hex), best manual_-10 rank 1 (Maddening Hex)"
+    },
+    {
+      "cardName": "Goblin Lookout",
+      "line": "Goblin Lookout [.scan-inbox/sessions/normal-scan-session-20260911-113049--card-006/source-highres/source-highres.png]: current rank 1 (Goblin Lookout), exact art rank 1 (Goblin Lookout), best manual_-10 rank 1 (Goblin Lookout)"
+    }
+  ],
+  "conditions": [
+    {
+      "label": "foil",
+      "n": 6,
+      "bestId": "manual_-5",
+      "bestTop1": 4,
+      "byId": {
+        "manual_-10": 3,
+        "manual_-5": 4,
+        "manual_0": 4,
+        "manual_+3": 3,
+        "manual_+5": 3,
+        "manual_+8": 3,
+        "manual_+12": 4
+      },
+      "detail": "manual -10% 3/6, manual -5% 4/6, manual 0% 4/6, manual +3% 3/6, manual +5% 3/6, manual +8% 3/6, manual +12% 4/6"
+    },
+    {
+      "label": "non-english",
+      "n": 5,
+      "bestId": "manual_-10",
+      "bestTop1": 4,
+      "byId": {
+        "manual_-10": 4,
+        "manual_-5": 4,
+        "manual_0": 3,
+        "manual_+3": 4,
+        "manual_+5": 3,
+        "manual_+8": 4,
+        "manual_+12": 4
+      },
+      "detail": "manual -10% 4/5, manual -5% 4/5, manual 0% 3/5, manual +3% 4/5, manual +5% 3/5, manual +8% 4/5, manual +12% 4/5"
+    },
+    {
+      "label": "modern_standard",
+      "n": 1,
+      "bestId": "manual_-10",
+      "bestTop1": 1,
+      "byId": {
+        "manual_-10": 1,
+        "manual_-5": 1,
+        "manual_0": 1,
+        "manual_+3": 1,
+        "manual_+5": 1,
+        "manual_+8": 1,
+        "manual_+12": 1
+      },
+      "detail": "manual -10% 1/1, manual -5% 1/1, manual 0% 1/1, manual +3% 1/1, manual +5% 1/1, manual +8% 1/1, manual +12% 1/1"
+    },
+    {
+      "label": "old/retro",
+      "n": 3,
+      "bestId": "manual_0",
+      "bestTop1": 3,
+      "byId": {
+        "manual_-10": 2,
+        "manual_-5": 2,
+        "manual_0": 3,
+        "manual_+3": 2,
+        "manual_+5": 2,
+        "manual_+8": 2,
+        "manual_+12": 2
+      },
+      "detail": "manual -10% 2/3, manual -5% 2/3, manual 0% 3/3, manual +3% 2/3, manual +5% 2/3, manual +8% 2/3, manual +12% 2/3"
+    },
+    {
+      "label": "glare",
+      "n": 1,
+      "bestId": "manual_-10",
+      "bestTop1": 1,
+      "byId": {
+        "manual_-10": 1,
+        "manual_-5": 1,
+        "manual_0": 1,
+        "manual_+3": 1,
+        "manual_+5": 1,
+        "manual_+8": 0,
+        "manual_+12": 1
+      },
+      "detail": "manual -10% 1/1, manual -5% 1/1, manual 0% 1/1, manual +3% 1/1, manual +5% 1/1, manual +8% 0/1, manual +12% 1/1"
+    },
+    {
+      "label": "basic land",
+      "n": 5,
+      "bestId": "manual_+3",
+      "bestTop1": 4,
+      "byId": {
+        "manual_-10": 2,
+        "manual_-5": 3,
+        "manual_0": 1,
+        "manual_+3": 4,
+        "manual_+5": 3,
+        "manual_+8": 2,
+        "manual_+12": 3
+      },
+      "detail": "manual -10% 2/5, manual -5% 3/5, manual 0% 1/5, manual +3% 4/5, manual +5% 3/5, manual +8% 2/5, manual +12% 3/5"
+    },
+    {
+      "label": "showcase",
+      "n": 2,
+      "bestId": "manual_-5",
+      "bestTop1": 1,
+      "byId": {
+        "manual_-10": 0,
+        "manual_-5": 1,
+        "manual_0": 0,
+        "manual_+3": 1,
+        "manual_+5": 0,
+        "manual_+8": 0,
+        "manual_+12": 0
+      },
+      "detail": "manual -10% 0/2, manual -5% 1/2, manual 0% 0/2, manual +3% 1/2, manual +5% 0/2, manual +8% 0/2, manual +12% 0/2"
+    },
+    {
+      "label": "borderless",
+      "n": 3,
+      "bestId": "manual_-5",
+      "bestTop1": 3,
+      "byId": {
+        "manual_-10": 2,
+        "manual_-5": 3,
+        "manual_0": 3,
+        "manual_+3": 3,
+        "manual_+5": 3,
+        "manual_+8": 2,
+        "manual_+12": 3
+      },
+      "detail": "manual -10% 2/3, manual -5% 3/3, manual 0% 3/3, manual +3% 3/3, manual +5% 3/3, manual +8% 2/3, manual +12% 3/3"
+    }
+  ],
+  "verdict": "CONTEXT_CROP_WIN",
+  "verdictWhy": "manual_+3 reaches 39 Top1 versus current 32 and exact art 37, with 9 wrong→correct and 2 correct→wrong.",
+  "autoNote": "auto_anchor is 35/46 Top1, with 4 wrong→correct and 1 correct→wrong.",
+  "orientation": {
+    "canonical": 41,
+    "reordered": 5,
+    "mirrored": 1,
+    "buckets": {
+      "0": 41,
+      "90": 4,
+      "180": 0,
+      "270": 0
+    },
+    "reorderedFrames": [
+      {
+        "cardName": "Livaan, Cultist of Tiamat",
+        "imageId": ".scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png",
+        "angle": 96.77876525658726,
+        "snapped": 90,
+        "kind": "rotation"
+      },
+      {
+        "cardName": "Lizard Blades",
+        "imageId": ".scan-fixtures/replay/lizard-blades-french-20260908T111833/source-highres.png",
+        "angle": 90.95470519764791,
+        "snapped": 90,
+        "kind": "rotation"
+      },
+      {
+        "cardName": "Maddening Hex",
+        "imageId": ".scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+        "angle": 89.92879986124407,
+        "snapped": 90,
+        "kind": "rotation"
+      },
+      {
+        "cardName": "Maddening Hex",
+        "imageId": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+        "angle": 2.20359720285468,
+        "snapped": null,
+        "kind": "mirror"
+      },
+      {
+        "cardName": "Goblin Lookout",
+        "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-006/source-highres/source-highres.png",
+        "angle": 88.95662206311688,
+        "snapped": 90,
+        "kind": "rotation"
+      }
+    ]
+  },
+  "turnedComparison": [
+    {
+      "cardName": "Livaan, Cultist of Tiamat",
+      "imageId": ".scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png",
+      "before": "-10% 61, -5% 22, 0% 508, +3% 230, +5% 387, +8% 39, +12% 22",
+      "after": "-10% 1, -5% 1, 0% 1, +3% 1, +5% 1, +8% 1, +12% 1"
+    },
+    {
+      "cardName": "Lizard Blades",
+      "imageId": ".scan-fixtures/replay/lizard-blades-french-20260908T111833/source-highres.png",
+      "before": "-10% 1, -5% 1, 0% 1, +3% 1, +5% 1, +8% 1, +12% 1",
+      "after": "-10% 1, -5% 1, 0% 1, +3% 1, +5% 1, +8% 1, +12% 1"
+    },
+    {
+      "cardName": "Maddening Hex",
+      "imageId": ".scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+      "before": "-10% 3, -5% 77, 0% 19, +3% 4, +5% 2, +8% 1, +12% 1",
+      "after": "-10% 1, -5% 1, 0% 1, +3% 1, +5% 1, +8% 1, +12% 1"
+    },
+    {
+      "cardName": "Maddening Hex",
+      "imageId": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+      "before": "-10% 29, -5% 101, 0% 6, +3% 4, +5% 4, +8% 59, +12% 11",
+      "after": "-10% 1, -5% 1, 0% 1, +3% 1, +5% 1, +8% 7, +12% 1"
+    },
+    {
+      "cardName": "Goblin Lookout",
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-006/source-highres/source-highres.png",
+      "before": "-10% 3241, -5% 3204, 0% 2969, +3% 2093, +5% 1232, +8% 995, +12% 827",
+      "after": "-10% 1, -5% 1, 0% 1, +3% 1, +5% 1, +8% 1, +12% 1"
+    }
+  ],
+  "otherComparison": [
+    {
+      "cardName": "Sword of Hearth and Home",
+      "imageId": ".scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+      "before": "-10% 1, -5% 1, 0% 2, +3% 1, +5% 2, +8% 1, +12% 1",
+      "after": "-10% 1, -5% 1, 0% 2, +3% 1, +5% 2, +8% 1, +12% 1"
+    },
+    {
+      "cardName": "Maddening Hex",
+      "imageId": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+      "before": "-10% 29, -5% 101, 0% 6, +3% 4, +5% 4, +8% 59, +12% 11",
+      "after": "-10% 1, -5% 1, 0% 1, +3% 1, +5% 1, +8% 7, +12% 1"
+    },
+    {
+      "cardName": "Teferi's Veil",
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120722/photo-source.png",
+      "before": "-10% 31525, -5% 31355, 0% 1, +3% 31284, +5% 26053, +8% 26053, +12% 26053",
+      "after": "-10% 31525, -5% 31355, 0% 1, +3% 31284, +5% 26053, +8% 26053, +12% 26053"
+    },
+    {
+      "cardName": "Wand of Wonder",
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t000-source.png",
+      "before": "-10% 647, -5% 820, 0% 1, +3% 76, +5% 654, +8% 1303, +12% 721",
+      "after": "-10% 647, -5% 820, 0% 1, +3% 76, +5% 654, +8% 1303, +12% 721"
+    }
+  ],
+  "frames": [
+    {
+      "imageId": ".scan-fixtures/replay/basilisk-collar-20260908T111744/source-highres.png",
+      "cardName": "Basilisk Collar",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_0",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.05682982438418313,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Basilisk Collar",
+          "top1Score": 0.6791719133706255,
+          "expectedScore": 0.6791719133706255,
+          "margin": 0.018068804802524263,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Basilisk Collar",
+          "top1Score": 0.7011360639770446,
+          "expectedScore": 0.7011360639770446,
+          "margin": 0.0766658663006361,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Basilisk Collar",
+          "top1Score": 0.7060635551144928,
+          "expectedScore": 0.7060635551144928,
+          "margin": 0.05443903832511676,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Basilisk Collar",
+          "top1Score": 0.7072624873211868,
+          "expectedScore": 0.7072624873211868,
+          "margin": 0.05092860565044732,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Basilisk Collar",
+          "top1Score": 0.7112841065082957,
+          "expectedScore": 0.7112841065082957,
+          "margin": 0.0984870673167838,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Basilisk Collar",
+          "top1Score": 0.6744019731120513,
+          "expectedScore": 0.6744019731120513,
+          "margin": 0.07406992385510869,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Basilisk Collar",
+          "top1Score": 0.6473519400322452,
+          "expectedScore": 0.6473519400322452,
+          "margin": 0.057292511619036146,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Basilisk Collar",
+          "top1Score": 0.5654052376563534,
+          "expectedScore": 0.5654052376563534,
+          "margin": 0.007635418064591892,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Basilisk Collar",
+          "top1Score": 0.5440155440452271,
+          "expectedScore": 0.5440155440452271,
+          "margin": 0.008940230746038669,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/livaan-cultist-of-tiamat-foil-20260908T111916/source-highres.png",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "frameFamily": "unknown",
+      "conditions": [
+        "foil"
+      ],
+      "group": "B",
+      "bestId": "manual_0",
+      "orientation": {
+        "snapped": 90,
+        "angle": 96.77876525658726,
+        "kind": "rotation",
+        "changed": true
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.695407587875992,
+          "expectedScore": 0.695407587875992,
+          "margin": 0.10363331679028187,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6652697121425554,
+          "expectedScore": 0.6652697121425554,
+          "margin": 0.08214426700969979,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.7148497072855254,
+          "expectedScore": 0.7148497072855254,
+          "margin": 0.09664327021354313,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6168253892215537,
+          "expectedScore": 0.6168253892215537,
+          "margin": 0.0697587079626899,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.7395684336719449,
+          "expectedScore": 0.7395684336719449,
+          "margin": 0.14197478200570768,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6563908760919568,
+          "expectedScore": 0.6563908760919568,
+          "margin": 0.0009086381330539739,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6560912985989027,
+          "expectedScore": 0.6560912985989027,
+          "margin": 0.04028763811607283,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6614428789691706,
+          "expectedScore": 0.6614428789691706,
+          "margin": 0.07105123088382026,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.5968451674753374,
+          "expectedScore": 0.5968451674753374,
+          "margin": 0.07598019855320304,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/lizard-blades-french-20260908T111833/source-highres.png",
+      "cardName": "Lizard Blades",
+      "frameFamily": "unknown",
+      "conditions": [
+        "non-english"
+      ],
+      "group": null,
+      "bestId": "manual_+3",
+      "orientation": {
+        "snapped": 90,
+        "angle": 90.95470519764791,
+        "kind": "rotation",
+        "changed": true
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7650119262454569,
+          "expectedScore": 0.7650119262454569,
+          "margin": 0.1313192746594134,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7584170698117668,
+          "expectedScore": 0.7584170698117668,
+          "margin": 0.11933928709958763,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7749944917913641,
+          "expectedScore": 0.7749944917913641,
+          "margin": 0.14209961663789605,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7476305384357219,
+          "expectedScore": 0.7476305384357219,
+          "margin": 0.12230489775111708,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7850815351678438,
+          "expectedScore": 0.7850815351678438,
+          "margin": 0.15977149408673574,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.8038719848439213,
+          "expectedScore": 0.8038719848439213,
+          "margin": 0.16144839644159004,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7749142452306667,
+          "expectedScore": 0.7749142452306667,
+          "margin": 0.13734323684189875,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7310983855825608,
+          "expectedScore": 0.7310983855825608,
+          "margin": 0.12022973042563168,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.673121146116908,
+          "expectedScore": 0.673121146116908,
+          "margin": 0.07626908180280578,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/maddening-hex-alt-art-20260908T082448/source-highres.png",
+      "cardName": "Maddening Hex",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": "B",
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 90,
+        "angle": 89.92879986124407,
+        "kind": "rotation",
+        "changed": true
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7746663699985766,
+          "expectedScore": 0.7746663699985766,
+          "margin": 0.09120548171473197,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7613571338906829,
+          "expectedScore": 0.7613571338906829,
+          "margin": 0.10743710398309725,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7510470226211435,
+          "expectedScore": 0.7510470226211435,
+          "margin": 0.08812701439079795,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7519198694564805,
+          "expectedScore": 0.7519198694564805,
+          "margin": 0.08398347596183942,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7412642406373492,
+          "expectedScore": 0.7412642406373492,
+          "margin": 0.11345161400380155,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7500092898488201,
+          "expectedScore": 0.7500092898488201,
+          "margin": 0.10526650370437418,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7457729859737258,
+          "expectedScore": 0.7457729859737258,
+          "margin": 0.0838911914975845,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7072211455365642,
+          "expectedScore": 0.7072211455365642,
+          "margin": 0.08457251992209769,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.6178781188493601,
+          "expectedScore": 0.6178781188493601,
+          "margin": 0.05289127997124943,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/negate-20260908T082630/source-highres.png",
+      "cardName": "Negate",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 3.049935010576575,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.6589058659633453,
+          "expectedScore": 0.6589058659633453,
+          "margin": 0.0350767638812538,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": false,
+          "rank": null,
+          "top1Name": null,
+          "top1Score": null,
+          "expectedScore": null,
+          "margin": null,
+          "available": false
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 4,
+          "top1Name": "Darkslick Drake",
+          "top1Score": 0.733074946937101,
+          "expectedScore": 0.6908394430317233,
+          "margin": 0.03255222946023184,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.6839053278901276,
+          "expectedScore": 0.6839053278901276,
+          "margin": 0.044432328318655956,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.6362650354056325,
+          "expectedScore": 0.6362650354056325,
+          "margin": 0.0318212805746545,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.640342500405669,
+          "expectedScore": 0.640342500405669,
+          "margin": 0.004429413721519615,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.6267000133699661,
+          "expectedScore": 0.6267000133699661,
+          "margin": 0.01939197527393821,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.6331230764987523,
+          "expectedScore": 0.6331230764987523,
+          "margin": 0.035234651749528,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Topaz Dragon",
+          "top1Score": 0.6400828906889408,
+          "expectedScore": 0.6393946334140066,
+          "margin": 0.0006882572749341564,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/negate-unsleeved-20260908T082746/source-highres.png",
+      "cardName": "Negate",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.21433143704413735,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.7816147328107027,
+          "expectedScore": 0.7816147328107027,
+          "margin": 0.08725222057227722,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.6985613077580031,
+          "expectedScore": 0.6985613077580031,
+          "margin": 0.06497529818305725,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.7622078003148748,
+          "expectedScore": 0.7622078003148748,
+          "margin": 0.07602451722391845,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.7630964956098061,
+          "expectedScore": 0.7630964956098061,
+          "margin": 0.1021358016698326,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.7541430527409156,
+          "expectedScore": 0.7541430527409156,
+          "margin": 0.11584932212062315,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.6631028071976984,
+          "expectedScore": 0.6631028071976984,
+          "margin": 0.043111846551132205,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.6860601767386405,
+          "expectedScore": 0.6860601767386405,
+          "margin": 0.03883352324419109,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.6917024283702543,
+          "expectedScore": 0.6917024283702543,
+          "margin": 0.054153261093107696,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Negate",
+          "top1Score": 0.6660638299545768,
+          "expectedScore": 0.6660638299545768,
+          "margin": 0.05640443668449824,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/p-e-d-tre-et-de-foyer-french-goo-20260908T082303/source-highres.png",
+      "cardName": "Sword of Hearth and Home",
+      "frameFamily": "unknown",
+      "conditions": [
+        "non-english"
+      ],
+      "group": "B",
+      "bestId": "manual_-10",
+      "orientation": {
+        "snapped": 0,
+        "angle": 356.48512673686264,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Hearth and Home",
+          "top1Score": 0.695645069764656,
+          "expectedScore": 0.695645069764656,
+          "margin": 0.062295645476714845,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Hearth and Home",
+          "top1Score": 0.6820133489981987,
+          "expectedScore": 0.6820133489981987,
+          "margin": 0.0133372298323009,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Hearth and Home",
+          "top1Score": 0.6845787094414462,
+          "expectedScore": 0.6845787094414462,
+          "margin": 0.02964730835125906,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Hearth and Home",
+          "top1Score": 0.6845336659021124,
+          "expectedScore": 0.6845336659021124,
+          "margin": 0.02304445333806049,
+          "available": true
+        },
+        "manual_0": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Immolating Glare",
+          "top1Score": 0.665499390169943,
+          "expectedScore": 0.6589213962082194,
+          "margin": 0.006577993961723538,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Hearth and Home",
+          "top1Score": 0.6653708513238163,
+          "expectedScore": 0.6653708513238163,
+          "margin": 0.016684085382334013,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Immolating Glare",
+          "top1Score": 0.6643845550001735,
+          "expectedScore": 0.6557870015612094,
+          "margin": 0.008597553438964067,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Hearth and Home",
+          "top1Score": 0.6596673846799452,
+          "expectedScore": 0.6596673846799452,
+          "margin": 0.013769794713715977,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Hearth and Home",
+          "top1Score": 0.6354889550429713,
+          "expectedScore": 0.6354889550429713,
+          "margin": 0.06923687978120385,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/slip-out-the-back-italian-20260908T111643/source-highres.png",
+      "cardName": "Slip Out the Back",
+      "frameFamily": "modern_standard",
+      "conditions": [
+        "modern_standard",
+        "non-english"
+      ],
+      "group": null,
+      "bestId": "manual_+5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.435611521246,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Slip Out the Back",
+          "top1Score": 0.7274640155461387,
+          "expectedScore": 0.7274640155461387,
+          "margin": 0.06493635390154262,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Slip Out the Back",
+          "top1Score": 0.675222176265936,
+          "expectedScore": 0.675222176265936,
+          "margin": 0.04477479757372249,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Slip Out the Back",
+          "top1Score": 0.691683982593371,
+          "expectedScore": 0.691683982593371,
+          "margin": 0.016104403016841462,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Slip Out the Back",
+          "top1Score": 0.7013321604006358,
+          "expectedScore": 0.7013321604006358,
+          "margin": 0.04315843922540574,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Slip Out the Back",
+          "top1Score": 0.7208423952823934,
+          "expectedScore": 0.7208423952823934,
+          "margin": 0.031209946938597133,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Slip Out the Back",
+          "top1Score": 0.7220440430523278,
+          "expectedScore": 0.7220440430523278,
+          "margin": 0.06265675129375037,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Slip Out the Back",
+          "top1Score": 0.7267973541117321,
+          "expectedScore": 0.7267973541117321,
+          "margin": 0.07620517248950409,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Slip Out the Back",
+          "top1Score": 0.6798152259936484,
+          "expectedScore": 0.6798152259936484,
+          "margin": 0.037459679595734374,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Slip Out the Back",
+          "top1Score": 0.6955896996144492,
+          "expectedScore": 0.6955896996144492,
+          "margin": 0.014040643718380652,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/teferi-veil-old-edition-good-cap-20260908T111548/source-highres.png",
+      "cardName": "Teferi's Veil",
+      "frameFamily": "unknown",
+      "conditions": [
+        "old/retro"
+      ],
+      "group": null,
+      "bestId": "manual_0",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.06542254846698793,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.8503905437822996,
+          "expectedScore": 0.8503905437822996,
+          "margin": 0.21437705954644248,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.8426415088613693,
+          "expectedScore": 0.8426415088613693,
+          "margin": 0.13792539720743258,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.7262282834802104,
+          "expectedScore": 0.7262282834802104,
+          "margin": 0.05704613559680061,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.8191217448871186,
+          "expectedScore": 0.8191217448871186,
+          "margin": 0.1448558610273194,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.8322945202161706,
+          "expectedScore": 0.8322945202161706,
+          "margin": 0.1606692360999542,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.7782977968334991,
+          "expectedScore": 0.7782977968334991,
+          "margin": 0.11997595532799199,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.7726881427566993,
+          "expectedScore": 0.7726881427566993,
+          "margin": 0.14577493708918954,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.7442750418583448,
+          "expectedScore": 0.7442750418583448,
+          "margin": 0.1275082997573328,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.7550775420812904,
+          "expectedScore": 0.7550775420812904,
+          "margin": 0.15076763020129913,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/replay/wand-of-wonder-20260908T073958/source-highres.png",
+      "cardName": "Wand of Wonder",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.7810871718878051,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7125721536997499,
+          "expectedScore": 0.7125721536997499,
+          "margin": 0.020847837025604332,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7588647802436991,
+          "expectedScore": 0.7588647802436991,
+          "margin": 0.06932857078635457,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7277323512004539,
+          "expectedScore": 0.7277323512004539,
+          "margin": 0.07160018119163714,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7866490164615764,
+          "expectedScore": 0.7866490164615764,
+          "margin": 0.14468001970498223,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7651467964462214,
+          "expectedScore": 0.7651467964462214,
+          "margin": 0.09963681293875604,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7348119972191538,
+          "expectedScore": 0.7348119972191538,
+          "margin": 0.0756822322433276,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.763448613166403,
+          "expectedScore": 0.763448613166403,
+          "margin": 0.07364654975603291,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7592905592271352,
+          "expectedScore": 0.7592905592271352,
+          "margin": 0.05967268426475647,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7310033537385392,
+          "expectedScore": 0.7310033537385392,
+          "margin": 0.11930775255923054,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-fixtures/real-photos/maddening-hex-afc-showcase-glare.png",
+      "cardName": "Maddening Hex",
+      "frameFamily": "unknown",
+      "conditions": [
+        "glare"
+      ],
+      "group": "B",
+      "bestId": "manual_-10",
+      "orientation": {
+        "snapped": null,
+        "angle": 2.20359720285468,
+        "kind": "mirror",
+        "changed": true
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7568474914626275,
+          "expectedScore": 0.7568474914626275,
+          "margin": 0.05074549456149091,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7812664037888469,
+          "expectedScore": 0.7812664037888469,
+          "margin": 0.06089527260598149,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7468639294455345,
+          "expectedScore": 0.7468639294455345,
+          "margin": 0.03408633018074769,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7446954087847701,
+          "expectedScore": 0.7446954087847701,
+          "margin": 0.040167122089609375,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.7308227721887698,
+          "expectedScore": 0.7308227721887698,
+          "margin": 0.04156628314777222,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.6791479575182231,
+          "expectedScore": 0.6791479575182231,
+          "margin": 0.033916309192015826,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.6213066558432776,
+          "expectedScore": 0.6213066558432776,
+          "margin": 0.009498828972103857,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 7,
+          "top1Name": "Dark Ritual",
+          "top1Score": 0.6204651496361142,
+          "expectedScore": 0.6132723604446306,
+          "margin": 0.0007452002819196002,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Maddening Hex",
+          "top1Score": 0.6716703098612967,
+          "expectedScore": 0.6716703098612967,
+          "margin": 0.03508270075463993,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120539/photo-source.png",
+      "cardName": "Lizard Blades",
+      "frameFamily": "unknown",
+      "conditions": [
+        "non-english"
+      ],
+      "group": null,
+      "bestId": "manual_0",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.6515270087286,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7701815915599733,
+          "expectedScore": 0.7701815915599733,
+          "margin": 0.108337958120993,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7207817085587599,
+          "expectedScore": 0.7207817085587599,
+          "margin": 0.08370731271838772,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.774968269924705,
+          "expectedScore": 0.774968269924705,
+          "margin": 0.09224908986533897,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.762133692451534,
+          "expectedScore": 0.762133692451534,
+          "margin": 0.0958621746136763,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7778926773753896,
+          "expectedScore": 0.7778926773753896,
+          "margin": 0.11081722262818816,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7674597453625185,
+          "expectedScore": 0.7674597453625185,
+          "margin": 0.10209058008854921,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7540768068053196,
+          "expectedScore": 0.7540768068053196,
+          "margin": 0.0702569298313438,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.7528879596430338,
+          "expectedScore": 0.7528879596430338,
+          "margin": 0.08946945873079626,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Lizard Blades",
+          "top1Score": 0.6734442748951186,
+          "expectedScore": 0.6734442748951186,
+          "margin": 0.01624087814934727,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+      "cardName": "Island",
+      "frameFamily": "unknown",
+      "conditions": [
+        "basic land"
+      ],
+      "group": null,
+      "bestId": "manual_+5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.6273899187088,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 36,
+          "top1Name": "Double-Faced Substitute Card",
+          "top1Score": 0.8086339036242748,
+          "expectedScore": 0.6349948079147432,
+          "margin": 0.09359252669083118,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": false,
+          "rank": null,
+          "top1Name": null,
+          "top1Score": null,
+          "expectedScore": null,
+          "margin": null,
+          "available": false
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7860136917033246,
+          "expectedScore": 0.7860136917033246,
+          "margin": 0.047853885021185816,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7758323877266597,
+          "expectedScore": 0.7758323877266597,
+          "margin": 0.05370626097304765,
+          "available": true
+        },
+        "manual_0": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Plains",
+          "top1Score": 0.7240156245725736,
+          "expectedScore": 0.7155720637774907,
+          "margin": 0.008443560795082905,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7749604926977377,
+          "expectedScore": 0.7749604926977377,
+          "margin": 0.08282651394025398,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7957178561321887,
+          "expectedScore": 0.7957178561321887,
+          "margin": 0.08446578013364969,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7746340024576832,
+          "expectedScore": 0.7746340024576832,
+          "margin": 0.10072219721037012,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7273447735744178,
+          "expectedScore": 0.7273447735744178,
+          "margin": 0.07780978924534154,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120722/photo-source.png",
+      "cardName": "Teferi's Veil",
+      "frameFamily": "unknown",
+      "conditions": [
+        "old/retro"
+      ],
+      "group": null,
+      "bestId": "manual_0",
+      "orientation": {
+        "snapped": 0,
+        "angle": 2.208992815141877,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.8588448837837084,
+          "expectedScore": 0.8588448837837084,
+          "margin": 0.20246864366606865,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.8069250129208377,
+          "expectedScore": 0.8069250129208377,
+          "margin": 0.1344268739343274,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 31525,
+          "top1Name": "Double-Faced Substitute Card",
+          "top1Score": 0.7785028326895075,
+          "expectedScore": 0.18611626477918503,
+          "margin": 0.08724865139052873,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": false,
+          "rank": 31355,
+          "top1Name": "Double-Faced Substitute Card",
+          "top1Score": 0.7528859221962138,
+          "expectedScore": 0.18185694310598727,
+          "margin": 0.04018090404644181,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.7875009568981105,
+          "expectedScore": 0.7875009568981105,
+          "margin": 0.14281751695300282,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": false,
+          "rank": 31284,
+          "top1Name": "Double-Faced Substitute Card",
+          "top1Score": 0.700213711589456,
+          "expectedScore": 0.15661109412804233,
+          "margin": 0.06329422835588083,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": false,
+          "rank": 26053,
+          "top1Name": "Whiteout",
+          "top1Score": 0.8493227075549936,
+          "expectedScore": 0.28919550751894785,
+          "margin": 0.06571659374055394,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 26053,
+          "top1Name": "Whiteout",
+          "top1Score": 0.8493227075549936,
+          "expectedScore": 0.28919550751894785,
+          "margin": 0.06571659374055394,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 26053,
+          "top1Name": "Whiteout",
+          "top1Score": 0.8493227075549936,
+          "expectedScore": 0.28919550751894785,
+          "margin": 0.06571659374055394,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+      "cardName": "Wand of Wonder",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": "A",
+      "bestId": "manual_-10",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.9672125336479623,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 3679,
+          "top1Name": "Who",
+          "top1Score": 0.5453619826537168,
+          "expectedScore": 0.2836730797026401,
+          "margin": 0.03312514377315212,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": false,
+          "rank": null,
+          "top1Name": null,
+          "top1Score": null,
+          "expectedScore": null,
+          "margin": null,
+          "available": false
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7510353361163526,
+          "expectedScore": 0.7510353361163526,
+          "margin": 0.11706373536572057,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7182355912767855,
+          "expectedScore": 0.7182355912767855,
+          "margin": 0.07074105525160834,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.6907442421838774,
+          "expectedScore": 0.6907442421838774,
+          "margin": 0.09041507310481078,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.6475500310757929,
+          "expectedScore": 0.6475500310757929,
+          "margin": 0.06552595154331642,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.712872035324413,
+          "expectedScore": 0.712872035324413,
+          "margin": 0.0776240634602251,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.683035214757992,
+          "expectedScore": 0.683035214757992,
+          "margin": 0.07213958057601144,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.6407881455378711,
+          "expectedScore": 0.6407881455378711,
+          "margin": 0.03620767084686982,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "frameFamily": "unknown",
+      "conditions": [
+        "foil"
+      ],
+      "group": "A",
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.67274903271374,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 138,
+          "top1Name": "Temple Garden",
+          "top1Score": 0.43854635172340095,
+          "expectedScore": 0.31726416581899597,
+          "margin": 0.003334772105580086,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": false,
+          "rank": null,
+          "top1Name": null,
+          "top1Score": null,
+          "expectedScore": null,
+          "margin": null,
+          "available": false
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 4,
+          "top1Name": "Garbage Fire",
+          "top1Score": 0.6749346325632262,
+          "expectedScore": 0.6290359667424351,
+          "margin": 0.030752864713546324,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.68030796960305,
+          "expectedScore": 0.68030796960305,
+          "margin": 0.021154395212839128,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6452994858587131,
+          "expectedScore": 0.6452994858587131,
+          "margin": 0.07973086085452674,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": false,
+          "rank": 5,
+          "top1Name": "The Balrog, Durin's Bane",
+          "top1Score": 0.6518293186879819,
+          "expectedScore": 0.6308686180450718,
+          "margin": 0.002142489592474872,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": false,
+          "rank": 5,
+          "top1Name": "Garbage Fire",
+          "top1Score": 0.6113922542347731,
+          "expectedScore": 0.5743521453647292,
+          "margin": 0.023662569353321006,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Garbage Fire",
+          "top1Score": 0.6325671001161545,
+          "expectedScore": 0.6232830527645329,
+          "margin": 0.009284047351621583,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6598632129554672,
+          "expectedScore": 0.6598632129554672,
+          "margin": 0.004578845251349661,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c008/deck-011-source.png",
+      "cardName": "Feywild Trickster",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_+3",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.63487419595657,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Feywild Trickster",
+          "top1Score": 0.8076390256536602,
+          "expectedScore": 0.8076390256536602,
+          "margin": 0.2227527668190955,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Feywild Trickster",
+          "top1Score": 0.7942796096024124,
+          "expectedScore": 0.7942796096024124,
+          "margin": 0.20585336215792793,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Feywild Trickster",
+          "top1Score": 0.8034174172364498,
+          "expectedScore": 0.8034174172364498,
+          "margin": 0.21372481935136334,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Feywild Trickster",
+          "top1Score": 0.8003821749624862,
+          "expectedScore": 0.8003821749624862,
+          "margin": 0.20354051415643104,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Feywild Trickster",
+          "top1Score": 0.7868758194431439,
+          "expectedScore": 0.7868758194431439,
+          "margin": 0.22284423972147283,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Feywild Trickster",
+          "top1Score": 0.8309623799356728,
+          "expectedScore": 0.8309623799356728,
+          "margin": 0.2649754867552453,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Feywild Trickster",
+          "top1Score": 0.8165835200578734,
+          "expectedScore": 0.8165835200578734,
+          "margin": 0.26433226725006764,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Feywild Trickster",
+          "top1Score": 0.8045523655888768,
+          "expectedScore": 0.8045523655888768,
+          "margin": 0.20611994075519224,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Feywild Trickster",
+          "top1Score": 0.7062558393531446,
+          "expectedScore": 0.7062558393531446,
+          "margin": 0.1460217084857225,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/deck-test-20260910-085502/deck-test-20260910-085502-c000/deck-001-source.png",
+      "cardName": "Sword of Feast and Famine",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_-10",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.72715939389434,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Feast and Famine",
+          "top1Score": 0.7908546166092423,
+          "expectedScore": 0.7908546166092423,
+          "margin": 0.13704380204304045,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Feast and Famine",
+          "top1Score": 0.7910025479349883,
+          "expectedScore": 0.7910025479349883,
+          "margin": 0.1524138041723676,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Feast and Famine",
+          "top1Score": 0.8054056010790478,
+          "expectedScore": 0.8054056010790478,
+          "margin": 0.14108476663966252,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Feast and Famine",
+          "top1Score": 0.7729385307445477,
+          "expectedScore": 0.7729385307445477,
+          "margin": 0.14944302793819308,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Feast and Famine",
+          "top1Score": 0.7521021527733539,
+          "expectedScore": 0.7521021527733539,
+          "margin": 0.1327875232409228,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Feast and Famine",
+          "top1Score": 0.7374406601703093,
+          "expectedScore": 0.7374406601703093,
+          "margin": 0.12902626723303967,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Feast and Famine",
+          "top1Score": 0.6750074280289174,
+          "expectedScore": 0.6750074280289174,
+          "margin": 0.07278620974207195,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of Feast and Famine",
+          "top1Score": 0.6198490153176756,
+          "expectedScore": 0.6198490153176756,
+          "margin": 0.008493020046034139,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 3,
+          "top1Name": "Who",
+          "top1Score": 0.5812686004971159,
+          "expectedScore": 0.5707691605708115,
+          "margin": 0.010274476224713669,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124234/t500-source.png",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "frameFamily": "unknown",
+      "conditions": [
+        "foil"
+      ],
+      "group": null,
+      "bestId": "manual_0",
+      "orientation": {
+        "snapped": 0,
+        "angle": 8.267959431000417,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 48,
+          "top1Name": "Nevermind",
+          "top1Score": 0.46042313043492933,
+          "expectedScore": 0.40164243002276684,
+          "margin": 0.011023660180835337,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": false,
+          "rank": 44,
+          "top1Name": "Muraganda Eldrazi",
+          "top1Score": 0.4826059963385244,
+          "expectedScore": 0.4385027967836099,
+          "margin": 0.0012435189097411703,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 3213,
+          "top1Name": "Whiteout",
+          "top1Score": 0.7019233014846017,
+          "expectedScore": 0.46524469888559244,
+          "margin": 0.006605717589988402,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": false,
+          "rank": 1148,
+          "top1Name": "Upriser Renegade",
+          "top1Score": 0.5775062765766739,
+          "expectedScore": 0.41868979353913455,
+          "margin": 0.024462605237532298,
+          "available": true
+        },
+        "manual_0": {
+          "top1": false,
+          "rank": 50,
+          "top1Name": "Dark Ritual",
+          "top1Score": 0.6644837023715315,
+          "expectedScore": 0.5895535149668553,
+          "margin": 0.01693413939776567,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": false,
+          "rank": 853,
+          "top1Name": "Caller of the Pack",
+          "top1Score": 0.5334070361263086,
+          "expectedScore": 0.3851761825325903,
+          "margin": 0.011049490327153189,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": false,
+          "rank": 888,
+          "top1Name": "Caller of the Pack",
+          "top1Score": 0.5369803943961753,
+          "expectedScore": 0.38824950273346365,
+          "margin": 0.011488792786533697,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 1055,
+          "top1Name": "Lost Jitte",
+          "top1Score": 0.5528999073291196,
+          "expectedScore": 0.4068873493257703,
+          "margin": 0.00473560772724424,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 2027,
+          "top1Name": "Sauron, the Dark Lord",
+          "top1Score": 0.559338945136104,
+          "expectedScore": 0.3569515301414639,
+          "margin": 0.03926839002534788,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T124408/t500-source.png",
+      "cardName": "Teferi's Veil",
+      "frameFamily": "unknown",
+      "conditions": [
+        "old/retro"
+      ],
+      "group": null,
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.79818269298795,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.8340249675229474,
+          "expectedScore": 0.8340249675229474,
+          "margin": 0.17964642001575637,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.8072847872287584,
+          "expectedScore": 0.8072847872287584,
+          "margin": 0.13972277725885052,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.75347171751118,
+          "expectedScore": 0.75347171751118,
+          "margin": 0.08889783602908219,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.8001681874522449,
+          "expectedScore": 0.8001681874522449,
+          "margin": 0.1295484460180113,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.7877978081339937,
+          "expectedScore": 0.7877978081339937,
+          "margin": 0.10199715322687863,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.7923099530029858,
+          "expectedScore": 0.7923099530029858,
+          "margin": 0.09740601707186747,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.7764464346598103,
+          "expectedScore": 0.7764464346598103,
+          "margin": 0.11721450090434749,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.7530583464025485,
+          "expectedScore": 0.7530583464025485,
+          "margin": 0.11009397593738546,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Teferi's Veil",
+          "top1Score": 0.7194686335416157,
+          "expectedScore": 0.7194686335416157,
+          "margin": 0.09107835146916221,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t500-source.png",
+      "cardName": "Wand of Wonder",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_0",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.07569525551133739,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7291255383458154,
+          "expectedScore": 0.7291255383458154,
+          "margin": 0.09221316289344073,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.6949312429580502,
+          "expectedScore": 0.6949312429580502,
+          "margin": 0.08050601404161095,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 9,
+          "top1Name": "Nira, Hellkite Duelist",
+          "top1Score": 0.6288305982616977,
+          "expectedScore": 0.5852756811336084,
+          "margin": 0.014776896376976212,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": false,
+          "rank": 25,
+          "top1Name": "Nira, Hellkite Duelist",
+          "top1Score": 0.64666865118145,
+          "expectedScore": 0.5606896113499238,
+          "margin": 0.01617685205143682,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.691961699416451,
+          "expectedScore": 0.691961699416451,
+          "margin": 0.07980194014104192,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.6646036864985149,
+          "expectedScore": 0.6646036864985149,
+          "margin": 0.006592052875050269,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.6314837893889957,
+          "expectedScore": 0.6314837893889957,
+          "margin": 0.021136968502952547,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.6439711231922125,
+          "expectedScore": 0.6439711231922125,
+          "margin": 0.006520574056209205,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 8,
+          "top1Name": "Jund 'Em Out",
+          "top1Score": 0.6387118301345835,
+          "expectedScore": 0.5740505704746081,
+          "margin": 0.042815664345905446,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132626/t000-source.png",
+      "cardName": "Wand of Wonder",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_0",
+      "orientation": {
+        "snapped": 0,
+        "angle": 351.8584342001733,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.7185818970668275,
+          "expectedScore": 0.7185818970668275,
+          "margin": 0.0823904757590661,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.6667406583446749,
+          "expectedScore": 0.6667406583446749,
+          "margin": 0.004801866097612351,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 647,
+          "top1Name": "Wheel of Misfortune",
+          "top1Score": 0.7496589387770372,
+          "expectedScore": 0.544908957397185,
+          "margin": 0.035995028365701454,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": false,
+          "rank": 820,
+          "top1Name": "Wheel of Misfortune",
+          "top1Score": 0.7487802830673752,
+          "expectedScore": 0.5417883844348956,
+          "margin": 0.01704774277156418,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Wand of Wonder",
+          "top1Score": 0.707351436937297,
+          "expectedScore": 0.707351436937297,
+          "margin": 0.08939811547854848,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": false,
+          "rank": 76,
+          "top1Name": "Double-Faced Substitute Card",
+          "top1Score": 0.706012706803074,
+          "expectedScore": 0.608652558662232,
+          "margin": 0.019262976090719475,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": false,
+          "rank": 654,
+          "top1Name": "Kemba's Banner",
+          "top1Score": 0.7091745564359019,
+          "expectedScore": 0.5165225287914275,
+          "margin": 0.04291547530802331,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 1303,
+          "top1Name": "Aesthetic Consultation",
+          "top1Score": 0.6361423759281558,
+          "expectedScore": 0.42988100683099284,
+          "margin": 0.012626460669041939,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 721,
+          "top1Name": "Double-Faced Substitute Card",
+          "top1Score": 0.6796134769869626,
+          "expectedScore": 0.4938287611519368,
+          "margin": 0.009613505774776265,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132712/t800-source.png",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "frameFamily": "unknown",
+      "conditions": [
+        "foil"
+      ],
+      "group": null,
+      "bestId": "manual_+3",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.443721768841596,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.697130655570496,
+          "expectedScore": 0.697130655570496,
+          "margin": 0.13056970036130777,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.7065942686044824,
+          "expectedScore": 0.7065942686044824,
+          "margin": 0.09305236219715962,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6661944469753447,
+          "expectedScore": 0.6661944469753447,
+          "margin": 0.08883381092921716,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.699595823975569,
+          "expectedScore": 0.699595823975569,
+          "margin": 0.11435663779773253,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.715867715520373,
+          "expectedScore": 0.715867715520373,
+          "margin": 0.1497646150802675,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.7479263790351165,
+          "expectedScore": 0.7479263790351165,
+          "margin": 0.14192073478431855,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6717726609032,
+          "expectedScore": 0.6717726609032,
+          "margin": 0.08648198156878373,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.5920814955147039,
+          "expectedScore": 0.5920814955147039,
+          "margin": 0.0481317551971675,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.5599564939706042,
+          "expectedScore": 0.5599564939706042,
+          "margin": 0.0868925480035651,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/focus-series-20260908T132801/t500-source.png",
+      "cardName": "Excalibur, Sword of Eden",
+      "frameFamily": "unknown",
+      "conditions": [
+        "foil",
+        "non-english"
+      ],
+      "group": null,
+      "bestId": "manual_+3",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.6206283495469,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 403,
+          "top1Name": "Return to Nature",
+          "top1Score": 0.7409271041872257,
+          "expectedScore": 0.5736219612983848,
+          "margin": 0.018192664582358575,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": false,
+          "rank": 156,
+          "top1Name": "Sanctify",
+          "top1Score": 0.7423138518190221,
+          "expectedScore": 0.6161576113312639,
+          "margin": 0.008139275255457545,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 174,
+          "top1Name": "Return to Nature",
+          "top1Score": 0.7273286891005064,
+          "expectedScore": 0.6000034043313263,
+          "margin": 0.0025479652314502887,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": false,
+          "rank": 184,
+          "top1Name": "Sanctify",
+          "top1Score": 0.7226269097754279,
+          "expectedScore": 0.5943336432056097,
+          "margin": 0.004177083617958877,
+          "available": true
+        },
+        "manual_0": {
+          "top1": false,
+          "rank": 65,
+          "top1Name": "Sanctify",
+          "top1Score": 0.7315426186616787,
+          "expectedScore": 0.6269223515802209,
+          "margin": 0.02247180670137372,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": false,
+          "rank": 33,
+          "top1Name": "Plains",
+          "top1Score": 0.6985624321932905,
+          "expectedScore": 0.6285372590597426,
+          "margin": 0.001364496558032946,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": false,
+          "rank": 34,
+          "top1Name": "Plains",
+          "top1Score": 0.6901455817798605,
+          "expectedScore": 0.6168405035412381,
+          "margin": 0.0101756876768746,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 67,
+          "top1Name": "Sanctify",
+          "top1Score": 0.6701063771736733,
+          "expectedScore": 0.5884984727686399,
+          "margin": 0.0010735505157919434,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 55,
+          "top1Name": "Supreme Verdict",
+          "top1Score": 0.6110607456201679,
+          "expectedScore": 0.5086305086234876,
+          "margin": 0.028851430221641827,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-007-source/geom-007-source.png",
+      "cardName": "The Spear of Leonidas",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_+3",
+      "orientation": {
+        "snapped": 0,
+        "angle": 358.24245361084166,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Engulfing Eruption",
+          "top1Score": 0.7204762455643664,
+          "expectedScore": 0.71874225004443,
+          "margin": 0.00173399551993636,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "The Spear of Leonidas",
+          "top1Score": 0.7104506025697375,
+          "expectedScore": 0.7104506025697375,
+          "margin": 0.06316925649673477,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 3,
+          "top1Name": "Seismic Assault",
+          "top1Score": 0.7221865238786284,
+          "expectedScore": 0.6909822167823407,
+          "margin": 0.029850385450363448,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Seismic Assault",
+          "top1Score": 0.6683960018029214,
+          "expectedScore": 0.6674202954605479,
+          "margin": 0.000975706342373428,
+          "available": true
+        },
+        "manual_0": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "The Black Arrow",
+          "top1Score": 0.6874122735736354,
+          "expectedScore": 0.6643954525049589,
+          "margin": 0.02301682106867653,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "The Spear of Leonidas",
+          "top1Score": 0.6821761695969399,
+          "expectedScore": 0.6821761695969399,
+          "margin": 0.03390058197037715,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Lost Jitte",
+          "top1Score": 0.6760933590934033,
+          "expectedScore": 0.6537646438739015,
+          "margin": 0.02232871521950175,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 4,
+          "top1Name": "Lost Jitte",
+          "top1Score": 0.6022245170651948,
+          "expectedScore": 0.584874160912571,
+          "margin": 0.0027491956184555466,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Artificer's Dragon",
+          "top1Score": 0.5770064874288838,
+          "expectedScore": 0.5472631156817365,
+          "margin": 0.029743371747147362,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-153114/geom-001-source/geom-001-source.png",
+      "cardName": "Island",
+      "frameFamily": "unknown",
+      "conditions": [
+        "basic land"
+      ],
+      "group": null,
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.10494638718853522,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.791146796454778,
+          "expectedScore": 0.791146796454778,
+          "margin": 0.04523856241581503,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7931780366670568,
+          "expectedScore": 0.7931780366670568,
+          "margin": 0.059336495914623644,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.8089908064599998,
+          "expectedScore": 0.8089908064599998,
+          "margin": 0.0324813065546552,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.8121225706899996,
+          "expectedScore": 0.8121225706899996,
+          "margin": 0.053642062613464825,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7729219206681587,
+          "expectedScore": 0.7729219206681587,
+          "margin": 0.010462781953156752,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.771438745345162,
+          "expectedScore": 0.771438745345162,
+          "margin": 0.03962991629942714,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7495083662501403,
+          "expectedScore": 0.7495083662501403,
+          "margin": 0.010310625715181265,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.765490596029868,
+          "expectedScore": 0.765490596029868,
+          "margin": 0.028132214872221617,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7296083490883835,
+          "expectedScore": 0.7296083490883835,
+          "margin": 0.06135357194289093,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-007-source/geom-007-source.png",
+      "cardName": "Island",
+      "frameFamily": "showcase",
+      "conditions": [
+        "showcase",
+        "basic land"
+      ],
+      "group": null,
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.6072237706093553,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 510,
+          "top1Name": "Double-Faced Substitute Card",
+          "top1Score": 0.6733765041938493,
+          "expectedScore": 0.49844122714854755,
+          "margin": 0.037096650420878396,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": false,
+          "rank": 52,
+          "top1Name": "Double-Faced Substitute Card",
+          "top1Score": 0.7129030124566356,
+          "expectedScore": 0.5606808122205669,
+          "margin": 0.05113341138261085,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 6,
+          "top1Name": "Dreadship Reef",
+          "top1Score": 0.72237108191325,
+          "expectedScore": 0.6707346283857683,
+          "margin": 0.023034630230046482,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7129065314184978,
+          "expectedScore": 0.7129065314184978,
+          "margin": 0.00373312161975492,
+          "available": true
+        },
+        "manual_0": {
+          "top1": false,
+          "rank": 5,
+          "top1Name": "Dreadship Reef",
+          "top1Score": 0.7031409751033443,
+          "expectedScore": 0.662908909785114,
+          "margin": 0.01599836149549272,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": false,
+          "rank": 6,
+          "top1Name": "Sludge Monster",
+          "top1Score": 0.6803211786131431,
+          "expectedScore": 0.6632751596202094,
+          "margin": 0.00023926637887672353,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": false,
+          "rank": 6,
+          "top1Name": "Plains",
+          "top1Score": 0.6647297128988001,
+          "expectedScore": 0.6273178164759611,
+          "margin": 0.010163096431958452,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Noxious Bayou",
+          "top1Score": 0.6314296785115987,
+          "expectedScore": 0.6095362236374245,
+          "margin": 0.021893454874174156,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 4,
+          "top1Name": "Noxious Bayou",
+          "top1Score": 0.6263284576823156,
+          "expectedScore": 0.573851496661509,
+          "margin": 0.03691671025823906,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-154646/geom-001-source/geom-001-source.png",
+      "cardName": "Mask of Memory",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 1.0066433228586795,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mask of Memory",
+          "top1Score": 0.6628676926457739,
+          "expectedScore": 0.6628676926457739,
+          "margin": 0.02145197970654189,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mask of Memory",
+          "top1Score": 0.797770327904466,
+          "expectedScore": 0.797770327904466,
+          "margin": 0.1253076122822563,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mask of Memory",
+          "top1Score": 0.8119604737429906,
+          "expectedScore": 0.8119604737429906,
+          "margin": 0.16775580718151895,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mask of Memory",
+          "top1Score": 0.8229240508687292,
+          "expectedScore": 0.8229240508687292,
+          "margin": 0.13616575796124986,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mask of Memory",
+          "top1Score": 0.7426621029633366,
+          "expectedScore": 0.7426621029633366,
+          "margin": 0.10242872737414721,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mask of Memory",
+          "top1Score": 0.7631314715751113,
+          "expectedScore": 0.7631314715751113,
+          "margin": 0.1285505845121483,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mask of Memory",
+          "top1Score": 0.7398357414306697,
+          "expectedScore": 0.7398357414306697,
+          "margin": 0.08213783433107447,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mask of Memory",
+          "top1Score": 0.7336811179529641,
+          "expectedScore": 0.7336811179529641,
+          "margin": 0.08446363344090924,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mask of Memory",
+          "top1Score": 0.6241342691118053,
+          "expectedScore": 0.6241342691118053,
+          "margin": 0.00979063982345274,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-155241/geom-006-source/geom-006-source.png",
+      "cardName": "Blacksmith's Talent",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_+5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.5743282143714373,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 3867,
+          "top1Name": "Royal",
+          "top1Score": 0.5038476746251276,
+          "expectedScore": 0.24022432035199381,
+          "margin": 0.05327494805055788,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": false,
+          "rank": 1731,
+          "top1Name": "Royal",
+          "top1Score": 0.5710138056618707,
+          "expectedScore": 0.31402714802034837,
+          "margin": 0.05145458779155532,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 904,
+          "top1Name": "Road",
+          "top1Score": 0.687485578877424,
+          "expectedScore": 0.5098256169328037,
+          "margin": 0.0018553485993820784,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": false,
+          "rank": 810,
+          "top1Name": "Locust Spray",
+          "top1Score": 0.6999503858178483,
+          "expectedScore": 0.5251945602960398,
+          "margin": 0.004132659379479597,
+          "available": true
+        },
+        "manual_0": {
+          "top1": false,
+          "rank": 1443,
+          "top1Name": "Road",
+          "top1Score": 0.6950950150998793,
+          "expectedScore": 0.498592434911916,
+          "margin": 0.008591751868162412,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": false,
+          "rank": 1718,
+          "top1Name": "Struggle",
+          "top1Score": 0.6703254856829999,
+          "expectedScore": 0.4815978346416301,
+          "margin": 0.0005945074836409825,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": false,
+          "rank": 308,
+          "top1Name": "Roc of Kher Ridges",
+          "top1Score": 0.6943022156969187,
+          "expectedScore": 0.5498669334797521,
+          "margin": 0.023320246192691463,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 575,
+          "top1Name": "Roc of Kher Ridges",
+          "top1Score": 0.7087131640391202,
+          "expectedScore": 0.5111889267125246,
+          "margin": 0.030898215267738616,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 825,
+          "top1Name": "Zurgo and Ojutai",
+          "top1Score": 0.655476677772389,
+          "expectedScore": 0.4658107261387413,
+          "margin": 0.011938267079258158,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+      "cardName": "Bulk Up",
+      "frameFamily": "borderless",
+      "conditions": [
+        "borderless"
+      ],
+      "group": "A",
+      "bestId": "manual_-10",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.78352797678616,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 662,
+          "top1Name": "Cauldron Familiar",
+          "top1Score": 0.513020763212715,
+          "expectedScore": 0.3974890450757739,
+          "margin": 0.0051551807232503855,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": false,
+          "rank": null,
+          "top1Name": null,
+          "top1Score": null,
+          "expectedScore": null,
+          "margin": null,
+          "available": false
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Bulk Up",
+          "top1Score": 0.7624527621307864,
+          "expectedScore": 0.7624527621307864,
+          "margin": 0.032377691201387004,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Bulk Up",
+          "top1Score": 0.7507135501791936,
+          "expectedScore": 0.7507135501791936,
+          "margin": 0.061175566470973886,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Bulk Up",
+          "top1Score": 0.6412845060020416,
+          "expectedScore": 0.6412845060020416,
+          "margin": 0.01527279993780406,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Bulk Up",
+          "top1Score": 0.698409667265247,
+          "expectedScore": 0.698409667265247,
+          "margin": 0.03734161264743219,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Bulk Up",
+          "top1Score": 0.665218769424395,
+          "expectedScore": 0.665218769424395,
+          "margin": 0.009971723640408214,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 5,
+          "top1Name": "Phyrexian Vindicator",
+          "top1Score": 0.6381603219996098,
+          "expectedScore": 0.6222193462032828,
+          "margin": 0.007396352931142491,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Bulk Up",
+          "top1Score": 0.6731220473226199,
+          "expectedScore": 0.6731220473226199,
+          "margin": 0.0178308008378103,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-164005/geom-001-source/geom-001-source.png",
+      "cardName": "The Ozolith",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_+5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.88383049132096,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "The Ozolith",
+          "top1Score": 0.7915764572419169,
+          "expectedScore": 0.7915764572419169,
+          "margin": 0.051245515209644266,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "The Ozolith",
+          "top1Score": 0.782405572232223,
+          "expectedScore": 0.782405572232223,
+          "margin": 0.03974587090310089,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "The Ozolith",
+          "top1Score": 0.8057647336228458,
+          "expectedScore": 0.8057647336228458,
+          "margin": 0.05514368963289151,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "The Ozolith",
+          "top1Score": 0.7856815413671437,
+          "expectedScore": 0.7856815413671437,
+          "margin": 0.027174566776001385,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "The Ozolith",
+          "top1Score": 0.7845061686830219,
+          "expectedScore": 0.7845061686830219,
+          "margin": 0.06466553305147293,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "The Ozolith",
+          "top1Score": 0.8049965159069379,
+          "expectedScore": 0.8049965159069379,
+          "margin": 0.0977329189166043,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "The Ozolith",
+          "top1Score": 0.8234785966635245,
+          "expectedScore": 0.8234785966635245,
+          "margin": 0.12339609407524188,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "The Ozolith",
+          "top1Score": 0.7943865754987995,
+          "expectedScore": 0.7943865754987995,
+          "margin": 0.1431979988466282,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "The Ozolith",
+          "top1Score": 0.7438803203784697,
+          "expectedScore": 0.7438803203784697,
+          "margin": 0.1139033850831388,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-006-source/geom-006-source.png",
+      "cardName": "Sword of the Animist",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_0",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.3501523085187,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7735869737478306,
+          "expectedScore": 0.7735869737478306,
+          "margin": 0.09069317491664464,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.6510073053584619,
+          "expectedScore": 0.6510073053584619,
+          "margin": 0.02781387848106287,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7356947516635302,
+          "expectedScore": 0.7356947516635302,
+          "margin": 0.08885884209854789,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7503618242454653,
+          "expectedScore": 0.7503618242454653,
+          "margin": 0.09404881749660288,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7591794087244135,
+          "expectedScore": 0.7591794087244135,
+          "margin": 0.10198855683475683,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7414430825913451,
+          "expectedScore": 0.7414430825913451,
+          "margin": 0.07617450472054754,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.739409226238151,
+          "expectedScore": 0.739409226238151,
+          "margin": 0.09679986336853963,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7277262406394917,
+          "expectedScore": 0.7277262406394917,
+          "margin": 0.10068027068040841,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.6685007757711846,
+          "expectedScore": 0.6685007757711846,
+          "margin": 0.08645443067154046,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-165339/geom-001-source/geom-001-source.png",
+      "cardName": "Island",
+      "frameFamily": "showcase",
+      "conditions": [
+        "showcase",
+        "basic land"
+      ],
+      "group": null,
+      "bestId": "manual_+3",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.585124581268,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 8,
+          "top1Name": "Riverglide Pathway",
+          "top1Score": 0.7418701274919115,
+          "expectedScore": 0.6812009536499251,
+          "margin": 0.03246559171463892,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": false,
+          "rank": 42,
+          "top1Name": "Riverglide Pathway",
+          "top1Score": 0.700699135436844,
+          "expectedScore": 0.6258951209220263,
+          "margin": 0.0007951703790851639,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 7,
+          "top1Name": "Twilight Mire",
+          "top1Score": 0.7135976604990115,
+          "expectedScore": 0.7069494093395848,
+          "margin": 0.003009957598631874,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": false,
+          "rank": 18,
+          "top1Name": "Sunset Revelry",
+          "top1Score": 0.729973550938459,
+          "expectedScore": 0.6860540367348604,
+          "margin": 0.006388624280816657,
+          "available": true
+        },
+        "manual_0": {
+          "top1": false,
+          "rank": 12,
+          "top1Name": "Sunset Revelry",
+          "top1Score": 0.7166282779825303,
+          "expectedScore": 0.6721256652091113,
+          "margin": 0.023978662469297363,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7215735983433921,
+          "expectedScore": 0.7215735983433921,
+          "margin": 0.011150703178607557,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": false,
+          "rank": 3,
+          "top1Name": "Sunset Revelry",
+          "top1Score": 0.7158495908245733,
+          "expectedScore": 0.713492772158824,
+          "margin": 0.0011220333827957063,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 13,
+          "top1Name": "Return to Nature",
+          "top1Score": 0.6892892236474585,
+          "expectedScore": 0.658122870568994,
+          "margin": 0.0003699728228120369,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 5,
+          "top1Name": "Calciform Pools",
+          "top1Score": 0.5829744625193753,
+          "expectedScore": 0.5391272617887908,
+          "margin": 0.02352547603639976,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-006-source/geom-006-source.png",
+      "cardName": "Netherese Puzzle-Ward",
+      "frameFamily": "borderless",
+      "conditions": [
+        "borderless"
+      ],
+      "group": null,
+      "bestId": "manual_-10",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.73059924855687,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Netherese Puzzle-Ward",
+          "top1Score": 0.7563247706229136,
+          "expectedScore": 0.7563247706229136,
+          "margin": 0.06147761953542952,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Netherese Puzzle-Ward",
+          "top1Score": 0.7479233883631587,
+          "expectedScore": 0.7479233883631587,
+          "margin": 0.07673260728502007,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Netherese Puzzle-Ward",
+          "top1Score": 0.852533490317176,
+          "expectedScore": 0.852533490317176,
+          "margin": 0.1464777403123665,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Netherese Puzzle-Ward",
+          "top1Score": 0.7927100464430067,
+          "expectedScore": 0.7927100464430067,
+          "margin": 0.06838460186028505,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Netherese Puzzle-Ward",
+          "top1Score": 0.7801466663175324,
+          "expectedScore": 0.7801466663175324,
+          "margin": 0.05869817446739467,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Netherese Puzzle-Ward",
+          "top1Score": 0.7889472772496274,
+          "expectedScore": 0.7889472772496274,
+          "margin": 0.06745487452119714,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Netherese Puzzle-Ward",
+          "top1Score": 0.7770826126303827,
+          "expectedScore": 0.7770826126303827,
+          "margin": 0.08169504355657842,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Netherese Puzzle-Ward",
+          "top1Score": 0.711963173522695,
+          "expectedScore": 0.711963173522695,
+          "margin": 0.05251897990856458,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Netherese Puzzle-Ward",
+          "top1Score": 0.6432068359916557,
+          "expectedScore": 0.6432068359916557,
+          "margin": 0.04392986585187697,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-173530/geom-001-source/geom-001-source.png",
+      "cardName": "Critical Hit",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_-10",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.4512297491422,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Critical Hit",
+          "top1Score": 0.8098991552538123,
+          "expectedScore": 0.8098991552538123,
+          "margin": 0.17772888501844286,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Critical Hit",
+          "top1Score": 0.7384615694527488,
+          "expectedScore": 0.7384615694527488,
+          "margin": 0.10351712081590891,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Critical Hit",
+          "top1Score": 0.8371897604235196,
+          "expectedScore": 0.8371897604235196,
+          "margin": 0.16705614422848203,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Critical Hit",
+          "top1Score": 0.8271744994006687,
+          "expectedScore": 0.8271744994006687,
+          "margin": 0.1608405863499548,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Critical Hit",
+          "top1Score": 0.7852757872923439,
+          "expectedScore": 0.7852757872923439,
+          "margin": 0.12397993313493472,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Critical Hit",
+          "top1Score": 0.7215010878799385,
+          "expectedScore": 0.7215010878799385,
+          "margin": 0.10235521709003514,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Critical Hit",
+          "top1Score": 0.7358540823858208,
+          "expectedScore": 0.7358540823858208,
+          "margin": 0.1185535735273624,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Critical Hit",
+          "top1Score": 0.6580836163292728,
+          "expectedScore": 0.6580836163292728,
+          "margin": 0.02835851283931834,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Critical Hit",
+          "top1Score": 0.6100811546022133,
+          "expectedScore": 0.6100811546022133,
+          "margin": 0.023554883528123294,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-005-source/geom-005-source.png",
+      "cardName": "Sword of the Animist",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.28156197786535,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7813322424377458,
+          "expectedScore": 0.7813322424377458,
+          "margin": 0.1462704220019021,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7225611008424769,
+          "expectedScore": 0.7225611008424769,
+          "margin": 0.06787388446656151,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7263278759763565,
+          "expectedScore": 0.7263278759763565,
+          "margin": 0.09515896975163707,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7612318874529844,
+          "expectedScore": 0.7612318874529844,
+          "margin": 0.11143010902689687,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.6964419441967001,
+          "expectedScore": 0.6964419441967001,
+          "margin": 0.053221739320216344,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7181069980360686,
+          "expectedScore": 0.7181069980360686,
+          "margin": 0.06933851119339363,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.7054234407407719,
+          "expectedScore": 0.7054234407407719,
+          "margin": 0.04593282789492559,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.6929319966406048,
+          "expectedScore": 0.6929319966406048,
+          "margin": 0.03445758191533976,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sword of the Animist",
+          "top1Score": 0.6568676598268349,
+          "expectedScore": 0.6568676598268349,
+          "margin": 0.06395079922914304,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-192617/geom-001-source/geom-001-source.png",
+      "cardName": "Swiftfoot Boots",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.4564353358529515,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Swiftfoot Boots",
+          "top1Score": 0.7532029548275102,
+          "expectedScore": 0.7532029548275102,
+          "margin": 0.056691541760320985,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Swiftfoot Boots",
+          "top1Score": 0.7686077023886599,
+          "expectedScore": 0.7686077023886599,
+          "margin": 0.08104556364625004,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Wildfire Elemental",
+          "top1Score": 0.7395742653453359,
+          "expectedScore": 0.7383216512954951,
+          "margin": 0.0012526140498407834,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Swiftfoot Boots",
+          "top1Score": 0.8394772358784686,
+          "expectedScore": 0.8394772358784686,
+          "margin": 0.11089057282480597,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Swiftfoot Boots",
+          "top1Score": 0.7634872806942439,
+          "expectedScore": 0.7634872806942439,
+          "margin": 0.0703857774226736,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Swiftfoot Boots",
+          "top1Score": 0.7812969844906394,
+          "expectedScore": 0.7812969844906394,
+          "margin": 0.10720795329931854,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Swiftfoot Boots",
+          "top1Score": 0.7419556847649791,
+          "expectedScore": 0.7419556847649791,
+          "margin": 0.07327845393616006,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Swiftfoot Boots",
+          "top1Score": 0.7077130638378586,
+          "expectedScore": 0.7077130638378586,
+          "margin": 0.04157602870281363,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Ashling, Rekindled",
+          "top1Score": 0.6324082761206516,
+          "expectedScore": 0.6315611140991199,
+          "margin": 0.0008471620215317888,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-085827/geom-001-source/geom-001-source.png",
+      "cardName": "Havi, the All-Father",
+      "frameFamily": "borderless",
+      "conditions": [
+        "borderless"
+      ],
+      "group": "A",
+      "bestId": "manual_+3",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.25171127313934,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 3,
+          "top1Name": "Minions",
+          "top1Score": 0.7175765353248584,
+          "expectedScore": 0.6666549080878433,
+          "margin": 0.028268840166059905,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Havi, the All-Father",
+          "top1Score": 0.7084140670030454,
+          "expectedScore": 0.7084140670030454,
+          "margin": 0.016855003156574733,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 6,
+          "top1Name": "Minions",
+          "top1Score": 0.7047676491009645,
+          "expectedScore": 0.6718082220079924,
+          "margin": 0.015418748066774679,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Havi, the All-Father",
+          "top1Score": 0.7317802952481476,
+          "expectedScore": 0.7317802952481476,
+          "margin": 0.03171447123966453,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Havi, the All-Father",
+          "top1Score": 0.6721070503854968,
+          "expectedScore": 0.6721070503854968,
+          "margin": 0.004044706903708728,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Havi, the All-Father",
+          "top1Score": 0.7443715590441643,
+          "expectedScore": 0.7443715590441643,
+          "margin": 0.05565720242982952,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Havi, the All-Father",
+          "top1Score": 0.6830292805985472,
+          "expectedScore": 0.6830292805985472,
+          "margin": 0.03410650283860783,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Havi, the All-Father",
+          "top1Score": 0.7346866282214218,
+          "expectedScore": 0.7346866282214218,
+          "margin": 0.058239431223210625,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Havi, the All-Father",
+          "top1Score": 0.6634572949217631,
+          "expectedScore": 0.6634572949217631,
+          "margin": 0.03484228605720796,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+      "cardName": "Mudbutton Torchrunner",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": "A",
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.8314930548647019,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 1698,
+          "top1Name": "That's No Moonmist",
+          "top1Score": 0.5340348933628838,
+          "expectedScore": 0.3425840322649045,
+          "margin": 0.007250337275225616,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": false,
+          "rank": null,
+          "top1Name": null,
+          "top1Score": null,
+          "expectedScore": null,
+          "margin": null,
+          "available": false
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mudbutton Torchrunner",
+          "top1Score": 0.7715412375768413,
+          "expectedScore": 0.7715412375768413,
+          "margin": 0.1083471820415226,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mudbutton Torchrunner",
+          "top1Score": 0.844851255591509,
+          "expectedScore": 0.844851255591509,
+          "margin": 0.20745305521833024,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mudbutton Torchrunner",
+          "top1Score": 0.8369111406336892,
+          "expectedScore": 0.8369111406336892,
+          "margin": 0.19860953122162128,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mudbutton Torchrunner",
+          "top1Score": 0.795494090318095,
+          "expectedScore": 0.795494090318095,
+          "margin": 0.1266550363555231,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mudbutton Torchrunner",
+          "top1Score": 0.8286161699682513,
+          "expectedScore": 0.8286161699682513,
+          "margin": 0.15756456809230646,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mudbutton Torchrunner",
+          "top1Score": 0.8118007030999953,
+          "expectedScore": 0.8118007030999953,
+          "margin": 0.17900023369739415,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Mudbutton Torchrunner",
+          "top1Score": 0.6505831760890947,
+          "expectedScore": 0.6505831760890947,
+          "margin": 0.08492051521185251,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/livaan-foil-20260908T105241/source-highres.png",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "frameFamily": "unknown",
+      "conditions": [
+        "foil"
+      ],
+      "group": null,
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 1.510138974061575,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6102454403734233,
+          "expectedScore": 0.6102454403734233,
+          "margin": 0.09095259146186796,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.572064363499836,
+          "expectedScore": 0.572064363499836,
+          "margin": 0.05580781256179246,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.7408987234206333,
+          "expectedScore": 0.7408987234206333,
+          "margin": 0.03461634864380947,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.7562668006337103,
+          "expectedScore": 0.7562668006337103,
+          "margin": 0.06304680504545113,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6988297333890001,
+          "expectedScore": 0.6988297333890001,
+          "margin": 0.08412482829736834,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6861093834396527,
+          "expectedScore": 0.6861093834396527,
+          "margin": 0.03433731635393067,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.7182185332308781,
+          "expectedScore": 0.7182185332308781,
+          "margin": 0.07701800166945849,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.7015734229556477,
+          "expectedScore": 0.7015734229556477,
+          "margin": 0.09040057239618449,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Livaan, Cultist of Tiamat",
+          "top1Score": 0.6405270538959543,
+          "expectedScore": 0.6405270538959543,
+          "margin": 0.0958427639644327,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-111516--card-007/source-highres/source-highres.png",
+      "cardName": "Sprouting Goblin",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_-5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.02295821250394034,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sprouting Goblin",
+          "top1Score": 0.684430138060505,
+          "expectedScore": 0.684430138060505,
+          "margin": 0.03213516968130681,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sprouting Goblin",
+          "top1Score": 0.6863347015856416,
+          "expectedScore": 0.6863347015856416,
+          "margin": 0.01562310430964109,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Swarming Goblins",
+          "top1Score": 0.6906876865156688,
+          "expectedScore": 0.6618844956011755,
+          "margin": 0.02880319091449335,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sprouting Goblin",
+          "top1Score": 0.6974579020742466,
+          "expectedScore": 0.6974579020742466,
+          "margin": 0.029548907838692462,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sprouting Goblin",
+          "top1Score": 0.6959774722878231,
+          "expectedScore": 0.6959774722878231,
+          "margin": 0.06395190581109522,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sprouting Goblin",
+          "top1Score": 0.6743884024695033,
+          "expectedScore": 0.6743884024695033,
+          "margin": 0.08100834268902846,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sprouting Goblin",
+          "top1Score": 0.643435298455584,
+          "expectedScore": 0.643435298455584,
+          "margin": 0.025323691396812342,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Sprouting Goblin",
+          "top1Score": 0.6348708467698163,
+          "expectedScore": 0.6348708467698163,
+          "margin": 0.015675157781285476,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 20,
+          "top1Name": "Goblin Engineer",
+          "top1Score": 0.6165633691851711,
+          "expectedScore": 0.5583472573432459,
+          "margin": 0.020513132966614722,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-006/source-highres/source-highres.png",
+      "cardName": "Goblin Lookout",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": "B",
+      "bestId": "manual_-10",
+      "orientation": {
+        "snapped": 90,
+        "angle": 88.95662206311688,
+        "kind": "rotation",
+        "changed": true
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Lookout",
+          "top1Score": 0.7632918003636409,
+          "expectedScore": 0.7632918003636409,
+          "margin": 0.07452036749725077,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Lookout",
+          "top1Score": 0.7723462126520063,
+          "expectedScore": 0.7723462126520063,
+          "margin": 0.10334113706497694,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Lookout",
+          "top1Score": 0.7834686655974303,
+          "expectedScore": 0.7834686655974303,
+          "margin": 0.07837037542171688,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Lookout",
+          "top1Score": 0.7581614728564804,
+          "expectedScore": 0.7581614728564804,
+          "margin": 0.07508073271473759,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Lookout",
+          "top1Score": 0.7767179716614558,
+          "expectedScore": 0.7767179716614558,
+          "margin": 0.07878183899368096,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Lookout",
+          "top1Score": 0.701377422933558,
+          "expectedScore": 0.701377422933558,
+          "margin": 0.06026818709712123,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Lookout",
+          "top1Score": 0.7271072083795953,
+          "expectedScore": 0.7271072083795953,
+          "margin": 0.06754568807395211,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Lookout",
+          "top1Score": 0.7197730337164213,
+          "expectedScore": 0.7197730337164213,
+          "margin": 0.08007703179830172,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Lookout",
+          "top1Score": 0.680371923405772,
+          "expectedScore": 0.680371923405772,
+          "margin": 0.08425009836021091,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-113049--card-001/source-highres/source-highres.png",
+      "cardName": "Goblin Blastronauts",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_0",
+      "orientation": {
+        "snapped": 0,
+        "angle": 359.4427918492107,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Blastronauts",
+          "top1Score": 0.7211379085302578,
+          "expectedScore": 0.7211379085302578,
+          "margin": 0.0023005034359852017,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Blastronauts",
+          "top1Score": 0.7696079381464472,
+          "expectedScore": 0.7696079381464472,
+          "margin": 0.061255886715831265,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Blastronauts",
+          "top1Score": 0.7340636465975081,
+          "expectedScore": 0.7340636465975081,
+          "margin": 0.0023508760983514954,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Blastronauts",
+          "top1Score": 0.7679412505459127,
+          "expectedScore": 0.7679412505459127,
+          "margin": 0.05089445872196929,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Blastronauts",
+          "top1Score": 0.773726937662674,
+          "expectedScore": 0.773726937662674,
+          "margin": 0.04395155460244948,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Blastronauts",
+          "top1Score": 0.7678484195295625,
+          "expectedScore": 0.7678484195295625,
+          "margin": 0.041674433097487196,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Blastronauts",
+          "top1Score": 0.7480186997039941,
+          "expectedScore": 0.7480186997039941,
+          "margin": 0.041228473006693744,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Goblin Blastronauts",
+          "top1Score": 0.6876794528498215,
+          "expectedScore": 0.6876794528498215,
+          "margin": 0.006113398873964115,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": false,
+          "rank": 3,
+          "top1Name": "Squirrel Stack",
+          "top1Score": 0.6115848402847031,
+          "expectedScore": 0.5762911060378639,
+          "margin": 0.01905522713098906,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/normal-scan-session-20260911-120703--card-005/source-highres/source-highres.png",
+      "cardName": "Elder Auntie",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": null,
+      "bestId": "manual_+5",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.7570698473852603,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Elder Auntie",
+          "top1Score": 0.7806208622433741,
+          "expectedScore": 0.7806208622433741,
+          "margin": 0.0933182815252317,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Elder Auntie",
+          "top1Score": 0.7597196542866231,
+          "expectedScore": 0.7597196542866231,
+          "margin": 0.10653504558154447,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Elder Auntie",
+          "top1Score": 0.7549409995545157,
+          "expectedScore": 0.7549409995545157,
+          "margin": 0.11021068709094006,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Elder Auntie",
+          "top1Score": 0.7695296959264936,
+          "expectedScore": 0.7695296959264936,
+          "margin": 0.1071784841921466,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Elder Auntie",
+          "top1Score": 0.7546588106399051,
+          "expectedScore": 0.7546588106399051,
+          "margin": 0.08563136087766476,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Elder Auntie",
+          "top1Score": 0.7579918443705289,
+          "expectedScore": 0.7579918443705289,
+          "margin": 0.09101728373603146,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Elder Auntie",
+          "top1Score": 0.7738572717947761,
+          "expectedScore": 0.7738572717947761,
+          "margin": 0.09438698869800977,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Elder Auntie",
+          "top1Score": 0.7257337116638765,
+          "expectedScore": 0.7257337116638765,
+          "margin": 0.0809076090922618,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Elder Auntie",
+          "top1Score": 0.5945781583648172,
+          "expectedScore": 0.5945781583648172,
+          "margin": 0.0013115617314476413,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171149/swap-03-source.png",
+      "cardName": "Octopus Form",
+      "frameFamily": "unknown",
+      "conditions": [],
+      "group": "A",
+      "bestId": "manual_0",
+      "orientation": {
+        "snapped": 0,
+        "angle": 2.0790004956744976,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Specimen Freighter",
+          "top1Score": 0.6905114715797959,
+          "expectedScore": 0.673650965571273,
+          "margin": 0.016860506008522846,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Octopus Form",
+          "top1Score": 0.7533268273724825,
+          "expectedScore": 0.7533268273724825,
+          "margin": 0.04380693426614968,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Octopus Form",
+          "top1Score": 0.7037474940162359,
+          "expectedScore": 0.7037474940162359,
+          "margin": 0.021924646181265772,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Octopus Form",
+          "top1Score": 0.723576863416517,
+          "expectedScore": 0.723576863416517,
+          "margin": 0.07336981528311903,
+          "available": true
+        },
+        "manual_0": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Octopus Form",
+          "top1Score": 0.7333426568962053,
+          "expectedScore": 0.7333426568962053,
+          "margin": 0.023845585921035695,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Octopus Form",
+          "top1Score": 0.7184925142955636,
+          "expectedScore": 0.7184925142955636,
+          "margin": 0.0926553740586018,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Octopus Form",
+          "top1Score": 0.6171474671795256,
+          "expectedScore": 0.6171474671795256,
+          "margin": 0.04547621373904065,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Octopus Form",
+          "top1Score": 0.6184839831050641,
+          "expectedScore": 0.6184839831050641,
+          "margin": 0.02346028590077065,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Octopus Form",
+          "top1Score": 0.5464460018070827,
+          "expectedScore": 0.5464460018070827,
+          "margin": 0.013262198102516276,
+          "available": true
+        }
+      }
+    },
+    {
+      "imageId": ".scan-inbox/sessions/phone-20260908/swap-test-20260908-171306/swap-03-source.png",
+      "cardName": "Island",
+      "frameFamily": "unknown",
+      "conditions": [
+        "basic land"
+      ],
+      "group": null,
+      "bestId": "manual_+3",
+      "orientation": {
+        "snapped": 0,
+        "angle": 0.17054712140154182,
+        "kind": "rotation",
+        "changed": false
+      },
+      "scores": {
+        "current": {
+          "top1": false,
+          "rank": 4,
+          "top1Name": "Mountain",
+          "top1Score": 0.7653887456677141,
+          "expectedScore": 0.686367839691147,
+          "margin": 0.0336888688152176,
+          "available": true
+        },
+        "auto_anchor": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7407310738250056,
+          "expectedScore": 0.7407310738250056,
+          "margin": 0.0013832476217583434,
+          "available": true
+        },
+        "manual_-10": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Plains",
+          "top1Score": 0.7742809754670481,
+          "expectedScore": 0.7487107784689252,
+          "margin": 0.025570196998122907,
+          "available": true
+        },
+        "manual_-5": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Plains",
+          "top1Score": 0.7682795038845249,
+          "expectedScore": 0.7666535118309932,
+          "margin": 0.0016259920535317551,
+          "available": true
+        },
+        "manual_0": {
+          "top1": false,
+          "rank": 2,
+          "top1Name": "Plains",
+          "top1Score": 0.7579711148040368,
+          "expectedScore": 0.7543053019628171,
+          "margin": 0.0036658128412196955,
+          "available": true
+        },
+        "manual_+3": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7679260602354442,
+          "expectedScore": 0.7679260602354442,
+          "margin": 0.05486871892065348,
+          "available": true
+        },
+        "manual_+5": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.7174993584138192,
+          "expectedScore": 0.7174993584138192,
+          "margin": 0.03217630943827432,
+          "available": true
+        },
+        "manual_+8": {
+          "top1": false,
+          "rank": 3,
+          "top1Name": "Plains",
+          "top1Score": 0.710542035780624,
+          "expectedScore": 0.6915455501709421,
+          "margin": 0.0008172211504303695,
+          "available": true
+        },
+        "manual_+12": {
+          "top1": true,
+          "rank": 1,
+          "top1Name": "Island",
+          "top1Score": 0.6921113115455562,
+          "expectedScore": 0.6921113115455562,
+          "margin": 0.03686796398864922,
+          "available": true
+        }
+      }
+    }
+  ]
+}

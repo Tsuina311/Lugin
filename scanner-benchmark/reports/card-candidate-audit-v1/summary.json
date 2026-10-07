@@ -1,0 +1,3507 @@
+{
+  "verdict": "CARD_CANDIDATE_SELECTION_PRIMARY",
+  "rows": [
+    {
+      "slug": "island-cq",
+      "card": "Island cq-120629",
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120629/photo-source.png",
+      "tags": [
+        "unsleeved"
+      ],
+      "frameFamily": "unknown",
+      "outlineSpace": "image",
+      "outlineScale": 1,
+      "human": {
+        "tl": [
+          322.0437168300801,
+          440.37060358010257
+        ],
+        "tr": [
+          679.5430421876406,
+          427.69811999640194
+        ],
+        "br": [
+          717.3518035441216,
+          948.4861023657462
+        ],
+        "bl": [
+          333.7087343707835,
+          952.2209229108573
+        ]
+      },
+      "width": 960,
+      "height": 1280,
+      "previewScale": 0.5416666666666666,
+      "file": "island-cq.png",
+      "generated": 44,
+      "rejectedWithoutQuad": 35,
+      "accepted": 9,
+      "deduped": 7,
+      "bestSurvivesDedupe": true,
+      "best": {
+        "index": 0,
+        "method": "luma×2.5",
+        "score": 0.8409326190448357,
+        "rank": 3,
+        "iou": 0.9814877221096797,
+        "band": "GOOD",
+        "meanCorner": 4.539065721987289,
+        "maxCorner": 6.549147877595056,
+        "corners": {
+          "tl": {
+            "px": 5.993742642963839,
+            "cardWidths": 0.016169039767284277
+          },
+          "tr": {
+            "px": 1.63062319849943,
+            "cardWidths": 0.0043988560925191916
+          },
+          "br": {
+            "px": 6.549147877595056,
+            "cardWidths": 0.01766733054495926
+          },
+          "bl": {
+            "px": 3.9827491688908343,
+            "cardWidths": 0.0107440765363043
+          }
+        },
+        "places": {
+          "tl": "inside card",
+          "tr": "on the card edge",
+          "br": "inside card",
+          "bl": "on the card edge"
+        },
+        "areaRatio": 0.9928904578648466,
+        "aspect": 0.7193435207387494,
+        "quad": {
+          "tl": [
+            322.29382757766416,
+            446.35912555835614
+          ],
+          "tr": [
+            681.1336418832299,
+            427.3390592440552
+          ],
+          "br": [
+            711.1372462923189,
+            946.4195554665266
+          ],
+          "bl": [
+            330.7208706016626,
+            954.8543543300281
+          ]
+        }
+      },
+      "selected": {
+        "index": 16,
+        "method": "luma@12",
+        "score": 0.8511945859366479,
+        "rank": 2,
+        "iou": 0.19008815481034272,
+        "band": "POOR",
+        "meanCorner": 471.29665975824497,
+        "maxCorner": 544.9717682145707,
+        "corners": {
+          "tl": {
+            "px": 544.9717682145707,
+            "cardWidths": 1.4701449023095443
+          },
+          "tr": {
+            "px": 435.18342566178455,
+            "cardWidths": 1.173974015025264
+          },
+          "br": {
+            "px": 442.6927279126603,
+            "cardWidths": 1.1942315092073845
+          },
+          "bl": {
+            "px": 462.33871724396425,
+            "cardWidths": 1.2472295776410365
+          }
+        },
+        "places": {
+          "tl": "outside card, on a larger rectangle",
+          "tr": "outside card, on a larger rectangle",
+          "br": "outside card, on a larger rectangle",
+          "bl": "outside card, on a larger rectangle"
+        },
+        "areaRatio": 5.260717065709502,
+        "aspect": 0.6019661527628364,
+        "quad": {
+          "tl": [
+            2.8305278231980338,
+            -1.3274472588981325
+          ],
+          "tr": [
+            575.7723155238883,
+            5.067962224381636
+          ],
+          "br": [
+            1012.9823882484704,
+            1278
+          ],
+          "bl": [
+            5.646114748034108,
+            1278
+          ]
+        }
+      },
+      "maxScore": {
+        "index": 28,
+        "method": "chroma@18",
+        "score": 0.984832637084146,
+        "rank": 1,
+        "iou": 0.15840811912907654,
+        "band": "POOR",
+        "meanCorner": 478.8168255506763,
+        "maxCorner": 544.4948906253982,
+        "corners": {
+          "tl": {
+            "px": 544.4948906253982,
+            "cardWidths": 1.46885845189571
+          },
+          "tr": {
+            "px": 502.5728621911314,
+            "cardWidths": 1.3557673525181602
+          },
+          "br": {
+            "px": 407.61385033873495,
+            "cardWidths": 1.099600858498627
+          },
+          "bl": {
+            "px": 460.5856990474409,
+            "cardWidths": 1.24250054227519
+          }
+        },
+        "places": {
+          "tl": "outside card, on a larger rectangle",
+          "tr": "outside card, on a larger rectangle",
+          "br": "outside card, on a larger rectangle",
+          "bl": "outside card, on a larger rectangle"
+        },
+        "areaRatio": 6.31280773673706,
+        "aspect": 0.7412585440853856,
+        "quad": {
+          "tl": [
+            1.5799204487321374,
+            0.16878494912700148
+          ],
+          "tr": [
+            945.8807689427267,
+            1.5013378429945259
+          ],
+          "br": [
+            957.2885499041803,
+            1278
+          ],
+          "bl": [
+            8.121297423400193,
+            1278
+          ]
+        }
+      },
+      "whereLost": "score-ranking",
+      "diagnosis": "SELECTION_FAILURE",
+      "tracking": "TRACKING_NOT_MEASURABLE",
+      "recognitionCorners": null,
+      "trackedCorners": null,
+      "rawCorners": null,
+      "selectedContainsHuman": 1,
+      "humanContainsSelected": 0.19008815481034272,
+      "nestedSelected": false,
+      "nestedBest": false,
+      "nestedAreaFraction": null,
+      "top": [
+        {
+          "index": 28,
+          "method": "chroma@18",
+          "score": 0.984832637084146,
+          "rank": 1,
+          "iou": 0.15840811912907654,
+          "band": "POOR",
+          "meanCorner": 478.8168255506763,
+          "maxCorner": 544.4948906253982,
+          "corners": {
+            "tl": {
+              "px": 544.4948906253982,
+              "cardWidths": 1.46885845189571
+            },
+            "tr": {
+              "px": 502.5728621911314,
+              "cardWidths": 1.3557673525181602
+            },
+            "br": {
+              "px": 407.61385033873495,
+              "cardWidths": 1.099600858498627
+            },
+            "bl": {
+              "px": 460.5856990474409,
+              "cardWidths": 1.24250054227519
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 6.31280773673706,
+          "aspect": 0.7412585440853856,
+          "quad": {
+            "tl": [
+              1.5799204487321374,
+              0.16878494912700148
+            ],
+            "tr": [
+              945.8807689427267,
+              1.5013378429945259
+            ],
+            "br": [
+              957.2885499041803,
+              1278
+            ],
+            "bl": [
+              8.121297423400193,
+              1278
+            ]
+          }
+        },
+        {
+          "index": 16,
+          "method": "luma@12",
+          "score": 0.8511945859366479,
+          "rank": 2,
+          "iou": 0.19008815481034272,
+          "band": "POOR",
+          "meanCorner": 471.29665975824497,
+          "maxCorner": 544.9717682145707,
+          "corners": {
+            "tl": {
+              "px": 544.9717682145707,
+              "cardWidths": 1.4701449023095443
+            },
+            "tr": {
+              "px": 435.18342566178455,
+              "cardWidths": 1.173974015025264
+            },
+            "br": {
+              "px": 442.6927279126603,
+              "cardWidths": 1.1942315092073845
+            },
+            "bl": {
+              "px": 462.33871724396425,
+              "cardWidths": 1.2472295776410365
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 5.260717065709502,
+          "aspect": 0.6019661527628364,
+          "quad": {
+            "tl": [
+              2.8305278231980338,
+              -1.3274472588981325
+            ],
+            "tr": [
+              575.7723155238883,
+              5.067962224381636
+            ],
+            "br": [
+              1012.9823882484704,
+              1278
+            ],
+            "bl": [
+              5.646114748034108,
+              1278
+            ]
+          }
+        },
+        {
+          "index": 0,
+          "method": "luma×2.5",
+          "score": 0.8409326190448357,
+          "rank": 3,
+          "iou": 0.9814877221096797,
+          "band": "GOOD",
+          "meanCorner": 4.539065721987289,
+          "maxCorner": 6.549147877595056,
+          "corners": {
+            "tl": {
+              "px": 5.993742642963839,
+              "cardWidths": 0.016169039767284277
+            },
+            "tr": {
+              "px": 1.63062319849943,
+              "cardWidths": 0.0043988560925191916
+            },
+            "br": {
+              "px": 6.549147877595056,
+              "cardWidths": 0.01766733054495926
+            },
+            "bl": {
+              "px": 3.9827491688908343,
+              "cardWidths": 0.0107440765363043
+            }
+          },
+          "places": {
+            "tl": "inside card",
+            "tr": "on the card edge",
+            "br": "inside card",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 0.9928904578648466,
+          "aspect": 0.7193435207387494,
+          "quad": {
+            "tl": [
+              322.29382757766416,
+              446.35912555835614
+            ],
+            "tr": [
+              681.1336418832299,
+              427.3390592440552
+            ],
+            "br": [
+              711.1372462923189,
+              946.4195554665266
+            ],
+            "bl": [
+              330.7208706016626,
+              954.8543543300281
+            ]
+          }
+        },
+        {
+          "index": 4,
+          "method": "luma×3.5",
+          "score": 0.8407000560409695,
+          "rank": 4,
+          "iou": 0.9796281963771337,
+          "band": "GOOD",
+          "meanCorner": 4.3843302112321565,
+          "maxCorner": 7.490518213994907,
+          "corners": {
+            "tl": {
+              "px": 7.490518213994907,
+              "cardWidths": 0.020206821362580406
+            },
+            "tr": {
+              "px": 0.6399979216716352,
+              "cardWidths": 0.0017264925211021257
+            },
+            "br": {
+              "px": 6.803762178915023,
+              "cardWidths": 0.018354191661392866
+            },
+            "bl": {
+              "px": 2.6030425303470612,
+              "cardWidths": 0.007022106335933958
+            }
+          },
+          "places": {
+            "tl": "inside card",
+            "tr": "on the card edge",
+            "br": "inside card",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 0.982920085424259,
+          "aspect": 0.7153208991494515,
+          "quad": {
+            "tl": [
+              324.60153657609044,
+              447.4108749712571
+            ],
+            "tr": [
+              679.834766965757,
+              428.2677637390841
+            ],
+            "br": [
+              710.9064111805257,
+              946.307089500586
+            ],
+            "bl": [
+              332.6634612973388,
+              954.6048764793496
+            ]
+          }
+        },
+        {
+          "index": 32,
+          "method": "chroma@28",
+          "score": 0.8242048637071118,
+          "rank": 5,
+          "iou": 0.22627481903081031,
+          "band": "POOR",
+          "meanCorner": 351.7645529271297,
+          "maxCorner": 468.36333924004515,
+          "corners": {
+            "tl": {
+              "px": 319.1411501962874,
+              "cardWidths": 0.8609321848275006
+            },
+            "tr": {
+              "px": 185.28518566691722,
+              "cardWidths": 0.4998351971040926
+            },
+            "br": {
+              "px": 434.26853660526916,
+              "cardWidths": 1.1715059615203616
+            },
+            "bl": {
+              "px": 468.36333924004515,
+              "cardWidths": 1.263481919197917
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 4.41940470567269,
+          "aspect": 0.8961902050558473,
+          "quad": {
+            "tl": [
+              9.98677688213256,
+              373.50102919135384
+            ],
+            "tr": [
+              750.7465162193997,
+              256.6406287443887
+            ],
+            "br": [
+              1000.211756791598,
+              1278
+            ],
+            "bl": [
+              -2.7912068996899677,
+              1278
+            ]
+          }
+        }
+      ],
+      "measured": [
+        {
+          "index": 28,
+          "method": "chroma@18",
+          "score": 0.984832637084146,
+          "rank": 1,
+          "iou": 0.15840811912907654,
+          "band": "POOR",
+          "meanCorner": 478.8168255506763,
+          "maxCorner": 544.4948906253982,
+          "corners": {
+            "tl": {
+              "px": 544.4948906253982,
+              "cardWidths": 1.46885845189571
+            },
+            "tr": {
+              "px": 502.5728621911314,
+              "cardWidths": 1.3557673525181602
+            },
+            "br": {
+              "px": 407.61385033873495,
+              "cardWidths": 1.099600858498627
+            },
+            "bl": {
+              "px": 460.5856990474409,
+              "cardWidths": 1.24250054227519
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 6.31280773673706,
+          "aspect": 0.7412585440853856
+        },
+        {
+          "index": 16,
+          "method": "luma@12",
+          "score": 0.8511945859366479,
+          "rank": 2,
+          "iou": 0.19008815481034272,
+          "band": "POOR",
+          "meanCorner": 471.29665975824497,
+          "maxCorner": 544.9717682145707,
+          "corners": {
+            "tl": {
+              "px": 544.9717682145707,
+              "cardWidths": 1.4701449023095443
+            },
+            "tr": {
+              "px": 435.18342566178455,
+              "cardWidths": 1.173974015025264
+            },
+            "br": {
+              "px": 442.6927279126603,
+              "cardWidths": 1.1942315092073845
+            },
+            "bl": {
+              "px": 462.33871724396425,
+              "cardWidths": 1.2472295776410365
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 5.260717065709502,
+          "aspect": 0.6019661527628364
+        },
+        {
+          "index": 0,
+          "method": "luma×2.5",
+          "score": 0.8409326190448357,
+          "rank": 3,
+          "iou": 0.9814877221096797,
+          "band": "GOOD",
+          "meanCorner": 4.539065721987289,
+          "maxCorner": 6.549147877595056,
+          "corners": {
+            "tl": {
+              "px": 5.993742642963839,
+              "cardWidths": 0.016169039767284277
+            },
+            "tr": {
+              "px": 1.63062319849943,
+              "cardWidths": 0.0043988560925191916
+            },
+            "br": {
+              "px": 6.549147877595056,
+              "cardWidths": 0.01766733054495926
+            },
+            "bl": {
+              "px": 3.9827491688908343,
+              "cardWidths": 0.0107440765363043
+            }
+          },
+          "places": {
+            "tl": "inside card",
+            "tr": "on the card edge",
+            "br": "inside card",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 0.9928904578648466,
+          "aspect": 0.7193435207387494
+        },
+        {
+          "index": 4,
+          "method": "luma×3.5",
+          "score": 0.8407000560409695,
+          "rank": 4,
+          "iou": 0.9796281963771337,
+          "band": "GOOD",
+          "meanCorner": 4.3843302112321565,
+          "maxCorner": 7.490518213994907,
+          "corners": {
+            "tl": {
+              "px": 7.490518213994907,
+              "cardWidths": 0.020206821362580406
+            },
+            "tr": {
+              "px": 0.6399979216716352,
+              "cardWidths": 0.0017264925211021257
+            },
+            "br": {
+              "px": 6.803762178915023,
+              "cardWidths": 0.018354191661392866
+            },
+            "bl": {
+              "px": 2.6030425303470612,
+              "cardWidths": 0.007022106335933958
+            }
+          },
+          "places": {
+            "tl": "inside card",
+            "tr": "on the card edge",
+            "br": "inside card",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 0.982920085424259,
+          "aspect": 0.7153208991494515
+        },
+        {
+          "index": 32,
+          "method": "chroma@28",
+          "score": 0.8242048637071118,
+          "rank": 5,
+          "iou": 0.22627481903081031,
+          "band": "POOR",
+          "meanCorner": 351.7645529271297,
+          "maxCorner": 468.36333924004515,
+          "corners": {
+            "tl": {
+              "px": 319.1411501962874,
+              "cardWidths": 0.8609321848275006
+            },
+            "tr": {
+              "px": 185.28518566691722,
+              "cardWidths": 0.4998351971040926
+            },
+            "br": {
+              "px": 434.26853660526916,
+              "cardWidths": 1.1715059615203616
+            },
+            "bl": {
+              "px": 468.36333924004515,
+              "cardWidths": 1.263481919197917
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 4.41940470567269,
+          "aspect": 0.8961902050558473
+        },
+        {
+          "index": 24,
+          "method": "luma@28",
+          "score": 0.820302646916137,
+          "rank": 6,
+          "iou": 0.9437505281798443,
+          "band": "GOOD",
+          "meanCorner": 14.825520958160883,
+          "maxCorner": 34.85241209382946,
+          "corners": {
+            "tl": {
+              "px": 34.85241209382946,
+              "cardWidths": 0.09401972535348109
+            },
+            "tr": {
+              "px": 15.640808983757546,
+              "cardWidths": 0.04219348035367402
+            },
+            "br": {
+              "px": 3.5362521973512426,
+              "cardWidths": 0.00953958249662933
+            },
+            "bl": {
+              "px": 5.272610557705285,
+              "cardWidths": 0.014223675400047374
+            }
+          },
+          "places": {
+            "tl": "background",
+            "tr": "on the card edge",
+            "br": "inside card",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.0167963520546943,
+          "aspect": 0.7544721537772966
+        },
+        {
+          "index": 37,
+          "method": "chroma@40",
+          "score": 0.8084526578574331,
+          "rank": 7,
+          "iou": 0.9017582012253594,
+          "band": "GOOD",
+          "meanCorner": 25.090278308212437,
+          "maxCorner": 54.45684450842347,
+          "corners": {
+            "tl": {
+              "px": 54.45684450842347,
+              "cardWidths": 0.14690568763261258
+            },
+            "tr": {
+              "px": 36.56205838203502,
+              "cardWidths": 0.09863175834666218
+            },
+            "br": {
+              "px": 2.230665616090522,
+              "cardWidths": 0.006017562515204397
+            },
+            "bl": {
+              "px": 7.111544726300733,
+              "cardWidths": 0.019184482273586177
+            }
+          },
+          "places": {
+            "tl": "background",
+            "tr": "background",
+            "br": "on the card edge",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.085178676826226,
+          "aspect": 0.7664940655639966
+        },
+        {
+          "index": 40,
+          "method": "edge",
+          "score": 0.7468556983377728,
+          "rank": 8,
+          "iou": 0.6133062036145444,
+          "band": "POOR",
+          "meanCorner": 106.28117136173431,
+          "maxCorner": 318.9057797953756,
+          "corners": {
+            "tl": {
+              "px": 318.9057797953756,
+              "cardWidths": 0.8602972370829803
+            },
+            "tr": {
+              "px": 94.80456761541878,
+              "cardWidths": 0.25574985701019287
+            },
+            "br": {
+              "px": 7.300966435844271,
+              "cardWidths": 0.019695476378078114
+            },
+            "bl": {
+              "px": 4.1133716002986,
+              "cardWidths": 0.011096450572652171
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "inside card",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.5013553169084146,
+          "aspect": 0.8778871184099482
+        },
+        {
+          "index": 20,
+          "method": "luma@18",
+          "score": 0.6348298240483605,
+          "rank": 9,
+          "iou": 0.21303748200923184,
+          "band": "POOR",
+          "meanCorner": 350.54891315626804,
+          "maxCorner": 511.2007081568765,
+          "corners": {
+            "tl": {
+              "px": 144.11303534968178,
+              "cardWidths": 0.3887670089219591
+            },
+            "tr": {
+              "px": 338.22021812275375,
+              "cardWidths": 0.9124008958486343
+            },
+            "br": {
+              "px": 408.6616909957602,
+              "cardWidths": 1.1024275693306491
+            },
+            "bl": {
+              "px": 511.2007081568765,
+              "cardWidths": 1.3790422898713517
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 2.93127247703524,
+          "aspect": 1.1560145809007483
+        }
+      ]
+    },
+    {
+      "slug": "wand",
+      "card": "Wand cq-120751",
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120751/photo-source.png",
+      "tags": [
+        "sleeved"
+      ],
+      "frameFamily": "unknown",
+      "outlineSpace": "capture",
+      "outlineScale": 0.6666666666666666,
+      "human": {
+        "tl": [
+          302.8955430358177,
+          328.4328276272147
+        ],
+        "tr": [
+          737.1529348350307,
+          347.69627887932626
+        ],
+        "br": [
+          695.1828050266022,
+          980.4511365680385
+        ],
+        "bl": [
+          258.41959163555543,
+          922.4349990125817
+        ]
+      },
+      "width": 960,
+      "height": 1280,
+      "previewScale": 0.5416666666666666,
+      "file": "wand.png",
+      "generated": 44,
+      "rejectedWithoutQuad": 34,
+      "accepted": 10,
+      "deduped": 9,
+      "bestSurvivesDedupe": true,
+      "best": {
+        "index": 4,
+        "method": "luma×3.5",
+        "score": 0.8937136670993674,
+        "rank": 5,
+        "iou": 0.9609660387498684,
+        "band": "GOOD",
+        "meanCorner": 7.584328169049456,
+        "maxCorner": 8.789306252814331,
+        "corners": {
+          "tl": {
+            "px": 8.789306252814331,
+            "cardWidths": 0.02008332425927523
+          },
+          "tr": {
+            "px": 6.196527666692502,
+            "cardWidths": 0.014158896144039564
+          },
+          "br": {
+            "px": 6.84000067807,
+            "cardWidths": 0.01562921436573637
+          },
+          "bl": {
+            "px": 8.511478078620994,
+            "cardWidths": 0.019448494484297193
+          }
+        },
+        "places": {
+          "tl": "on the card edge",
+          "tr": "on the card edge",
+          "br": "on the card edge",
+          "bl": "on the card edge"
+        },
+        "areaRatio": 1.0122574951694088,
+        "aspect": 0.7093558083346506,
+        "quad": {
+          "tl": [
+            294.1074934949384,
+            328.5814535765387
+          ],
+          "tr": [
+            731.2515437653523,
+            345.80669200204187
+          ],
+          "br": [
+            689.2497045588016,
+            983.8546535894418
+          ],
+          "bl": [
+            251.24000958036186,
+            927.0065261748753
+          ]
+        }
+      },
+      "selected": {
+        "index": 16,
+        "method": "luma@12",
+        "score": 0.9186749239673988,
+        "rank": 2,
+        "iou": 0.2507856718304822,
+        "band": "POOR",
+        "meanCorner": 407.013719898723,
+        "maxCorner": 442.56934377119694,
+        "corners": {
+          "tl": {
+            "px": 442.56934377119694,
+            "cardWidths": 1.0112588391519048
+          },
+          "tr": {
+            "px": 331.50671172782523,
+            "cardWidths": 0.7574837642759555
+          },
+          "br": {
+            "px": 419.3635564555962,
+            "cardWidths": 0.9582342501859945
+          },
+          "bl": {
+            "px": 434.61526764027366,
+            "cardWidths": 0.9930839928642193
+          }
+        },
+        "places": {
+          "tl": "outside card, on a larger rectangle",
+          "tr": "outside card, on a larger rectangle",
+          "br": "outside card, on a larger rectangle",
+          "bl": "outside card, on a larger rectangle"
+        },
+        "areaRatio": 3.9874686328808564,
+        "aspect": 0.6557004731906753,
+        "quad": {
+          "tl": [
+            12.205516646152228,
+            -5.284017323176471
+          ],
+          "tr": [
+            717.2929625187825,
+            16.784989527945466
+          ],
+          "br": [
+            990.7000910750395,
+            1278
+          ],
+          "bl": [
+            8.49168015137576,
+            1278
+          ]
+        }
+      },
+      "maxScore": {
+        "index": 28,
+        "method": "chroma@18",
+        "score": 0.9506118648080355,
+        "rank": 1,
+        "iou": 0.23856215823822916,
+        "band": "POOR",
+        "meanCorner": 411.8259415603175,
+        "maxCorner": 444.7719974924176,
+        "corners": {
+          "tl": {
+            "px": 444.7719974924176,
+            "cardWidths": 1.0162918426270096
+          },
+          "tr": {
+            "px": 344.06734121725145,
+            "cardWidths": 0.7861844589247498
+          },
+          "br": {
+            "px": 426.0053497824335,
+            "cardWidths": 0.9734105661783121
+          },
+          "bl": {
+            "px": 432.45907774916765,
+            "cardWidths": 0.9881571579693961
+          }
+        },
+        "places": {
+          "tl": "outside card, on a larger rectangle",
+          "tr": "outside card, on a larger rectangle",
+          "br": "outside card, on a larger rectangle",
+          "bl": "outside card, on a larger rectangle"
+        },
+        "areaRatio": 4.191779649316366,
+        "aspect": 0.6884941361612644,
+        "quad": {
+          "tl": [
+            3.9235241375967624,
+            -0.8662183314959577
+          ],
+          "tr": [
+            784.2862949278984,
+            6.8725976911426825
+          ],
+          "br": [
+            1000.0520096268723,
+            1278
+          ],
+          "bl": [
+            12.260326117318641,
+            1278
+          ]
+        }
+      },
+      "whereLost": "score-ranking",
+      "diagnosis": "SELECTION_FAILURE",
+      "tracking": "TRACKING_NOT_MEASURABLE",
+      "recognitionCorners": null,
+      "trackedCorners": null,
+      "rawCorners": null,
+      "selectedContainsHuman": 1,
+      "humanContainsSelected": 0.2507856718304822,
+      "nestedSelected": false,
+      "nestedBest": false,
+      "nestedAreaFraction": null,
+      "top": [
+        {
+          "index": 28,
+          "method": "chroma@18",
+          "score": 0.9506118648080355,
+          "rank": 1,
+          "iou": 0.23856215823822916,
+          "band": "POOR",
+          "meanCorner": 411.8259415603175,
+          "maxCorner": 444.7719974924176,
+          "corners": {
+            "tl": {
+              "px": 444.7719974924176,
+              "cardWidths": 1.0162918426270096
+            },
+            "tr": {
+              "px": 344.06734121725145,
+              "cardWidths": 0.7861844589247498
+            },
+            "br": {
+              "px": 426.0053497824335,
+              "cardWidths": 0.9734105661783121
+            },
+            "bl": {
+              "px": 432.45907774916765,
+              "cardWidths": 0.9881571579693961
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 4.191779649316366,
+          "aspect": 0.6884941361612644,
+          "quad": {
+            "tl": [
+              3.9235241375967624,
+              -0.8662183314959577
+            ],
+            "tr": [
+              784.2862949278984,
+              6.8725976911426825
+            ],
+            "br": [
+              1000.0520096268723,
+              1278
+            ],
+            "bl": [
+              12.260326117318641,
+              1278
+            ]
+          }
+        },
+        {
+          "index": 16,
+          "method": "luma@12",
+          "score": 0.9186749239673988,
+          "rank": 2,
+          "iou": 0.2507856718304822,
+          "band": "POOR",
+          "meanCorner": 407.013719898723,
+          "maxCorner": 442.56934377119694,
+          "corners": {
+            "tl": {
+              "px": 442.56934377119694,
+              "cardWidths": 1.0112588391519048
+            },
+            "tr": {
+              "px": 331.50671172782523,
+              "cardWidths": 0.7574837642759555
+            },
+            "br": {
+              "px": 419.3635564555962,
+              "cardWidths": 0.9582342501859945
+            },
+            "bl": {
+              "px": 434.61526764027366,
+              "cardWidths": 0.9930839928642193
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 3.9874686328808564,
+          "aspect": 0.6557004731906753,
+          "quad": {
+            "tl": [
+              12.205516646152228,
+              -5.284017323176471
+            ],
+            "tr": [
+              717.2929625187825,
+              16.784989527945466
+            ],
+            "br": [
+              990.7000910750395,
+              1278
+            ],
+            "bl": [
+              8.49168015137576,
+              1278
+            ]
+          }
+        },
+        {
+          "index": 32,
+          "method": "chroma@28",
+          "score": 0.9168300998375303,
+          "rank": 3,
+          "iou": 0.2513703934444034,
+          "band": "POOR",
+          "meanCorner": 407.0264657374975,
+          "maxCorner": 444.0964727329165,
+          "corners": {
+            "tl": {
+              "px": 444.0964727329165,
+              "cardWidths": 1.0147482870379791
+            },
+            "tr": {
+              "px": 325.7346700669683,
+              "cardWidths": 0.7442948070387542
+            },
+            "br": {
+              "px": 420.4464234128282,
+              "cardWidths": 0.9607085715495015
+            },
+            "bl": {
+              "px": 437.82829673727707,
+              "cardWidths": 1.0004256764230262
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 3.978193240251959,
+          "aspect": 0.6556978980386706,
+          "quad": {
+            "tl": [
+              13.79449495109165,
+              -8.67585082845929
+            ],
+            "tr": [
+              710.8040004382997,
+              23.029050875338335
+            ],
+            "br": [
+              992.2347682097919,
+              1278
+            ],
+            "bl": [
+              2.945233828979525,
+              1278
+            ]
+          }
+        },
+        {
+          "index": 40,
+          "method": "edge",
+          "score": 0.8994236260969638,
+          "rank": 4,
+          "iou": 0.9053803714546896,
+          "band": "GOOD",
+          "meanCorner": 20.278167673287555,
+          "maxCorner": 26.865359237902158,
+          "corners": {
+            "tl": {
+              "px": 23.67688138894003,
+              "cardWidths": 0.0541010260315168
+            },
+            "tr": {
+              "px": 21.748721361460376,
+              "cardWidths": 0.04969523313480808
+            },
+            "br": {
+              "px": 8.821708704847659,
+              "cardWidths": 0.02015736297544496
+            },
+            "bl": {
+              "px": 26.865359237902158,
+              "cardWidths": 0.06138661066041954
+            }
+          },
+          "places": {
+            "tl": "background",
+            "tr": "on the card edge",
+            "br": "on the card edge",
+            "bl": "background"
+          },
+          "areaRatio": 1.1044579297146568,
+          "aspect": 0.7382354490355065,
+          "quad": {
+            "tl": [
+              281.86608984048905,
+              317.5536359931172
+            ],
+            "tr": [
+              758.8091541993851,
+              349.7000362751709
+            ],
+            "br": [
+              696.0233416516442,
+              989.2327106100396
+            ],
+            "bl": [
+              240.04392325897783,
+              942.0330177567196
+            ]
+          }
+        },
+        {
+          "index": 4,
+          "method": "luma×3.5",
+          "score": 0.8937136670993674,
+          "rank": 5,
+          "iou": 0.9609660387498684,
+          "band": "GOOD",
+          "meanCorner": 7.584328169049456,
+          "maxCorner": 8.789306252814331,
+          "corners": {
+            "tl": {
+              "px": 8.789306252814331,
+              "cardWidths": 0.02008332425927523
+            },
+            "tr": {
+              "px": 6.196527666692502,
+              "cardWidths": 0.014158896144039564
+            },
+            "br": {
+              "px": 6.84000067807,
+              "cardWidths": 0.01562921436573637
+            },
+            "bl": {
+              "px": 8.511478078620994,
+              "cardWidths": 0.019448494484297193
+            }
+          },
+          "places": {
+            "tl": "on the card edge",
+            "tr": "on the card edge",
+            "br": "on the card edge",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.0122574951694088,
+          "aspect": 0.7093558083346506,
+          "quad": {
+            "tl": [
+              294.1074934949384,
+              328.5814535765387
+            ],
+            "tr": [
+              731.2515437653523,
+              345.80669200204187
+            ],
+            "br": [
+              689.2497045588016,
+              983.8546535894418
+            ],
+            "bl": [
+              251.24000958036186,
+              927.0065261748753
+            ]
+          }
+        }
+      ],
+      "measured": [
+        {
+          "index": 28,
+          "method": "chroma@18",
+          "score": 0.9506118648080355,
+          "rank": 1,
+          "iou": 0.23856215823822916,
+          "band": "POOR",
+          "meanCorner": 411.8259415603175,
+          "maxCorner": 444.7719974924176,
+          "corners": {
+            "tl": {
+              "px": 444.7719974924176,
+              "cardWidths": 1.0162918426270096
+            },
+            "tr": {
+              "px": 344.06734121725145,
+              "cardWidths": 0.7861844589247498
+            },
+            "br": {
+              "px": 426.0053497824335,
+              "cardWidths": 0.9734105661783121
+            },
+            "bl": {
+              "px": 432.45907774916765,
+              "cardWidths": 0.9881571579693961
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 4.191779649316366,
+          "aspect": 0.6884941361612644
+        },
+        {
+          "index": 16,
+          "method": "luma@12",
+          "score": 0.9186749239673988,
+          "rank": 2,
+          "iou": 0.2507856718304822,
+          "band": "POOR",
+          "meanCorner": 407.013719898723,
+          "maxCorner": 442.56934377119694,
+          "corners": {
+            "tl": {
+              "px": 442.56934377119694,
+              "cardWidths": 1.0112588391519048
+            },
+            "tr": {
+              "px": 331.50671172782523,
+              "cardWidths": 0.7574837642759555
+            },
+            "br": {
+              "px": 419.3635564555962,
+              "cardWidths": 0.9582342501859945
+            },
+            "bl": {
+              "px": 434.61526764027366,
+              "cardWidths": 0.9930839928642193
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 3.9874686328808564,
+          "aspect": 0.6557004731906753
+        },
+        {
+          "index": 32,
+          "method": "chroma@28",
+          "score": 0.9168300998375303,
+          "rank": 3,
+          "iou": 0.2513703934444034,
+          "band": "POOR",
+          "meanCorner": 407.0264657374975,
+          "maxCorner": 444.0964727329165,
+          "corners": {
+            "tl": {
+              "px": 444.0964727329165,
+              "cardWidths": 1.0147482870379791
+            },
+            "tr": {
+              "px": 325.7346700669683,
+              "cardWidths": 0.7442948070387542
+            },
+            "br": {
+              "px": 420.4464234128282,
+              "cardWidths": 0.9607085715495015
+            },
+            "bl": {
+              "px": 437.82829673727707,
+              "cardWidths": 1.0004256764230262
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 3.978193240251959,
+          "aspect": 0.6556978980386706
+        },
+        {
+          "index": 40,
+          "method": "edge",
+          "score": 0.8994236260969638,
+          "rank": 4,
+          "iou": 0.9053803714546896,
+          "band": "GOOD",
+          "meanCorner": 20.278167673287555,
+          "maxCorner": 26.865359237902158,
+          "corners": {
+            "tl": {
+              "px": 23.67688138894003,
+              "cardWidths": 0.0541010260315168
+            },
+            "tr": {
+              "px": 21.748721361460376,
+              "cardWidths": 0.04969523313480808
+            },
+            "br": {
+              "px": 8.821708704847659,
+              "cardWidths": 0.02015736297544496
+            },
+            "bl": {
+              "px": 26.865359237902158,
+              "cardWidths": 0.06138661066041954
+            }
+          },
+          "places": {
+            "tl": "background",
+            "tr": "on the card edge",
+            "br": "on the card edge",
+            "bl": "background"
+          },
+          "areaRatio": 1.1044579297146568,
+          "aspect": 0.7382354490355065
+        },
+        {
+          "index": 4,
+          "method": "luma×3.5",
+          "score": 0.8937136670993674,
+          "rank": 5,
+          "iou": 0.9609660387498684,
+          "band": "GOOD",
+          "meanCorner": 7.584328169049456,
+          "maxCorner": 8.789306252814331,
+          "corners": {
+            "tl": {
+              "px": 8.789306252814331,
+              "cardWidths": 0.02008332425927523
+            },
+            "tr": {
+              "px": 6.196527666692502,
+              "cardWidths": 0.014158896144039564
+            },
+            "br": {
+              "px": 6.84000067807,
+              "cardWidths": 0.01562921436573637
+            },
+            "bl": {
+              "px": 8.511478078620994,
+              "cardWidths": 0.019448494484297193
+            }
+          },
+          "places": {
+            "tl": "on the card edge",
+            "tr": "on the card edge",
+            "br": "on the card edge",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.0122574951694088,
+          "aspect": 0.7093558083346506
+        },
+        {
+          "index": 8,
+          "method": "luma×5",
+          "score": 0.889177232097131,
+          "rank": 6,
+          "iou": 0.958319554972188,
+          "band": "GOOD",
+          "meanCorner": 9.498458185594378,
+          "maxCorner": 14.265806043754981,
+          "corners": {
+            "tl": {
+              "px": 6.387201275900267,
+              "cardWidths": 0.014594580123099882
+            },
+            "tr": {
+              "px": 14.265806043754981,
+              "cardWidths": 0.03259697641152519
+            },
+            "br": {
+              "px": 14.075050310453443,
+              "cardWidths": 0.032161104781158016
+            },
+            "bl": {
+              "px": 3.2657751122688183,
+              "cardWidths": 0.007462206760239414
+            }
+          },
+          "places": {
+            "tl": "on the card edge",
+            "tr": "inside card",
+            "br": "on the card edge",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 0.9806535574966004,
+          "aspect": 0.7048626182333709
+        },
+        {
+          "index": 0,
+          "method": "luma×2.5",
+          "score": 0.8840535268539252,
+          "rank": 7,
+          "iou": 0.8993661117074397,
+          "band": "GOOD",
+          "meanCorner": 26.29431540727677,
+          "maxCorner": 59.04480773483827,
+          "corners": {
+            "tl": {
+              "px": 29.978280441714478,
+              "cardWidths": 0.06849955042284027
+            },
+            "tr": {
+              "px": 59.04480773483827,
+              "cardWidths": 0.13491576985221349
+            },
+            "br": {
+              "px": 5.679283342237912,
+              "cardWidths": 0.012977007017583756
+            },
+            "bl": {
+              "px": 10.474890110316426,
+              "cardWidths": 0.023934837245931616
+            }
+          },
+          "places": {
+            "tl": "background",
+            "tr": "background",
+            "br": "on the card edge",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.103609275226227,
+          "aspect": 0.6785026767518467
+        },
+        {
+          "index": 24,
+          "method": "luma@28",
+          "score": 0.8839296101002672,
+          "rank": 8,
+          "iou": 0.8895239698435085,
+          "band": "GOOD",
+          "meanCorner": 37.88364405067662,
+          "maxCorner": 75.88925698244202,
+          "corners": {
+            "tl": {
+              "px": 75.88925698244202,
+              "cardWidths": 0.17340487541730967
+            },
+            "tr": {
+              "px": 48.696266004325054,
+              "cardWidths": 0.11126963519647884
+            },
+            "br": {
+              "px": 13.517613981215503,
+              "cardWidths": 0.030887378023667797
+            },
+            "bl": {
+              "px": 13.431439234723914,
+              "cardWidths": 0.03069047108619509
+            }
+          },
+          "places": {
+            "tl": "background",
+            "tr": "background",
+            "br": "on the card edge",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.1016150178187953,
+          "aspect": 0.7272218972102473
+        },
+        {
+          "index": 20,
+          "method": "luma@18",
+          "score": 0.836816534431822,
+          "rank": 9,
+          "iou": 0.3254608971863375,
+          "band": "POOR",
+          "meanCorner": 311.455082966383,
+          "maxCorner": 441.1351261246705,
+          "corners": {
+            "tl": {
+              "px": 263.3883646637135,
+              "cardWidths": 0.6018352053630882
+            },
+            "tr": {
+              "px": 122.51079975689089,
+              "cardWidths": 0.2799338248104565
+            },
+            "br": {
+              "px": 418.7860413202569,
+              "cardWidths": 0.9569146439060399
+            },
+            "bl": {
+              "px": 441.1351261246705,
+              "cardWidths": 1.007981691078433
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 3.0725657326123144,
+          "aspect": 0.854547819910354
+        },
+        {
+          "index": 36,
+          "method": "chroma@40",
+          "score": 0.7391184916750232,
+          "rank": 10,
+          "iou": 0.36958799647880725,
+          "band": "POOR",
+          "meanCorner": 299.4272076066172,
+          "maxCorner": 469.1769973194955,
+          "corners": {
+            "tl": {
+              "px": 71.61899357271473,
+              "cardWidths": 0.16364744038623305
+            },
+            "tr": {
+              "px": 203.70460375935423,
+              "cardWidths": 0.4654594450041299
+            },
+            "br": {
+              "px": 453.20823577490415,
+              "cardWidths": 1.0355684162361538
+            },
+            "bl": {
+              "px": 469.1769973194955,
+              "cardWidths": 1.0720565993639615
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 2.4651443514846094,
+          "aspect": 0.5870706313559555
+        }
+      ]
+    },
+    {
+      "slug": "livaan",
+      "card": "Livaan cq-120813",
+      "imageId": ".scan-inbox/sessions/phone-20260908/cq-20260908T120813/photo-source.png",
+      "tags": [
+        "sleeved",
+        "foil"
+      ],
+      "frameFamily": "unknown",
+      "outlineSpace": "capture",
+      "outlineScale": 0.6666666666666666,
+      "human": {
+        "tl": [
+          262.32007420013696,
+          237.06868216044057
+        ],
+        "tr": [
+          699.7710774764107,
+          249.80959047915593
+        ],
+        "br": [
+          652.8847384854748,
+          858.9469085156295
+        ],
+        "bl": [
+          247.0406781513042,
+          838.8803337613964
+        ]
+      },
+      "width": 960,
+      "height": 1280,
+      "previewScale": 0.5416666666666666,
+      "file": "livaan.png",
+      "generated": 44,
+      "rejectedWithoutQuad": 33,
+      "accepted": 11,
+      "deduped": 10,
+      "bestSurvivesDedupe": false,
+      "best": {
+        "index": 8,
+        "method": "luma×5",
+        "score": 0.8763475038708596,
+        "rank": 6,
+        "iou": 0.942990012975909,
+        "band": "GOOD",
+        "meanCorner": 12.419818993375774,
+        "maxCorner": 18.65032793723082,
+        "corners": {
+          "tl": {
+            "px": 18.65032793723082,
+            "cardWidths": 0.044196328366525005
+          },
+          "tr": {
+            "px": 13.396612946869764,
+            "cardWidths": 0.0317464179070627
+          },
+          "br": {
+            "px": 2.6543082014114594,
+            "cardWidths": 0.006290006119482712
+          },
+          "bl": {
+            "px": 14.978026887991046,
+            "cardWidths": 0.03549394932101028
+          }
+        },
+        "places": {
+          "tl": "on the card edge",
+          "tr": "on the card edge",
+          "br": "on the card edge",
+          "bl": "on the card edge"
+        },
+        "areaRatio": 1.0461366773005853,
+        "aspect": 0.6974391804763819,
+        "quad": {
+          "tl": [
+            254.05342673305455,
+            220.35051025615533
+          ],
+          "tr": [
+            693.9162766436755,
+            237.7600865201856
+          ],
+          "br": [
+            655.5382382760779,
+            859.0124133959793
+          ],
+          "bl": [
+            232.25755497273653,
+            836.4718988869026
+          ]
+        }
+      },
+      "selected": {
+        "index": 16,
+        "method": "luma@12",
+        "score": 0.9622641105383217,
+        "rank": 2,
+        "iou": 0.2262133626865165,
+        "band": "POOR",
+        "meanCorner": 408.99690268866436,
+        "maxCorner": 523.7316618157259,
+        "corners": {
+          "tl": {
+            "px": 350.06421312034587,
+            "cardWidths": 0.8295592959280262
+          },
+          "tr": {
+            "px": 256.33022438984415,
+            "cardWidths": 0.6074346148511041
+          },
+          "br": {
+            "px": 523.7316618157259,
+            "cardWidths": 1.2411050668629955
+          },
+          "bl": {
+            "px": 505.8615114287412,
+            "cardWidths": 1.1987575522712692
+          }
+        },
+        "places": {
+          "tl": "outside card, on a larger rectangle",
+          "tr": "outside card, on a larger rectangle",
+          "br": "outside card, on a larger rectangle",
+          "bl": "outside card, on a larger rectangle"
+        },
+        "areaRatio": 4.420605344105099,
+        "aspect": 0.7000514912196306,
+        "quad": {
+          "tl": [
+            15.674963143672537,
+            -11.348592801489701
+          ],
+          "tr": [
+            827.252627728722,
+            27.427850489076583
+          ],
+          "br": [
+            967.0333658987644,
+            1278
+          ],
+          "bl": [
+            -4.09631129363558,
+            1278
+          ]
+        }
+      },
+      "maxScore": {
+        "index": 28,
+        "method": "chroma@18",
+        "score": 0.9766448142175682,
+        "rank": 1,
+        "iou": 0.21831765232781328,
+        "band": "POOR",
+        "meanCorner": 419.99823639271796,
+        "maxCorner": 538.0805944009112,
+        "corners": {
+          "tl": {
+            "px": 351.1046656076345,
+            "cardWidths": 0.8320248922399377
+          },
+          "tr": {
+            "px": 286.5336038468499,
+            "cardWidths": 0.6790086097295439
+          },
+          "br": {
+            "px": 538.0805944009112,
+            "cardWidths": 1.2751082296158611
+          },
+          "bl": {
+            "px": 504.27408171547614,
+            "cardWidths": 1.1949957650736196
+          }
+        },
+        "places": {
+          "tl": "outside card, on a larger rectangle",
+          "tr": "outside card, on a larger rectangle",
+          "br": "outside card, on a larger rectangle",
+          "bl": "outside card, on a larger rectangle"
+        },
+        "areaRatio": 4.580481648357308,
+        "aspect": 0.7179852881330867,
+        "quad": {
+          "tl": [
+            5.430198238217752,
+            -2.2680635342366884
+          ],
+          "tr": [
+            851.490562143653,
+            6.740250360394878
+          ],
+          "br": [
+            990.4128596668509,
+            1278
+          ],
+          "bl": [
+            -0.8832380255829264,
+            1278
+          ]
+        }
+      },
+      "whereLost": "score-ranking",
+      "diagnosis": "SELECTION_FAILURE",
+      "tracking": "TRACKING_NOT_MEASURABLE",
+      "recognitionCorners": null,
+      "trackedCorners": null,
+      "rawCorners": null,
+      "selectedContainsHuman": 1,
+      "humanContainsSelected": 0.2262133626865165,
+      "nestedSelected": false,
+      "nestedBest": false,
+      "nestedAreaFraction": null,
+      "top": [
+        {
+          "index": 28,
+          "method": "chroma@18",
+          "score": 0.9766448142175682,
+          "rank": 1,
+          "iou": 0.21831765232781328,
+          "band": "POOR",
+          "meanCorner": 419.99823639271796,
+          "maxCorner": 538.0805944009112,
+          "corners": {
+            "tl": {
+              "px": 351.1046656076345,
+              "cardWidths": 0.8320248922399377
+            },
+            "tr": {
+              "px": 286.5336038468499,
+              "cardWidths": 0.6790086097295439
+            },
+            "br": {
+              "px": 538.0805944009112,
+              "cardWidths": 1.2751082296158611
+            },
+            "bl": {
+              "px": 504.27408171547614,
+              "cardWidths": 1.1949957650736196
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 4.580481648357308,
+          "aspect": 0.7179852881330867,
+          "quad": {
+            "tl": [
+              5.430198238217752,
+              -2.2680635342366884
+            ],
+            "tr": [
+              851.490562143653,
+              6.740250360394878
+            ],
+            "br": [
+              990.4128596668509,
+              1278
+            ],
+            "bl": [
+              -0.8832380255829264,
+              1278
+            ]
+          }
+        },
+        {
+          "index": 16,
+          "method": "luma@12",
+          "score": 0.9622641105383217,
+          "rank": 2,
+          "iou": 0.2262133626865165,
+          "band": "POOR",
+          "meanCorner": 408.99690268866436,
+          "maxCorner": 523.7316618157259,
+          "corners": {
+            "tl": {
+              "px": 350.06421312034587,
+              "cardWidths": 0.8295592959280262
+            },
+            "tr": {
+              "px": 256.33022438984415,
+              "cardWidths": 0.6074346148511041
+            },
+            "br": {
+              "px": 523.7316618157259,
+              "cardWidths": 1.2411050668629955
+            },
+            "bl": {
+              "px": 505.8615114287412,
+              "cardWidths": 1.1987575522712692
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 4.420605344105099,
+          "aspect": 0.7000514912196306,
+          "quad": {
+            "tl": [
+              15.674963143672537,
+              -11.348592801489701
+            ],
+            "tr": [
+              827.252627728722,
+              27.427850489076583
+            ],
+            "br": [
+              967.0333658987644,
+              1278
+            ],
+            "bl": [
+              -4.09631129363558,
+              1278
+            ]
+          }
+        },
+        {
+          "index": 20,
+          "method": "luma@18",
+          "score": 0.8921782014453852,
+          "rank": 3,
+          "iou": 0.6113650887805787,
+          "band": "POOR",
+          "meanCorner": 127.25809826750826,
+          "maxCorner": 270.6313552446952,
+          "corners": {
+            "tl": {
+              "px": 270.6313552446952,
+              "cardWidths": 0.6413245001872161
+            },
+            "tr": {
+              "px": 154.60068200389358,
+              "cardWidths": 0.36636259322243947
+            },
+            "br": {
+              "px": 68.75825096470457,
+              "cardWidths": 0.1629388098574756
+            },
+            "bl": {
+              "px": 15.042104856739696,
+              "cardWidths": 0.03564579710392362
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.6356838464469525,
+          "aspect": 0.6285668131603408,
+          "quad": {
+            "tl": [
+              187.38515587545547,
+              -22.981483110135173
+            ],
+            "tr": [
+              721.7160391530971,
+              96.77433462914668
+            ],
+            "br": [
+              719.7415781273,
+              875.0049304620762
+            ],
+            "bl": [
+              233.08689509585383,
+              844.4978827787685
+            ]
+          }
+        },
+        {
+          "index": 4,
+          "method": "luma×3.5",
+          "score": 0.8819614344584084,
+          "rank": 4,
+          "iou": 0.930204713943525,
+          "band": "GOOD",
+          "meanCorner": 15.404804557878382,
+          "maxCorner": 20.09680086050343,
+          "corners": {
+            "tl": {
+              "px": 20.09680086050343,
+              "cardWidths": 0.047624085374627007
+            },
+            "tr": {
+              "px": 18.69747738139559,
+              "cardWidths": 0.04430806003814057
+            },
+            "br": {
+              "px": 3.8470705761921424,
+              "cardWidths": 0.009116536449483462
+            },
+            "bl": {
+              "px": 18.977869413422358,
+              "cardWidths": 0.04497251475231608
+            }
+          },
+          "places": {
+            "tl": "on the card edge",
+            "tr": "on the card edge",
+            "br": "on the card edge",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.073522625317715,
+          "aspect": 0.7089409042451055,
+          "quad": {
+            "tl": [
+              248.44922493678985,
+              222.52629770876848
+            ],
+            "tr": [
+              702.4142025333169,
+              231.29987545267986
+            ],
+            "br": [
+              656.1982229904572,
+              860.901588144992
+            ],
+            "bl": [
+              228.2860646996519,
+              835.9779206701887
+            ]
+          }
+        },
+        {
+          "index": 40,
+          "method": "edge",
+          "score": 0.8807419962991552,
+          "rank": 5,
+          "iou": 0.7127122963887724,
+          "band": "USABLE",
+          "meanCorner": 77.05461392053883,
+          "maxCorner": 200.92934777520387,
+          "corners": {
+            "tl": {
+              "px": 33.86917811408703,
+              "cardWidths": 0.08026096497994176
+            },
+            "tr": {
+              "px": 23.58522694772853,
+              "cardWidths": 0.055890729551192855
+            },
+            "br": {
+              "px": 200.92934777520387,
+              "cardWidths": 0.47614923783818214
+            },
+            "bl": {
+              "px": 49.83470284513591,
+              "cardWidths": 0.11809502215749515
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 1.4030907072417298,
+          "aspect": 0.6706512505804256,
+          "quad": {
+            "tl": [
+              255,
+              204
+            ],
+            "tr": [
+              714,
+              231
+            ],
+            "br": [
+              705,
+              1053
+            ],
+            "bl": [
+              204,
+              864
+            ]
+          }
+        }
+      ],
+      "measured": [
+        {
+          "index": 28,
+          "method": "chroma@18",
+          "score": 0.9766448142175682,
+          "rank": 1,
+          "iou": 0.21831765232781328,
+          "band": "POOR",
+          "meanCorner": 419.99823639271796,
+          "maxCorner": 538.0805944009112,
+          "corners": {
+            "tl": {
+              "px": 351.1046656076345,
+              "cardWidths": 0.8320248922399377
+            },
+            "tr": {
+              "px": 286.5336038468499,
+              "cardWidths": 0.6790086097295439
+            },
+            "br": {
+              "px": 538.0805944009112,
+              "cardWidths": 1.2751082296158611
+            },
+            "bl": {
+              "px": 504.27408171547614,
+              "cardWidths": 1.1949957650736196
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 4.580481648357308,
+          "aspect": 0.7179852881330867
+        },
+        {
+          "index": 16,
+          "method": "luma@12",
+          "score": 0.9622641105383217,
+          "rank": 2,
+          "iou": 0.2262133626865165,
+          "band": "POOR",
+          "meanCorner": 408.99690268866436,
+          "maxCorner": 523.7316618157259,
+          "corners": {
+            "tl": {
+              "px": 350.06421312034587,
+              "cardWidths": 0.8295592959280262
+            },
+            "tr": {
+              "px": 256.33022438984415,
+              "cardWidths": 0.6074346148511041
+            },
+            "br": {
+              "px": 523.7316618157259,
+              "cardWidths": 1.2411050668629955
+            },
+            "bl": {
+              "px": 505.8615114287412,
+              "cardWidths": 1.1987575522712692
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 4.420605344105099,
+          "aspect": 0.7000514912196306
+        },
+        {
+          "index": 20,
+          "method": "luma@18",
+          "score": 0.8921782014453852,
+          "rank": 3,
+          "iou": 0.6113650887805787,
+          "band": "POOR",
+          "meanCorner": 127.25809826750826,
+          "maxCorner": 270.6313552446952,
+          "corners": {
+            "tl": {
+              "px": 270.6313552446952,
+              "cardWidths": 0.6413245001872161
+            },
+            "tr": {
+              "px": 154.60068200389358,
+              "cardWidths": 0.36636259322243947
+            },
+            "br": {
+              "px": 68.75825096470457,
+              "cardWidths": 0.1629388098574756
+            },
+            "bl": {
+              "px": 15.042104856739696,
+              "cardWidths": 0.03564579710392362
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.6356838464469525,
+          "aspect": 0.6285668131603408
+        },
+        {
+          "index": 4,
+          "method": "luma×3.5",
+          "score": 0.8819614344584084,
+          "rank": 4,
+          "iou": 0.930204713943525,
+          "band": "GOOD",
+          "meanCorner": 15.404804557878382,
+          "maxCorner": 20.09680086050343,
+          "corners": {
+            "tl": {
+              "px": 20.09680086050343,
+              "cardWidths": 0.047624085374627007
+            },
+            "tr": {
+              "px": 18.69747738139559,
+              "cardWidths": 0.04430806003814057
+            },
+            "br": {
+              "px": 3.8470705761921424,
+              "cardWidths": 0.009116536449483462
+            },
+            "bl": {
+              "px": 18.977869413422358,
+              "cardWidths": 0.04497251475231608
+            }
+          },
+          "places": {
+            "tl": "on the card edge",
+            "tr": "on the card edge",
+            "br": "on the card edge",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.073522625317715,
+          "aspect": 0.7089409042451055
+        },
+        {
+          "index": 40,
+          "method": "edge",
+          "score": 0.8807419962991552,
+          "rank": 5,
+          "iou": 0.7127122963887724,
+          "band": "USABLE",
+          "meanCorner": 77.05461392053883,
+          "maxCorner": 200.92934777520387,
+          "corners": {
+            "tl": {
+              "px": 33.86917811408703,
+              "cardWidths": 0.08026096497994176
+            },
+            "tr": {
+              "px": 23.58522694772853,
+              "cardWidths": 0.055890729551192855
+            },
+            "br": {
+              "px": 200.92934777520387,
+              "cardWidths": 0.47614923783818214
+            },
+            "bl": {
+              "px": 49.83470284513591,
+              "cardWidths": 0.11809502215749515
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 1.4030907072417298,
+          "aspect": 0.6706512505804256
+        },
+        {
+          "index": 8,
+          "method": "luma×5",
+          "score": 0.8763475038708596,
+          "rank": 6,
+          "iou": 0.942990012975909,
+          "band": "GOOD",
+          "meanCorner": 12.419818993375774,
+          "maxCorner": 18.65032793723082,
+          "corners": {
+            "tl": {
+              "px": 18.65032793723082,
+              "cardWidths": 0.044196328366525005
+            },
+            "tr": {
+              "px": 13.396612946869764,
+              "cardWidths": 0.0317464179070627
+            },
+            "br": {
+              "px": 2.6543082014114594,
+              "cardWidths": 0.006290006119482712
+            },
+            "bl": {
+              "px": 14.978026887991046,
+              "cardWidths": 0.03549394932101028
+            }
+          },
+          "places": {
+            "tl": "on the card edge",
+            "tr": "on the card edge",
+            "br": "on the card edge",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 1.0461366773005853,
+          "aspect": 0.6974391804763819
+        },
+        {
+          "index": 0,
+          "method": "luma×2.5",
+          "score": 0.8728401462208781,
+          "rank": 7,
+          "iou": 0.831669202514877,
+          "band": "GOOD",
+          "meanCorner": 46.52417669964038,
+          "maxCorner": 122.99331602841663,
+          "corners": {
+            "tl": {
+              "px": 122.99331602841663,
+              "cardWidths": 0.2914615228415546
+            },
+            "tr": {
+              "px": 16.83158489967442,
+              "cardWidths": 0.039886389969049904
+            },
+            "br": {
+              "px": 19.026597942756684,
+              "cardWidths": 0.045087988436774924
+            },
+            "bl": {
+              "px": 27.245207927713764,
+              "cardWidths": 0.06456391330169162
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "on the card edge",
+            "br": "on the card edge",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 1.2024011433585717,
+          "aspect": 0.6937793281312796
+        },
+        {
+          "index": 12,
+          "method": "luma×7",
+          "score": 0.8266034717546812,
+          "rank": 8,
+          "iou": 0.8811586731813524,
+          "band": "GOOD",
+          "meanCorner": 23.566247908757664,
+          "maxCorner": 40.51215500422189,
+          "corners": {
+            "tl": {
+              "px": 5.186879856160403,
+              "cardWidths": 0.01229152892603864
+            },
+            "tr": {
+              "px": 35.129105240577914,
+              "cardWidths": 0.08324665794940016
+            },
+            "br": {
+              "px": 40.51215500422189,
+              "cardWidths": 0.09600305750269823
+            },
+            "bl": {
+              "px": 13.436851534070447,
+              "cardWidths": 0.03184177268146194
+            }
+          },
+          "places": {
+            "tl": "on the card edge",
+            "tr": "background",
+            "br": "inside card",
+            "bl": "on the card edge"
+          },
+          "areaRatio": 0.9216796529102739,
+          "aspect": 0.651723313735793
+        },
+        {
+          "index": 32,
+          "method": "chroma@28",
+          "score": 0.7613625254822827,
+          "rank": 9,
+          "iou": 0.4103060705895093,
+          "band": "POOR",
+          "meanCorner": 241.94853665465368,
+          "maxCorner": 342.5912712893445,
+          "corners": {
+            "tl": {
+              "px": 342.5912712893445,
+              "cardWidths": 0.8118504067257317
+            },
+            "tr": {
+              "px": 258.1348206007063,
+              "cardWidths": 0.6117110290231592
+            },
+            "br": {
+              "px": 49.29259235611528,
+              "cardWidths": 0.1168103641469588
+            },
+            "bl": {
+              "px": 317.7754623724486,
+              "cardWidths": 0.7530435244412309
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 2.2293415526333646,
+          "aspect": 0.9869864937113182
+        },
+        {
+          "index": 36,
+          "method": "chroma@40",
+          "score": 0.7570777965133155,
+          "rank": 10,
+          "iou": 0.516411450345663,
+          "band": "POOR",
+          "meanCorner": 197.80694341259664,
+          "maxCorner": 347.7577340486623,
+          "corners": {
+            "tl": {
+              "px": 253.22026763103887,
+              "cardWidths": 0.6000648425564588
+            },
+            "tr": {
+              "px": 161.4701656285014,
+              "cardWidths": 0.38264144660257543
+            },
+            "br": {
+              "px": 28.779606342183975,
+              "cardWidths": 0.06820003039299623
+            },
+            "bl": {
+              "px": 347.7577340486623,
+              "cardWidths": 0.8240935525499085
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 1.5270749512818464,
+          "aspect": 0.9954187338474302
+        },
+        {
+          "index": 24,
+          "method": "luma@28",
+          "score": 0.620584336588528,
+          "rank": 11,
+          "iou": 0.565356934540109,
+          "band": "POOR",
+          "meanCorner": 195.9623970043201,
+          "maxCorner": 389.9031277471291,
+          "corners": {
+            "tl": {
+              "px": 241.02910404316214,
+              "cardWidths": 0.5711750197655023
+            },
+            "tr": {
+              "px": 125.47747298553104,
+              "cardWidths": 0.29734831566150527
+            },
+            "br": {
+              "px": 27.439883241458094,
+              "cardWidths": 0.06502524213837792
+            },
+            "bl": {
+              "px": 389.9031277471291,
+              "cardWidths": 0.923966952379814
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 1.2308532308800977,
+          "aspect": 1.1390603610278414
+        }
+      ]
+    },
+    {
+      "slug": "bulk-up",
+      "card": "Bulk Up",
+      "imageId": ".scan-inbox/sessions/geometry-test-20260910-162108/geom-001-source/geom-001-source.png",
+      "tags": [],
+      "frameFamily": "borderless",
+      "outlineSpace": "image",
+      "outlineScale": 1,
+      "human": {
+        "tl": [
+          249.06622516556294,
+          663.7350993377484
+        ],
+        "tr": [
+          821.2516556291391,
+          740.0264900662252
+        ],
+        "br": [
+          711.9006622516556,
+          1630.092715231788
+        ],
+        "bl": [
+          30.364238410596073,
+          1497.8543046357615
+        ]
+      },
+      "width": 1022,
+      "height": 1920,
+      "previewScale": 0.5088062622309197,
+      "file": "bulk-up.png",
+      "generated": 40,
+      "rejectedWithoutQuad": 36,
+      "accepted": 4,
+      "deduped": 4,
+      "bestSurvivesDedupe": true,
+      "best": {
+        "index": 36,
+        "method": "edge",
+        "score": 0.9284025750651211,
+        "rank": 1,
+        "iou": 0.8671597521588627,
+        "band": "GOOD",
+        "meanCorner": 38.849606846506084,
+        "maxCorner": 45.01892485654136,
+        "corners": {
+          "tl": {
+            "px": 35.829011692283515,
+            "cardWidths": 0.056357249177043905
+          },
+          "tr": {
+            "px": 33.403095257833996,
+            "cardWidths": 0.05254140356697919
+          },
+          "br": {
+            "px": 41.147395579365465,
+            "cardWidths": 0.0647228018894009
+          },
+          "bl": {
+            "px": 45.01892485654136,
+            "cardWidths": 0.07081252443167839
+          }
+        },
+        "places": {
+          "tl": "outside card, on a larger rectangle",
+          "tr": "outside card, on a larger rectangle",
+          "br": "outside card, on a larger rectangle",
+          "bl": "outside card, on a larger rectangle"
+        },
+        "areaRatio": 1.1531900523639638,
+        "aspect": 0.7372978716493461,
+        "quad": {
+          "tl": [
+            234.52051648946707,
+            630.9915436671139
+          ],
+          "tr": [
+            851.2622601765482,
+            725.3591662645578
+          ],
+          "br": [
+            735.0129782258465,
+            1664.1357617064198
+          ],
+          "bl": [
+            -6.7803826824806865,
+            1523.2901203115105
+          ]
+        }
+      },
+      "selected": {
+        "index": 32,
+        "method": "chroma@40",
+        "score": 0.8627834884769693,
+        "rank": 3,
+        "iou": 0.34400161115367806,
+        "band": "POOR",
+        "meanCorner": 478.44137201348974,
+        "maxCorner": 670.4118500725629,
+        "corners": {
+          "tl": {
+            "px": 379.3237748894445,
+            "cardWidths": 0.5966573871426499
+          },
+          "tr": {
+            "px": 670.4118500725629,
+            "cardWidths": 1.0545244175384176
+          },
+          "br": {
+            "px": 444.36346503428905,
+            "cardWidths": 0.6989615772601842
+          },
+          "bl": {
+            "px": 419.66639805766243,
+            "cardWidths": 0.6601143221503355
+          }
+        },
+        "places": {
+          "tl": "outside card, on a larger rectangle",
+          "tr": "outside card, on a larger rectangle",
+          "br": "outside card, on a larger rectangle",
+          "bl": "outside card, on a larger rectangle"
+        },
+        "areaRatio": 2.9069631291734375,
+        "aspect": 0.5656379239862548,
+        "quad": {
+          "tl": [
+            34.90897941793664,
+            350.6485293763896
+          ],
+          "tr": [
+            869.7236860264592,
+            71.36924529363036
+          ],
+          "br": [
+            1051.8608031966849,
+            1916.25
+          ],
+          "bl": [
+            -2.268992495456143,
+            1916.25
+          ]
+        }
+      },
+      "maxScore": {
+        "index": 36,
+        "method": "edge",
+        "score": 0.9284025750651211,
+        "rank": 1,
+        "iou": 0.8671597521588627,
+        "band": "GOOD",
+        "meanCorner": 38.849606846506084,
+        "maxCorner": 45.01892485654136,
+        "corners": {
+          "tl": {
+            "px": 35.829011692283515,
+            "cardWidths": 0.056357249177043905
+          },
+          "tr": {
+            "px": 33.403095257833996,
+            "cardWidths": 0.05254140356697919
+          },
+          "br": {
+            "px": 41.147395579365465,
+            "cardWidths": 0.0647228018894009
+          },
+          "bl": {
+            "px": 45.01892485654136,
+            "cardWidths": 0.07081252443167839
+          }
+        },
+        "places": {
+          "tl": "outside card, on a larger rectangle",
+          "tr": "outside card, on a larger rectangle",
+          "br": "outside card, on a larger rectangle",
+          "bl": "outside card, on a larger rectangle"
+        },
+        "areaRatio": 1.1531900523639638,
+        "aspect": 0.7372978716493461,
+        "quad": {
+          "tl": [
+            234.52051648946707,
+            630.9915436671139
+          ],
+          "tr": [
+            851.2622601765482,
+            725.3591662645578
+          ],
+          "br": [
+            735.0129782258465,
+            1664.1357617064198
+          ],
+          "bl": [
+            -6.7803826824806865,
+            1523.2901203115105
+          ]
+        }
+      },
+      "whereLost": "nested-selection",
+      "diagnosis": "SELECTION_FAILURE",
+      "tracking": "TRACKING_NOT_MEASURABLE",
+      "recognitionCorners": null,
+      "trackedCorners": null,
+      "rawCorners": null,
+      "selectedContainsHuman": 1,
+      "humanContainsSelected": 0.34400161115367806,
+      "nestedSelected": false,
+      "nestedBest": false,
+      "nestedAreaFraction": null,
+      "top": [
+        {
+          "index": 36,
+          "method": "edge",
+          "score": 0.9284025750651211,
+          "rank": 1,
+          "iou": 0.8671597521588627,
+          "band": "GOOD",
+          "meanCorner": 38.849606846506084,
+          "maxCorner": 45.01892485654136,
+          "corners": {
+            "tl": {
+              "px": 35.829011692283515,
+              "cardWidths": 0.056357249177043905
+            },
+            "tr": {
+              "px": 33.403095257833996,
+              "cardWidths": 0.05254140356697919
+            },
+            "br": {
+              "px": 41.147395579365465,
+              "cardWidths": 0.0647228018894009
+            },
+            "bl": {
+              "px": 45.01892485654136,
+              "cardWidths": 0.07081252443167839
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 1.1531900523639638,
+          "aspect": 0.7372978716493461,
+          "quad": {
+            "tl": [
+              234.52051648946707,
+              630.9915436671139
+            ],
+            "tr": [
+              851.2622601765482,
+              725.3591662645578
+            ],
+            "br": [
+              735.0129782258465,
+              1664.1357617064198
+            ],
+            "bl": [
+              -6.7803826824806865,
+              1523.2901203115105
+            ]
+          }
+        },
+        {
+          "index": 16,
+          "method": "luma@18",
+          "score": 0.8977388644160972,
+          "rank": 2,
+          "iou": 0.32480067199733503,
+          "band": "POOR",
+          "meanCorner": 486.39327715848526,
+          "maxCorner": 750.9558878683041,
+          "corners": {
+            "tl": {
+              "px": 358.0916471319842,
+              "cardWidths": 0.5632603086839179
+            },
+            "tr": {
+              "px": 750.9558878683041,
+              "cardWidths": 1.1812161735590685
+            },
+            "br": {
+              "px": 416.2723675174095,
+              "cardWidths": 0.6547756813160776
+            },
+            "bl": {
+              "px": 420.2532061162434,
+              "cardWidths": 0.6610373419718303
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 3.0788113640608645,
+          "aspect": 0.5989947607454081,
+          "quad": {
+            "tl": [
+              37.26443367434949,
+              374.99710587860903
+            ],
+            "tr": [
+              1012.3716348774327,
+              13.797945421906858
+            ],
+            "br": [
+              1014.2195209631717,
+              1916.25
+            ],
+            "bl": [
+              -9.104728533790423,
+              1916.25
+            ]
+          }
+        },
+        {
+          "index": 32,
+          "method": "chroma@40",
+          "score": 0.8627834884769693,
+          "rank": 3,
+          "iou": 0.34400161115367806,
+          "band": "POOR",
+          "meanCorner": 478.44137201348974,
+          "maxCorner": 670.4118500725629,
+          "corners": {
+            "tl": {
+              "px": 379.3237748894445,
+              "cardWidths": 0.5966573871426499
+            },
+            "tr": {
+              "px": 670.4118500725629,
+              "cardWidths": 1.0545244175384176
+            },
+            "br": {
+              "px": 444.36346503428905,
+              "cardWidths": 0.6989615772601842
+            },
+            "bl": {
+              "px": 419.66639805766243,
+              "cardWidths": 0.6601143221503355
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 2.9069631291734375,
+          "aspect": 0.5656379239862548,
+          "quad": {
+            "tl": [
+              34.90897941793664,
+              350.6485293763896
+            ],
+            "tr": [
+              869.7236860264592,
+              71.36924529363036
+            ],
+            "br": [
+              1051.8608031966849,
+              1916.25
+            ],
+            "bl": [
+              -2.268992495456143,
+              1916.25
+            ]
+          }
+        },
+        {
+          "index": 20,
+          "method": "luma@28",
+          "score": 0.8597489425970508,
+          "rank": 4,
+          "iou": 0.41785483354047953,
+          "band": "POOR",
+          "meanCorner": 370.0585018344518,
+          "maxCorner": 517.4842843560464,
+          "corners": {
+            "tl": {
+              "px": 117.23854531664956,
+              "cardWidths": 0.18441038698780446
+            },
+            "tr": {
+              "px": 517.4842843560464,
+              "cardWidths": 0.8139769806974327
+            },
+            "br": {
+              "px": 420.1497088109957,
+              "cardWidths": 0.6608745458704169
+            },
+            "bl": {
+              "px": 425.36146885411557,
+              "cardWidths": 0.6690723845918328
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 2.39317561921448,
+          "aspect": 0.6150559450580257,
+          "quad": {
+            "tl": [
+              154.49009640497627,
+              594.4513900214522
+            ],
+            "tr": [
+              865.2976596437838,
+              224.4201149254291
+            ],
+            "br": [
+              1019.5364634647927,
+              1916.25
+            ],
+            "bl": [
+              -46.300103277088574,
+              1916.25
+            ]
+          }
+        }
+      ],
+      "measured": [
+        {
+          "index": 36,
+          "method": "edge",
+          "score": 0.9284025750651211,
+          "rank": 1,
+          "iou": 0.8671597521588627,
+          "band": "GOOD",
+          "meanCorner": 38.849606846506084,
+          "maxCorner": 45.01892485654136,
+          "corners": {
+            "tl": {
+              "px": 35.829011692283515,
+              "cardWidths": 0.056357249177043905
+            },
+            "tr": {
+              "px": 33.403095257833996,
+              "cardWidths": 0.05254140356697919
+            },
+            "br": {
+              "px": 41.147395579365465,
+              "cardWidths": 0.0647228018894009
+            },
+            "bl": {
+              "px": 45.01892485654136,
+              "cardWidths": 0.07081252443167839
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 1.1531900523639638,
+          "aspect": 0.7372978716493461
+        },
+        {
+          "index": 16,
+          "method": "luma@18",
+          "score": 0.8977388644160972,
+          "rank": 2,
+          "iou": 0.32480067199733503,
+          "band": "POOR",
+          "meanCorner": 486.39327715848526,
+          "maxCorner": 750.9558878683041,
+          "corners": {
+            "tl": {
+              "px": 358.0916471319842,
+              "cardWidths": 0.5632603086839179
+            },
+            "tr": {
+              "px": 750.9558878683041,
+              "cardWidths": 1.1812161735590685
+            },
+            "br": {
+              "px": 416.2723675174095,
+              "cardWidths": 0.6547756813160776
+            },
+            "bl": {
+              "px": 420.2532061162434,
+              "cardWidths": 0.6610373419718303
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 3.0788113640608645,
+          "aspect": 0.5989947607454081
+        },
+        {
+          "index": 32,
+          "method": "chroma@40",
+          "score": 0.8627834884769693,
+          "rank": 3,
+          "iou": 0.34400161115367806,
+          "band": "POOR",
+          "meanCorner": 478.44137201348974,
+          "maxCorner": 670.4118500725629,
+          "corners": {
+            "tl": {
+              "px": 379.3237748894445,
+              "cardWidths": 0.5966573871426499
+            },
+            "tr": {
+              "px": 670.4118500725629,
+              "cardWidths": 1.0545244175384176
+            },
+            "br": {
+              "px": 444.36346503428905,
+              "cardWidths": 0.6989615772601842
+            },
+            "bl": {
+              "px": 419.66639805766243,
+              "cardWidths": 0.6601143221503355
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 2.9069631291734375,
+          "aspect": 0.5656379239862548
+        },
+        {
+          "index": 20,
+          "method": "luma@28",
+          "score": 0.8597489425970508,
+          "rank": 4,
+          "iou": 0.41785483354047953,
+          "band": "POOR",
+          "meanCorner": 370.0585018344518,
+          "maxCorner": 517.4842843560464,
+          "corners": {
+            "tl": {
+              "px": 117.23854531664956,
+              "cardWidths": 0.18441038698780446
+            },
+            "tr": {
+              "px": 517.4842843560464,
+              "cardWidths": 0.8139769806974327
+            },
+            "br": {
+              "px": 420.1497088109957,
+              "cardWidths": 0.6608745458704169
+            },
+            "bl": {
+              "px": 425.36146885411557,
+              "cardWidths": 0.6690723845918328
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 2.39317561921448,
+          "aspect": 0.6150559450580257
+        }
+      ]
+    },
+    {
+      "slug": "mudbutton",
+      "card": "Mudbutton Torchrunner",
+      "imageId": ".scan-inbox/sessions/geometry-test-20260911-100459/geom-003-source/geom-003-source.png",
+      "tags": [],
+      "frameFamily": "unknown",
+      "outlineSpace": "image",
+      "outlineScale": 1,
+      "human": {
+        "tl": [
+          153.47350993377486,
+          755.2847682119206
+        ],
+        "tr": [
+          743.4602649006623,
+          729.8543046357615
+        ],
+        "br": [
+          868.0695364238411,
+          1591.9470198675497
+        ],
+        "bl": [
+          186.53311258278148,
+          1675.867549668874
+        ]
+      },
+      "width": 1019,
+      "height": 1920,
+      "previewScale": 0.5103042198233563,
+      "file": "mudbutton.png",
+      "generated": 31,
+      "rejectedWithoutQuad": 29,
+      "accepted": 2,
+      "deduped": 2,
+      "bestSurvivesDedupe": true,
+      "best": {
+        "index": 27,
+        "method": "edge",
+        "score": 0.8707625329783144,
+        "rank": 2,
+        "iou": 0.8615981365178127,
+        "band": "GOOD",
+        "meanCorner": 37.74588220484769,
+        "maxCorner": 46.370388141608565,
+        "corners": {
+          "tl": {
+            "px": 30.442235539638624,
+            "cardWidths": 0.04766958849525373
+          },
+          "tr": {
+            "px": 33.469337334682756,
+            "cardWidths": 0.052409736330819384
+          },
+          "br": {
+            "px": 46.370388141608565,
+            "cardWidths": 0.07261153072012247
+          },
+          "bl": {
+            "px": 40.701567803460804,
+            "cardWidths": 0.06373470784615305
+          }
+        },
+        "places": {
+          "tl": "inside card",
+          "tr": "inside card",
+          "br": "inside card",
+          "bl": "inside card"
+        },
+        "areaRatio": 0.8615981365178125,
+        "aspect": 0.6923772441047333,
+        "quad": {
+          "tl": [
+            177.46378850239694,
+            774.0249987027856
+          ],
+          "tr": [
+            720.2280239647619,
+            753.9470322256186
+          ],
+          "br": [
+            829.9853684342888,
+            1565.493115714344
+          ],
+          "bl": [
+            209.34484661891366,
+            1642.1593546426718
+          ]
+        }
+      },
+      "selected": {
+        "index": 12,
+        "method": "luma@28",
+        "score": 0.8891214511854755,
+        "rank": 1,
+        "iou": 0.3180193079733222,
+        "band": "POOR",
+        "meanCorner": 535.0512262969498,
+        "maxCorner": 779.3517686044818,
+        "corners": {
+          "tl": {
+            "px": 770.7199227633388,
+            "cardWidths": 1.2068726528110372
+          },
+          "tr": {
+            "px": 779.3517686044818,
+            "cardWidths": 1.2203892862614936
+          },
+          "br": {
+            "px": 389.4179777819668,
+            "cardWidths": 0.6097907865323803
+          },
+          "bl": {
+            "px": 200.715236038012,
+            "cardWidths": 0.314300593798419
+          }
+        },
+        "places": {
+          "tl": "outside card, on a larger rectangle",
+          "tr": "outside card, on a larger rectangle",
+          "br": "outside card, on a larger rectangle",
+          "bl": "outside card, on a larger rectangle"
+        },
+        "areaRatio": 3.1440514850007184,
+        "aspect": 0.5832162778755765,
+        "quad": {
+          "tl": [
+            -5.0989030562280695e-14,
+            0
+          ],
+          "tr": [
+            1016.7766991514823,
+            0
+          ],
+          "br": [
+            997.9702609961909,
+            1959.0603037124345
+          ],
+          "bl": [
+            9.050538096744275e-14,
+            1601.7594941824814
+          ]
+        }
+      },
+      "maxScore": {
+        "index": 12,
+        "method": "luma@28",
+        "score": 0.8891214511854755,
+        "rank": 1,
+        "iou": 0.3180193079733222,
+        "band": "POOR",
+        "meanCorner": 535.0512262969498,
+        "maxCorner": 779.3517686044818,
+        "corners": {
+          "tl": {
+            "px": 770.7199227633388,
+            "cardWidths": 1.2068726528110372
+          },
+          "tr": {
+            "px": 779.3517686044818,
+            "cardWidths": 1.2203892862614936
+          },
+          "br": {
+            "px": 389.4179777819668,
+            "cardWidths": 0.6097907865323803
+          },
+          "bl": {
+            "px": 200.715236038012,
+            "cardWidths": 0.314300593798419
+          }
+        },
+        "places": {
+          "tl": "outside card, on a larger rectangle",
+          "tr": "outside card, on a larger rectangle",
+          "br": "outside card, on a larger rectangle",
+          "bl": "outside card, on a larger rectangle"
+        },
+        "areaRatio": 3.1440514850007184,
+        "aspect": 0.5832162778755765,
+        "quad": {
+          "tl": [
+            -5.0989030562280695e-14,
+            0
+          ],
+          "tr": [
+            1016.7766991514823,
+            0
+          ],
+          "br": [
+            997.9702609961909,
+            1959.0603037124345
+          ],
+          "bl": [
+            9.050538096744275e-14,
+            1601.7594941824814
+          ]
+        }
+      },
+      "whereLost": "score-ranking",
+      "diagnosis": "SELECTION_FAILURE",
+      "tracking": "TRACKING_NOT_MEASURABLE",
+      "recognitionCorners": null,
+      "trackedCorners": null,
+      "rawCorners": null,
+      "selectedContainsHuman": 0.99990066723091,
+      "humanContainsSelected": 0.31802935543553323,
+      "nestedSelected": false,
+      "nestedBest": false,
+      "nestedAreaFraction": null,
+      "top": [
+        {
+          "index": 12,
+          "method": "luma@28",
+          "score": 0.8891214511854755,
+          "rank": 1,
+          "iou": 0.3180193079733222,
+          "band": "POOR",
+          "meanCorner": 535.0512262969498,
+          "maxCorner": 779.3517686044818,
+          "corners": {
+            "tl": {
+              "px": 770.7199227633388,
+              "cardWidths": 1.2068726528110372
+            },
+            "tr": {
+              "px": 779.3517686044818,
+              "cardWidths": 1.2203892862614936
+            },
+            "br": {
+              "px": 389.4179777819668,
+              "cardWidths": 0.6097907865323803
+            },
+            "bl": {
+              "px": 200.715236038012,
+              "cardWidths": 0.314300593798419
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 3.1440514850007184,
+          "aspect": 0.5832162778755765,
+          "quad": {
+            "tl": [
+              -5.0989030562280695e-14,
+              0
+            ],
+            "tr": [
+              1016.7766991514823,
+              0
+            ],
+            "br": [
+              997.9702609961909,
+              1959.0603037124345
+            ],
+            "bl": [
+              9.050538096744275e-14,
+              1601.7594941824814
+            ]
+          }
+        },
+        {
+          "index": 27,
+          "method": "edge",
+          "score": 0.8707625329783144,
+          "rank": 2,
+          "iou": 0.8615981365178127,
+          "band": "GOOD",
+          "meanCorner": 37.74588220484769,
+          "maxCorner": 46.370388141608565,
+          "corners": {
+            "tl": {
+              "px": 30.442235539638624,
+              "cardWidths": 0.04766958849525373
+            },
+            "tr": {
+              "px": 33.469337334682756,
+              "cardWidths": 0.052409736330819384
+            },
+            "br": {
+              "px": 46.370388141608565,
+              "cardWidths": 0.07261153072012247
+            },
+            "bl": {
+              "px": 40.701567803460804,
+              "cardWidths": 0.06373470784615305
+            }
+          },
+          "places": {
+            "tl": "inside card",
+            "tr": "inside card",
+            "br": "inside card",
+            "bl": "inside card"
+          },
+          "areaRatio": 0.8615981365178125,
+          "aspect": 0.6923772441047333,
+          "quad": {
+            "tl": [
+              177.46378850239694,
+              774.0249987027856
+            ],
+            "tr": [
+              720.2280239647619,
+              753.9470322256186
+            ],
+            "br": [
+              829.9853684342888,
+              1565.493115714344
+            ],
+            "bl": [
+              209.34484661891366,
+              1642.1593546426718
+            ]
+          }
+        }
+      ],
+      "measured": [
+        {
+          "index": 12,
+          "method": "luma@28",
+          "score": 0.8891214511854755,
+          "rank": 1,
+          "iou": 0.3180193079733222,
+          "band": "POOR",
+          "meanCorner": 535.0512262969498,
+          "maxCorner": 779.3517686044818,
+          "corners": {
+            "tl": {
+              "px": 770.7199227633388,
+              "cardWidths": 1.2068726528110372
+            },
+            "tr": {
+              "px": 779.3517686044818,
+              "cardWidths": 1.2203892862614936
+            },
+            "br": {
+              "px": 389.4179777819668,
+              "cardWidths": 0.6097907865323803
+            },
+            "bl": {
+              "px": 200.715236038012,
+              "cardWidths": 0.314300593798419
+            }
+          },
+          "places": {
+            "tl": "outside card, on a larger rectangle",
+            "tr": "outside card, on a larger rectangle",
+            "br": "outside card, on a larger rectangle",
+            "bl": "outside card, on a larger rectangle"
+          },
+          "areaRatio": 3.1440514850007184,
+          "aspect": 0.5832162778755765
+        },
+        {
+          "index": 27,
+          "method": "edge",
+          "score": 0.8707625329783144,
+          "rank": 2,
+          "iou": 0.8615981365178127,
+          "band": "GOOD",
+          "meanCorner": 37.74588220484769,
+          "maxCorner": 46.370388141608565,
+          "corners": {
+            "tl": {
+              "px": 30.442235539638624,
+              "cardWidths": 0.04766958849525373
+            },
+            "tr": {
+              "px": 33.469337334682756,
+              "cardWidths": 0.052409736330819384
+            },
+            "br": {
+              "px": 46.370388141608565,
+              "cardWidths": 0.07261153072012247
+            },
+            "bl": {
+              "px": 40.701567803460804,
+              "cardWidths": 0.06373470784615305
+            }
+          },
+          "places": {
+            "tl": "inside card",
+            "tr": "inside card",
+            "br": "inside card",
+            "bl": "inside card"
+          },
+          "areaRatio": 0.8615981365178125,
+          "aspect": 0.6923772441047333
+        }
+      ]
+    }
+  ]
+}

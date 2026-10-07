@@ -1,0 +1,13 @@
+{
+  "id": "oracle-art",
+  "datasetVersion": "stills-v1",
+  "detector": "manual-corners",
+  "quadSource": "manual-corners",
+  "cropMode": "canonical-art-primary",
+  "visualModel": "CLIP_VIT_B32",
+  "gallery": "full",
+  "ocrMode": "recorded",
+  "fusionMode": "fuseEvidence",
+  "reportName": "oracle-art-current-crop",
+  "note": "NOT INDEPENDENT / SAME CROP LOGIC. This arm calls the same extractArtCropFromCard as oracle-card. It does not isolate art-crop definition from card geometry."
+}

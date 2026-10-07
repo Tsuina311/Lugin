@@ -1,0 +1,227 @@
+{
+  "decision": "RECOGNITION_ADAPTER_STRONG_WIN",
+  "chosenKind": "linear",
+  "identities": {
+    "frames": 120,
+    "known": 116,
+    "missing": 4,
+    "unique": 73,
+    "train": 43,
+    "dev": 12,
+    "holdout": 18,
+    "holdoutFrames": 26,
+    "trainFrames": 70
+  },
+  "b1All": {
+    "n": 113,
+    "top1": 48,
+    "top3": 71,
+    "top5": 74,
+    "top10": 82,
+    "wrongConfident": 3,
+    "meanRank": 291.01769911504425,
+    "medianRank": 2
+  },
+  "b1Holdout": {
+    "n": 26,
+    "top1": 11,
+    "top3": 14,
+    "top5": 15,
+    "top10": 17,
+    "wrongConfident": 0,
+    "meanRank": 751.5769230769231,
+    "medianRank": 2
+  },
+  "b1ProductionHoldout": {
+    "n": 26,
+    "top1": 10,
+    "top3": 12,
+    "top5": 13,
+    "top10": 13,
+    "wrongConfident": 1,
+    "meanRank": 1200.6538461538462,
+    "medianRank": 4
+  },
+  "linearHoldout": {
+    "n": 26,
+    "top1": 16,
+    "top3": 18,
+    "top5": 18,
+    "top10": 19,
+    "wrongConfident": 0,
+    "meanRank": 512.1153846153846,
+    "medianRank": 1
+  },
+  "mlpHoldout": {
+    "n": 26,
+    "top1": 14,
+    "top3": 14,
+    "top5": 15,
+    "top10": 16,
+    "wrongConfident": 0,
+    "meanRank": 712.0769230769231,
+    "medianRank": 1
+  },
+  "chosenHoldout": {
+    "n": 26,
+    "top1": 16,
+    "top3": 18,
+    "top5": 18,
+    "top10": 19,
+    "wrongConfident": 0,
+    "meanRank": 512.1153846153846,
+    "medianRank": 1
+  },
+  "chosenProductionHoldout": {
+    "n": 26,
+    "top1": 12,
+    "top3": 14,
+    "top5": 15,
+    "top10": 16,
+    "wrongConfident": 0,
+    "meanRank": 1249.2307692307693,
+    "medianRank": 2
+  },
+  "transition": {
+    "fixes": 5,
+    "regressions": 0,
+    "fixNames": [
+      "Swiftfoot Boots",
+      "Moonsnare Specialist",
+      "Ulamog's Crusher",
+      "Whiplash Trap",
+      "Goblin Blastronauts"
+    ],
+    "regressionNames": []
+  },
+  "breakdownAll": [
+    {
+      "key": "foil",
+      "n": 9,
+      "top1": 5,
+      "top3": 7,
+      "top5": 7,
+      "top10": 7,
+      "wrongConfident": 0,
+      "meanRank": 396.1111111111111,
+      "medianRank": 1
+    },
+    {
+      "key": "sleeved",
+      "n": 70,
+      "top1": 27,
+      "top3": 42,
+      "top5": 45,
+      "top10": 52,
+      "wrongConfident": 1,
+      "meanRank": 379.74285714285713,
+      "medianRank": 2
+    },
+    {
+      "key": "unsleeved",
+      "n": 6,
+      "top1": 2,
+      "top3": 3,
+      "top5": 3,
+      "top10": 4,
+      "wrongConfident": 0,
+      "meanRank": 15.5,
+      "medianRank": 2
+    },
+    {
+      "key": "basic land",
+      "n": 23,
+      "top1": 8,
+      "top3": 17,
+      "top5": 18,
+      "top10": 19,
+      "wrongConfident": 1,
+      "meanRank": 6.869565217391305,
+      "medianRank": 2
+    },
+    {
+      "key": "borderless/showcase",
+      "n": 12,
+      "top1": 5,
+      "top3": 6,
+      "top5": 7,
+      "top10": 8,
+      "wrongConfident": 1,
+      "meanRank": 328.9166666666667,
+      "medianRank": 2
+    },
+    {
+      "key": "non-English",
+      "n": 36,
+      "top1": 14,
+      "top3": 22,
+      "top5": 24,
+      "top10": 26,
+      "wrongConfident": 1,
+      "meanRank": 660.5,
+      "medianRank": 2
+    }
+  ],
+  "misses": [
+    {
+      "cardName": "Excalibur, Sword of Eden",
+      "top1Name": "Revoke Existence",
+      "rank": 30,
+      "failure": "GLARE_OR_FOIL"
+    },
+    {
+      "cardName": "The Spear of Leonidas",
+      "top1Name": "Case of the Burning Masks",
+      "rank": 36,
+      "failure": "ALTERNATE_ART"
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "top1Name": "Famished Foragers",
+      "rank": 550,
+      "failure": "ALTERNATE_ART"
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "top1Name": "Restless Bloodseeker",
+      "rank": 59,
+      "failure": "ALTERNATE_ART"
+    },
+    {
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "top1Name": "Skaab Wrangler",
+      "rank": 6,
+      "failure": "VISUALLY_SIMILAR"
+    },
+    {
+      "cardName": "Kaito, Bane of Nightmares",
+      "top1Name": "Brazen Upstart",
+      "rank": 2,
+      "failure": "VISUALLY_SIMILAR"
+    },
+    {
+      "cardName": "Agent of the Shadow Thieves",
+      "top1Name": "Double-Faced Substitute Card",
+      "rank": 429,
+      "failure": "ALTERNATE_ART"
+    },
+    {
+      "cardName": "Kaito, Bane of Nightmares",
+      "top1Name": "Myrkul's Invoker",
+      "rank": 285,
+      "failure": "ALTERNATE_ART"
+    },
+    {
+      "cardName": "Chasm Skulker",
+      "top1Name": "Nazgûl",
+      "rank": 2,
+      "failure": "VISUALLY_SIMILAR"
+    },
+    {
+      "cardName": "Deadly Rollick",
+      "top1Name": "Minions",
+      "rank": 11900,
+      "failure": "ALTERNATE_ART"
+    }
+  ]
+}
