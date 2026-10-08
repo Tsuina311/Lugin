@@ -1,0 +1,575 @@
+{
+  "challengerId": "B-gbm-ab595716ca0a",
+  "split": "dev",
+  "current": {
+    "n": 16,
+    "cleanTop1": 9,
+    "prototypeTop1": 12,
+    "correctPublished": 8,
+    "wrongPublished": 0,
+    "withheldCorrect": 4
+  },
+  "learned": {
+    "n": 16,
+    "cleanTop1": 12,
+    "prototypeTop1": 13,
+    "correctPublished": 9,
+    "wrongPublished": 0,
+    "withheldCorrect": 4
+  },
+  "challenger": {
+    "n": 16,
+    "cleanTop1": 11,
+    "prototypeTop1": 15,
+    "correctPublished": 7,
+    "wrongPublished": 0,
+    "withheldCorrect": 8
+  },
+  "frames": [
+    {
+      "id": "capture-quality__cq-20260908T120813",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Rosnakht, Heir of Rohgahh",
+        "protoName": "Kenrith, the Returned King",
+        "margin": 0.07496701045700838
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Livaan, Cultist of Tiamat",
+        "protoName": "Livaan, Cultist of Tiamat",
+        "margin": 0.07728061656930896
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "True Polymorph",
+        "protoName": "Livaan, Cultist of Tiamat",
+        "margin": 0.0038149310164080075
+      }
+    },
+    {
+      "id": "focus-series__focus-series-20260908T132712",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Livaan, Cultist of Tiamat",
+        "protoName": "Livaan, Cultist of Tiamat",
+        "margin": 0.07932339222201923
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Livaan, Cultist of Tiamat",
+        "protoName": "Livaan, Cultist of Tiamat",
+        "margin": 0.07932339222201923
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Livaan, Cultist of Tiamat",
+        "protoName": "Livaan, Cultist of Tiamat",
+        "margin": 0.07932339222201923
+      }
+    },
+    {
+      "id": "replay__livaan-cultist-of-tiamat-foil-20260908T111916",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Livaan, Cultist of Tiamat",
+        "protoName": "Livaan, Cultist of Tiamat",
+        "margin": 0.07380445579659456
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Livaan, Cultist of Tiamat",
+        "protoName": "Livaan, Cultist of Tiamat",
+        "margin": 0.03882567392690928
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Livaan, Cultist of Tiamat",
+        "protoName": "Livaan, Cultist of Tiamat",
+        "margin": 0.07380445579659456
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c000_deck-001-source",
+      "cardName": "Sword of Feast and Famine",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Sword of Feast and Famine",
+        "protoName": "Sword of Feast and Famine",
+        "margin": 0.2060040204921988
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Sword of Feast and Famine",
+        "protoName": "Sword of Feast and Famine",
+        "margin": 0.2060040204921988
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Sword of Feast and Famine",
+        "protoName": "Sword of Feast and Famine",
+        "margin": 0.09617517562147038
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260910-162108_geom-001-source_geom-001-source",
+      "cardName": "Bulk Up",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Unearth",
+        "protoName": "Food Chain",
+        "margin": 0.0033879818942407214
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Abomination, Terrifying Titan",
+        "protoName": "Bulk Up",
+        "margin": 0.08771169765506825
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Abomination, Terrifying Titan",
+        "protoName": "Bulk Up",
+        "margin": 0.08771169765506825
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source",
+      "cardName": "Critical Hit",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Critical Hit",
+        "protoName": "Critical Hit",
+        "margin": 0.06414586711307235
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Critical Hit",
+        "protoName": "Critical Hit",
+        "margin": 0.06414586711307235
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Critical Hit",
+        "protoName": "Critical Hit",
+        "margin": 0.12177193286545795
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-150559_geom-014-source_geom-014-source",
+      "cardName": "Darkwater Catacombs",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Darkwater Catacombs",
+        "protoName": "Darkwater Catacombs",
+        "margin": 0.057996514032257473
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Darkwater Catacombs",
+        "protoName": "Darkwater Catacombs",
+        "margin": 0.057996514032257473
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Darkwater Catacombs",
+        "protoName": "Darkwater Catacombs",
+        "margin": 0.057996514032257473
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-002-source_geom-002-source",
+      "cardName": "Darkwater Catacombs",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Darkwater Catacombs",
+        "protoName": "Darkwater Catacombs",
+        "margin": 0.070077732304897
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Darkwater Catacombs",
+        "protoName": "Darkwater Catacombs",
+        "margin": 0.070077732304897
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Darkwater Catacombs",
+        "protoName": "Darkwater Catacombs",
+        "margin": 0.06753970367302631
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-020-source_geom-020-source",
+      "cardName": "Eliminate",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Erase (Not the Urza's Legacy One)",
+        "protoName": "Eliminate",
+        "margin": 0.018488433438203056
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Eliminate",
+        "protoName": "Eliminate",
+        "margin": 0.1183469417040307
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Erase (Not the Urza's Legacy One)",
+        "protoName": "Eliminate",
+        "margin": 0.018488433438203056
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-023-source_geom-023-source",
+      "cardName": "Distortion Strike",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Martyr for the Cause",
+        "protoName": "Who",
+        "margin": 0.005366106558000627
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Cosima, God of the Voyage",
+        "protoName": "Cosima, God of the Voyage",
+        "margin": 0.005971650487763713
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Distortion Strike",
+        "protoName": "Cosima, God of the Voyage",
+        "margin": 0.006394845844665764
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-024-source_geom-024-source",
+      "cardName": "Sage Owl",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Road",
+        "protoName": "Case of the Locked Hothouse",
+        "margin": 0.017035066666975185
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Nadu, Winged Wisdom",
+        "protoName": "Teremko Griffin",
+        "margin": 0.01894180820845337
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Sage Owl",
+        "protoName": "Sage Owl",
+        "margin": 0.1660548010651366
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-027-source_geom-027-source",
+      "cardName": "Throatseeker",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Minions",
+        "protoName": "Throatseeker",
+        "margin": 0.02100934032902113
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Throatseeker",
+        "protoName": "Throatseeker",
+        "margin": 0.04631315226838251
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Throatseeker",
+        "protoName": "Throatseeker",
+        "margin": 0.04631315226838251
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-034-source_geom-034-source",
+      "cardName": "Vela the Night-Clad",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Vela the Night-Clad",
+        "protoName": "Vela the Night-Clad",
+        "margin": 0.08142020015726648
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Vela the Night-Clad",
+        "protoName": "Vela the Night-Clad",
+        "margin": 0.08142020015726648
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Arcane Signet",
+        "protoName": "Vela the Night-Clad",
+        "margin": 0.036327747693961965
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-153936_geom-001-source_geom-001-source",
+      "cardName": "Glamdring, Foe-hammer",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Glamdring, Foe-hammer",
+        "protoName": "Glamdring, Foe-hammer",
+        "margin": 0.02802184468298441
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Glamdring, Foe-hammer",
+        "protoName": "Glamdring, Foe-hammer",
+        "margin": 0.02802184468298441
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Glamdring, Foe-hammer",
+        "protoName": "Glamdring, Foe-hammer",
+        "margin": 0.02802184468298441
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_normal-scan-session-20260911-113049--card-006_source-highres_source-highres",
+      "cardName": "Goblin Lookout",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Goblin Lookout",
+        "protoName": "Goblin Lookout",
+        "margin": 0.06480312916049391
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Goblin Lookout",
+        "protoName": "Goblin Lookout",
+        "margin": 0.09344538087870768
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Goblin Lookout",
+        "protoName": "Goblin Lookout",
+        "margin": 0.03804372378075882
+      }
+    },
+    {
+      "id": "scanner-lab__livaan-foil-20260908T105241",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "The Ruinous Powers",
+        "protoName": "Livaan, Cultist of Tiamat",
+        "margin": 0.046599813351701935
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Aetherflame Wall",
+        "protoName": "Chandra's Phoenix",
+        "margin": 0.007022315010439484
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Implement of Improvement",
+        "protoName": "Livaan, Cultist of Tiamat",
+        "margin": 0.04863619920168394
+      }
+    }
+  ],
+  "wrongPublicationsIncreased": false
+}

@@ -1,0 +1,301 @@
+{
+  "id": "B-gbm-728ffcc5c949",
+  "family": "B-gbm",
+  "spec": {
+    "kind": "gbm",
+    "features": "relative",
+    "weights": "uniform",
+    "depth": 2,
+    "rounds": 8,
+    "minLeaf": 6,
+    "lr": 0.1
+  },
+  "featureSchema": "ranker-features-v1+conservative-v1",
+  "datasetHash": "ab54804ca3cec4cb8919b6d9c728d39a8018022cc5c249db202f14ba5efc1522",
+  "splitHash": "fe29ccd434d5cc78531ced6d3dd8eea5137f7a6cc9abd050736ceb211e06b4e8",
+  "cv": {
+    "n": 23,
+    "ge90": 13,
+    "ge80": 21,
+    "ge70": 21,
+    "catastrophic": 2,
+    "median": 0.9282427544037151,
+    "p10": 0.8299029001794472,
+    "mean": 0.8663333814947968,
+    "goodToBad": 0,
+    "improved": 4,
+    "regressed": 3,
+    "meanRegret": 0.05704277514740556,
+    "medianRegret": 0.008738771298334003,
+    "p90Regret": 0.08280398404933806,
+    "regretOver10": 2,
+    "regretOver25": 2,
+    "swapsAlready90": 8,
+    "already90": 17,
+    "actions": {
+      "HARMFUL_SWAP": 5,
+      "SAME_AS_CURRENT": 10,
+      "SAFE_OVERRIDE": 2,
+      "CATASTROPHIC_FIX": 3,
+      "USELESS_SWAP": 3
+    }
+  },
+  "dev": null,
+  "holdout": null,
+  "status": "frontier",
+  "beatsFrozenGbmOnCv": true,
+  "createdAt": "2026-10-07T15:52:50.372Z",
+  "git": {
+    "rev": "39088e07d31ba91056e68fec534a3baca5e2bd44",
+    "dirty": true
+  },
+  "seed": "deterministic-no-rng",
+  "codeHash": "e9ffb37e35d8d0c6605376454caf9484e28d2abd6670cdb45de67994576c7b45",
+  "model": {
+    "family": "tree",
+    "kind": "gbm-iou",
+    "names": [
+      "detectorScore",
+      "aspectScore",
+      "parallelScore",
+      "areaScore",
+      "centerScore",
+      "aspectRatio",
+      "frameFraction",
+      "centerX",
+      "centerY",
+      "parallelRaw",
+      "scoreRank",
+      "scoreMinusBest",
+      "scoreMinusMedian",
+      "areaOverLargest",
+      "areaOverMedian",
+      "candidateCount",
+      "containedByCount",
+      "containsCount",
+      "hasContainer",
+      "closestContainerRatio",
+      "closestContainerOffset",
+      "hasContained",
+      "closestContainedRatio",
+      "inNestedRelation",
+      "isNestedInner",
+      "isNestedOuter",
+      "srcEdge",
+      "srcLuma",
+      "srcChroma",
+      "lumaMultiplier",
+      "lumaThreshold",
+      "chromaThreshold",
+      "frameRegionSuccess",
+      "artBoxConfidence",
+      "titleArtConfidence",
+      "artTypeConfidence",
+      "innerLeftConfidence",
+      "innerRightConfidence",
+      "gbmUtility",
+      "fractionOverCurrent",
+      "scoreMinusCurrent"
+    ],
+    "norm": null,
+    "weights": null,
+    "trees": [
+      {
+        "feature": 38,
+        "threshold": 0.6541490705143262,
+        "left": {
+          "feature": 38,
+          "threshold": 0.3605945108260295,
+          "left": {
+            "value": -0.48273531071036874
+          },
+          "right": {
+            "value": -0.12684301420173708
+          }
+        },
+        "right": {
+          "feature": 38,
+          "threshold": 0.7842264592670448,
+          "left": {
+            "value": 0.0313777810756015
+          },
+          "right": {
+            "value": 0.28251196351850705
+          }
+        }
+      },
+      {
+        "feature": 38,
+        "threshold": 0.6541490705143262,
+        "left": {
+          "feature": 38,
+          "threshold": 0.3605945108260295,
+          "left": {
+            "value": -0.4344617796393321
+          },
+          "right": {
+            "value": -0.11415871278156328
+          }
+        },
+        "right": {
+          "feature": 38,
+          "threshold": 0.7842264592670448,
+          "left": {
+            "value": 0.028240002968041387
+          },
+          "right": {
+            "value": 0.2542607671666564
+          }
+        }
+      },
+      {
+        "feature": 38,
+        "threshold": 0.6541490705143262,
+        "left": {
+          "feature": 3,
+          "threshold": 0.6261306924516532,
+          "left": {
+            "value": -0.5071930153245187
+          },
+          "right": {
+            "value": -0.12758134512526473
+          }
+        },
+        "right": {
+          "feature": 38,
+          "threshold": 0.7842264592670448,
+          "left": {
+            "value": 0.025416002671237187
+          },
+          "right": {
+            "value": 0.22883469044999075
+          }
+        }
+      },
+      {
+        "feature": 38,
+        "threshold": 0.6541490705143262,
+        "left": {
+          "feature": 38,
+          "threshold": 0.42802951815696755,
+          "left": {
+            "value": -0.30938350315797297
+          },
+          "right": {
+            "value": -0.06571559840419834
+          }
+        },
+        "right": {
+          "feature": 38,
+          "threshold": 0.7842264592670448,
+          "left": {
+            "value": 0.022874402404113543
+          },
+          "right": {
+            "value": 0.2059512214049917
+          }
+        }
+      },
+      {
+        "feature": 38,
+        "threshold": 0.5390184556473995,
+        "left": {
+          "feature": 39,
+          "threshold": 1.0330403064274891,
+          "left": {
+            "value": -0.38548406448790457
+          },
+          "right": {
+            "value": -0.11613797818406861
+          }
+        },
+        "right": {
+          "feature": 38,
+          "threshold": 0.8517965380473789,
+          "left": {
+            "value": 0.029201371253502917
+          },
+          "right": {
+            "value": 0.19487682373401455
+          }
+        }
+      },
+      {
+        "feature": 38,
+        "threshold": 0.4518336758354716,
+        "left": {
+          "feature": 14,
+          "threshold": 1.0150525226302363,
+          "left": {
+            "value": -0.38712206521078135
+          },
+          "right": {
+            "value": -0.16436803167610053
+          }
+        },
+        "right": {
+          "feature": 38,
+          "threshold": 0.7842264592670448,
+          "left": {
+            "value": -0.015508861947715545
+          },
+          "right": {
+            "value": 0.16869702217734367
+          }
+        }
+      },
+      {
+        "feature": 38,
+        "threshold": 0.6541490705143262,
+        "left": {
+          "feature": 38,
+          "threshold": 0.3605945108260295,
+          "left": {
+            "value": -0.27415283139948293
+          },
+          "right": {
+            "value": -0.06399586592807154
+          }
+        },
+        "right": {
+          "feature": 8,
+          "threshold": 0.48979509720396214,
+          "left": {
+            "value": -0.06693366222062046
+          },
+          "right": {
+            "value": 0.14505216064900106
+          }
+        }
+      },
+      {
+        "feature": 38,
+        "threshold": 0.4518336758354716,
+        "left": {
+          "feature": 39,
+          "threshold": 1.0959869347907034,
+          "left": {
+            "value": -0.29015826837711733
+          },
+          "right": {
+            "value": -0.11650088212882119
+          }
+        },
+        "right": {
+          "feature": 38,
+          "threshold": 0.7842264592670448,
+          "left": {
+            "value": -0.012822779502390712
+          },
+          "right": {
+            "value": 0.13913173896798647
+          }
+        }
+      }
+    ],
+    "base": 0.6231918650949976,
+    "learningRate": 0.1,
+    "rounds": 8
+  },
+  "modelHash": "20c9b738f2a871ed3c95836fcfa6f32f606aba4f5725c2080ec352603e8d1fd5"
+}

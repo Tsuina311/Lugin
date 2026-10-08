@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { DetectorInputThumb } from './DetectorInputThumb';
@@ -17,6 +18,10 @@ import type {
 } from './useFrameAnalysis';
 import type { JsLagStats } from './jsLagProbe';
 import { getPerfBaseline } from './perfBaseline';
+import { getVNextDebug } from '@/lib/scan/vnext/debug';
+import { summarizeVNextTiming } from '@/lib/scan/vnext/timing';
+import { isScannerVNextEnabled } from '@/lib/scan/vnext/flag';
+import { saveVNextDebugCapture } from './vnextCapture';
 
 type SessionBits = {
   artCandidates: { name: string; score: number }[];
@@ -801,6 +806,7 @@ export function ScanDebugPanel({
               {session.temporalLeader ?? '—'}
               {session.temporalResetReason ? ` · reset: ${session.temporalResetReason}` : ''}
             </Text>
+            {isScannerVNextEnabled() ? <VNextDebugLines /> : null}
             <Text style={styles.title}>Recognition source</Text>
             <Text style={session.sourceLabel === 'high-res' ? styles.ok : styles.warn}>
               source: {session.recognitionSource ?? 'none'} ({session.sourceLabel}) · phase{' '}
@@ -1042,3 +1048,53 @@ const styles = StyleSheet.create({
     color: '#F5C542',
   },
 });
+
+const fmt = (value: number | null | undefined): string =>
+  value == null || !Number.isFinite(value) ? '—' : value.toFixed(1);
+
+function VNextDebugLines() {
+  const snap = getVNextDebug();
+  const [saved, setSaved] = useState<string | null>(null);
+  const timing = summarizeVNextTiming();
+  const top5 = snap?.prototypeTop5.map(row => row.name).join(' · ') || '—';
+  return (
+    <>
+      <Text style={styles.title}>Scanner vNext</Text>
+      <Text style={styles.line}>
+        decision {snap?.source ?? '—'} · candidate {snap?.candidateIndex ?? '—'} /{' '}
+        {snap?.candidateCount ?? '—'} · utility {snap?.gbmUtility?.toFixed(4) ?? '—'}
+      </Text>
+      <Text style={styles.line}>geometry {snap?.geometrySource ?? '—'} · art {snap?.artAnchor ?? '—'}</Text>
+      <Text style={styles.line}>
+        clean {snap?.cleanTop1?.name ?? '—'} · prototype {snap?.prototypeTop1?.name ?? '—'} · margin{' '}
+        {snap?.prototypeMargin?.toFixed(4) ?? '—'} · agree {snap?.agreement == null ? '—' : snap.agreement ? 'yes' : 'no'}
+      </Text>
+      <Text style={styles.line}>prototype top5 {top5}</Text>
+      <Text style={styles.line}>
+        ocr {snap?.ocrRaw || '—'} · normalized {snap?.ocrNormalized || '—'} · exact{' '}
+        {snap?.ocrExactOracle ?? '—'} · in top5 {snap?.ocrInTop5 == null ? '—' : snap.ocrInTop5 ? 'yes' : 'no'}
+      </Text>
+      {snap?.note ? (
+        <Text style={snap.note.includes('VNEXT_ASSETS_NOT_LOADED') || snap.note.includes('VNEXT_NATIVE_METHOD_MISSING') ? styles.bad : styles.line}>
+          {snap.note}
+        </Text>
+      ) : null}
+      <Text style={styles.line}>
+        n {timing.n} · ocr calls {timing.ocrInvoked} · gbm med {fmt(timing.gbm.median)} p90 {fmt(timing.gbm.p90)} ·
+        clip med {fmt(timing.clip.median)} p90 {fmt(timing.clip.p90)} · search med {fmt(timing.search.median)} p90{' '}
+        {fmt(timing.search.p90)}
+      </Text>
+      <Text style={styles.line}>
+        visual med {fmt(timing.visual.median)} · ocr-recovery med {fmt(timing.ocrRecovery.median)} · withheld med{' '}
+        {fmt(timing.withheld.median)}
+      </Text>
+      <Pressable
+        onPress={() => {
+          void saveVNextDebugCapture().then(uri => setSaved(uri ?? 'nothing to save'));
+        }}
+      >
+        <Text style={styles.line}>save vNext diagnostic{saved ? ` · ${saved}` : ''}</Text>
+      </Pressable>
+    </>
+  );
+}

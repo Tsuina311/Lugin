@@ -1,0 +1,30 @@
+{
+  "id": "B-gbm-ab595716ca0a",
+  "metrics": {
+    "n": 16,
+    "ge90": 8,
+    "ge80": 14,
+    "ge70": 16,
+    "catastrophic": 0,
+    "median": 0.9005687479587314,
+    "p10": 0.7591722530292135,
+    "mean": 0.8820745707496449,
+    "goodToBad": 0,
+    "improved": 6,
+    "regressed": 2,
+    "meanRegret": 0.039611718289310344,
+    "medianRegret": 0.0023398287662603767,
+    "p90Regret": 0.13752387605459893,
+    "regretOver10": 3,
+    "regretOver25": 0,
+    "swapsAlready90": 2,
+    "already90": 6,
+    "actions": {
+      "CATASTROPHIC_FIX": 4,
+      "SAME_AS_CURRENT": 5,
+      "HARMFUL_SWAP": 3,
+      "USELESS_SWAP": 1,
+      "SAFE_OVERRIDE": 3
+    }
+  }
+}

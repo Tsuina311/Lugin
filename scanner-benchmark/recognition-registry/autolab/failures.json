@@ -1,0 +1,632 @@
+[
+  {
+    "frameId": "capture-quality__cq-20260908T120539",
+    "cardName": "Lizard Blades",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/208100a46975774e/production.png"
+  },
+  {
+    "frameId": "capture-quality__cq-20260908T120629",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/016a1261a6f720c5/learned.png"
+  },
+  {
+    "frameId": "capture-quality__cq-20260908T120722",
+    "cardName": "Teferi's Veil",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/231555367b539ac6/learned.png"
+  },
+  {
+    "frameId": "capture-quality__cq-20260908T120751",
+    "cardName": "Wand of Wonder",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/c5f879379e18aeee/learned.png"
+  },
+  {
+    "frameId": "focus-series__focus-series-20260908T124408__t500-source",
+    "cardName": "Teferi's Veil",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/7452c7d75b69d6a7/production.png"
+  },
+  {
+    "frameId": "focus-series__focus-series-20260908T132626__t500-source",
+    "cardName": "Wand of Wonder",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/1aa07f0ebbcd75a7/learned.png"
+  },
+  {
+    "frameId": "replay__basilisk-collar-20260908T111744",
+    "cardName": "Basilisk Collar",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/5571649f5126b089/production.png"
+  },
+  {
+    "frameId": "replay__lizard-blades-french-20260908T111833",
+    "cardName": "Lizard Blades",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/fac2e9400811cb5f/production.png"
+  },
+  {
+    "frameId": "replay__p-e-d-tre-et-de-foyer-french-goo-20260908T082303",
+    "cardName": "Sword of Hearth and Home",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/350815a3294dd4c4/learned.png"
+  },
+  {
+    "frameId": "replay__teferi-veil-old-edition-good-cap-20260908T111548",
+    "cardName": "Teferi's Veil",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/b3c6673d36628800/production.png"
+  },
+  {
+    "frameId": "replay__wand-of-wonder-20260908T073958",
+    "cardName": "Wand of Wonder",
+    "rank": 34,
+    "publish": false,
+    "correctTop1": false,
+    "className": "REPRESENTATION_FAILURE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/b771b100d9bdece9/learned.png"
+  },
+  {
+    "frameId": "scan-fixtures_real-photos_maddening-hex-afc-showcase-glare",
+    "cardName": "Maddening Hex",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/387febceb6e8f4f6/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c008_deck-011-source",
+    "cardName": "Feywild Trickster",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/c4f9fd1003b3518f/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-153114_geom-001-source_geom-001-source",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/b57833f0c365cc95/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-154646_geom-001-source_geom-001-source",
+    "cardName": "Mask of Memory",
+    "rank": 2,
+    "publish": false,
+    "correctTop1": false,
+    "className": "VISUALLY_SIMILAR",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/98d264019729c8e4/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-154646_geom-007-source_geom-007-source",
+    "cardName": "Island",
+    "rank": 25,
+    "publish": false,
+    "correctTop1": false,
+    "className": "REPRESENTATION_FAILURE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/fa485b6cdfe6a000/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-155241_geom-006-source_geom-006-source",
+    "cardName": "Blacksmith's Talent",
+    "rank": 43,
+    "publish": false,
+    "correctTop1": false,
+    "className": "REPRESENTATION_FAILURE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/7b6c9bcc8bc39b21/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-164005_geom-001-source_geom-001-source",
+    "cardName": "The Ozolith",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/6edf93d40fb94cb8/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-165339_geom-001-source_geom-001-source",
+    "cardName": "Island",
+    "rank": 2,
+    "publish": false,
+    "correctTop1": false,
+    "className": "VISUALLY_SIMILAR",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/2cd6a8b8d245ec42/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260910-173530_geom-006-source_geom-006-source",
+    "cardName": "Netherese Puzzle-Ward",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/a7343bb47179a804/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260911-085827_geom-001-source_geom-001-source",
+    "cardName": "Havi, the All-Father",
+    "rank": 51,
+    "publish": false,
+    "correctTop1": false,
+    "className": "REPRESENTATION_FAILURE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/67e7367eaba4f01d/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20260911-100459_geom-003-source_geom-003-source",
+    "cardName": "Mudbutton Torchrunner",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/3175a42c77366c9d/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-003-source_geom-003-source",
+    "cardName": "Swamp",
+    "rank": 3,
+    "publish": false,
+    "correctTop1": false,
+    "className": "VISUALLY_SIMILAR",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/53a0e2bfdb41f0f0/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-006-source_geom-006-source",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/9de387e94d443228/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-011-source_geom-011-source",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/eb6cc2dc83074d32/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-012-source_geom-012-source",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/3cd1ad9f083b3f9d/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-015-source_geom-015-source",
+    "cardName": "Drowned Catacomb",
+    "rank": 2,
+    "publish": false,
+    "correctTop1": false,
+    "className": "VISUALLY_SIMILAR",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/80f6f4da781b5309/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-016-source_geom-016-source",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/de54fb13de4c6ae2/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-001-source_geom-001-source",
+    "cardName": "Drowned Catacomb",
+    "rank": 2,
+    "publish": false,
+    "correctTop1": false,
+    "className": "VISUALLY_SIMILAR",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/3299040507574dc8/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-005-source_geom-005-source",
+    "cardName": "Swamp",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/c9be1d6b39b3ab45/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-006-source_geom-006-source",
+    "cardName": "Swamp",
+    "rank": 29,
+    "publish": false,
+    "correctTop1": false,
+    "className": "REPRESENTATION_FAILURE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/f2aa16c94c95909d/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-007-source_geom-007-source",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/b9939c149e6d9e25/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-008-source_geom-008-source",
+    "cardName": "Index",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/87f807b124add48b/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-010-source_geom-010-source",
+    "cardName": "Daze",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/b64dd31083d06a4e/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-011-source_geom-011-source",
+    "cardName": "Silver-Fur Master",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/728d45922ed1f39c/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-012-source_geom-012-source",
+    "cardName": "Wingcrafter",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/e168f913ab07597c/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-014-source_geom-014-source",
+    "cardName": "Saiba Cryptomancer",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/fa6a7df8a8826b00/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-016-source_geom-016-source",
+    "cardName": "Pilgrim's Eye",
+    "rank": 112,
+    "publish": false,
+    "correctTop1": false,
+    "className": "PHONE_DOMAIN_DAMAGE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/a00480cb9f47ae4d/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-017-source_geom-017-source",
+    "cardName": "Mist-Syndicate Naga",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/e510407bd7ea9555/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-018-source_geom-018-source",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/60043e10c05fa697/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-019-source_geom-019-source",
+    "cardName": "Sword Coast Sailor",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/4a0e6497d3d74cfa/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-021-source_geom-021-source",
+    "cardName": "Sakashima's Student",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/d8f6c6bfd8a89a15/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-022-source_geom-022-source",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/3d5074141cd02451/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-025-source_geom-025-source",
+    "cardName": "Deep-Cavern Bat",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/e600a61df6bd980b/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-026-source_geom-026-source",
+    "cardName": "Swamp",
+    "rank": 124,
+    "publish": false,
+    "correctTop1": false,
+    "className": "PHONE_DOMAIN_DAMAGE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/84a3729a55e3988b/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-028-source_geom-028-source",
+    "cardName": "Swamp",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/9030ac5f844ff0f8/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-029-source_geom-029-source",
+    "cardName": "Satoru Umezawa",
+    "rank": 14,
+    "publish": false,
+    "correctTop1": false,
+    "className": "REPRESENTATION_FAILURE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/85a4398023023270/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-030-source_geom-030-source",
+    "cardName": "Swamp",
+    "rank": 2,
+    "publish": false,
+    "correctTop1": false,
+    "className": "VISUALLY_SIMILAR",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/273240a4c0e3be54/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-031-source_geom-031-source",
+    "cardName": "Dirge of Dread",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/12e98d2e6dce2b5f/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-035-source_geom-035-source",
+    "cardName": "Lightning Greaves",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/b8165645ffcda044/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-036-source_geom-036-source",
+    "cardName": "Ornithopter",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/1daa097e8e511a4d/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-037-source_geom-037-source",
+    "cardName": "Swamp",
+    "rank": 5,
+    "publish": false,
+    "correctTop1": false,
+    "className": "VISUALLY_SIMILAR",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/cdcad8520ee4d486/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-038-source_geom-038-source",
+    "cardName": "Island",
+    "rank": 19,
+    "publish": false,
+    "correctTop1": false,
+    "className": "ART_CROP_FAILURE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/784fc763bce82ca0/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-039-source_geom-039-source",
+    "cardName": "Crafty Pathmage",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/d0faf03113fc799f/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-040-source_geom-040-source",
+    "cardName": "Brainstorm",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/0e0a6b2e4ce0cf50/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-042-source_geom-042-source",
+    "cardName": "Commandeer",
+    "rank": 24,
+    "publish": false,
+    "correctTop1": false,
+    "className": "REPRESENTATION_FAILURE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/c417e3b1ac52ff33/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-043-source_geom-043-source",
+    "cardName": "Darkslick Shores",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/d8ba4fd97756b163/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-044-source_geom-044-source",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/3bba2181ab9d9364/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-045-source_geom-045-source",
+    "cardName": "Ingenious Prodigy",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/a8f51018959a9970/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-046-source_geom-046-source",
+    "cardName": "Kaito, Dancing Shadow",
+    "rank": 33,
+    "publish": false,
+    "correctTop1": false,
+    "className": "REPRESENTATION_FAILURE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/9843b8e5919ca942/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-047-source_geom-047-source",
+    "cardName": "Swamp",
+    "rank": 14,
+    "publish": false,
+    "correctTop1": false,
+    "className": "REPRESENTATION_FAILURE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/848c29be04551a1f/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-048-source_geom-048-source",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/6483e5f7990f484e/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-049-source_geom-049-source",
+    "cardName": "Fallen Shinobi",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/775de57dfabaa14c/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-050-source_geom-050-source",
+    "cardName": "Deluge",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/6219bcd9360a2843/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-003-source_geom-003-source",
+    "cardName": "The Queen of Dale",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/d122781bfdf78881/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-004-source_geom-004-source",
+    "cardName": "Dáin Ironfoot",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/identity/crops/0d81ae91d0e4a89a/production.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-005-source_geom-005-source",
+    "cardName": "Treasure",
+    "rank": 2188,
+    "publish": false,
+    "correctTop1": false,
+    "className": "PHONE_DOMAIN_DAMAGE",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/5417341a559d1c71/learned.png"
+  },
+  {
+    "frameId": "scan-inbox_sessions_normal-scan-session-20260911-120703--card-005_source-highres_source-highres",
+    "cardName": "Elder Auntie",
+    "rank": 4,
+    "publish": false,
+    "correctTop1": false,
+    "className": "VISUALLY_SIMILAR",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/d2904286197b1948/learned.png"
+  },
+  {
+    "frameId": "swap-test__swap-test-20260908-171149__swap-03-source",
+    "cardName": "Octopus Form",
+    "rank": 1,
+    "publish": true,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/51e7a6e8982ba588/learned.png"
+  },
+  {
+    "frameId": "swap-test__swap-test-20260908-171306__swap-03-source",
+    "cardName": "Island",
+    "rank": 1,
+    "publish": false,
+    "correctTop1": true,
+    "className": "OK",
+    "learnedPath": "/Library/Projects/Lugin/scanner-benchmark/reports/frozen-recognition-v1/crops/9186e3b9554d0461/learned.png"
+  }
+]

@@ -1,0 +1,1300 @@
+{
+  "challenger": {
+    "n": 26,
+    "top1": 17,
+    "top3": 18,
+    "top5": 18,
+    "top10": 21,
+    "correctPublished": 14,
+    "wrongPublished": 0,
+    "withheldCorrect": 3,
+    "wrongWithheld": 9,
+    "precision": 1,
+    "recall": 0.5384615384615384,
+    "safeHit": 0.5384615384615384,
+    "meanRank": 391.3076923076923,
+    "medianRank": 1
+  },
+  "baseline": {
+    "n": 26,
+    "top1": 16,
+    "top3": 18,
+    "top5": 18,
+    "top10": 21,
+    "correctPublished": 10,
+    "wrongPublished": 0,
+    "withheldCorrect": 6,
+    "wrongWithheld": 10,
+    "precision": 1,
+    "recall": 0.38461538461538464,
+    "safeHit": 0.38461538461538464,
+    "meanRank": 391.3076923076923,
+    "medianRank": 1
+  },
+  "human": {
+    "n": 26,
+    "top1": 19,
+    "top3": 21,
+    "top5": 21,
+    "top10": 22,
+    "correctPublished": 11,
+    "wrongPublished": 0,
+    "withheldCorrect": 8,
+    "wrongWithheld": 7,
+    "precision": 1,
+    "recall": 0.4230769230769231,
+    "safeHit": 0.4230769230769231,
+    "meanRank": 535.3846153846154,
+    "medianRank": 1
+  },
+  "frames": [
+    {
+      "frameId": "focus-series__focus-series-20260908T132801__t500-source",
+      "cardName": "Excalibur, Sword of Eden",
+      "challenger": {
+        "frameId": "focus-series__focus-series-20260908T132801__t500-source",
+        "fold": 0,
+        "expected": 10792,
+        "top1": 10229,
+        "margin": 0.002226412296295166,
+        "rank": 18,
+        "correctTop1": false,
+        "top1Score": 0.7368756532669067,
+        "top5": [
+          10229,
+          4540,
+          159,
+          8360,
+          8423
+        ],
+        "publish": false,
+        "cleanTop1": 77,
+        "cleanMargin": 0.0032935738563537598,
+        "cleanScore": 0.6821367144584656,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "focus-series__focus-series-20260908T132801__t500-source",
+        "fold": 0,
+        "expected": 10792,
+        "top1": 10229,
+        "margin": 0.002226412296295166,
+        "rank": 18,
+        "correctTop1": false,
+        "top1Score": 0.7368756532669067,
+        "top5": [
+          10229,
+          4540,
+          159,
+          8360,
+          8423
+        ],
+        "publish": false,
+        "cleanTop1": 77,
+        "cleanMargin": 0.0032935738563537598,
+        "cleanScore": 0.6821367144584656,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "replay__negate-unsleeved-20260908T082746",
+      "cardName": "Negate",
+      "challenger": {
+        "frameId": "replay__negate-unsleeved-20260908T082746",
+        "fold": 0,
+        "expected": 901,
+        "top1": 901,
+        "margin": 0.09014642238616943,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7171711921691895,
+        "top5": [
+          901,
+          5650,
+          21310,
+          3459,
+          5817
+        ],
+        "publish": true,
+        "cleanTop1": 901,
+        "cleanMargin": 0.09479784965515137,
+        "cleanScore": 0.6699676513671875,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "replay__negate-unsleeved-20260908T082746",
+        "fold": 0,
+        "expected": 901,
+        "top1": 901,
+        "margin": 0.09014642238616943,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7171711921691895,
+        "top5": [
+          901,
+          5650,
+          21310,
+          3459,
+          5817
+        ],
+        "publish": true,
+        "cleanTop1": 901,
+        "cleanMargin": 0.09479784965515137,
+        "cleanScore": 0.6699676513671875,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "replay__slip-out-the-back-italian-20260908T111643",
+      "cardName": "Slip Out the Back",
+      "challenger": {
+        "frameId": "replay__slip-out-the-back-italian-20260908T111643",
+        "fold": 0,
+        "expected": 24790,
+        "top1": 24790,
+        "margin": 0.11377757787704468,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.8084763884544373,
+        "top5": [
+          24790,
+          31534,
+          6150,
+          1579,
+          19234
+        ],
+        "publish": true,
+        "cleanTop1": 24790,
+        "cleanMargin": 0.05269753932952881,
+        "cleanScore": 0.7063009738922119,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "replay__slip-out-the-back-italian-20260908T111643",
+        "fold": 0,
+        "expected": 24790,
+        "top1": 24790,
+        "margin": 0.11377757787704468,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.8084763884544373,
+        "top5": [
+          24790,
+          31534,
+          6150,
+          1579,
+          19234
+        ],
+        "publish": true,
+        "cleanTop1": 24790,
+        "cleanMargin": 0.05269753932952881,
+        "cleanScore": 0.7063009738922119,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20260910-153114_geom-007-source_geom-007-source",
+      "cardName": "The Spear of Leonidas",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-153114_geom-007-source_geom-007-source",
+        "fold": 0,
+        "expected": 6918,
+        "top1": 6918,
+        "margin": 0.002050340175628662,
+        "rank": 3,
+        "correctTop1": true,
+        "top1Score": 0.6818045377731323,
+        "top5": [
+          11124,
+          19466,
+          6918,
+          28193,
+          6433
+        ],
+        "publish": true,
+        "cleanTop1": 28193,
+        "cleanMargin": 0.0000037550926208496094,
+        "cleanScore": 0.617022693157196,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-153114_geom-007-source_geom-007-source",
+        "fold": 0,
+        "expected": 6918,
+        "top1": 11124,
+        "margin": 0.002050340175628662,
+        "rank": 3,
+        "correctTop1": false,
+        "top1Score": 0.6818045377731323,
+        "top5": [
+          11124,
+          19466,
+          6918,
+          28193,
+          6433
+        ],
+        "publish": false,
+        "cleanTop1": 28193,
+        "cleanMargin": 0.0000037550926208496094,
+        "cleanScore": 0.617022693157196,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source",
+      "cardName": "Sword of the Animist",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source",
+        "fold": 0,
+        "expected": 395,
+        "top1": 395,
+        "margin": 0.024492383003234863,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7107706665992737,
+        "top5": [
+          395,
+          7904,
+          25430,
+          18374,
+          10063
+        ],
+        "publish": true,
+        "cleanTop1": 395,
+        "cleanMargin": 0.026402831077575684,
+        "cleanScore": 0.644412636756897,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source",
+        "fold": 0,
+        "expected": 395,
+        "top1": 395,
+        "margin": 0.024492383003234863,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7107706665992737,
+        "top5": [
+          395,
+          7904,
+          25430,
+          18374,
+          10063
+        ],
+        "publish": false,
+        "cleanTop1": 395,
+        "cleanMargin": 0.026402831077575684,
+        "cleanScore": 0.644412636756897,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20260910-192617_geom-001-source_geom-001-source",
+      "cardName": "Swiftfoot Boots",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-192617_geom-001-source_geom-001-source",
+        "fold": 0,
+        "expected": 667,
+        "top1": 667,
+        "margin": 0.06808829307556152,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7896916270256042,
+        "top5": [
+          667,
+          8336,
+          7769,
+          3736,
+          19477
+        ],
+        "publish": true,
+        "cleanTop1": 667,
+        "cleanMargin": 0.07268625497817993,
+        "cleanScore": 0.7235762476921082,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-192617_geom-001-source_geom-001-source",
+        "fold": 0,
+        "expected": 667,
+        "top1": 667,
+        "margin": 0.06808829307556152,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7896916270256042,
+        "top5": [
+          667,
+          8336,
+          7769,
+          3736,
+          19477
+        ],
+        "publish": true,
+        "cleanTop1": 667,
+        "cleanMargin": 0.07268625497817993,
+        "cleanScore": 0.7235762476921082,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20260910-192617_geom-005-source_geom-005-source",
+      "cardName": "Sword of the Animist",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-192617_geom-005-source_geom-005-source",
+        "fold": 0,
+        "expected": 395,
+        "top1": 395,
+        "margin": 0.09592151641845703,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7678210735321045,
+        "top5": [
+          395,
+          18374,
+          8625,
+          7904,
+          31789
+        ],
+        "publish": true,
+        "cleanTop1": 395,
+        "cleanMargin": 0.06649124622344971,
+        "cleanScore": 0.6770426630973816,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-192617_geom-005-source_geom-005-source",
+        "fold": 0,
+        "expected": 395,
+        "top1": 395,
+        "margin": 0.09592151641845703,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7678210735321045,
+        "top5": [
+          395,
+          18374,
+          8625,
+          7904,
+          31789
+        ],
+        "publish": true,
+        "cleanTop1": 395,
+        "cleanMargin": 0.06649124622344971,
+        "cleanScore": 0.6770426630973816,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-001-source_geom-001-source",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-001-source_geom-001-source",
+        "fold": 0,
+        "expected": 14811,
+        "top1": 14670,
+        "margin": 0.0017330050468444824,
+        "rank": 77,
+        "correctTop1": false,
+        "top1Score": 0.6405900120735168,
+        "top5": [
+          14670,
+          23280,
+          2429,
+          31593,
+          9562
+        ],
+        "publish": false,
+        "cleanTop1": 26393,
+        "cleanMargin": 0.01761072874069214,
+        "cleanScore": 0.5761910080909729,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-001-source_geom-001-source",
+        "fold": 0,
+        "expected": 14811,
+        "top1": 14670,
+        "margin": 0.0017330050468444824,
+        "rank": 77,
+        "correctTop1": false,
+        "top1Score": 0.6405900120735168,
+        "top5": [
+          14670,
+          23280,
+          2429,
+          31593,
+          9562
+        ],
+        "publish": false,
+        "cleanTop1": 26393,
+        "cleanMargin": 0.01761072874069214,
+        "cleanScore": 0.5761910080909729,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-002-source_geom-002-source",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-002-source_geom-002-source",
+        "fold": 0,
+        "expected": 14811,
+        "top1": 2429,
+        "margin": 0.0016756653785705566,
+        "rank": 7,
+        "correctTop1": false,
+        "top1Score": 0.6264129877090454,
+        "top5": [
+          2429,
+          4926,
+          18415,
+          17811,
+          16700
+        ],
+        "publish": false,
+        "cleanTop1": 20683,
+        "cleanMargin": 0.0005338788032531738,
+        "cleanScore": 0.5618237853050232,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-002-source_geom-002-source",
+        "fold": 0,
+        "expected": 14811,
+        "top1": 2429,
+        "margin": 0.0016756653785705566,
+        "rank": 7,
+        "correctTop1": false,
+        "top1Score": 0.6264129877090454,
+        "top5": [
+          2429,
+          4926,
+          18415,
+          17811,
+          16700
+        ],
+        "publish": false,
+        "cleanTop1": 20683,
+        "cleanMargin": 0.0005338788032531738,
+        "cleanScore": 0.5618237853050232,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-004-source_geom-004-source",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-004-source_geom-004-source",
+        "fold": 0,
+        "expected": 14811,
+        "top1": 1080,
+        "margin": 0.029816508293151855,
+        "rank": 130,
+        "correctTop1": false,
+        "top1Score": 0.646126925945282,
+        "top5": [
+          1080,
+          2429,
+          26393,
+          11066,
+          7774
+        ],
+        "publish": false,
+        "cleanTop1": 1080,
+        "cleanMargin": 0.00763314962387085,
+        "cleanScore": 0.5226406455039978,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-004-source_geom-004-source",
+        "fold": 0,
+        "expected": 14811,
+        "top1": 1080,
+        "margin": 0.029816508293151855,
+        "rank": 130,
+        "correctTop1": false,
+        "top1Score": 0.646126925945282,
+        "top5": [
+          1080,
+          2429,
+          26393,
+          11066,
+          7774
+        ],
+        "publish": false,
+        "cleanTop1": 1080,
+        "cleanMargin": 0.00763314962387085,
+        "cleanScore": 0.5226406455039978,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-005-source_geom-005-source",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-005-source_geom-005-source",
+        "fold": 0,
+        "expected": 14811,
+        "top1": 26393,
+        "margin": 0.009009599685668945,
+        "rank": 7,
+        "correctTop1": false,
+        "top1Score": 0.6413143873214722,
+        "top5": [
+          26393,
+          4926,
+          1080,
+          14670,
+          3408
+        ],
+        "publish": false,
+        "cleanTop1": 12441,
+        "cleanMargin": 0.008102774620056152,
+        "cleanScore": 0.5487462282180786,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-005-source_geom-005-source",
+        "fold": 0,
+        "expected": 14811,
+        "top1": 26393,
+        "margin": 0.009009599685668945,
+        "rank": 7,
+        "correctTop1": false,
+        "top1Score": 0.6413143873214722,
+        "top5": [
+          26393,
+          4926,
+          1080,
+          14670,
+          3408
+        ],
+        "publish": false,
+        "cleanTop1": 12441,
+        "cleanMargin": 0.008102774620056152,
+        "cleanScore": 0.5487462282180786,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-007-source_geom-007-source",
+      "cardName": "Moonsnare Specialist",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-007-source_geom-007-source",
+        "fold": 0,
+        "expected": 8957,
+        "top1": 8957,
+        "margin": 0.04670894145965576,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7535865306854248,
+        "top5": [
+          8957,
+          15428,
+          8148,
+          95,
+          2826
+        ],
+        "publish": false,
+        "cleanTop1": 21283,
+        "cleanMargin": 0.02113652229309082,
+        "cleanScore": 0.6543590426445007,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-007-source_geom-007-source",
+        "fold": 0,
+        "expected": 8957,
+        "top1": 8957,
+        "margin": 0.04670894145965576,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7535865306854248,
+        "top5": [
+          8957,
+          15428,
+          8148,
+          95,
+          2826
+        ],
+        "publish": false,
+        "cleanTop1": 21283,
+        "cleanMargin": 0.02113652229309082,
+        "cleanScore": 0.6543590426445007,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-008-source_geom-008-source",
+      "cardName": "Moonsnare Specialist",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-008-source_geom-008-source",
+        "fold": 0,
+        "expected": 8957,
+        "top1": 8957,
+        "margin": 0.07330173254013062,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7840181589126587,
+        "top5": [
+          8957,
+          95,
+          25626,
+          18672,
+          16646
+        ],
+        "publish": true,
+        "cleanTop1": 8957,
+        "cleanMargin": 0.08292394876480103,
+        "cleanScore": 0.7028710246086121,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-008-source_geom-008-source",
+        "fold": 0,
+        "expected": 8957,
+        "top1": 8957,
+        "margin": 0.07330173254013062,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7840181589126587,
+        "top5": [
+          8957,
+          95,
+          25626,
+          18672,
+          16646
+        ],
+        "publish": true,
+        "cleanTop1": 8957,
+        "cleanMargin": 0.08292394876480103,
+        "cleanScore": 0.7028710246086121,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-009-source_geom-009-source",
+      "cardName": "Moonsnare Specialist",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-009-source_geom-009-source",
+        "fold": 0,
+        "expected": 8957,
+        "top1": 8957,
+        "margin": 0.11343258619308472,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.8081763386726379,
+        "top5": [
+          8957,
+          25626,
+          18672,
+          15005,
+          19485
+        ],
+        "publish": true,
+        "cleanTop1": 8957,
+        "cleanMargin": 0.07396531105041504,
+        "cleanScore": 0.7112056016921997,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-009-source_geom-009-source",
+        "fold": 0,
+        "expected": 8957,
+        "top1": 8957,
+        "margin": 0.11343258619308472,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.8081763386726379,
+        "top5": [
+          8957,
+          25626,
+          18672,
+          15005,
+          19485
+        ],
+        "publish": true,
+        "cleanTop1": 8957,
+        "cleanMargin": 0.07396531105041504,
+        "cleanScore": 0.7112056016921997,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-010-source_geom-010-source",
+      "cardName": "Kaito, Bane of Nightmares",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-010-source_geom-010-source",
+        "fold": 0,
+        "expected": 6531,
+        "top1": 6531,
+        "margin": 0.02520120143890381,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.6919978260993958,
+        "top5": [
+          6531,
+          11311,
+          12080,
+          21975,
+          13491
+        ],
+        "publish": false,
+        "cleanTop1": 17985,
+        "cleanMargin": 0.007780671119689941,
+        "cleanScore": 0.565308690071106,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-010-source_geom-010-source",
+        "fold": 0,
+        "expected": 6531,
+        "top1": 6531,
+        "margin": 0.02520120143890381,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.6919978260993958,
+        "top5": [
+          6531,
+          11311,
+          12080,
+          21975,
+          13491
+        ],
+        "publish": false,
+        "cleanTop1": 17985,
+        "cleanMargin": 0.007780671119689941,
+        "cleanScore": 0.565308690071106,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-013-source_geom-013-source",
+      "cardName": "Agent of the Shadow Thieves",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-013-source_geom-013-source",
+        "fold": 0,
+        "expected": 28473,
+        "top1": 6491,
+        "margin": 0.007105350494384766,
+        "rank": 74,
+        "correctTop1": false,
+        "top1Score": 0.7062574028968811,
+        "top5": [
+          6491,
+          18001,
+          5108,
+          15987,
+          968
+        ],
+        "publish": false,
+        "cleanTop1": 1222,
+        "cleanMargin": 0.0020952224731445312,
+        "cleanScore": 0.6148912310600281,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-013-source_geom-013-source",
+        "fold": 0,
+        "expected": 28473,
+        "top1": 6491,
+        "margin": 0.007105350494384766,
+        "rank": 74,
+        "correctTop1": false,
+        "top1Score": 0.7062574028968811,
+        "top5": [
+          6491,
+          18001,
+          5108,
+          15987,
+          968
+        ],
+        "publish": false,
+        "cleanTop1": 1222,
+        "cleanMargin": 0.0020952224731445312,
+        "cleanScore": 0.6148912310600281,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-003-source_geom-003-source",
+      "cardName": "Kaito, Bane of Nightmares",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-003-source_geom-003-source",
+        "fold": 0,
+        "expected": 6531,
+        "top1": 6531,
+        "margin": 0.024647116661071777,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.688873291015625,
+        "top5": [
+          6531,
+          12080,
+          13491,
+          11311,
+          28178
+        ],
+        "publish": false,
+        "cleanTop1": 17985,
+        "cleanMargin": 0.02318120002746582,
+        "cleanScore": 0.5767713189125061,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-003-source_geom-003-source",
+        "fold": 0,
+        "expected": 6531,
+        "top1": 6531,
+        "margin": 0.024647116661071777,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.688873291015625,
+        "top5": [
+          6531,
+          12080,
+          13491,
+          11311,
+          28178
+        ],
+        "publish": false,
+        "cleanTop1": 17985,
+        "cleanMargin": 0.02318120002746582,
+        "cleanScore": 0.5767713189125061,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-004-source_geom-004-source",
+      "cardName": "Moonsnare Specialist",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-004-source_geom-004-source",
+        "fold": 0,
+        "expected": 8957,
+        "top1": 8957,
+        "margin": 0.07985413074493408,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.8148341178894043,
+        "top5": [
+          8957,
+          18678,
+          95,
+          52,
+          16646
+        ],
+        "publish": true,
+        "cleanTop1": 8957,
+        "cleanMargin": 0.10580658912658691,
+        "cleanScore": 0.74436354637146,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-004-source_geom-004-source",
+        "fold": 0,
+        "expected": 8957,
+        "top1": 8957,
+        "margin": 0.07985413074493408,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.8148341178894043,
+        "top5": [
+          8957,
+          18678,
+          95,
+          52,
+          16646
+        ],
+        "publish": true,
+        "cleanTop1": 8957,
+        "cleanMargin": 0.10580658912658691,
+        "cleanScore": 0.74436354637146,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-009-source_geom-009-source",
+      "cardName": "Chasm Skulker",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-009-source_geom-009-source",
+        "fold": 0,
+        "expected": 6338,
+        "top1": 6338,
+        "margin": 0.037451982498168945,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7300229668617249,
+        "top5": [
+          6338,
+          31326,
+          28673,
+          33027,
+          16604
+        ],
+        "publish": true,
+        "cleanTop1": 6338,
+        "cleanMargin": 0.039055824279785156,
+        "cleanScore": 0.6308742165565491,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-009-source_geom-009-source",
+        "fold": 0,
+        "expected": 6338,
+        "top1": 6338,
+        "margin": 0.037451982498168945,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7300229668617249,
+        "top5": [
+          6338,
+          31326,
+          28673,
+          33027,
+          16604
+        ],
+        "publish": false,
+        "cleanTop1": 6338,
+        "cleanMargin": 0.039055824279785156,
+        "cleanScore": 0.6308742165565491,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-015-source_geom-015-source",
+      "cardName": "Command Tower",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-015-source_geom-015-source",
+        "fold": 0,
+        "expected": 1704,
+        "top1": 1704,
+        "margin": 0.09721308946609497,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.760284423828125,
+        "top5": [
+          1704,
+          2244,
+          31892,
+          10121,
+          1945
+        ],
+        "publish": true,
+        "cleanTop1": 1704,
+        "cleanMargin": 0.10763269662857056,
+        "cleanScore": 0.7043717503547668,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-015-source_geom-015-source",
+        "fold": 0,
+        "expected": 1704,
+        "top1": 1704,
+        "margin": 0.09721308946609497,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.760284423828125,
+        "top5": [
+          1704,
+          2244,
+          31892,
+          10121,
+          1945
+        ],
+        "publish": true,
+        "cleanTop1": 1704,
+        "cleanMargin": 0.10763269662857056,
+        "cleanScore": 0.7043717503547668,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-032-source_geom-032-source",
+      "cardName": "Ulamog's Crusher",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-032-source_geom-032-source",
+        "fold": 0,
+        "expected": 21520,
+        "top1": 200,
+        "margin": 0.010100483894348145,
+        "rank": 2,
+        "correctTop1": false,
+        "top1Score": 0.6822243332862854,
+        "top5": [
+          200,
+          21520,
+          26364,
+          18241,
+          15293
+        ],
+        "publish": false,
+        "cleanTop1": 200,
+        "cleanMargin": 0.013131976127624512,
+        "cleanScore": 0.6085240244865417,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-032-source_geom-032-source",
+        "fold": 0,
+        "expected": 21520,
+        "top1": 200,
+        "margin": 0.010100483894348145,
+        "rank": 2,
+        "correctTop1": false,
+        "top1Score": 0.6822243332862854,
+        "top5": [
+          200,
+          21520,
+          26364,
+          18241,
+          15293
+        ],
+        "publish": false,
+        "cleanTop1": 200,
+        "cleanMargin": 0.013131976127624512,
+        "cleanScore": 0.6085240244865417,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-033-source_geom-033-source",
+      "cardName": "Whiplash Trap",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-033-source_geom-033-source",
+        "fold": 0,
+        "expected": 3653,
+        "top1": 3653,
+        "margin": 0.08094000816345215,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7088373899459839,
+        "top5": [
+          3653,
+          6948,
+          31200,
+          7173,
+          9839
+        ],
+        "publish": true,
+        "cleanTop1": 3653,
+        "cleanMargin": 0.011020064353942871,
+        "cleanScore": 0.602129340171814,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-033-source_geom-033-source",
+        "fold": 0,
+        "expected": 3653,
+        "top1": 3653,
+        "margin": 0.08094000816345215,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7088373899459839,
+        "top5": [
+          3653,
+          6948,
+          31200,
+          7173,
+          9839
+        ],
+        "publish": true,
+        "cleanTop1": 3653,
+        "cleanMargin": 0.011020064353942871,
+        "cleanScore": 0.602129340171814,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-041-source_geom-041-source",
+      "cardName": "Deadly Rollick",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-041-source_geom-041-source",
+        "fold": 0,
+        "expected": 4732,
+        "top1": 29954,
+        "margin": 0.025195658206939697,
+        "rank": 9834,
+        "correctTop1": false,
+        "top1Score": 0.7350502610206604,
+        "top5": [
+          29954,
+          3927,
+          33949,
+          13960,
+          27441
+        ],
+        "publish": false,
+        "cleanTop1": 13960,
+        "cleanMargin": 0.0005950927734375,
+        "cleanScore": 0.6151222586631775,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-041-source_geom-041-source",
+        "fold": 0,
+        "expected": 4732,
+        "top1": 29954,
+        "margin": 0.025195658206939697,
+        "rank": 9834,
+        "correctTop1": false,
+        "top1Score": 0.7350502610206604,
+        "top5": [
+          29954,
+          3927,
+          33949,
+          13960,
+          27441
+        ],
+        "publish": false,
+        "cleanTop1": 13960,
+        "cleanMargin": 0.0005950927734375,
+        "cleanScore": 0.6151222586631775,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-002-source_geom-002-source",
+      "cardName": "Bilbo, Luckwearer",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-002-source_geom-002-source",
+        "fold": 0,
+        "expected": 3457,
+        "top1": 3457,
+        "margin": 0.14814746379852295,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7680090665817261,
+        "top5": [
+          3457,
+          22779,
+          8838,
+          5749,
+          10235
+        ],
+        "publish": true,
+        "cleanTop1": 3457,
+        "cleanMargin": 0.10168170928955078,
+        "cleanScore": 0.668727457523346,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-002-source_geom-002-source",
+        "fold": 0,
+        "expected": 3457,
+        "top1": 3457,
+        "margin": 0.14814746379852295,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7680090665817261,
+        "top5": [
+          3457,
+          22779,
+          8838,
+          5749,
+          10235
+        ],
+        "publish": true,
+        "cleanTop1": 3457,
+        "cleanMargin": 0.10168170928955078,
+        "cleanScore": 0.668727457523346,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_normal-scan-session-20260911-111516--card-007_source-highres_source-highres",
+      "cardName": "Sprouting Goblin",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_normal-scan-session-20260911-111516--card-007_source-highres_source-highres",
+        "fold": 0,
+        "expected": 20322,
+        "top1": 13336,
+        "margin": 0.005175113677978516,
+        "rank": 6,
+        "correctTop1": false,
+        "top1Score": 0.5866257548332214,
+        "top5": [
+          13336,
+          14172,
+          4748,
+          32758,
+          20391
+        ],
+        "publish": false,
+        "cleanTop1": 11260,
+        "cleanMargin": 0.004252612590789795,
+        "cleanScore": 0.543849527835846,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_normal-scan-session-20260911-111516--card-007_source-highres_source-highres",
+        "fold": 0,
+        "expected": 20322,
+        "top1": 13336,
+        "margin": 0.005175113677978516,
+        "rank": 6,
+        "correctTop1": false,
+        "top1Score": 0.5866257548332214,
+        "top5": [
+          13336,
+          14172,
+          4748,
+          32758,
+          20391
+        ],
+        "publish": false,
+        "cleanTop1": 11260,
+        "cleanMargin": 0.004252612590789795,
+        "cleanScore": 0.543849527835846,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_normal-scan-session-20260911-113049--card-001_source-highres_source-highres",
+      "cardName": "Goblin Blastronauts",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_normal-scan-session-20260911-113049--card-001_source-highres_source-highres",
+        "fold": 0,
+        "expected": 5595,
+        "top1": 5595,
+        "margin": 0.03219926357269287,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.712445855140686,
+        "top5": [
+          5595,
+          30815,
+          24432,
+          17479,
+          18553
+        ],
+        "publish": true,
+        "cleanTop1": 5595,
+        "cleanMargin": 0.09935128688812256,
+        "cleanScore": 0.7369865775108337,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_normal-scan-session-20260911-113049--card-001_source-highres_source-highres",
+        "fold": 0,
+        "expected": 5595,
+        "top1": 5595,
+        "margin": 0.03219926357269287,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.712445855140686,
+        "top5": [
+          5595,
+          30815,
+          24432,
+          17479,
+          18553
+        ],
+        "publish": false,
+        "cleanTop1": 5595,
+        "cleanMargin": 0.09935128688812256,
+        "cleanScore": 0.7369865775108337,
+        "agreement": true
+      }
+    }
+  ]
+}

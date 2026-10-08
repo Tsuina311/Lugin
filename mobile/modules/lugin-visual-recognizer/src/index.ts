@@ -10,6 +10,9 @@ export type {
   VisualInitResult,
   VisualRecognizeResult,
   VisualTiming,
+  VNextNameLookup,
+  VNextNativeHit,
+  VNextNativeResult,
 } from './LuginVisual.types';
 
 const MODULE_NAME = 'LuginVisual';

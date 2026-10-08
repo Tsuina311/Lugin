@@ -1,0 +1,852 @@
+{
+  "challenger": {
+    "n": 17,
+    "top1": 13,
+    "top3": 13,
+    "top5": 13,
+    "top10": 15,
+    "correctPublished": 10,
+    "wrongPublished": 0,
+    "withheldCorrect": 3,
+    "wrongWithheld": 4,
+    "precision": 1,
+    "recall": 0.5882352941176471,
+    "safeHit": 0.5882352941176471,
+    "meanRank": 45.1764705882353,
+    "medianRank": 1
+  },
+  "baseline": {
+    "n": 17,
+    "top1": 13,
+    "top3": 13,
+    "top5": 13,
+    "top10": 15,
+    "correctPublished": 9,
+    "wrongPublished": 0,
+    "withheldCorrect": 4,
+    "wrongWithheld": 4,
+    "precision": 1,
+    "recall": 0.5294117647058824,
+    "safeHit": 0.5294117647058824,
+    "meanRank": 45.1764705882353,
+    "medianRank": 1
+  },
+  "frames": [
+    {
+      "frameId": "capture-quality__cq-20260908T120813",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "challenger": {
+        "frameId": "capture-quality__cq-20260908T120813",
+        "fold": 0,
+        "expected": 2415,
+        "top1": 2415,
+        "margin": 0.07728058099746704,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.6348851919174194,
+        "top5": [
+          2415,
+          17820,
+          9913,
+          1973,
+          1020
+        ],
+        "publish": true,
+        "cleanTop1": 2415,
+        "cleanMargin": 0.011692464351654053,
+        "cleanScore": 0.5800281763076782,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "capture-quality__cq-20260908T120813",
+        "fold": 0,
+        "expected": 2415,
+        "top1": 2415,
+        "margin": 0.07728058099746704,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.6348851919174194,
+        "top5": [
+          2415,
+          17820,
+          9913,
+          1973,
+          1020
+        ],
+        "publish": true,
+        "cleanTop1": 2415,
+        "cleanMargin": 0.011692464351654053,
+        "cleanScore": 0.5800281763076782,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "focus-series__focus-series-20260908T124234__t500-source",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "challenger": {
+        "frameId": "focus-series__focus-series-20260908T124234__t500-source",
+        "fold": 0,
+        "expected": 2415,
+        "top1": 11437,
+        "margin": 0.001162707805633545,
+        "rank": 345,
+        "correctTop1": false,
+        "top1Score": 0.5837322473526001,
+        "top5": [
+          11437,
+          19471,
+          7707,
+          33103,
+          20591
+        ],
+        "publish": false,
+        "cleanTop1": 7707,
+        "cleanMargin": 0.0012853741645812988,
+        "cleanScore": 0.5302445888519287,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "focus-series__focus-series-20260908T124234__t500-source",
+        "fold": 0,
+        "expected": 2415,
+        "top1": 11437,
+        "margin": 0.001162707805633545,
+        "rank": 345,
+        "correctTop1": false,
+        "top1Score": 0.5837322473526001,
+        "top5": [
+          11437,
+          19471,
+          7707,
+          33103,
+          20591
+        ],
+        "publish": false,
+        "cleanTop1": 7707,
+        "cleanMargin": 0.0012853741645812988,
+        "cleanScore": 0.5302445888519287,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "focus-series__focus-series-20260908T132712",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "challenger": {
+        "frameId": "focus-series__focus-series-20260908T132712",
+        "fold": 0,
+        "expected": 2415,
+        "top1": 2415,
+        "margin": 0.07932335138320923,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.6239929795265198,
+        "top5": [
+          2415,
+          305,
+          2289,
+          31563,
+          24285
+        ],
+        "publish": true,
+        "cleanTop1": 2415,
+        "cleanMargin": 0.05692964792251587,
+        "cleanScore": 0.5981640219688416,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "focus-series__focus-series-20260908T132712",
+        "fold": 0,
+        "expected": 2415,
+        "top1": 2415,
+        "margin": 0.07932335138320923,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.6239929795265198,
+        "top5": [
+          2415,
+          305,
+          2289,
+          31563,
+          24285
+        ],
+        "publish": true,
+        "cleanTop1": 2415,
+        "cleanMargin": 0.05692964792251587,
+        "cleanScore": 0.5981640219688416,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "replay__livaan-cultist-of-tiamat-foil-20260908T111916",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "challenger": {
+        "frameId": "replay__livaan-cultist-of-tiamat-foil-20260908T111916",
+        "fold": 0,
+        "expected": 2415,
+        "top1": 2415,
+        "margin": 0.03882569074630737,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.6340087652206421,
+        "top5": [
+          2415,
+          897,
+          12332,
+          18885,
+          5922
+        ],
+        "publish": false,
+        "cleanTop1": 2415,
+        "cleanMargin": 0.09420883655548096,
+        "cleanScore": 0.6270301342010498,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "replay__livaan-cultist-of-tiamat-foil-20260908T111916",
+        "fold": 0,
+        "expected": 2415,
+        "top1": 2415,
+        "margin": 0.03882569074630737,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.6340087652206421,
+        "top5": [
+          2415,
+          897,
+          12332,
+          18885,
+          5922
+        ],
+        "publish": false,
+        "cleanTop1": 2415,
+        "cleanMargin": 0.09420883655548096,
+        "cleanScore": 0.6270301342010498,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c000_deck-001-source",
+      "cardName": "Sword of Feast and Famine",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c000_deck-001-source",
+        "fold": 4,
+        "expected": 3567,
+        "top1": 3567,
+        "margin": 0.20600390434265137,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7987249493598938,
+        "top5": [
+          3567,
+          25233,
+          1405,
+          14750,
+          4198
+        ],
+        "publish": true,
+        "cleanTop1": 3567,
+        "cleanMargin": 0.14977103471755981,
+        "cleanScore": 0.7411383390426636,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_deck-test-20260910-085502_deck-test-20260910-085502-c000_deck-001-source",
+        "fold": 4,
+        "expected": 3567,
+        "top1": 3567,
+        "margin": 0.20600390434265137,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7987249493598938,
+        "top5": [
+          3567,
+          25233,
+          1405,
+          14750,
+          4198
+        ],
+        "publish": true,
+        "cleanTop1": 3567,
+        "cleanMargin": 0.14977103471755981,
+        "cleanScore": 0.7411383390426636,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20260910-162108_geom-001-source_geom-001-source",
+      "cardName": "Bulk Up",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-162108_geom-001-source_geom-001-source",
+        "fold": 4,
+        "expected": 14453,
+        "top1": 14453,
+        "margin": 0.08771169185638428,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7739294171333313,
+        "top5": [
+          14453,
+          19592,
+          26428,
+          9638,
+          1216
+        ],
+        "publish": false,
+        "cleanTop1": 11923,
+        "cleanMargin": 0.016194641590118408,
+        "cleanScore": 0.6097810864448547,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-162108_geom-001-source_geom-001-source",
+        "fold": 4,
+        "expected": 14453,
+        "top1": 14453,
+        "margin": 0.08771169185638428,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7739294171333313,
+        "top5": [
+          14453,
+          19592,
+          26428,
+          9638,
+          1216
+        ],
+        "publish": false,
+        "cleanTop1": 11923,
+        "cleanMargin": 0.016194641590118408,
+        "cleanScore": 0.6097810864448547,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source",
+      "cardName": "Critical Hit",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source",
+        "fold": 2,
+        "expected": 31261,
+        "top1": 31261,
+        "margin": 0.06414598226547241,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.628878653049469,
+        "top5": [
+          31261,
+          21113,
+          6396,
+          15967,
+          2682
+        ],
+        "publish": true,
+        "cleanTop1": 31261,
+        "cleanMargin": 0.12774404883384705,
+        "cleanScore": 0.6180955767631531,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20260910-173530_geom-001-source_geom-001-source",
+        "fold": 2,
+        "expected": 31261,
+        "top1": 31261,
+        "margin": 0.06414598226547241,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.628878653049469,
+        "top5": [
+          31261,
+          21113,
+          6396,
+          15967,
+          2682
+        ],
+        "publish": true,
+        "cleanTop1": 31261,
+        "cleanMargin": 0.12774404883384705,
+        "cleanScore": 0.6180955767631531,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-014-source_geom-014-source",
+      "cardName": "Darkwater Catacombs",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-014-source_geom-014-source",
+        "fold": 1,
+        "expected": 719,
+        "top1": 719,
+        "margin": 0.05799645185470581,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7780510783195496,
+        "top5": [
+          719,
+          21180,
+          11614,
+          14825,
+          5352
+        ],
+        "publish": true,
+        "cleanTop1": 719,
+        "cleanMargin": 0.045826852321624756,
+        "cleanScore": 0.7262616753578186,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-150559_geom-014-source_geom-014-source",
+        "fold": 1,
+        "expected": 719,
+        "top1": 719,
+        "margin": 0.05799645185470581,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7780510783195496,
+        "top5": [
+          719,
+          21180,
+          11614,
+          14825,
+          5352
+        ],
+        "publish": true,
+        "cleanTop1": 719,
+        "cleanMargin": 0.045826852321624756,
+        "cleanScore": 0.7262616753578186,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-002-source_geom-002-source",
+      "cardName": "Darkwater Catacombs",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-002-source_geom-002-source",
+        "fold": 1,
+        "expected": 719,
+        "top1": 719,
+        "margin": 0.07007771730422974,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7750881910324097,
+        "top5": [
+          719,
+          14825,
+          23379,
+          11614,
+          21180
+        ],
+        "publish": true,
+        "cleanTop1": 719,
+        "cleanMargin": 0.06822365522384644,
+        "cleanScore": 0.7469977736473083,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-002-source_geom-002-source",
+        "fold": 1,
+        "expected": 719,
+        "top1": 719,
+        "margin": 0.07007771730422974,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7750881910324097,
+        "top5": [
+          719,
+          14825,
+          23379,
+          11614,
+          21180
+        ],
+        "publish": true,
+        "cleanTop1": 719,
+        "cleanMargin": 0.06822365522384644,
+        "cleanScore": 0.7469977736473083,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-020-source_geom-020-source",
+      "cardName": "Eliminate",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-020-source_geom-020-source",
+        "fold": 3,
+        "expected": 21066,
+        "top1": 21066,
+        "margin": 0.11834686994552612,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7923924326896667,
+        "top5": [
+          21066,
+          8046,
+          2885,
+          8747,
+          4355
+        ],
+        "publish": true,
+        "cleanTop1": 21066,
+        "cleanMargin": 0.01378023624420166,
+        "cleanScore": 0.6714664101600647,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-020-source_geom-020-source",
+        "fold": 3,
+        "expected": 21066,
+        "top1": 21066,
+        "margin": 0.11834686994552612,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7923924326896667,
+        "top5": [
+          21066,
+          8046,
+          2885,
+          8747,
+          4355
+        ],
+        "publish": true,
+        "cleanTop1": 21066,
+        "cleanMargin": 0.01378023624420166,
+        "cleanScore": 0.6714664101600647,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-023-source_geom-023-source",
+      "cardName": "Distortion Strike",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-023-source_geom-023-source",
+        "fold": 4,
+        "expected": 12911,
+        "top1": 10422,
+        "margin": 0.0059716105461120605,
+        "rank": 10,
+        "correctTop1": false,
+        "top1Score": 0.5107238292694092,
+        "top5": [
+          10422,
+          6813,
+          351,
+          11535,
+          11287
+        ],
+        "publish": false,
+        "cleanTop1": 10422,
+        "cleanMargin": 0.004901319742202759,
+        "cleanScore": 0.4427584111690521,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-023-source_geom-023-source",
+        "fold": 4,
+        "expected": 12911,
+        "top1": 10422,
+        "margin": 0.0059716105461120605,
+        "rank": 10,
+        "correctTop1": false,
+        "top1Score": 0.5107238292694092,
+        "top5": [
+          10422,
+          6813,
+          351,
+          11535,
+          11287
+        ],
+        "publish": false,
+        "cleanTop1": 10422,
+        "cleanMargin": 0.004901319742202759,
+        "cleanScore": 0.4427584111690521,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-024-source_geom-024-source",
+      "cardName": "Sage Owl",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-024-source_geom-024-source",
+        "fold": 1,
+        "expected": 9025,
+        "top1": 4564,
+        "margin": 0.018941879272460938,
+        "rank": 10,
+        "correctTop1": false,
+        "top1Score": 0.5699720978736877,
+        "top5": [
+          4564,
+          31795,
+          24311,
+          29354,
+          9674
+        ],
+        "publish": false,
+        "cleanTop1": 24311,
+        "cleanMargin": 0.00036394596099853516,
+        "cleanScore": 0.502514123916626,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-024-source_geom-024-source",
+        "fold": 1,
+        "expected": 9025,
+        "top1": 4564,
+        "margin": 0.018941879272460938,
+        "rank": 10,
+        "correctTop1": false,
+        "top1Score": 0.5699720978736877,
+        "top5": [
+          4564,
+          31795,
+          24311,
+          29354,
+          9674
+        ],
+        "publish": false,
+        "cleanTop1": 24311,
+        "cleanMargin": 0.00036394596099853516,
+        "cleanScore": 0.502514123916626,
+        "agreement": false
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-027-source_geom-027-source",
+      "cardName": "Throatseeker",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-027-source_geom-027-source",
+        "fold": 3,
+        "expected": 28639,
+        "top1": 28639,
+        "margin": 0.04631316661834717,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.6692655086517334,
+        "top5": [
+          28639,
+          18070,
+          4636,
+          18576,
+          16674
+        ],
+        "publish": false,
+        "cleanTop1": 28639,
+        "cleanMargin": 0.005100429058074951,
+        "cleanScore": 0.5252199172973633,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-027-source_geom-027-source",
+        "fold": 3,
+        "expected": 28639,
+        "top1": 28639,
+        "margin": 0.04631316661834717,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.6692655086517334,
+        "top5": [
+          28639,
+          18070,
+          4636,
+          18576,
+          16674
+        ],
+        "publish": false,
+        "cleanTop1": 28639,
+        "cleanMargin": 0.005100429058074951,
+        "cleanScore": 0.5252199172973633,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-034-source_geom-034-source",
+      "cardName": "Vela the Night-Clad",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-034-source_geom-034-source",
+        "fold": 2,
+        "expected": 20434,
+        "top1": 20434,
+        "margin": 0.08142024278640747,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.724100649356842,
+        "top5": [
+          20434,
+          31186,
+          26247,
+          16619,
+          21318
+        ],
+        "publish": true,
+        "cleanTop1": 20434,
+        "cleanMargin": 0.0802885890007019,
+        "cleanScore": 0.6631227135658264,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-152155_geom-034-source_geom-034-source",
+        "fold": 2,
+        "expected": 20434,
+        "top1": 20434,
+        "margin": 0.08142024278640747,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.724100649356842,
+        "top5": [
+          20434,
+          31186,
+          26247,
+          16619,
+          21318
+        ],
+        "publish": true,
+        "cleanTop1": 20434,
+        "cleanMargin": 0.0802885890007019,
+        "cleanScore": 0.6631227135658264,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-001-source_geom-001-source",
+      "cardName": "Glamdring, Foe-hammer",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-001-source_geom-001-source",
+        "fold": 3,
+        "expected": 18530,
+        "top1": 18530,
+        "margin": 0.028021812438964844,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.760643482208252,
+        "top5": [
+          18530,
+          8440,
+          3508,
+          11,
+          2271
+        ],
+        "publish": true,
+        "cleanTop1": 18530,
+        "cleanMargin": 0.003527820110321045,
+        "cleanScore": 0.6267093420028687,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_geometry-test-20261006-153936_geom-001-source_geom-001-source",
+        "fold": 3,
+        "expected": 18530,
+        "top1": 18530,
+        "margin": 0.028021812438964844,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.760643482208252,
+        "top5": [
+          18530,
+          8440,
+          3508,
+          11,
+          2271
+        ],
+        "publish": false,
+        "cleanTop1": 18530,
+        "cleanMargin": 0.003527820110321045,
+        "cleanScore": 0.6267093420028687,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scan-inbox_sessions_normal-scan-session-20260911-113049--card-006_source-highres_source-highres",
+      "cardName": "Goblin Lookout",
+      "challenger": {
+        "frameId": "scan-inbox_sessions_normal-scan-session-20260911-113049--card-006_source-highres_source-highres",
+        "fold": 2,
+        "expected": 10103,
+        "top1": 10103,
+        "margin": 0.09344536066055298,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7292699813842773,
+        "top5": [
+          10103,
+          24475,
+          20932,
+          30186,
+          6911
+        ],
+        "publish": true,
+        "cleanTop1": 10103,
+        "cleanMargin": 0.08407151699066162,
+        "cleanScore": 0.6488104462623596,
+        "agreement": true
+      },
+      "baseline": {
+        "frameId": "scan-inbox_sessions_normal-scan-session-20260911-113049--card-006_source-highres_source-highres",
+        "fold": 2,
+        "expected": 10103,
+        "top1": 10103,
+        "margin": 0.09344536066055298,
+        "rank": 1,
+        "correctTop1": true,
+        "top1Score": 0.7292699813842773,
+        "top5": [
+          10103,
+          24475,
+          20932,
+          30186,
+          6911
+        ],
+        "publish": true,
+        "cleanTop1": 10103,
+        "cleanMargin": 0.08407151699066162,
+        "cleanScore": 0.6488104462623596,
+        "agreement": true
+      }
+    },
+    {
+      "frameId": "scanner-lab__livaan-foil-20260908T105241",
+      "cardName": "Livaan, Cultist of Tiamat",
+      "challenger": {
+        "frameId": "scanner-lab__livaan-foil-20260908T105241",
+        "fold": 0,
+        "expected": 2415,
+        "top1": 8037,
+        "margin": 0.007022380828857422,
+        "rank": 390,
+        "correctTop1": false,
+        "top1Score": 0.6667206287384033,
+        "top5": [
+          8037,
+          4251,
+          7072,
+          1386,
+          14292
+        ],
+        "publish": false,
+        "cleanTop1": 26051,
+        "cleanMargin": 0.002894163131713867,
+        "cleanScore": 0.5877918004989624,
+        "agreement": false
+      },
+      "baseline": {
+        "frameId": "scanner-lab__livaan-foil-20260908T105241",
+        "fold": 0,
+        "expected": 2415,
+        "top1": 8037,
+        "margin": 0.007022380828857422,
+        "rank": 390,
+        "correctTop1": false,
+        "top1Score": 0.6667206287384033,
+        "top5": [
+          8037,
+          4251,
+          7072,
+          1386,
+          14292
+        ],
+        "publish": false,
+        "cleanTop1": 26051,
+        "cleanMargin": 0.002894163131713867,
+        "cleanScore": 0.5877918004989624,
+        "agreement": false
+      }
+    }
+  ]
+}

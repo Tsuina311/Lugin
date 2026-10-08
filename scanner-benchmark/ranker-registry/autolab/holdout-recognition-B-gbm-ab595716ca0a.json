@@ -1,0 +1,915 @@
+{
+  "challengerId": "B-gbm-ab595716ca0a",
+  "split": "holdout",
+  "current": {
+    "n": 26,
+    "cleanTop1": 12,
+    "prototypeTop1": 14,
+    "correctPublished": 10,
+    "wrongPublished": 0,
+    "withheldCorrect": 4
+  },
+  "learned": {
+    "n": 26,
+    "cleanTop1": 13,
+    "prototypeTop1": 16,
+    "correctPublished": 10,
+    "wrongPublished": 0,
+    "withheldCorrect": 6
+  },
+  "challenger": {
+    "n": 26,
+    "cleanTop1": 16,
+    "prototypeTop1": 17,
+    "correctPublished": 11,
+    "wrongPublished": 0,
+    "withheldCorrect": 6
+  },
+  "frames": [
+    {
+      "id": "focus-series__focus-series-20260908T132801__t500-source",
+      "cardName": "Excalibur, Sword of Eden",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Plains",
+        "protoName": "Razortip Whip",
+        "margin": 0.002226394834853762
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Plains",
+        "protoName": "Razortip Whip",
+        "margin": 0.002226394834853762
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Supreme Verdict",
+        "protoName": "The Prydwen, Steel Flagship",
+        "margin": 0.04693417203726635
+      }
+    },
+    {
+      "id": "replay__negate-unsleeved-20260908T082746",
+      "cardName": "Negate",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Negate",
+        "protoName": "Negate",
+        "margin": 0.08387393828810341
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Negate",
+        "protoName": "Negate",
+        "margin": 0.09014640903506932
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Negate",
+        "protoName": "Negate",
+        "margin": 0.09014640903506932
+      }
+    },
+    {
+      "id": "replay__slip-out-the-back-italian-20260908T111643",
+      "cardName": "Slip Out the Back",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Slip Out the Back",
+        "protoName": "Slip Out the Back",
+        "margin": 0.11377766661058175
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Slip Out the Back",
+        "protoName": "Slip Out the Back",
+        "margin": 0.11377766661058175
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Slip Out the Back",
+        "protoName": "Slip Out the Back",
+        "margin": 0.043371186548880614
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260910-153114_geom-007-source_geom-007-source",
+      "cardName": "The Spear of Leonidas",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "The Black Arrow",
+        "protoName": "Predator, Flagship",
+        "margin": 0.0020503569039591607
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "The Black Arrow",
+        "protoName": "Predator, Flagship",
+        "margin": 0.0020503569039591607
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "The Black Arrow",
+        "protoName": "Predator, Flagship",
+        "margin": 0.0020503569039591607
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260910-165339_geom-006-source_geom-006-source",
+      "cardName": "Sword of the Animist",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Sword of the Animist",
+        "protoName": "Sword of the Animist",
+        "margin": 0.024492351154273062
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Sword of the Animist",
+        "protoName": "Sword of the Animist",
+        "margin": 0.024492351154273062
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Sword of the Animist",
+        "protoName": "Sword of the Animist",
+        "margin": 0.024492351154273062
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260910-192617_geom-001-source_geom-001-source",
+      "cardName": "Swiftfoot Boots",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Swiftfoot Boots",
+        "protoName": "Swiftfoot Boots",
+        "margin": 0.06808824017934678
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Swiftfoot Boots",
+        "protoName": "Swiftfoot Boots",
+        "margin": 0.06808824017934678
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Swiftfoot Boots",
+        "protoName": "Swiftfoot Boots",
+        "margin": 0.06808824017934678
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20260910-192617_geom-005-source_geom-005-source",
+      "cardName": "Sword of the Animist",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Sword of the Animist",
+        "protoName": "Sword of the Animist",
+        "margin": 0.09592148274426315
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Sword of the Animist",
+        "protoName": "Sword of the Animist",
+        "margin": 0.09592148274426315
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Sword of the Animist",
+        "protoName": "Sword of the Animist",
+        "margin": 0.09592148274426315
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-150559_geom-001-source_geom-001-source",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Pest Control",
+        "protoName": "Nahiri's Binding",
+        "margin": 0.008304593714461905
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Skaab Wrangler",
+        "protoName": "Sangromancer",
+        "margin": 0.001733065884224172
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Skaab Wrangler",
+        "protoName": "Sangromancer",
+        "margin": 0.001733065884224172
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-150559_geom-002-source_geom-002-source",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Double-Faced Substitute Card",
+        "protoName": "Occupation of Llanowar",
+        "margin": 0.0018890984384866139
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Evie Frye",
+        "protoName": "Xantcha, Sleeper Agent",
+        "margin": 0.0016756336280783213
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Robber of the Rich",
+        "protoName": "Errant, Street Artist",
+        "margin": 0.005314422056211354
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-150559_geom-004-source_geom-004-source",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Ward of Bones",
+        "protoName": "Spiteful Banditry",
+        "margin": 0.006400967235777488
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Rona, Sheoldred's Faithful",
+        "protoName": "Rona, Sheoldred's Faithful",
+        "margin": 0.029816585671033513
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Rona, Sheoldred's Faithful",
+        "protoName": "Rona, Sheoldred's Faithful",
+        "margin": 0.029816585671033513
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-150559_geom-005-source_geom-005-source",
+      "cardName": "Yuriko, the Tiger's Shadow",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Jhoira, Ageless Innovator",
+        "protoName": "Skaab Wrangler",
+        "margin": 0.009009525880674496
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Jhoira, Ageless Innovator",
+        "protoName": "Skaab Wrangler",
+        "margin": 0.009009525880674496
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Jhoira, Ageless Innovator",
+        "protoName": "Skaab Wrangler",
+        "margin": 0.009009525880674496
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-150559_geom-007-source_geom-007-source",
+      "cardName": "Moonsnare Specialist",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Necklace of Girion",
+        "protoName": "Moonsnare Specialist",
+        "margin": 0.0467090174355822
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Necklace of Girion",
+        "protoName": "Moonsnare Specialist",
+        "margin": 0.0467090174355822
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Moonsnare Specialist",
+        "protoName": "Moonsnare Specialist",
+        "margin": 0.008733500552063123
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-150559_geom-008-source_geom-008-source",
+      "cardName": "Moonsnare Specialist",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Moonsnare Specialist",
+        "protoName": "Moonsnare Specialist",
+        "margin": 0.07330178480546723
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Moonsnare Specialist",
+        "protoName": "Moonsnare Specialist",
+        "margin": 0.07330178480546723
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Moonsnare Specialist",
+        "protoName": "Moonsnare Specialist",
+        "margin": 0.07330178480546723
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-150559_geom-009-source_geom-009-source",
+      "cardName": "Moonsnare Specialist",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Road",
+        "protoName": "Tranquil Cove",
+        "margin": 0.025931959961793205
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Moonsnare Specialist",
+        "protoName": "Moonsnare Specialist",
+        "margin": 0.1134326508552147
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Moonsnare Specialist",
+        "protoName": "Moonsnare Specialist",
+        "margin": 0.1134326508552147
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-150559_geom-010-source_geom-010-source",
+      "cardName": "Kaito, Bane of Nightmares",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Timebender",
+        "protoName": "Isperia, Supreme Judge",
+        "margin": 0.019748989025515917
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Havi, the All-Father",
+        "protoName": "Kaito, Bane of Nightmares",
+        "margin": 0.02520118883645217
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Kaito, Bane of Nightmares",
+        "protoName": "Kaito, Bane of Nightmares",
+        "margin": 0.23317543813579922
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-150559_geom-013-source_geom-013-source",
+      "cardName": "Agent of the Shadow Thieves",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Double-Faced Substitute Card",
+        "protoName": "Mox Tantalite",
+        "margin": 0.007105346029353865
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Double-Faced Substitute Card",
+        "protoName": "Mox Tantalite",
+        "margin": 0.007105346029353865
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Double-Faced Substitute Card",
+        "protoName": "Mox Tantalite",
+        "margin": 0.007105346029353865
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-003-source_geom-003-source",
+      "cardName": "Kaito, Bane of Nightmares",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Kaito, Bane of Nightmares",
+        "protoName": "Kaito, Bane of Nightmares",
+        "margin": 0.16709936394724223
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Havi, the All-Father",
+        "protoName": "Kaito, Bane of Nightmares",
+        "margin": 0.024647174718533837
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Havi, the All-Father",
+        "protoName": "Kaito, Bane of Nightmares",
+        "margin": 0.024647174718533837
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-004-source_geom-004-source",
+      "cardName": "Moonsnare Specialist",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Moonsnare Specialist",
+        "protoName": "Moonsnare Specialist",
+        "margin": 0.07985418691768675
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Moonsnare Specialist",
+        "protoName": "Moonsnare Specialist",
+        "margin": 0.07985418691768675
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Moonsnare Specialist",
+        "protoName": "Moonsnare Specialist",
+        "margin": 0.11458397307606105
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-009-source_geom-009-source",
+      "cardName": "Chasm Skulker",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Hidetsugu Consumes All",
+        "protoName": "Searchlight Geist",
+        "margin": 0.00022391979830171937
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Chasm Skulker",
+        "protoName": "Chasm Skulker",
+        "margin": 0.03745195968810322
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Chasm Skulker",
+        "protoName": "Chasm Skulker",
+        "margin": 0.03745195968810322
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-015-source_geom-015-source",
+      "cardName": "Command Tower",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Command Tower",
+        "protoName": "Command Tower",
+        "margin": 0.14145703724231717
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Command Tower",
+        "protoName": "Command Tower",
+        "margin": 0.0972131190440848
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Command Tower",
+        "protoName": "Command Tower",
+        "margin": 0.13665988501324522
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-032-source_geom-032-source",
+      "cardName": "Ulamog's Crusher",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Ulamog's Crusher",
+        "protoName": "Ulamog's Crusher",
+        "margin": 0.09241349524815246
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Beast Within",
+        "protoName": "Beast Within",
+        "margin": 0.01010044173902791
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Ulamog's Crusher",
+        "protoName": "Ulamog's Crusher",
+        "margin": 0.09241349524815246
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-033-source_geom-033-source",
+      "cardName": "Whiplash Trap",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Armix, Filigree Thrasher",
+        "protoName": "Whiplash Trap",
+        "margin": 0.0366033542853863
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Whiplash Trap",
+        "protoName": "Whiplash Trap",
+        "margin": 0.08093997763152705
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Whiplash Trap",
+        "protoName": "Whiplash Trap",
+        "margin": 0.08093997763152705
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-152155_geom-041-source_geom-041-source",
+      "cardName": "Deadly Rollick",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Polluted Cistern",
+        "protoName": "Consign",
+        "margin": 0.030533437988004786
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Power Word Kill",
+        "protoName": "Crypt Lurker",
+        "margin": 0.025195652600452645
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Power Word Kill",
+        "protoName": "Crypt Lurker",
+        "margin": 0.025195652600452645
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_geometry-test-20261006-153936_geom-002-source_geom-002-source",
+      "cardName": "Bilbo, Luckwearer",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Bilbo, Luckwearer",
+        "protoName": "Bilbo, Luckwearer",
+        "margin": 0.1481474957547515
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Bilbo, Luckwearer",
+        "protoName": "Bilbo, Luckwearer",
+        "margin": 0.1481474957547515
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": true,
+        "correctPublish": true,
+        "wrongPublish": false,
+        "cleanName": "Bilbo, Luckwearer",
+        "protoName": "Bilbo, Luckwearer",
+        "margin": 0.16722478005346408
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_normal-scan-session-20260911-111516--card-007_source-highres_source-highres",
+      "cardName": "Sprouting Goblin",
+      "current": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Glorious End",
+        "protoName": "Lure of Prey",
+        "margin": 0.006644722559296934
+      },
+      "learned": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Glorious End",
+        "protoName": "Bane of Progress",
+        "margin": 0.005175058477223882
+      },
+      "challenger": {
+        "cleanTop1": false,
+        "prototypeTop1": false,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Glorious End",
+        "protoName": "Lure of Prey",
+        "margin": 0.006644722559296934
+      }
+    },
+    {
+      "id": "scan-inbox_sessions_normal-scan-session-20260911-113049--card-001_source-highres_source-highres",
+      "cardName": "Goblin Blastronauts",
+      "current": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Goblin Blastronauts",
+        "protoName": "Goblin Blastronauts",
+        "margin": 0.03219926550761665
+      },
+      "learned": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Goblin Blastronauts",
+        "protoName": "Goblin Blastronauts",
+        "margin": 0.03219926550761665
+      },
+      "challenger": {
+        "cleanTop1": true,
+        "prototypeTop1": true,
+        "publish": false,
+        "correctPublish": false,
+        "wrongPublish": false,
+        "cleanName": "Goblin Blastronauts",
+        "protoName": "Goblin Blastronauts",
+        "margin": 0.017773228373734518
+      }
+    }
+  ],
+  "wrongPublicationsIncreased": false
+}

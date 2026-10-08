@@ -9,6 +9,7 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import org.json.JSONObject
+import android.os.Debug
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
@@ -43,6 +44,8 @@ class LuginVisualModule : Module() {
   private val handleSeq = AtomicInteger(1)
   private val handleStore = HashMap<Int, FloatArray>()
   private val lockedEmbedding = AtomicReference<FloatArray?>(null)
+  /** Optional frozen clean + prototype galleries. Not loaded by initialize(). */
+  private var vnext: VNextIndex? = null
 
   override fun definition() = ModuleDefinition {
     Name("LuginVisual")
@@ -271,6 +274,78 @@ class LuginVisualModule : Module() {
         promise.reject(VisualFailedException(e.message ?: "warmUp failed"))
       }
     }
+
+    AsyncFunction("recognizeVNextFromRgbaBytes") { rgba: ByteArray, width: Int, height: Int, topK: Int, promise: Promise ->
+      val started = System.nanoTime()
+      try {
+        ensureReady()
+        val index = ensureVNext()
+        val sess = session!!
+        val tPre = System.nanoTime()
+        val pixels = preprocessRgba(rgba, width, height)
+        val preprocessMs = elapsedMs(tPre)
+        val tEnc = System.nanoTime()
+        val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(pixels), longArrayOf(1, 3, 224, 224))
+        val out = sess.run(mapOf("pixel_values" to tensor))
+        val embTensor = out[0].value as Array<*>
+        @Suppress("UNCHECKED_CAST")
+        val row = embTensor[0] as FloatArray
+        val raw = l2Normalize(row)
+        out.close()
+        tensor.close()
+        val encoderMs = elapsedMs(tEnc)
+        val tAdapt = System.nanoTime()
+        val query = VNextGallery.applyLinear(raw, index.adapterW, index.adapterB)
+        val adapterMs = elapsedMs(tAdapt)
+        val tSearch = System.nanoTime()
+        val k = max(5, min(topK, 10))
+        val dual = VNextGallery.dualTop(query, index.clean, index.prototype, index.oracleIds, index.names, index.dims, k)
+        val searchMs = elapsedMs(tSearch)
+        promise.resolve(
+          mapOf(
+            "cleanTop" to dual.clean.map { hitMap(it) },
+            "prototypeTop" to dual.prototype.map { hitMap(it) },
+            "galleryBytes" to index.galleryBytes,
+            "nativeHeapBytes" to Debug.getNativeHeapAllocatedSize(),
+            "timing" to mapOf(
+              "preprocessMs" to preprocessMs,
+              "encoderMs" to encoderMs,
+              "adapterMs" to adapterMs,
+              "searchMs" to searchMs,
+              "totalMs" to elapsedMs(started),
+            ),
+            "error" to null,
+          ),
+        )
+      } catch (e: Exception) {
+        promise.resolve(
+          mapOf(
+            "cleanTop" to emptyList<Map<String, Any>>(),
+            "prototypeTop" to emptyList<Map<String, Any>>(),
+            "galleryBytes" to (vnext?.galleryBytes ?: 0L),
+            "nativeHeapBytes" to Debug.getNativeHeapAllocatedSize(),
+            "timing" to mapOf(
+              "preprocessMs" to 0.0,
+              "encoderMs" to 0.0,
+              "adapterMs" to 0.0,
+              "searchMs" to 0.0,
+              "totalMs" to elapsedMs(started),
+            ),
+            "error" to (e.message ?: "vNext recognize failed"),
+          ),
+        )
+      }
+    }
+
+    AsyncFunction("lookupVNextExactName") { name: String, promise: Promise ->
+      try {
+        val index = ensureVNext()
+        val ids = index.nameToOracles[name] ?: emptyList()
+        promise.resolve(mapOf("oracleIds" to ids, "unique" to (ids.size == 1)))
+      } catch (e: Exception) {
+        promise.resolve(mapOf("oracleIds" to emptyList<String>(), "unique" to false, "error" to (e.message ?: "lookup failed")))
+      }
+    }
   }
 
   private fun runDummy(rgba: ByteArray) {
@@ -284,6 +359,29 @@ class LuginVisualModule : Module() {
   private fun ensureReady() {
     if (status != "READY" || session == null || embeddingsF32 == null) {
       throw VisualFailedException("CLIP engine not READY (status=$status)")
+    }
+  }
+
+  private fun hitMap(hit: VNextHit): Map<String, Any> = mapOf(
+    "oracleId" to hit.oracleId,
+    "name" to hit.name,
+    "score" to hit.score.toDouble(),
+  )
+
+  /** Loads the frozen float32 galleries once. Does not replace the F16 production index. */
+  private fun ensureVNext(): VNextIndex {
+    vnext?.let { return it }
+    val ctx = appContext.reactContext ?: throw VisualFailedException("no React context")
+    val dir = File(ctx.getExternalFilesDir(null), "lugin-visual-vnext")
+    if (!File(dir, "manifest.json").isFile) {
+      throw VisualFailedException(
+        "VNEXT_ASSETS_NOT_LOADED missing ${dir.absolutePath}",
+      )
+    }
+    return try {
+      VNextGallery.load(dir).also { vnext = it }
+    } catch (e: Exception) {
+      throw VisualFailedException("VNEXT_ASSETS_NOT_LOADED ${e.message ?: "gallery load failed"}")
     }
   }
 

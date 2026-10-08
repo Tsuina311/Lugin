@@ -1,0 +1,29 @@
+{
+  "id": "B-linear-63b449c2c3c4",
+  "metrics": {
+    "n": 16,
+    "ge90": 9,
+    "ge80": 13,
+    "ge70": 15,
+    "catastrophic": 0,
+    "median": 0.9099048657725372,
+    "p10": 0.7254659250465407,
+    "mean": 0.8747603907356997,
+    "goodToBad": 1,
+    "improved": 6,
+    "regressed": 3,
+    "meanRegret": 0.046925898303255574,
+    "medianRegret": 0.01697725913165582,
+    "p90Regret": 0.12215592187817498,
+    "regretOver10": 2,
+    "regretOver25": 1,
+    "swapsAlready90": 6,
+    "already90": 6,
+    "actions": {
+      "CATASTROPHIC_FIX": 4,
+      "HARMFUL_SWAP": 4,
+      "USELESS_SWAP": 5,
+      "SAFE_OVERRIDE": 3
+    }
+  }
+}

@@ -63,4 +63,42 @@ export type LuginVisualNativeModule = {
   lockHandle(handle: number): Promise<void>;
   clearLockedHandle(): Promise<void>;
   warmUp(): Promise<{ coldMs: number; warmMs: number }>;
+  /**
+   * Development-only dual gallery. Absent on binaries built before vNext.
+   * Does not replace recognizeFromRgbaBytes.
+   */
+  recognizeVNextFromRgbaBytes?(
+    rgba: Uint8Array | ArrayBuffer,
+    width: number,
+    height: number,
+    topK: number,
+  ): Promise<VNextNativeResult>;
+  lookupVNextExactName?(name: string): Promise<VNextNameLookup>;
+};
+
+export type VNextNativeHit = {
+  oracleId: string;
+  name: string;
+  score: number;
+};
+
+export type VNextNativeResult = {
+  cleanTop: VNextNativeHit[];
+  prototypeTop: VNextNativeHit[];
+  galleryBytes: number;
+  nativeHeapBytes: number;
+  timing: {
+    preprocessMs: number;
+    encoderMs: number;
+    adapterMs: number;
+    searchMs: number;
+    totalMs: number;
+  };
+  error: string | null;
+};
+
+export type VNextNameLookup = {
+  oracleIds: string[];
+  unique: boolean;
+  error?: string | null;
 };

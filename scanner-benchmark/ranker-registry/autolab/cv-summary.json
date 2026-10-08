@@ -1,0 +1,378 @@
+{
+  "cvFrames": 23,
+  "sealedGroups": 23,
+  "configurations": 248,
+  "winner": "B-linear-63b449c2c3c4",
+  "beatsFrozenGbmOnCv": true,
+  "frozenGbm": {
+    "n": 23,
+    "ge90": 18,
+    "ge80": 20,
+    "ge70": 21,
+    "catastrophic": 2,
+    "median": 0.9392604537243967,
+    "p10": 0.780984097342101,
+    "mean": 0.8769141665145436,
+    "goodToBad": 0,
+    "improved": 3,
+    "regressed": 0,
+    "meanRegret": 0.04646199012765899,
+    "medianRegret": 0.007816135362235577,
+    "p90Regret": 0.05521054760243462,
+    "regretOver10": 2,
+    "regretOver25": 2,
+    "swapsAlready90": 5,
+    "already90": 17,
+    "actions": {
+      "CATASTROPHIC_FIX": 3,
+      "USELESS_SWAP": 5,
+      "SAME_AS_CURRENT": 12,
+      "SAFE_OVERRIDE": 3
+    }
+  },
+  "current": {
+    "n": 23,
+    "ge90": 17,
+    "ge80": 17,
+    "ge70": 18,
+    "catastrophic": 5,
+    "median": 0.9282427544037151,
+    "p10": 0.27865687637094555,
+    "mean": 0.7868486731539265,
+    "goodToBad": 0,
+    "improved": 0,
+    "regressed": 0,
+    "meanRegret": 0.13652748348827598,
+    "medianRegret": 0.022464316607145096,
+    "p90Regret": 0.5374842356751438,
+    "regretOver10": 5,
+    "regretOver25": 5,
+    "swapsAlready90": 0,
+    "already90": 17,
+    "actions": {
+      "SAME_AS_CURRENT": 23
+    }
+  },
+  "top": [
+    {
+      "id": "B-linear-63b449c2c3c4",
+      "family": "B-linear",
+      "spec": {
+        "kind": "linear",
+        "features": "relative",
+        "weights": "conservative"
+      },
+      "metrics": {
+        "n": 23,
+        "ge90": 13,
+        "ge80": 20,
+        "ge70": 21,
+        "catastrophic": 1,
+        "median": 0.9168024330929038,
+        "p10": 0.7717802464025697,
+        "mean": 0.8783897274068992,
+        "goodToBad": 0,
+        "improved": 4,
+        "regressed": 4,
+        "meanRegret": 0.044986429235303396,
+        "medianRegret": 0.003597503264600843,
+        "p90Regret": 0.13203120447268724,
+        "regretOver10": 3,
+        "regretOver25": 1,
+        "swapsAlready90": 10,
+        "already90": 17,
+        "actions": {
+          "USELESS_SWAP": 5,
+          "SAME_AS_CURRENT": 8,
+          "HARMFUL_SWAP": 4,
+          "SAFE_OVERRIDE": 3,
+          "CATASTROPHIC_FIX": 3
+        }
+      }
+    },
+    {
+      "id": "B-linear-b7dcc7b7eb8e",
+      "family": "B-linear",
+      "spec": {
+        "kind": "linear",
+        "features": "relative",
+        "weights": "catastrophe"
+      },
+      "metrics": {
+        "n": 23,
+        "ge90": 13,
+        "ge80": 20,
+        "ge70": 21,
+        "catastrophic": 1,
+        "median": 0.9168024330929038,
+        "p10": 0.7717802464025697,
+        "mean": 0.8783897274068992,
+        "goodToBad": 0,
+        "improved": 4,
+        "regressed": 4,
+        "meanRegret": 0.044986429235303396,
+        "medianRegret": 0.003597503264600843,
+        "p90Regret": 0.13203120447268724,
+        "regretOver10": 3,
+        "regretOver25": 1,
+        "swapsAlready90": 10,
+        "already90": 17,
+        "actions": {
+          "USELESS_SWAP": 5,
+          "SAME_AS_CURRENT": 8,
+          "HARMFUL_SWAP": 4,
+          "SAFE_OVERRIDE": 3,
+          "CATASTROPHIC_FIX": 3
+        }
+      }
+    },
+    {
+      "id": "B-linear-bb209cf2fabc",
+      "family": "B-linear",
+      "spec": {
+        "kind": "linear",
+        "features": "relative",
+        "weights": "uniform"
+      },
+      "metrics": {
+        "n": 23,
+        "ge90": 13,
+        "ge80": 20,
+        "ge70": 21,
+        "catastrophic": 1,
+        "median": 0.9168024330929038,
+        "p10": 0.7717802464025697,
+        "mean": 0.8783897274068992,
+        "goodToBad": 0,
+        "improved": 4,
+        "regressed": 4,
+        "meanRegret": 0.044986429235303396,
+        "medianRegret": 0.003597503264600843,
+        "p90Regret": 0.13203120447268724,
+        "regretOver10": 3,
+        "regretOver25": 1,
+        "swapsAlready90": 10,
+        "already90": 17,
+        "actions": {
+          "USELESS_SWAP": 5,
+          "SAME_AS_CURRENT": 8,
+          "HARMFUL_SWAP": 4,
+          "SAFE_OVERRIDE": 3,
+          "CATASTROPHIC_FIX": 3
+        }
+      }
+    },
+    {
+      "id": "B-gbm-ab595716ca0a",
+      "family": "B-gbm",
+      "spec": {
+        "kind": "gbm",
+        "features": "relative",
+        "weights": "uniform",
+        "depth": 2,
+        "rounds": 8,
+        "minLeaf": 3,
+        "lr": 0.05
+      },
+      "metrics": {
+        "n": 23,
+        "ge90": 14,
+        "ge80": 21,
+        "ge70": 21,
+        "catastrophic": 2,
+        "median": 0.9358825464058015,
+        "p10": 0.8299029001794472,
+        "mean": 0.8689577159898636,
+        "goodToBad": 0,
+        "improved": 4,
+        "regressed": 2,
+        "meanRegret": 0.05441844065233867,
+        "medianRegret": 0.008738771298334003,
+        "p90Regret": 0.08196657602821494,
+        "regretOver10": 2,
+        "regretOver25": 2,
+        "swapsAlready90": 7,
+        "already90": 17,
+        "actions": {
+          "HARMFUL_SWAP": 4,
+          "SAME_AS_CURRENT": 11,
+          "SAFE_OVERRIDE": 2,
+          "CATASTROPHIC_FIX": 3,
+          "USELESS_SWAP": 3
+        }
+      }
+    },
+    {
+      "id": "B-gbm-d25b296936df",
+      "family": "B-gbm",
+      "spec": {
+        "kind": "gbm",
+        "features": "relative",
+        "weights": "uniform",
+        "depth": 2,
+        "rounds": 8,
+        "minLeaf": 6,
+        "lr": 0.05
+      },
+      "metrics": {
+        "n": 23,
+        "ge90": 14,
+        "ge80": 21,
+        "ge70": 21,
+        "catastrophic": 2,
+        "median": 0.9358825464058015,
+        "p10": 0.8299029001794472,
+        "mean": 0.8689577159898636,
+        "goodToBad": 0,
+        "improved": 4,
+        "regressed": 2,
+        "meanRegret": 0.05441844065233867,
+        "medianRegret": 0.008738771298334003,
+        "p90Regret": 0.08196657602821494,
+        "regretOver10": 2,
+        "regretOver25": 2,
+        "swapsAlready90": 7,
+        "already90": 17,
+        "actions": {
+          "HARMFUL_SWAP": 4,
+          "SAME_AS_CURRENT": 11,
+          "SAFE_OVERRIDE": 2,
+          "CATASTROPHIC_FIX": 3,
+          "USELESS_SWAP": 3
+        }
+      }
+    },
+    {
+      "id": "B-gbm-02efdec18e07",
+      "family": "B-gbm",
+      "spec": {
+        "kind": "gbm",
+        "features": "gbm",
+        "weights": "uniform",
+        "depth": 2,
+        "rounds": 8,
+        "minLeaf": 3,
+        "lr": 0.05
+      },
+      "metrics": {
+        "n": 23,
+        "ge90": 13,
+        "ge80": 21,
+        "ge70": 21,
+        "catastrophic": 2,
+        "median": 0.9282427544037151,
+        "p10": 0.8299029001794472,
+        "mean": 0.8669171154522065,
+        "goodToBad": 0,
+        "improved": 4,
+        "regressed": 3,
+        "meanRegret": 0.056459041189995854,
+        "medianRegret": 0.008738771298334003,
+        "p90Regret": 0.08280398404933806,
+        "regretOver10": 2,
+        "regretOver25": 2,
+        "swapsAlready90": 8,
+        "already90": 17,
+        "actions": {
+          "HARMFUL_SWAP": 5,
+          "SAME_AS_CURRENT": 9,
+          "SAFE_OVERRIDE": 3,
+          "CATASTROPHIC_FIX": 3,
+          "USELESS_SWAP": 3
+        }
+      }
+    },
+    {
+      "id": "B-gbm-728ffcc5c949",
+      "family": "B-gbm",
+      "spec": {
+        "kind": "gbm",
+        "features": "relative",
+        "weights": "uniform",
+        "depth": 2,
+        "rounds": 8,
+        "minLeaf": 6,
+        "lr": 0.1
+      },
+      "metrics": {
+        "n": 23,
+        "ge90": 13,
+        "ge80": 21,
+        "ge70": 21,
+        "catastrophic": 2,
+        "median": 0.9282427544037151,
+        "p10": 0.8299029001794472,
+        "mean": 0.8663333814947968,
+        "goodToBad": 0,
+        "improved": 4,
+        "regressed": 3,
+        "meanRegret": 0.05704277514740556,
+        "medianRegret": 0.008738771298334003,
+        "p90Regret": 0.08280398404933806,
+        "regretOver10": 2,
+        "regretOver25": 2,
+        "swapsAlready90": 8,
+        "already90": 17,
+        "actions": {
+          "HARMFUL_SWAP": 5,
+          "SAME_AS_CURRENT": 10,
+          "SAFE_OVERRIDE": 2,
+          "CATASTROPHIC_FIX": 3,
+          "USELESS_SWAP": 3
+        }
+      }
+    },
+    {
+      "id": "B-gbm-837567aba993",
+      "family": "B-gbm",
+      "spec": {
+        "kind": "gbm",
+        "features": "gbm",
+        "weights": "uniform",
+        "depth": 2,
+        "rounds": 8,
+        "minLeaf": 6,
+        "lr": 0.05
+      },
+      "metrics": {
+        "n": 23,
+        "ge90": 13,
+        "ge80": 21,
+        "ge70": 21,
+        "catastrophic": 2,
+        "median": 0.9282427544037151,
+        "p10": 0.8299029001794472,
+        "mean": 0.8669171154522065,
+        "goodToBad": 0,
+        "improved": 4,
+        "regressed": 3,
+        "meanRegret": 0.056459041189995854,
+        "medianRegret": 0.008738771298334003,
+        "p90Regret": 0.08280398404933806,
+        "regretOver10": 2,
+        "regretOver25": 2,
+        "swapsAlready90": 8,
+        "already90": 17,
+        "actions": {
+          "HARMFUL_SWAP": 5,
+          "SAME_AS_CURRENT": 9,
+          "SAFE_OVERRIDE": 3,
+          "CATASTROPHIC_FIX": 3,
+          "USELESS_SWAP": 3
+        }
+      }
+    }
+  ],
+  "saved": [
+    "B-linear-63b449c2c3c4",
+    "B-linear-b7dcc7b7eb8e",
+    "B-linear-bb209cf2fabc",
+    "B-gbm-ab595716ca0a",
+    "B-gbm-d25b296936df",
+    "B-gbm-02efdec18e07",
+    "B-gbm-728ffcc5c949",
+    "B-gbm-837567aba993"
+  ],
+  "datasetHash": "ab54804ca3cec4cb8919b6d9c728d39a8018022cc5c249db202f14ba5efc1522",
+  "splitHash": "fe29ccd434d5cc78531ced6d3dd8eea5137f7a6cc9abd050736ceb211e06b4e8"
+}

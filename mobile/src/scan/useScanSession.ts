@@ -373,6 +373,10 @@ export const useScanSession = (opts: {
     };
   }, [preferredSource]);
 
+  useEffect(() => {
+    void import('./vnextFlag').then(mod => mod.hydrateScannerVNextFlag());
+  }, []);
+
   // Optional warmup — must not gate deps.ocr.
   useEffect(() => {
     if (!enabled) return;
@@ -1696,7 +1700,18 @@ export const useScanSession = (opts: {
       try {
         const channel = getRecognitionChannel();
         let updated: RecognitionAttempt | null = null;
-        if (channelIsNewVisual(channel)) {
+        const vnextOn =
+          isBenchmarkToolsEnabled() &&
+          (await (await import('./vnextFlag')).hydrateScannerVNextFlag());
+        if (vnextOn) {
+          const { runScannerVNext } = await import('./vnextRun');
+          updated = await runScannerVNext({
+            attempt,
+            nameIndex,
+            now: monoNow,
+            ocr,
+          });
+        } else if (channelIsNewVisual(channel)) {
           // Verified CLIP / CLIP+OCR — native visual retrieval + optional title OCR.
           if (getVisualRecognizerState() !== 'READY') {
             await initializeVisualRecognizer();

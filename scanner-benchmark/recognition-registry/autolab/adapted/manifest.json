@@ -1,0 +1,11 @@
+{
+  "adapterSha256": "afed03d3fbd0b1d0f04dedba07366656941bdcac9bed868550300d031fff44c8",
+  "views": [
+    "clean",
+    "blur",
+    "motion",
+    "perspective"
+  ],
+  "count": 49968,
+  "dims": 512
+}

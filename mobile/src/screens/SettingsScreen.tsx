@@ -35,6 +35,11 @@ import {
 import { useAppUpdates } from '../updates/UpdateProvider';
 import { DebugInboxPanel } from '../scan/debugInbox';
 import { PendingUploadsPanel } from '../scan/uploadQueue/PendingUploadsPanel';
+import {
+  hydrateScannerVNextFlag,
+  isScannerVNextEnabled,
+  setScannerVNextFromDeveloper,
+} from '../scan/vnextFlag';
 
 function extraLugin(): { buildId?: string; buildLabel?: string; channel?: string } {
   const extra = Constants.expoConfig?.extra as
@@ -70,8 +75,13 @@ export function SettingsScreen() {
   const [targetCount, setTargetCount] = useState('50');
   const [manifestText, setManifestText] = useState('');
   const [benchStatus, setBenchStatus] = useState<string | null>(null);
+  const [vnextOn, setVnextOn] = useState(() => isScannerVNextEnabled());
 
   useEffect(() => subscribeScannerData(() => setScanner(getScannerDataStatus())), []);
+  useEffect(() => {
+    if (!benchEnabled) return;
+    void hydrateScannerVNextFlag().then(setVnextOn);
+  }, [benchEnabled]);
 
   useEffect(() => {
     if (!benchEnabled) return;
@@ -184,6 +194,29 @@ export function SettingsScreen() {
             Deck / Swap / Focus Series / Scanner Lab remain on the camera debug panel (dev builds).
             Binder product mode is the Binder tab. Geometry is the detector lab tab.
           </Text>
+          <Text style={styles.section}>Scanner vNext</Text>
+          <Text style={styles.note}>
+            Development only. Off by default. Current scanner stays the production path until this
+            is switched on for a deck comparison.
+          </Text>
+          <View style={styles.actions}>
+            <Pressable
+              onPress={() => {
+                void setScannerVNextFromDeveloper(false).then(() => setVnextOn(false));
+              }}
+              style={styles.button}
+            >
+              <Text style={styles.buttonLabel}>Current scanner{vnextOn ? '' : ' · on'}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                void setScannerVNextFromDeveloper(true).then(() => setVnextOn(true));
+              }}
+              style={styles.button}
+            >
+              <Text style={styles.buttonLabel}>vNext{vnextOn ? ' · on' : ''}</Text>
+            </Pressable>
+          </View>
           <Text style={styles.section}>Scanner Benchmark Session</Text>
           <Text style={styles.note}>
             Dev-only. Each recognition auto-saves JSON + full 744×1039 PNG locally. Uploads never
