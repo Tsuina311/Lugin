@@ -5,8 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { isBenchmarkToolsEnabled } from '../scan/benchmark';
 import { CameraScanScreen } from '../screens/CameraScanScreen';
+import { CollectionScreen } from '../screens/CollectionScreen';
+import { DeckScreens } from '../screens/DeckScreens';
 import { SettingsScreen } from '../screens/SettingsScreen';
-import { StubScreen } from '../screens/StubScreen';
 
 type Tab = 'collection' | 'decks' | 'scan' | 'binder' | 'geometry' | 'settings';
 
@@ -44,18 +45,8 @@ export function RootTabs() {
   return (
     <View style={styles.root}>
       <View style={styles.body}>
-        {tab === 'collection' ? (
-          <StubScreen
-            body="Owned cards, quantities, foil, cost basis, and valuation will reuse the portable collection domain — after the camera gate."
-            title="Collection"
-          />
-        ) : null}
-        {tab === 'decks' ? (
-          <StubScreen
-            body="Deck lists and ManaBox export reuse existing portable deck logic. Cardmarket wants/cart stay in the Chrome extension."
-            title="Decks"
-          />
-        ) : null}
+        {tab === 'collection' ? <CollectionScreen /> : null}
+        {tab === 'decks' ? <DeckScreens /> : null}
         {keepCameraMounted ? (
           <View
             style={cameraVisible ? styles.cameraFill : styles.cameraHidden}

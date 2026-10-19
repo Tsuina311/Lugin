@@ -38,6 +38,36 @@ function readStamp(): Stamp {
   }
 }
 
+const readDotEnv = (name: string): string | undefined => {
+  for (const file of [join(rootDir, '.env.local'), join(rootDir, '.env')]) {
+    if (!existsSync(file)) continue;
+    for (const line of readFileSync(file, 'utf8').split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq < 0 || trimmed.slice(0, eq) !== name) continue;
+      return trimmed.slice(eq + 1).trim().replace(/^['"]|['"]$/g, '');
+    }
+  }
+  return undefined;
+};
+
+const googleClientId =
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID?.trim() ||
+  process.env.VITE_GOOGLE_CLIENT_ID?.trim() ||
+  readDotEnv('VITE_GOOGLE_CLIENT_ID') ||
+  '';
+
+const pricesCandidate =
+  process.env.EXPO_PUBLIC_LUGIN_PRICES_URL?.trim() ||
+  process.env.VITE_LUGIN_PRICES_URL?.trim() ||
+  readDotEnv('VITE_LUGIN_PRICES_URL') ||
+  '';
+
+const pricesUrl = pricesCandidate.startsWith('https://')
+  ? pricesCandidate
+  : 'https://tsuina311.github.io/Lugin/prices.json';
+
 function resolveProjectId(): string | undefined {
   if (process.env.EAS_PROJECT_ID?.trim()) return process.env.EAS_PROJECT_ID.trim();
   const local = join(mobileDir, 'eas-project.json');
@@ -123,6 +153,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         buildId: stamp.id,
         buildLabel: stamp.label,
         channel: 'development',
+        googleClientId,
+        pricesUrl,
       },
     },
   };

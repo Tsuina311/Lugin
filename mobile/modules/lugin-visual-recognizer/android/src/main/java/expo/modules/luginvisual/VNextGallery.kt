@@ -4,6 +4,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
+import java.security.MessageDigest
 import kotlin.math.sqrt
 import org.json.JSONObject
 
@@ -33,8 +34,10 @@ object VNextGallery {
     val manifest = JSONObject(File(dir, "manifest.json").readText())
     val dims = manifest.optInt("dims", 512)
     val count = manifest.getInt("count")
-    val clean = readF32(File(dir, manifest.getString("clean")))
-    val prototype = readF32(File(dir, manifest.getString("prototype")))
+    val cleanFile = File(dir, manifest.getString("clean"))
+    val prototypeFile = File(dir, manifest.getString("prototype"))
+    val clean = readF32(cleanFile, manifest.optString("cleanSha256", ""))
+    val prototype = readF32(prototypeFile, manifest.optString("prototypeSha256", ""))
     val adapterW = readF32(File(dir, manifest.getString("adapterW")))
     val adapterB = readF32(File(dir, manifest.getString("adapterB")))
     if (clean.size != count * dims || prototype.size != count * dims) {
@@ -126,13 +129,53 @@ object VNextGallery {
   private fun rank(best: Map<String, VNextHit>, k: Int): List<VNextHit> =
     best.values.sortedWith(compareByDescending<VNextHit> { it.score }.thenBy { it.index }).take(k)
 
-  private fun readF32(file: File): FloatArray {
+  /**
+   * One read of the gallery file. The mapped copy is released after the floats
+   * are in the array the search keeps, so the camera is not left holding both.
+   */
+  private fun readF32(file: File, expectedSha: String = ""): FloatArray {
     FileInputStream(file).use { input ->
       val channel = input.channel
-      val mapped = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size()).order(ByteOrder.LITTLE_ENDIAN)
-      val out = FloatArray((channel.size() / 4).toInt())
-      mapped.asFloatBuffer().get(out)
-      return out
+      val size = channel.size()
+      if (size <= 0L || size % 4L != 0L) {
+        throw IllegalStateException("vNext gallery not float32 ${file.name}")
+      }
+      val mapped = channel.map(FileChannel.MapMode.READ_ONLY, 0, size).order(ByteOrder.LITTLE_ENDIAN)
+      try {
+        if (expectedSha.isNotEmpty()) {
+          val digest = MessageDigest.getInstance("SHA-256")
+          val bytes = mapped.duplicate()
+          val buf = ByteArray(1024 * 1024)
+          while (bytes.hasRemaining()) {
+            val n = minOf(buf.size, bytes.remaining())
+            bytes.get(buf, 0, n)
+            digest.update(buf, 0, n)
+          }
+          val actual = digest.digest().joinToString("") { "%02x".format(it) }
+          if (!actual.equals(expectedSha, ignoreCase = true)) {
+            throw IllegalStateException("vNext sha mismatch ${file.name}")
+          }
+          mapped.position(0)
+        }
+        val out = FloatArray((size / 4).toInt())
+        mapped.asFloatBuffer().get(out)
+        return out
+      } finally {
+        unmap(mapped)
+      }
+    }
+  }
+
+  private fun unmap(buffer: java.nio.ByteBuffer) {
+    try {
+      val unsafeClass = Class.forName("sun.misc.Unsafe")
+      val field = unsafeClass.getDeclaredField("theUnsafe")
+      field.isAccessible = true
+      val unsafe = field.get(null)
+      val invokeCleaner = unsafeClass.getMethod("invokeCleaner", java.nio.ByteBuffer::class.java)
+      invokeCleaner.invoke(unsafe, buffer)
+    } catch (_: Throwable) {
+      // The float array is already copied. A leftover mapping is collected later.
     }
   }
 }

@@ -13,6 +13,7 @@ import { evaluateMtgFastAccept, perspectiveAspect } from '@/lib/scan/detection/m
 import { quadArea } from '@/lib/scan/recognitionQuad';
 import { scanImageToPngDataUri, scanImageToThumbnailPngDataUri } from './debug/scanImagePng';
 import { isBenchmarkToolsEnabled } from './benchmark/isBenchmarkEnabled';
+import { isScannerVNextEnabled } from './vnextFlag';
 import {
   HIRES_WAIT_MS,
   RECOGNITION_SOURCES,
@@ -129,6 +130,8 @@ import {
 } from './verifiedScan/lifecycle';
 import * as attemptRegistry from './verifiedScan/registry';
 import { getScanBackgroundQueue } from '@/lib/scan/backgroundQueue';
+import { captureColorCard, resumeSavedCards } from './fastCapture';
+import { waitUntilCaptureGap } from './capturePace';
 import { recognizeCard } from './sharedCore';
 
 /** Verified result UI max width — readable on phone, not a debug thumb. */
@@ -311,6 +314,9 @@ export const useScanSession = (opts: {
   const verifiedAttemptIdSeq = useRef(0);
   const activeAttemptIdRef = useRef<number | null>(null);
   const paintArmedForAttemptRef = useRef<number | null>(null);
+  const vNextKickedRef = useRef<number | null>(null);
+  const kickVNextRef = useRef<(attemptId: number) => void>(() => {});
+  const queueManualCaptureRef = useRef<(attempt: RecognitionAttempt) => void>(() => {});
   /** Frozen at capture request — never replaced by live detector after snapshot starts. */
   const pendingCaptureMetaRef = useRef<{
     analysisQuad: import('./sharedCore').CardCorners;
@@ -902,6 +908,41 @@ export const useScanSession = (opts: {
     return parentSessionRef.current;
   }, []);
 
+  useEffect(() => {
+    resumeSavedCards(async warp => {
+      const attemptId = (verifiedAttemptIdSeq.current += 1);
+      const parent = ensureParentSession();
+      const attempt = createRecognitionAttempt({
+        attemptId,
+        captureId: attemptId,
+        cardSessionId: attemptId,
+        childId: 'resume',
+        parentSessionId: parent.id,
+        recognitionQuad: {
+          bottomLeft: { x: 0, y: warp.height - 1 },
+          bottomRight: { x: warp.width - 1, y: warp.height - 1 },
+          topLeft: { x: 0, y: 0 },
+          topRight: { x: warp.width - 1, y: 0 },
+        },
+        source: warp,
+        warp,
+      });
+      attemptRegistry.putAttempt(attempt);
+      try {
+        const { runScannerVNext } = await import('./vnextRun');
+        await runScannerVNext({
+          attempt,
+          nameIndex: indexesRef.current.names?.index ?? null,
+          now: monoNow,
+          ocr: getOrCreateOcrRecognizer(),
+          preparedWarp: warp,
+        });
+      } finally {
+        attemptRegistry.releaseAttempt(attemptId);
+      }
+    });
+  }, [ensureParentSession]);
+
   const syncVerifiedPhaseFromSnap = useCallback((snap: SessionSnapshot) => {
     if (!verifiedHoldActive.current) return;
     const now = monoNow();
@@ -938,17 +979,26 @@ export const useScanSession = (opts: {
   }, []);
 
   const enterVerifiedCaptured = useCallback(
-    (cache: HiResCache) => {
-      if (!isGeometryV2Pipeline()) return;
-      if (getScannerMode() !== 'normal') return;
-      if (!isTrueHiRes(cache.attempt.mode) || !cache.prepared?.image || !cache.source) return;
+    (cache: HiResCache, opts?: { manual?: boolean; recognize?: boolean }): boolean => {
+      if (!isGeometryV2Pipeline()) return false;
+      if (getScannerMode() !== 'normal') return false;
+      // Automatic capture still requires a real hi-res frame. An explicit check
+      // warps the analysis picture already on screen so the camera is not asked
+      // to refocus.
+      if (
+        (!opts?.manual && !isTrueHiRes(cache.attempt.mode)) ||
+        !cache.prepared?.image ||
+        !cache.source
+      ) {
+        return false;
+      }
       if (cache.captureId == null || cache.cardSessionId == null) {
         if (typeof __DEV__ !== 'undefined' && __DEV__) {
           throw new Error(
             `verified capture missing ownership captureId=${cache.captureId} cardSessionId=${cache.cardSessionId}`,
           );
         }
-        return;
+        return false;
       }
       const parent = ensureParentSession();
       const childId = nextNormalScanChildId(parent);
@@ -1114,6 +1164,36 @@ export const useScanSession = (opts: {
       activeAttemptIdRef.current = attemptId;
       paintArmedForAttemptRef.current = null;
 
+      // Without the card list, naming the card only freezes the button.
+      // With the list on the phone, the same tap runs the frozen scanner.
+      if (opts?.manual && !opts.recognize) {
+        const finished = attemptRegistry.updateAttempt(attemptId, a =>
+          finalizeAttempt(a, {
+            terminalStatus: 'NO_MATCH',
+            at: now,
+            ocr: { recognitionStatus: 'capture-only' },
+          }),
+        );
+        if (finished) {
+          recordAttemptTerminal(parent, finished);
+          queueManualCaptureRef.current(finished);
+        }
+        verifiedHoldActive.current = false;
+        controller.setVerifiedHold(false);
+        setVerifiedPhase('ready');
+        return true;
+      }
+
+      // Naming stays off the live outline thread. Do not hold the camera or
+      // encode a second preview before the frozen scanner starts.
+      if (opts?.manual && opts.recognize) {
+        verifiedHoldActive.current = false;
+        controller.setVerifiedHold(false);
+        setVerifiedPhase('ready');
+        kickVNextRef.current(attemptId);
+        return true;
+      }
+
       verifiedHoldActive.current = true;
       controller.setVerifiedRecognizeReady(false);
       controller.setVerifiedHold(true);
@@ -1126,6 +1206,14 @@ export const useScanSession = (opts: {
       proposedPrintingRef.current = null;
 
       const card = cache.prepared.image;
+      // A manual check already owns a copied frame. Once lookup is queued, the
+      // camera has to move again so the next card can be checked.
+      const releaseManualCamera = () => {
+        if (!opts?.manual) return;
+        verifiedHoldActive.current = false;
+        controller.setVerifiedHold(false);
+        setVerifiedPhase('ready');
+      };
       // Paint handshake: commit preview state, then double-rAF before OCR (no 400ms sleep).
       requestAnimationFrame(() => {
         setTimeout(() => {
@@ -1206,6 +1294,8 @@ export const useScanSession = (opts: {
                     recogAt,
                   );
                   controller.setVerifiedRecognizeReady(true);
+                  kickVNextRef.current(attemptId);
+                  releaseManualCamera();
                 }
               });
             });
@@ -1213,6 +1303,8 @@ export const useScanSession = (opts: {
             setVerifiedWarpUri(null);
             paintArmedForAttemptRef.current = attemptId;
             controller.setVerifiedRecognizeReady(true);
+            kickVNextRef.current(attemptId);
+            releaseManualCamera();
           }
           // Bounded fallback only if rAF/onLoad path never armed (~250ms).
           setTimeout(() => {
@@ -1245,10 +1337,13 @@ export const useScanSession = (opts: {
                 recogAt,
               );
               controller.setVerifiedRecognizeReady(true);
+              kickVNextRef.current(attemptId);
+              releaseManualCamera();
             }
           }, 250);
         }, 0);
       });
+      return true;
     },
     [controller, ensureParentSession],
   );
@@ -1278,7 +1373,7 @@ export const useScanSession = (opts: {
   };
 
   const startCapture = useCallback(
-    (frame: AnalyzedFrame) => {
+    (frame: AnalyzedFrame, opts?: { force?: boolean }) => {
       // Continuous owns identity — do not run Verified capture / NEXT panel.
       if (getSingleScanWorkflow() === 'continuous') return;
       const snap = controllerRef.current?.snapshot();
@@ -1300,8 +1395,9 @@ export const useScanSession = (opts: {
       if (labHoldRef.current) return;
       if (suspendsNormalRecognition(getScannerMode())) return;
       if (store.current.inFlight) return;
-      // geometry-v2: only capture after short confirmation lock (not on focusing).
-      if (isGeometryV2Pipeline()) {
+      // geometry-v2: automatic capture waits for a short confirmation lock.
+      // An explicit check skips that wait and uses the outline on screen now.
+      if (isGeometryV2Pipeline() && !opts?.force) {
         const phase = snap?.phase;
         if (phase !== 'locking' && phase !== 'recognizing') return;
       }
@@ -1473,7 +1569,11 @@ export const useScanSession = (opts: {
       const kickPhases = isGeometryV2Pipeline()
         ? lastPhase.current === 'locking'
         : lastPhase.current === 'focusing' || lastPhase.current === 'locking';
+      // vNext checks are explicit. An automatic capture would freeze the camera
+      // again while the copied picture is still being looked up.
+      const vnextHandsOff = isBenchmarkToolsEnabled() && isScannerVNextEnabled();
       if (
+        !vnextHandsOff &&
         kickPhases &&
         (frame.detection.lockCorners ?? frame.detection.trackedCorners ?? frame.detection.corners)
       ) {
@@ -1522,12 +1622,16 @@ export const useScanSession = (opts: {
         // Keep lastGoodLab — Lab must reuse the locked frame if the track
         // drops while reaching for the button.
       }
-      if (snap.phase === 'locking' || (!isGeometryV2Pipeline() && snap.phase === 'focusing')) {
+      if (
+        !vnextHandsOff &&
+        (snap.phase === 'locking' || (!isGeometryV2Pipeline() && snap.phase === 'focusing'))
+      ) {
         if (store.current.waitStartedAt == null) store.current.waitStartedAt = Date.now();
         startCapture(frame);
       }
       // Verified: if hi-res already ready and controller hasn't held yet, enter capture UI.
       if (
+        !vnextHandsOff &&
         isGeometryV2Pipeline() &&
         getScannerMode() === 'normal' &&
         !verifiedHoldActive.current &&
@@ -1656,10 +1760,11 @@ export const useScanSession = (opts: {
         attemptId: snap.attemptId,
         enqueuedAt: monoNow(),
         run: async () => {
+          await waitUntilCaptureGap();
           const latest = attemptRegistry.getAttempt(snap.attemptId) ?? snap;
           const parent = parentSessionRef.current;
           if (uploadNow || latest.terminalStatus != null) {
-            await finalizeNormalScanDiagnostic({
+            const saved = await finalizeNormalScanDiagnostic({
               source: latest.artifacts.source,
               warp: latest.artifacts.warp,
               titleCrop: latest.artifacts.titleCrop,
@@ -1668,7 +1773,7 @@ export const useScanSession = (opts: {
               telemetry: telemetryFromAttempt(latest),
               parentSummary: parent?.summary ?? null,
             });
-            attemptRegistry.releaseAttempt(latest.attemptId);
+            if (saved.ok) attemptRegistry.releaseAttempt(latest.attemptId);
           } else {
             await enqueueNormalScanDiagnostic({
               source: latest.artifacts.source,
@@ -1697,6 +1802,7 @@ export const useScanSession = (opts: {
       attemptRegistry.updateAttempt(attempt.attemptId, a =>
         markAttemptRecognizing(a, monoNow()),
       );
+      let usedVNext = false;
       try {
         const channel = getRecognitionChannel();
         let updated: RecognitionAttempt | null = null;
@@ -1704,6 +1810,7 @@ export const useScanSession = (opts: {
           isBenchmarkToolsEnabled() &&
           (await (await import('./vnextFlag')).hydrateScannerVNextFlag());
         if (vnextOn) {
+          usedVNext = true;
           const { runScannerVNext } = await import('./vnextRun');
           updated = await runScannerVNext({
             attempt,
@@ -1711,6 +1818,7 @@ export const useScanSession = (opts: {
             now: monoNow,
             ocr,
           });
+          setVerifiedPhase(updated?.terminalStatus === 'FOUND' ? 'result' : 'failed');
         } else if (channelIsNewVisual(channel)) {
           // Verified CLIP / CLIP+OCR — native visual retrieval + optional title OCR.
           if (getVisualRecognizerState() !== 'READY') {
@@ -1848,6 +1956,29 @@ export const useScanSession = (opts: {
         // Encode/upload via bounded queue — do not hold recognize slot for PNG work.
         scheduleAttemptEncode(updated, true);
       } catch (err) {
+        if (usedVNext) {
+          const { setVNextDebug } = await import('@/lib/scan/vnext/debug');
+          setVNextDebug({
+            at: Date.now(),
+            candidateIndex: null,
+            candidateCount: 0,
+            gbmUtility: null,
+            geometrySource: 'gbm-iou-all-2dd2ec36b833',
+            artAnchor: null,
+            cleanTop1: null,
+            prototypeTop1: null,
+            prototypeMargin: null,
+            agreement: null,
+            prototypeTop5: [],
+            ocrRaw: null,
+            ocrNormalized: null,
+            ocrExactOracle: null,
+            ocrInTop5: null,
+            source: 'WITHHELD',
+            note: err instanceof Error ? err.message : String(err),
+            timing: null,
+          });
+        }
         const at = monoNow();
         const updated = attemptRegistry.updateAttempt(attempt.attemptId, a =>
           finalizeAttempt(a, {
@@ -1864,6 +1995,7 @@ export const useScanSession = (opts: {
           if (parent) recordAttemptTerminal(parent, updated);
           scheduleAttemptEncode(updated, true);
         }
+        if (usedVNext) setVerifiedPhase('failed');
       }
     },
     [scheduleAttemptEncode],
@@ -1885,12 +2017,41 @@ export const useScanSession = (opts: {
     [runBackgroundRecognize],
   );
 
+  queueManualCaptureRef.current = attempt => {
+    scheduleAttemptEncode(attempt, true);
+  };
+
+  kickVNextRef.current = (attemptId: number) => {
+    if (vNextKickedRef.current === attemptId) return;
+    vNextKickedRef.current = attemptId;
+    void import('./vnextFlag').then(async flag => {
+      if (!(await flag.hydrateScannerVNextFlag())) {
+        if (vNextKickedRef.current === attemptId) vNextKickedRef.current = null;
+        return;
+      }
+      const current = attemptRegistry.getAttempt(attemptId);
+      if (!current || current.terminalStatus != null) return;
+      scheduleBackgroundRecognize(current);
+      setVerifiedPhase(prev =>
+        prev === 'captured' || prev === 'acquiring' ? 'identifying' : prev,
+      );
+    });
+  };
+
   const verifiedUploadNext = useCallback(async (): Promise<string> => {
     const attemptId = activeAttemptIdRef.current;
     const attempt = attemptId != null ? attemptRegistry.getAttempt(attemptId) : null;
     if (!attempt) {
+      const { resendStoredNormalScans } = await import('./verifiedScan/enqueue');
+      const sent = await resendStoredNormalScans();
       clearVerifiedForNext('verified-next');
-      return 'Upload failed: no frozen attempt';
+      if (!sent.paired) {
+        return 'Saved on the phone. Pair the debug receiver in Settings, then tap Retry uploads.';
+      }
+      if (sent.queued === 0) {
+        return 'Upload failed: no saved picture to send';
+      }
+      return `Sending ${sent.queued} saved picture(s). Leave the app open.`;
     }
     const at = monoNow();
     attemptRegistry.updateAttempt(attemptId!, a => markAttemptAdvancedEarly(a, at));
@@ -1997,6 +2158,86 @@ export const useScanSession = (opts: {
       : { ok: false as const, reason: result.reason };
   }, [controller]);
 
+  const checkCurrentOutline = useCallback(async (): Promise<{
+    naming: boolean;
+    ok: boolean;
+    previewUri: string | null;
+    reason: string;
+  }> => {
+    const detection = helperState.current.detection;
+    const analysis = helperState.current.analysis;
+    const spaces = helperState.current.spaces;
+    const outline =
+      detection?.corners ?? detection?.lockCorners ?? detection?.trackedCorners ?? null;
+    if (!outline || !spaces || !analysis || analysis.width < 8 || analysis.height < 8) {
+      return { naming: false, ok: false, previewUri: null, reason: 'no card outline' };
+    }
+    const frozen = freezeCorners(outline);
+    const captureId = (captureIdSeq.current += 1);
+    const cardSessionId = controller.snapshot().lockGates?.cardSessionId ?? 0;
+    const parent = ensureParentSession();
+    const childId = nextNormalScanChildId(parent);
+    const { vnextGalleryInstalled } = await import('./vnextGalleryDownload');
+    const naming = await vnextGalleryInstalled();
+    let saved: Awaited<ReturnType<typeof captureColorCard>>;
+    try {
+      saved = await captureColorCard({
+        captureId,
+        cardSessionId,
+        childId,
+        corners: frozen,
+        onName: naming
+          ? async warp => {
+              const attemptId = (verifiedAttemptIdSeq.current += 1);
+              const attempt = createRecognitionAttempt({
+                attemptId,
+                captureId,
+                cardSessionId,
+                childId,
+                parentSessionId: parent.id,
+                recognitionQuad: {
+                  bottomLeft: { x: 0, y: warp.height - 1 },
+                  bottomRight: { x: warp.width - 1, y: warp.height - 1 },
+                  topLeft: { x: 0, y: 0 },
+                  topRight: { x: warp.width - 1, y: 0 },
+                },
+                source: warp,
+                warp,
+              });
+              attemptRegistry.putAttempt(attempt);
+              try {
+                const { runScannerVNext } = await import('./vnextRun');
+                await runScannerVNext({
+                  attempt,
+                  nameIndex: indexesRef.current.names?.index ?? null,
+                  now: monoNow,
+                  ocr: getOrCreateOcrRecognizer(),
+                  preparedWarp: warp,
+                });
+              } finally {
+                attemptRegistry.releaseAttempt(attemptId);
+              }
+            }
+          : null,
+        parentSessionId: parent.id,
+        saveSnapshotJpeg: capturer.saveSnapshotJpeg,
+        score: detection?.score ?? 0,
+        spaces,
+      });
+    } catch {
+      saved = { ok: false, reason: 'Could not take a color picture. Hold the card in view and tap again.' };
+    }
+    if (!saved.ok) {
+      return { naming: false, ok: false, previewUri: null, reason: saved.reason };
+    }
+    vNextKickedRef.current = null;
+    lastCaptureKey.current = '';
+    verifiedHoldActive.current = false;
+    controller.setVerifiedHold(false);
+    setVerifiedPhase('ready');
+    return { naming, ok: true, previewUri: saved.previewUri, reason: 'captured' };
+  }, [capturer, controller, ensureParentSession]);
+
   const forceSnapshot = useCallback(async (): Promise<{
     captureMs: number | null;
     height: number | null;
@@ -2007,10 +2248,13 @@ export const useScanSession = (opts: {
     const detection = helperState.current.detection;
     const spaces = helperState.current.spaces;
     const analysis = helperState.current.analysis;
-    if (!detection?.corners || !spaces) {
-      return { captureMs: null, height: null, ok: false, reason: 'no quad', width: null };
+    const outline =
+      detection?.corners ?? detection?.lockCorners ?? detection?.trackedCorners ?? null;
+    if (!detection || !outline || !spaces) {
+      return { captureMs: null, height: null, ok: false, reason: 'no card outline', width: null };
     }
     lastCaptureKey.current = '';
+    vNextKickedRef.current = null;
     startCapture({
       detection,
       image: analysis ?? {
@@ -2019,7 +2263,7 @@ export const useScanSession = (opts: {
         width: 1,
       },
       spaces,
-    });
+    }, { force: true });
     const t0 = Date.now();
     while (store.current.inFlight && Date.now() - t0 < 2500) {
       await new Promise(r => setTimeout(r, 40));
@@ -2403,6 +2647,7 @@ export const useScanSession = (opts: {
     forceLock: forceRecognize,
     forceRecognize,
     forceSnapshot,
+    checkCurrentOutline,
     focusNorm,
     indexes,
     lastNormalized,

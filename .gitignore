@@ -64,6 +64,10 @@ mobile/.eas-decide.json
 .geometry-corpus/
 .geometry-benchmarks/
 
+# Gradle outputs from local Expo modules. The visual-recognizer AAR embeds
+# the ONNX weights and is larger than GitHub's 100 MB file limit.
+mobile/modules/**/android/build/
+
 # Generated on-device visual index (pack via scripts/recognition/pack-visual-assets.mjs).
 # Weights are large and rebuilt locally — never commit the binaries.
 mobile/modules/lugin-visual-recognizer/**/assets/lugin-visual/*.onnx

@@ -12,9 +12,10 @@ import {
 } from '@/lib/scan/verifiedScan';
 import { CARD_HEIGHT, CARD_WIDTH, type CardCorners, type ScanImage } from '../sharedCore';
 import { isBenchmarkToolsEnabled } from '../benchmark/isBenchmarkEnabled';
-import { bytesToBase64, scanImageToArtifactPngBytes } from '../debug/scanImagePng';
+import { bytesToBase64Async, scanImageToArtifactPngBytesAsync } from '../debug/scanImagePng';
 import { isInboxConfigured, loadInboxSettings } from '../debugInbox/settings';
-import { runBenchmarkUploadSession } from '../benchmarkUpload/session';
+import { loadUploadAckState, runBenchmarkUploadSession } from '../benchmarkUpload/session';
+import { trackSend } from '../sendProgress';
 import { annotateSourceWithRecognitionQuad } from '../annotateQuads';
 import type { NormalScanCardTelemetry } from './diagnostics';
 
@@ -31,7 +32,7 @@ const writePngFile = async (
   path: string,
   bytes: Uint8Array,
 ): Promise<void> => {
-  await FileSystem.writeAsStringAsync(path, bytesToBase64(bytes), {
+  await FileSystem.writeAsStringAsync(path, await bytesToBase64Async(bytes), {
     encoding: FileSystem.EncodingType.Base64,
   });
 };
@@ -50,17 +51,13 @@ export const persistNormalScanArtifacts = async (args: {
   if (!isBenchmarkToolsEnabled()) {
     return { ok: false, reason: 'benchmark tools disabled' };
   }
-  await loadInboxSettings();
-  if (!isInboxConfigured()) {
-    return { ok: false, reason: 'inbox not paired' };
-  }
   if (!args.warp) return { ok: false, reason: 'no recognition-card warp' };
   if (!args.source) return { ok: false, reason: 'no source-highres' };
   const quad = args.recognitionQuad ?? args.provenance?.projectedSourceQuad ?? null;
   if (!quad) return { ok: false, reason: 'no recognition-quad' };
 
   const FileSystem = await fs();
-  const root = FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? '';
+  const root = FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '';
   if (!root) return { ok: false, reason: 'no app storage' };
   const runId = args.runId.slice(0, 80);
   const dir = `${root}normal-scan/${runId}/`;
@@ -69,13 +66,13 @@ export const persistNormalScanArtifacts = async (args: {
   await writePngFile(
     FileSystem,
     `${dir}recognition-card.png`,
-    scanImageToArtifactPngBytes(args.warp),
+    await scanImageToArtifactPngBytesAsync(args.warp),
   );
 
   await writePngFile(
     FileSystem,
     `${dir}source-highres.png`,
-    scanImageToArtifactPngBytes(args.source),
+    await scanImageToArtifactPngBytesAsync(args.source),
   );
 
   // Dev forensic — exact source + projected quad. Off hot path (caller queues).
@@ -83,14 +80,14 @@ export const persistNormalScanArtifacts = async (args: {
   await writePngFile(
     FileSystem,
     `${dir}source-with-recognition-quad.png`,
-    scanImageToArtifactPngBytes(overlay),
+    await scanImageToArtifactPngBytesAsync(overlay),
   );
 
   if (args.titleCrop) {
     await writePngFile(
       FileSystem,
       `${dir}title-crop.png`,
-      scanImageToArtifactPngBytes(args.titleCrop),
+      await scanImageToArtifactPngBytesAsync(args.titleCrop),
     );
   }
 
@@ -180,19 +177,12 @@ export const enqueueNormalScanDiagnostic = async (args: {
     telemetry: args.telemetry,
     parentSummary: args.parentSummary,
   });
-  if (!persisted.ok || !persisted.dirUri) return persisted;
+  const dirUri = persisted.dirUri;
+  if (!persisted.ok || !dirUri) return persisted;
 
   if (args.uploadNow === false) {
     return { ok: true, runId: persisted.runId };
   }
-
-  const requireTitle =
-    Boolean(args.titleCrop) ||
-    args.telemetry.terminalStatus === 'FOUND' ||
-    args.telemetry.terminalStatus === 'AMBIGUOUS' ||
-    args.telemetry.terminalStatus === 'NO_MATCH' ||
-    args.telemetry.terminalStatus === 'OCR_ERROR' ||
-    args.telemetry.ocr.ocrRawText != null;
 
   const files: { relativePath: string; required: boolean; role?: BenchmarkUploadManifest['files'][0]['role'] }[] = [
     { relativePath: 'metadata.json', required: true, role: 'metadata' },
@@ -201,7 +191,7 @@ export const enqueueNormalScanDiagnostic = async (args: {
     { relativePath: 'source-with-recognition-quad.png', required: true, role: 'source' },
     { relativePath: 'recognition-quad.json', required: true, role: 'quad' },
   ];
-  if (requireTitle || args.titleCrop) {
+  if (args.titleCrop) {
     files.push({ relativePath: 'title-crop.png', required: true, role: 'title-crop' });
   }
 
@@ -216,11 +206,24 @@ export const enqueueNormalScanDiagnostic = async (args: {
     createdAt: new Date().toISOString(),
   };
 
-  void runBenchmarkUploadSession({
-    manifest,
-    dirUri: persisted.dirUri,
-  }).catch(() => {
-    /* retry via Pending uploads */
+  void trackSend(runId, files.length, async onProgress => {
+    const result = await runBenchmarkUploadSession({
+      manifest,
+      dirUri,
+      onProgress: ack => {
+        onProgress(
+          ack.acknowledged.length,
+          ack.acknowledged.length + ack.missingRequired.length,
+          ack.failReasons?.[0] ?? null,
+        );
+      },
+    });
+    return {
+      done: result.acknowledged.length,
+      total: result.acknowledged.length + result.missingRequired.length,
+      ok: result.uploadStatus === 'COMPLETE',
+      detail: result.reason ?? null,
+    };
   });
 
   return { ok: true, runId: persisted.runId };
@@ -239,3 +242,103 @@ export const finalizeNormalScanDiagnostic = async (args: {
     ...args,
     uploadNow: true,
   });
+
+const storageRoots = async (): Promise<string[]> => {
+  const FileSystem = await fs();
+  return [FileSystem.documentDirectory, FileSystem.cacheDirectory].filter(
+    (root): root is string => Boolean(root),
+  );
+};
+
+/** Pictures already written on the phone, newest storage root first. */
+export const listStoredNormalScanDirs = async (): Promise<{ runId: string; dirUri: string }[]> => {
+  const FileSystem = await fs();
+  const found: { runId: string; dirUri: string }[] = [];
+  const seen = new Set<string>();
+  for (const root of await storageRoots()) {
+    const base = `${root}normal-scan/`;
+    const info = await FileSystem.getInfoAsync(base);
+    if (!info.exists) continue;
+    let names: string[] = [];
+    try {
+      names = await FileSystem.readDirectoryAsync(base);
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      if (seen.has(name)) continue;
+      const dirUri = `${base}${name}/`;
+      const card = await FileSystem.getInfoAsync(`${dirUri}recognition-card.png`);
+      const cardJpeg = await FileSystem.getInfoAsync(`${dirUri}recognition-card.jpg`);
+      const jpeg = await FileSystem.getInfoAsync(`${dirUri}source.jpg`);
+      const meta = await FileSystem.getInfoAsync(`${dirUri}metadata.json`);
+      if ((!card.exists && !cardJpeg.exists && !jpeg.exists) || !meta.exists) continue;
+      seen.add(name);
+      found.push({ runId: name, dirUri });
+    }
+  }
+  return found;
+};
+
+/** Send every stored picture that has not been acknowledged yet. */
+export const resendStoredNormalScans = async (): Promise<{ paired: boolean; queued: number }> => {
+  await loadInboxSettings();
+  if (!isInboxConfigured()) return { paired: false, queued: 0 };
+  const dirs = await listStoredNormalScanDirs();
+  let queued = 0;
+  for (const item of dirs) {
+    const ack = await loadUploadAckState(item.runId);
+    if (ack?.uploadStatus === 'COMPLETE') continue;
+    const FileSystem = await fs();
+    const names = await FileSystem.readDirectoryAsync(item.dirUri);
+    const wanted = [
+      'metadata.json',
+      'recognition-card.png',
+      'recognition-card.jpg',
+      'source.jpg',
+      'source-highres.png',
+      'source-with-recognition-quad.png',
+      'recognition-quad.json',
+      'title-crop.png',
+    ];
+    const files = wanted.filter(name => names.includes(name));
+    if (
+      (!files.includes('recognition-card.png') &&
+        !files.includes('recognition-card.jpg') &&
+        !files.includes('source.jpg')) ||
+      !files.includes('metadata.json')
+    ) {
+      continue;
+    }
+    const manifest: BenchmarkUploadManifest = {
+      runId: item.runId,
+      kind: 'normal-scan',
+      files: files.map(relativePath => ({
+        relativePath,
+        required: relativePath !== 'title-crop.png',
+      })),
+      createdAt: new Date().toISOString(),
+    };
+    await trackSend(item.runId, files.length, async onProgress => {
+      const result = await runBenchmarkUploadSession({
+        manifest,
+        dirUri: item.dirUri,
+        onProgress: ack => {
+          onProgress(
+            ack.acknowledged.length,
+            ack.acknowledged.length + ack.missingRequired.length,
+            ack.failReasons?.[0] ?? null,
+          );
+        },
+      });
+      return {
+        done: result.acknowledged.length,
+        total: result.acknowledged.length + result.missingRequired.length,
+        ok: result.uploadStatus === 'COMPLETE',
+        detail: result.reason ?? null,
+      };
+    });
+    queued += 1;
+  }
+  return { paired: true, queued };
+};

@@ -412,6 +412,56 @@ export const rankLiveCandidates = (image: ScanImage, candidates: DetectionCandid
   };
 };
 
+/** Same scores as {@link rankLiveCandidates}. Yields between candidate warps. */
+export const rankLiveCandidatesPaced = async (
+  image: ScanImage,
+  candidates: DetectionCandidateDebug[],
+) => {
+  ensureFrameBuffer();
+  const t0 = now();
+  const measured: FeatureRowInput[] = [];
+  for (let index = 0; index < candidates.length; index++) {
+    const candidate = candidates[index];
+    if (!candidate.corners || candidate.rejectedBecause.length) continue;
+    const quad = namedQuad(candidate.corners);
+    const terms = termsOfQuad(quad, image.width, image.height);
+    if (!terms) continue;
+    let structure = null;
+    try {
+      const warped = warpQuadToCard(image, cornersToQuad(candidate.corners), FRAME_WARP_WIDTH, FRAME_WARP_HEIGHT);
+      structure = structureFromDetection(detectFrameRegions(warped));
+    } catch {
+      structure = null;
+    }
+    measured.push({ index, method: candidate.method, quad, structure, ...terms });
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+  }
+  const nested = traceNested(candidates, measured);
+  const built = buildRankerFeatureRows({
+    rows: measured,
+    width: image.width,
+    height: image.height,
+    nested,
+  });
+  const featureMs = now() - t0;
+  const t1 = now();
+  const scored: RankedCandidate[] = built.map(row => {
+    const vector = vectorOf(row.features, frozenGbm.featureNames);
+    return { index: row.index, detectorScore: row.detectorScore, utility: gbmUtility(frozenGbm, vector), vector };
+  });
+  const selected = selectByUtility(scored);
+  return {
+    scored,
+    selected,
+    featureMs,
+    gbmMs: now() - t1,
+    candidateCount: candidates.length,
+    measuredCount: measured.length,
+  };
+};
+
 type FrameDetection = {
   regions?: { artBox?: { confidence?: number; quad?: NamedQuad } | null };
   debug?: { boundaries?: BoundaryRow[] };

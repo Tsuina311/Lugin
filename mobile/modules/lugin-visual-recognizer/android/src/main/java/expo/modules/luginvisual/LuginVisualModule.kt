@@ -16,6 +16,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.security.MessageDigest
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
@@ -40,12 +41,21 @@ class LuginVisualModule : Module() {
   private var status: String = "UNINITIALIZED"
   private var modelSha: String? = null
   private var indexSha: String? = null
+  private var lastError: String? = null
+  private val clipLock = Any()
 
   private val handleSeq = AtomicInteger(1)
   private val handleStore = HashMap<Int, FloatArray>()
   private val lockedEmbedding = AtomicReference<FloatArray?>(null)
   /** Optional frozen clean + prototype galleries. Not loaded by initialize(). */
   private var vnext: VNextIndex? = null
+  /**
+   * Live outline detection shares Expo's single async-module thread.
+   * Gallery load and search stay on this thread so a capture does not stall that outline.
+   */
+  private val vnextExecutor = Executors.newSingleThreadExecutor { runnable ->
+    Thread(runnable, "lugin-vnext").apply { priority = Thread.NORM_PRIORITY - 1 }
+  }
 
   override fun definition() = ModuleDefinition {
     Name("LuginVisual")
@@ -132,8 +142,9 @@ class LuginVisualModule : Module() {
             "totalMs" to elapsedMs(t0),
           ),
         )
-      } catch (e: Exception) {
+      } catch (e: Throwable) {
         status = "ERROR"
+        lastError = e.message ?: "initialize failed"
         promise.resolve(
           mapOf(
             "status" to "ERROR",
@@ -167,14 +178,17 @@ class LuginVisualModule : Module() {
 
         val tEnc = System.nanoTime()
         val shape = longArrayOf(1, 3, 224, 224)
-        val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(pixels), shape)
-        val out = sess.run(mapOf("pixel_values" to tensor))
-        val embTensor = out[0].value as Array<*>
-        @Suppress("UNCHECKED_CAST")
-        val row = embTensor[0] as FloatArray
+        val row = synchronized(clipLock) {
+          val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(pixels), shape)
+          val out = sess.run(mapOf("pixel_values" to tensor))
+          val embTensor = out[0].value as Array<*>
+          @Suppress("UNCHECKED_CAST")
+          val encoded = embTensor[0] as FloatArray
+          out.close()
+          tensor.close()
+          encoded
+        }
         val query = l2Normalize(row)
-        out.close()
-        tensor.close()
         val encoderMs = elapsedMs(tEnc)
 
         val tSearch = System.nanoTime()
@@ -229,13 +243,16 @@ class LuginVisualModule : Module() {
           ?: throw VisualFailedException("unknown embedding handle $handle")
         val pixels = preprocessRgba(rgba, width, height)
         val shape = longArrayOf(1, 3, 224, 224)
-        val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(pixels), shape)
-        val out = session!!.run(mapOf("pixel_values" to tensor))
-        @Suppress("UNCHECKED_CAST")
-        val row = (out[0].value as Array<*>)[0] as FloatArray
+        val row = synchronized(clipLock) {
+          val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(pixels), shape)
+          val out = session!!.run(mapOf("pixel_values" to tensor))
+          @Suppress("UNCHECKED_CAST")
+          val encoded = (out[0].value as Array<*>)[0] as FloatArray
+          out.close()
+          tensor.close()
+          encoded
+        }
         val query = l2Normalize(row)
-        out.close()
-        tensor.close()
         var dot = 0f
         for (i in query.indices) dot += query[i] * locked[i]
         promise.resolve(mapOf("similarity" to dot.toDouble(), "ms" to elapsedMs(t0)))
@@ -276,23 +293,27 @@ class LuginVisualModule : Module() {
     }
 
     AsyncFunction("recognizeVNextFromRgbaBytes") { rgba: ByteArray, width: Int, height: Int, topK: Int, promise: Promise ->
+      vnextExecutor.execute {
       val started = System.nanoTime()
       try {
-        ensureReady()
+        ensureClipSession()
         val index = ensureVNext()
         val sess = session!!
         val tPre = System.nanoTime()
         val pixels = preprocessRgba(rgba, width, height)
         val preprocessMs = elapsedMs(tPre)
         val tEnc = System.nanoTime()
-        val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(pixels), longArrayOf(1, 3, 224, 224))
-        val out = sess.run(mapOf("pixel_values" to tensor))
-        val embTensor = out[0].value as Array<*>
-        @Suppress("UNCHECKED_CAST")
-        val row = embTensor[0] as FloatArray
-        val raw = l2Normalize(row)
-        out.close()
-        tensor.close()
+        val raw = synchronized(clipLock) {
+          val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(pixels), longArrayOf(1, 3, 224, 224))
+          val out = sess.run(mapOf("pixel_values" to tensor))
+          val embTensor = out[0].value as Array<*>
+          @Suppress("UNCHECKED_CAST")
+          val row = embTensor[0] as FloatArray
+          val normalized = l2Normalize(row)
+          out.close()
+          tensor.close()
+          normalized
+        }
         val encoderMs = elapsedMs(tEnc)
         val tAdapt = System.nanoTime()
         val query = VNextGallery.applyLinear(raw, index.adapterW, index.adapterB)
@@ -317,7 +338,7 @@ class LuginVisualModule : Module() {
             "error" to null,
           ),
         )
-      } catch (e: Exception) {
+      } catch (e: Throwable) {
         promise.resolve(
           mapOf(
             "cleanTop" to emptyList<Map<String, Any>>(),
@@ -335,30 +356,65 @@ class LuginVisualModule : Module() {
           ),
         )
       }
+      }
     }
 
     AsyncFunction("lookupVNextExactName") { name: String, promise: Promise ->
-      try {
-        val index = ensureVNext()
-        val ids = index.nameToOracles[name] ?: emptyList()
-        promise.resolve(mapOf("oracleIds" to ids, "unique" to (ids.size == 1)))
-      } catch (e: Exception) {
-        promise.resolve(mapOf("oracleIds" to emptyList<String>(), "unique" to false, "error" to (e.message ?: "lookup failed")))
+      vnextExecutor.execute {
+        try {
+          val index = ensureVNext()
+          val ids = index.nameToOracles[name] ?: emptyList()
+          promise.resolve(mapOf("oracleIds" to ids, "unique" to (ids.size == 1)))
+        } catch (e: Exception) {
+          promise.resolve(mapOf("oracleIds" to emptyList<String>(), "unique" to false, "error" to (e.message ?: "lookup failed")))
+        }
       }
     }
   }
 
   private fun runDummy(rgba: ByteArray) {
     val pixels = preprocessRgba(rgba, 224, 224)
-    val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(pixels), longArrayOf(1, 3, 224, 224))
-    val out = session!!.run(mapOf("pixel_values" to tensor))
-    out.close()
-    tensor.close()
+    synchronized(clipLock) {
+      val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(pixels), longArrayOf(1, 3, 224, 224))
+      val out = session!!.run(mapOf("pixel_values" to tensor))
+      out.close()
+      tensor.close()
+    }
   }
 
   private fun ensureReady() {
     if (status != "READY" || session == null || embeddingsF32 == null) {
-      throw VisualFailedException("CLIP engine not READY (status=$status)")
+      val why = lastError?.let { " — $it" } ?: ""
+      throw VisualFailedException("CLIP engine not READY (status=$status)$why")
+    }
+  }
+
+  /**
+   * Quantized CLIP session only. vNext searches its own galleries and must not
+   * wait on the production F16 index.
+   */
+  private fun ensureClipSession() {
+    if (session != null) return
+    synchronized(clipLock) {
+      if (session != null) return
+      val ctx = appContext.reactContext ?: throw VisualFailedException("no React context")
+      val manifest = JSONObject(
+        ctx.assets.open("lugin-visual/manifest.json").bufferedReader().use { it.readText() },
+      )
+      val modelBytes = ctx.assets.open("lugin-visual/clip-vit-b32-quant.onnx").use { it.readBytes() }
+      val sha = sha256(modelBytes)
+      val expected = manifest.getJSONObject("files").getJSONObject("model").getString("sha256")
+      if (sha != expected) throw VisualFailedException("model SHA mismatch")
+      val modelFile = File(ctx.cacheDir, "lugin-clip-vit-b32-quant.onnx")
+      if (!modelFile.exists() || modelFile.length() != modelBytes.size.toLong()) {
+        FileOutputStream(modelFile).use { it.write(modelBytes) }
+      }
+      val opts = OrtSession.SessionOptions()
+      opts.setIntraOpNumThreads(2)
+      opts.setInterOpNumThreads(1)
+      session = env.createSession(modelFile.absolutePath, opts)
+      modelSha = sha
+      lastError = null
     }
   }
 
@@ -372,10 +428,13 @@ class LuginVisualModule : Module() {
   private fun ensureVNext(): VNextIndex {
     vnext?.let { return it }
     val ctx = appContext.reactContext ?: throw VisualFailedException("no React context")
-    val dir = File(ctx.getExternalFilesDir(null), "lugin-visual-vnext")
-    if (!File(dir, "manifest.json").isFile) {
-      throw VisualFailedException(
-        "VNEXT_ASSETS_NOT_LOADED missing ${dir.absolutePath}",
+    val external = File(ctx.getExternalFilesDir(null), "lugin-visual-vnext")
+    val internal = File(ctx.filesDir, "lugin-visual-vnext")
+    val dir = when {
+      File(external, "manifest.json").isFile -> external
+      File(internal, "manifest.json").isFile -> internal
+      else -> throw VisualFailedException(
+        "VNEXT_ASSETS_NOT_LOADED missing ${external.absolutePath}",
       )
     }
     return try {

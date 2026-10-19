@@ -9,17 +9,19 @@
 import { decideVNext, type VNextDecision } from '@/lib/scan/vnext/decide';
 import { setVNextDebug, type VNextHit } from '@/lib/scan/vnext/debug';
 import { cropRecognitionArt } from '@/lib/scan/vnext/artCrop';
-import { rankLiveCandidates } from '@/lib/scan/vnext/features';
+import { rankLiveCandidatesPaced } from '@/lib/scan/vnext/features';
 import { FROZEN_GBM_ID } from '@/lib/scan/vnext/gbm';
 import { recordVNextTiming, type VNextTimingSample } from '@/lib/scan/vnext/timing';
-import { detectCardQuad } from '@/lib/scan/detectCard';
+import { detectCardQuadPaced } from '@/lib/scan/detectCard';
 import { cornersToQuad, warpQuadToCard } from '@/lib/scan/geometry';
+import type { ScanImage } from '@/lib/scan/types';
 import { shapeFold, type CardNameIndex } from '@/lib/scan/matchName';
 import { recognizeCapturedCard } from '@/lib/scan/recognizeCaptured';
 import type { TextRecognizer } from '@/lib/scan/textRecognizer';
 import { finalizeAttempt, type RecognitionAttempt } from '@/lib/scan/verifiedScan';
 
-import { initializeVisualRecognizer, getVisualRecognizerState } from './visualRecognizer';
+import { waitUntilCaptureGap } from './capturePace';
+import { getVisualRecognizerError } from './visualRecognizer';
 import { lookupVNextExactName, recognizeVNextArt } from './vnextNative';
 import * as attemptRegistry from './verifiedScan/registry';
 
@@ -47,16 +49,39 @@ export const runScannerVNext = async (args: {
   nameIndex: CardNameIndex | null;
   ocr: TextRecognizer | null;
   now: () => number;
+  /** Warp already made from the capture outline. Skips a second card search. */
+  preparedWarp?: ScanImage | null;
 }): Promise<RecognitionAttempt | null> => {
   const started = clock();
-  const source = args.attempt.artifacts.source;
-  const tGen = clock();
-  const detected = detectCardQuad(source);
-  const candidateGenerationMs = clock() - tGen;
-  const ranked = rankLiveCandidates(source, detected.debug.candidates);
-  const selected = ranked.selected;
-  const chosen = selected ? detected.debug.candidates[selected.index] : null;
+  // Naming waits until the last tap is a second behind, so a burst of
+  // pictures is saved before any of them is named.
+  await waitUntilCaptureGap();
+  const prepared = args.preparedWarp ?? null;
+  let candidateGenerationMs = 0;
+  let featureMs = 0;
+  let gbmMs = 0;
+  let candidateCount = 0;
+  let selected: { index: number; utility: number } | null = null;
+  let chosen: { corners: RecognitionAttempt['artifacts']['recognitionQuad'] | null } | null = null;
+  let card = prepared;
   let warpMs = 0;
+  if (!prepared) {
+    const source = args.attempt.artifacts.source;
+    const tGen = clock();
+    const detected = await detectCardQuadPaced(source);
+    candidateGenerationMs = clock() - tGen;
+    const ranked = await rankLiveCandidatesPaced(source, detected.debug.candidates);
+    featureMs = ranked.featureMs;
+    gbmMs = ranked.gbmMs;
+    candidateCount = ranked.candidateCount;
+    selected = ranked.selected;
+    chosen = selected ? detected.debug.candidates[selected.index] ?? null : null;
+    if (chosen?.corners != null) {
+      const tWarp = clock();
+      card = warpQuadToCard(source, cornersToQuad(chosen.corners));
+      warpMs = clock() - tWarp;
+    }
+  }
   let artMs = 0;
   let artAnchor: string | null = null;
   let clipMs: number | null = null;
@@ -76,19 +101,6 @@ export const runScannerVNext = async (args: {
   let galleryBytes: number | null = null;
   let nativeHeapBytes: number | null = null;
 
-  const card =
-    chosen?.corners != null
-      ? (() => {
-          const tWarp = clock();
-          const warped = warpQuadToCard(source, cornersToQuad(chosen.corners));
-          warpMs = clock() - tWarp;
-          return warped;
-        })()
-      : null;
-
-  if (card && getVisualRecognizerState() !== 'READY') {
-    await initializeVisualRecognizer();
-  }
   if (card) {
     const art = cropRecognitionArt(card);
     artMs = art.artMs;
@@ -102,9 +114,15 @@ export const runScannerVNext = async (args: {
     nativeHeapBytes = visual.nativeHeapBytes;
     cleanTop = hit(visual.cleanTop[0]);
     prototypeTop = visual.prototypeTop.map(row => hit(row)).filter((row): row is VNextHit => row != null);
-    if (!visual.ok) note = visual.error;
+    if (!visual.ok) {
+      const initError = getVisualRecognizerError();
+      note =
+        visual.error?.includes('not READY') && initError
+          ? initError
+          : visual.error;
+    }
   } else {
-    note = 'no GBM candidate';
+    note = prepared ? 'no capture warp' : 'no GBM candidate';
   }
 
   const proto1 = prototypeTop[0] ?? null;
@@ -185,9 +203,9 @@ export const runScannerVNext = async (args: {
   const timing: VNextTimingSample = {
     source: decision.source,
     candidateGenerationMs,
-    featureMs: ranked.featureMs,
-    gbmMs: ranked.gbmMs,
-    candidateCount: ranked.candidateCount,
+    featureMs,
+    gbmMs,
+    candidateCount,
     warpMs,
     artMs,
     clipMs,
@@ -204,9 +222,9 @@ export const runScannerVNext = async (args: {
   setVNextDebug({
     at,
     candidateIndex: selected?.index ?? null,
-    candidateCount: ranked.candidateCount,
+    candidateCount,
     gbmUtility: selected?.utility ?? null,
-    geometrySource: FROZEN_GBM_ID,
+    geometrySource: prepared ? 'capture-outline' : FROZEN_GBM_ID,
     artAnchor,
     cleanTop1: cleanTop,
     prototypeTop1: proto1,

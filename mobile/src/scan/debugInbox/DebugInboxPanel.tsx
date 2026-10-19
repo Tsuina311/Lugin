@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { applyReceiverInput } from './protocol';
+import { PairQrScanner } from './PairQrScanner';
 import {
   applyInboxPairInput,
   getInboxSettings,
   loadInboxSettings,
   saveInboxSettings,
+  subscribeInboxSettings,
 } from './settings';
 import {
   clearUploadedInboxTraces,
@@ -31,6 +34,7 @@ export function DebugInboxPanel({ compact = false }: { compact?: boolean }) {
   const [snap, setSnap] = useState<InboxSnapshot>(() => getInboxSnapshot());
   const [status, setStatus] = useState<string | null>(null);
   const [edit, setEdit] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -40,7 +44,17 @@ export function DebugInboxPanel({ compact = false }: { compact?: boolean }) {
       setReplayWorker(settings.replayWorker);
       setSnap(await restoreInboxQueue());
     })();
-    return subscribeInbox(() => setSnap(getInboxSnapshot()));
+    const unsubQueue = subscribeInbox(() => setSnap(getInboxSnapshot()));
+    const unsubSettings = subscribeInboxSettings(saved => {
+      setUrl(saved.url);
+      setToken(saved.token);
+      setReplayWorker(saved.replayWorker);
+      setSnap(getInboxSnapshot());
+    });
+    return () => {
+      unsubQueue();
+      unsubSettings();
+    };
   }, []);
 
   const onUrlChange = (text: string) => {
@@ -52,6 +66,21 @@ export function DebugInboxPanel({ compact = false }: { compact?: boolean }) {
         setStatus('Paired — token stored on device');
       });
     }
+  };
+
+  const onPairCode = (raw: string): boolean => {
+    if (!applyReceiverInput(raw).url) return false;
+    setScanning(false);
+    void (async () => {
+      const saved = await applyInboxPairInput(raw);
+      setUrl(saved.url);
+      setToken(saved.token);
+      const next = await testInboxConnection();
+      setSnap(next);
+      setEdit(false);
+      setStatus(next.connection === 'connected' ? 'Paired' : (next.lastError ?? 'Paired — connection failed'));
+    })();
+    return true;
   };
 
   const onTest = () => {
@@ -78,10 +107,10 @@ export function DebugInboxPanel({ compact = false }: { compact?: boolean }) {
       {hideFields ? (
         <Text style={styles.note}>Connected. Point at one card, then Capture geometry trace.</Text>
       ) : compact ? (
-        <Text style={styles.note}>Paste Pair / HTTPS URL from yarn scan:inbox:tunnel</Text>
+        <Text style={styles.note}>Scan the Pair QR, or paste the HTTPS URL from yarn scan:inbox:tunnel</Text>
       ) : (
         <Text style={styles.note}>
-          Paste the Mac Pair line or HTTPS URL + token. Images go only to that receiver.
+          Scan the Pair QR on the Mac, or paste the Pair line. Images go only to that receiver.
         </Text>
       )}
       {hideFields ? (
@@ -101,21 +130,35 @@ export function DebugInboxPanel({ compact = false }: { compact?: boolean }) {
             </Pressable>
           ) : null}
           {status ? <Text style={styles.ok}>{status}</Text> : null}
-          <Pressable onPress={() => setEdit(true)} style={styles.button}>
-            <Text style={styles.buttonLabel}>Change receiver</Text>
-          </Pressable>
+          <View style={styles.actionRow}>
+            <Pressable onPress={() => setScanning(true)} style={[styles.button, styles.actionGrow]}>
+              <Text style={styles.buttonLabel}>Scan Pair QR</Text>
+            </Pressable>
+            <Pressable onPress={() => setEdit(true)} style={[styles.button, styles.actionGrow]}>
+              <Text style={styles.buttonLabel}>Change receiver</Text>
+            </Pressable>
+          </View>
         </>
       ) : (
         <>
-      <TextInput
-        autoCapitalize="none"
-        autoCorrect={false}
-        onChangeText={onUrlChange}
-        placeholder="https://….trycloudflare.com or lugin-debug://pair?…"
-        placeholderTextColor="#6E7B91"
-        style={styles.input}
-        value={url}
-      />
+      <View style={styles.inputRow}>
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={onUrlChange}
+          placeholder="https://….trycloudflare.com or lugin-debug://pair?…"
+          placeholderTextColor="#6E7B91"
+          style={[styles.input, styles.inputFlex]}
+          value={url}
+        />
+        <Pressable
+          accessibilityLabel="Scan pair QR"
+          onPress={() => setScanning(true)}
+          style={styles.scanButton}
+        >
+          <ScanGlyph />
+        </Pressable>
+      </View>
       <TextInput
         autoCapitalize="none"
         autoCorrect={false}
@@ -183,11 +226,30 @@ export function DebugInboxPanel({ compact = false }: { compact?: boolean }) {
           </Pressable>
         </View>
       ) : null}
+      {scanning ? <PairQrScanner onClose={() => setScanning(false)} onCode={onPairCode} /> : null}
+    </View>
+  );
+}
+
+function ScanGlyph() {
+  return (
+    <View style={styles.glyph}>
+      <View style={[styles.mark, styles.markTL]} />
+      <View style={[styles.mark, styles.markTR]} />
+      <View style={[styles.mark, styles.markBL]} />
+      <View style={[styles.mark, styles.markBR]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  actionGrow: {
+    flex: 1,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   button: {
     backgroundColor: '#3D7EFF',
     borderRadius: 10,
@@ -205,6 +267,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
+  glyph: {
+    height: 18,
+    width: 18,
+  },
   input: {
     backgroundColor: 'rgba(0,0,0,0.45)',
     borderColor: 'rgba(255,255,255,0.16)',
@@ -216,6 +282,46 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
+  },
+  inputFlex: {
+    flex: 1,
+    marginTop: 0,
+  },
+  inputRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
+  mark: {
+    borderColor: '#fff',
+    height: 7,
+    position: 'absolute',
+    width: 7,
+  },
+  markBL: {
+    borderBottomWidth: 2,
+    borderLeftWidth: 2,
+    bottom: 0,
+    left: 0,
+  },
+  markBR: {
+    borderBottomWidth: 2,
+    borderRightWidth: 2,
+    bottom: 0,
+    right: 0,
+  },
+  markTL: {
+    borderLeftWidth: 2,
+    borderTopWidth: 2,
+    left: 0,
+    top: 0,
+  },
+  markTR: {
+    borderRightWidth: 2,
+    borderTopWidth: 2,
+    right: 0,
+    top: 0,
   },
   line: {
     color: '#D7DEEA',
@@ -234,6 +340,14 @@ const styles = StyleSheet.create({
   },
   row: {
     gap: 0,
+  },
+  scanButton: {
+    alignItems: 'center',
+    backgroundColor: '#3D7EFF',
+    borderRadius: 8,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
   },
   title: {
     color: '#F5C542',

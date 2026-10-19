@@ -45,30 +45,39 @@ export const resetVisualRecognizerForTests = (): void => {
   lastInit = null;
 };
 
-export const initializeVisualRecognizer = async (): Promise<VisualRecognizerState> => {
-  const mod = getLuginVisualModule();
-  if (!mod) {
-    state = 'ERROR';
-    lastError = 'LuginVisual native module not linked — rebuild APK with EAS';
-    return state;
-  }
-  state = 'LOADING';
-  lastError = null;
-  try {
-    const result = await mod.initialize();
-    lastInit = result;
-    if (result.status === 'READY') {
-      state = 'READY';
-      lastError = null;
-    } else {
+let inflight: Promise<VisualRecognizerState> | null = null;
+
+export const initializeVisualRecognizer = (): Promise<VisualRecognizerState> => {
+  if (state === 'READY') return Promise.resolve(state);
+  if (inflight) return inflight;
+  inflight = (async () => {
+    const mod = getLuginVisualModule();
+    if (!mod) {
       state = 'ERROR';
-      lastError = result.error ?? 'initialize failed';
+      lastError = 'LuginVisual native module not linked — rebuild APK with EAS';
+      return state;
     }
-  } catch (err) {
-    state = 'ERROR';
-    lastError = err instanceof Error ? err.message : String(err);
-  }
-  return state;
+    state = 'LOADING';
+    lastError = null;
+    try {
+      const result = await mod.initialize();
+      lastInit = result;
+      if (result.status === 'READY') {
+        state = 'READY';
+        lastError = null;
+      } else {
+        state = 'ERROR';
+        lastError = result.error ?? 'initialize failed';
+      }
+    } catch (err) {
+      state = 'ERROR';
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+    return state;
+  })().finally(() => {
+    inflight = null;
+  });
+  return inflight;
 };
 
 /** Packed RGBA art-crop → top-K oracle candidates. */

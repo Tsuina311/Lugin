@@ -20,7 +20,6 @@ import type { JsLagStats } from './jsLagProbe';
 import { getPerfBaseline } from './perfBaseline';
 import { getVNextDebug } from '@/lib/scan/vnext/debug';
 import { summarizeVNextTiming } from '@/lib/scan/vnext/timing';
-import { isScannerVNextEnabled } from '@/lib/scan/vnext/flag';
 import { saveVNextDebugCapture } from './vnextCapture';
 
 type SessionBits = {
@@ -806,7 +805,6 @@ export function ScanDebugPanel({
               {session.temporalLeader ?? '—'}
               {session.temporalResetReason ? ` · reset: ${session.temporalResetReason}` : ''}
             </Text>
-            {isScannerVNextEnabled() ? <VNextDebugLines /> : null}
             <Text style={styles.title}>Recognition source</Text>
             <Text style={session.sourceLabel === 'high-res' ? styles.ok : styles.warn}>
               source: {session.recognitionSource ?? 'none'} ({session.sourceLabel}) · phase{' '}
@@ -1052,7 +1050,7 @@ const styles = StyleSheet.create({
 const fmt = (value: number | null | undefined): string =>
   value == null || !Number.isFinite(value) ? '—' : value.toFixed(1);
 
-function VNextDebugLines() {
+export function VNextDebugLines() {
   const snap = getVNextDebug();
   const [saved, setSaved] = useState<string | null>(null);
   const timing = summarizeVNextTiming();

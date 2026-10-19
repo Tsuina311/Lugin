@@ -27,6 +27,7 @@ import {
 } from './hiresCapture';
 import { scaleVisibleRect } from './hiresMap';
 import { imageToScanImage, photoToScanImage } from './imageToScanImage';
+import { Images } from 'react-native-nitro-image';
 import type { CardCorners, ScanImage } from './sharedCore';
 
 const now = () =>
@@ -40,6 +41,8 @@ export interface CaptureRequest {
   cardSessionId: number;
   captureId: number;
   corners: CardCorners;
+  /** Caps the color snapshot. Other callers keep {@link HIRES_MAX_LONG_EDGE}. */
+  maxLongEdge?: number;
   score: number;
   spaces: HiResSpaces;
 }
@@ -70,7 +73,7 @@ export const createHiResCapturer = (deps: {
     try {
       deps.store.phase = 'converting';
       const t1 = now();
-      const source = await imageToScanImage(snap, HIRES_MAX_LONG_EDGE);
+      const source = await imageToScanImage(snap, req.maxLongEdge ?? HIRES_MAX_LONG_EDGE);
       const convertMs = now() - t1;
       const { mapped, prepared, warpMs } = mapAndWarp(
         source,
@@ -153,7 +156,28 @@ export const createHiResCapturer = (deps: {
     }
   };
 
-  return { capturePhoto, captureSnapshot };
+  const saveSnapshotJpeg = async (absolutePath: string) => {
+    const cam = deps.cameraRef.current;
+    if (!cam?.takeSnapshot) throw new Error('Preview snapshot is not available');
+    const snap = await cam.takeSnapshot();
+    try {
+      // PreviewView bitmaps are often hardware-backed. compress() and resize()
+      // throw on those. A raw copy is a normal bitmap that can be saved.
+      const raw = await snap.toRawPixelDataAsync(false);
+      const soft = await Images.loadFromRawPixelDataAsync(raw);
+      try {
+        await soft.saveToFileAsync(absolutePath, 'jpg', 82);
+      } catch (err) {
+        soft.dispose();
+        throw err;
+      }
+      return soft;
+    } finally {
+      snap.dispose();
+    }
+  };
+
+  return { capturePhoto, captureSnapshot, saveSnapshotJpeg };
 };
 
 export const useHiResStore = () => {

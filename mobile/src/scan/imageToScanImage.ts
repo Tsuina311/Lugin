@@ -7,7 +7,7 @@ import type { Image } from 'react-native-nitro-image';
 import type { Photo } from 'react-native-vision-camera';
 
 import { HIRES_MAX_LONG_EDGE } from './hiresCapture';
-import { parsePixelOrder, rawPixelsToScanImage, type RawPixelOrder } from './rawPixelsToScanImage';
+import { parsePixelOrder, rawPixelsToScanImagePaced, type RawPixelOrder } from './rawPixelsToScanImage';
 import type { ScanImage } from './sharedCore';
 
 /**
@@ -32,7 +32,7 @@ export const imageToScanImage = async (
   }
   const order = orderForNitroBitmap(parsed);
   const bytes = new Uint8Array(raw.buffer);
-  return rawPixelsToScanImage(
+  return rawPixelsToScanImagePaced(
     {
       bytes,
       height: raw.height,

@@ -29,9 +29,16 @@ export type VNextDebugSnapshot = {
 };
 
 let last: VNextDebugSnapshot | null = null;
+const listeners = new Set<() => void>();
 
 export const setVNextDebug = (snapshot: VNextDebugSnapshot): void => {
   last = snapshot;
+  listeners.forEach(listener => listener());
+};
+
+export const subscribeVNextDebug = (listener: () => void): (() => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 };
 
 export const getVNextDebug = (): VNextDebugSnapshot | null => last;

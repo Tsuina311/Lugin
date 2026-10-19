@@ -108,3 +108,47 @@ export const rawPixelsToScanImage = (
   }
   return out;
 };
+
+/** Same pixels as {@link rawPixelsToScanImage}. Yields between rows so a tab press can run. */
+export const rawPixelsToScanImagePaced = async (
+  raw: RawPixels,
+  options: { maxLongEdge?: number } = {},
+): Promise<ScanImage> => {
+  const { bytes, height: srcH, pixelOrder, width: srcW } = raw;
+  if (srcW <= 0 || srcH <= 0) return blankImage(1, 1);
+  const bpp = bppFor(pixelOrder);
+  const minStride = srcW * bpp;
+  const stride = raw.bytesPerRow && raw.bytesPerRow >= minStride ? raw.bytesPerRow : minStride;
+  const max = options.maxLongEdge ?? 0;
+  const long = Math.max(srcW, srcH);
+  const scale = max > 0 && long > max ? max / long : 1;
+  const outW = Math.max(1, Math.round(srcW * scale));
+  const outH = Math.max(1, Math.round(srcH * scale));
+  const out = blankImage(outW, outH);
+  const { b, g, r } = channels(pixelOrder);
+  const last = bytes.length - bpp;
+  const xMap = new Int32Array(outW);
+  for (let x = 0; x < outW; x++) {
+    xMap[x] = Math.min(srcW - 1, Math.max(0, Math.floor((x * srcW) / outW)));
+  }
+  let di = 0;
+  for (let y = 0; y < outH; y++) {
+    const sy = Math.min(srcH - 1, Math.max(0, Math.floor((y * srcH) / outH)));
+    const row = sy * stride;
+    for (let x = 0; x < outW; x++) {
+      const si = row + xMap[x] * bpp;
+      if (si >= 0 && si <= last) {
+        out.data[di] = bytes[si + r];
+        out.data[di + 1] = bytes[si + g];
+        out.data[di + 2] = bytes[si + b];
+      }
+      di += 4;
+    }
+    if (y > 0 && y % 24 === 0) {
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 0);
+      });
+    }
+  }
+  return out;
+};

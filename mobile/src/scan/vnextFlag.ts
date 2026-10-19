@@ -17,38 +17,41 @@ const fileUri = async (): Promise<string | null> => {
   return `${FileSystem.cacheDirectory}${FILE}`;
 };
 
-let hydrated: Promise<boolean> | null = null;
+let hydrated: Promise<void> | null = null;
+/** Bumped by the Settings toggle so an in-flight file read cannot turn vNext back off. */
+let revision = 0;
 
 export const hydrateScannerVNextFlag = (): Promise<boolean> => {
   if (!hydrated) hydrated = readScannerVNextFlag();
-  return hydrated;
+  return hydrated.then(() => isScannerVNextEnabled());
 };
 
-const readScannerVNextFlag = async (): Promise<boolean> => {
+const readScannerVNextFlag = async (): Promise<void> => {
+  const seen = revision;
   if (!isBenchmarkToolsEnabled()) {
-    setScannerVNextEnabled(false);
-    return false;
+    if (seen === revision) setScannerVNextEnabled(false);
+    return;
   }
   try {
     const uri = await fileUri();
-    if (!uri) return isScannerVNextEnabled();
+    if (!uri || seen !== revision) return;
     const FileSystem = await import('expo-file-system/legacy');
     const info = await FileSystem.getInfoAsync(uri);
+    if (seen !== revision) return;
     if (!info.exists) {
       setScannerVNextEnabled(false);
-      return false;
+      return;
     }
     const text = await FileSystem.readAsStringAsync(uri);
-    const on = text.trim() === '1';
-    setScannerVNextEnabled(on);
-    return on;
+    if (seen !== revision) return;
+    setScannerVNextEnabled(text.trim() === '1');
   } catch {
-    setScannerVNextEnabled(false);
-    return false;
+    if (seen === revision) setScannerVNextEnabled(false);
   }
 };
 
 export const setScannerVNextFromDeveloper = async (on: boolean): Promise<void> => {
+  revision += 1;
   if (!isBenchmarkToolsEnabled()) {
     setScannerVNextEnabled(false);
     return;

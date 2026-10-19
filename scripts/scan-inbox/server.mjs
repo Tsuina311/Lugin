@@ -3,7 +3,8 @@ import { randomBytes } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
 import { mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import {
   DEFAULT_PORT,
@@ -20,6 +21,19 @@ import {
   validateUploadBody,
 } from './lib.mjs';
 import { nextQueuedJob, parseReplayJobBody, readJob, writeJob } from './replay-jobs.mjs';
+
+const galleryDir = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../.scan-fixtures/vnext-galleries',
+);
+const galleryNames = [
+  'manifest.json',
+  'refs.json',
+  'adapter-b.f32',
+  'adapter-w.f32',
+  'clean.f32',
+  'prototype.f32',
+];
 
 export const lanIPv4 = () => {
   try {
@@ -188,6 +202,47 @@ export const startInboxServer = async ({
           serverTime: new Date().toISOString(),
           version: INBOX_VERSION,
         });
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/vnext-gallery') {
+        if (!authorize(req)) {
+          send(res, 401, { ok: false, reason: 'unauthorized' });
+          return;
+        }
+        const files = [];
+        for (const name of galleryNames) {
+          const filePath = join(galleryDir, name);
+          if (!existsSync(filePath)) {
+            send(res, 404, { ok: false, reason: `missing ${name}` });
+            return;
+          }
+          const info = await stat(filePath);
+          files.push({ name, bytes: info.size });
+        }
+        send(res, 200, { ok: true, files });
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname.startsWith('/vnext-gallery/')) {
+        if (!authorize(req)) {
+          send(res, 401, { ok: false, reason: 'unauthorized' });
+          return;
+        }
+        const name = decodeURIComponent(url.pathname.slice('/vnext-gallery/'.length));
+        if (!galleryNames.includes(name)) {
+          send(res, 404, { ok: false, reason: 'unknown gallery file' });
+          return;
+        }
+        const filePath = join(galleryDir, name);
+        const info = await stat(filePath);
+        res.writeHead(200, {
+          'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+          'Access-Control-Allow-Origin': '*',
+          'Content-Length': info.size,
+          'Content-Type': 'application/octet-stream',
+        });
+        createReadStream(filePath).pipe(res);
         return;
       }
 

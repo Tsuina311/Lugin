@@ -11,6 +11,20 @@ const FILE = 'lugin-debug-inbox/settings.json';
 
 let cached: InboxSettings = { replayWorker: false, token: '', url: '' };
 let loaded = false;
+const settingsListeners = new Set<(settings: InboxSettings) => void>();
+
+const publishSettings = (): void => {
+  for (const listener of settingsListeners) listener(cached);
+};
+
+export const subscribeInboxSettings = (
+  listener: (settings: InboxSettings) => void,
+): (() => void) => {
+  settingsListeners.add(listener);
+  return () => {
+    settingsListeners.delete(listener);
+  };
+};
 
 const fs = async () => import('expo-file-system/legacy');
 
@@ -66,8 +80,12 @@ export const saveInboxSettings = async (
   if (!isBenchmarkToolsEnabled()) return cached;
   const FileSystem = await fs();
   const uri = await settingsUri();
-  if (!uri) return cached;
+  if (!uri) {
+    publishSettings();
+    return cached;
+  }
   await FileSystem.writeAsStringAsync(uri, JSON.stringify(cached));
+  publishSettings();
   return cached;
 };
 

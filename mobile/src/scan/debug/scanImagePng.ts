@@ -39,6 +39,16 @@ const crc32 = (bytes: Uint8Array): number => {
   return (c ^ 0xffffffff) >>> 0;
 };
 
+const crc32Paced = async (bytes: Uint8Array): Promise<number> => {
+  let c = 0xffffffff;
+  const step = 64 * 1024;
+  for (let i = 0; i < bytes.length; i++) {
+    c = crcTable[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+    if (i > 0 && i % step === 0) await yieldToUi();
+  }
+  return (c ^ 0xffffffff) >>> 0;
+};
+
 const adler32 = (bytes: Uint8Array): number => {
   let a = 1;
   let b = 0;
@@ -49,22 +59,50 @@ const adler32 = (bytes: Uint8Array): number => {
   return ((b << 16) | a) >>> 0;
 };
 
+const adler32Paced = async (bytes: Uint8Array): Promise<number> => {
+  let a = 1;
+  let b = 0;
+  const step = 64 * 1024;
+  for (let i = 0; i < bytes.length; i++) {
+    a = (a + bytes[i]) % 65521;
+    b = (b + a) % 65521;
+    if (i > 0 && i % step === 0) await yieldToUi();
+  }
+  return ((b << 16) | a) >>> 0;
+};
+
 const base64 = (bytes: Uint8Array): string => {
-  let out = '';
+  const parts: string[] = [];
   let i = 0;
   for (; i + 2 < bytes.length; i += 3) {
     const n = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
-    out += B64[(n >>> 18) & 63] + B64[(n >>> 12) & 63] + B64[(n >>> 6) & 63] + B64[n & 63];
+    parts.push(B64[(n >>> 18) & 63] + B64[(n >>> 12) & 63] + B64[(n >>> 6) & 63] + B64[n & 63]);
   }
   const left = bytes.length - i;
   if (left === 1) {
     const n = bytes[i] << 16;
-    out += `${B64[(n >>> 18) & 63]}${B64[(n >>> 12) & 63]}==`;
+    parts.push(`${B64[(n >>> 18) & 63]}${B64[(n >>> 12) & 63]}==`);
   } else if (left === 2) {
     const n = (bytes[i] << 16) | (bytes[i + 1] << 8);
-    out += `${B64[(n >>> 18) & 63]}${B64[(n >>> 12) & 63]}${B64[(n >>> 6) & 63]}=`;
+    parts.push(`${B64[(n >>> 18) & 63]}${B64[(n >>> 12) & 63]}${B64[(n >>> 6) & 63]}=`);
   }
-  return out;
+  return parts.join('');
+};
+
+const yieldToUi = (): Promise<void> =>
+  new Promise(resolve => {
+    setTimeout(resolve, 0);
+  });
+
+/** Same encoding as {@link base64}. Yields so a tab press can run between slices. */
+export const bytesToBase64Async = async (bytes: Uint8Array): Promise<string> => {
+  const parts: string[] = [];
+  const slice = 48 * 1024;
+  for (let start = 0; start < bytes.length; start += slice) {
+    parts.push(base64(bytes.subarray(start, Math.min(bytes.length, start + slice))));
+    await yieldToUi();
+  }
+  return parts.join('');
 };
 
 /** Nearest-neighbour downscale; keeps artefacts visible instead of blurring them away. */
@@ -126,6 +164,45 @@ const storedZlib = (raw: Uint8Array): Uint8Array => {
   return out.subarray(0, at);
 };
 
+const storedZlibPaced = async (raw: Uint8Array): Promise<Uint8Array> => {
+  const blocks = Math.max(1, Math.ceil(raw.length / MAX_BLOCK));
+  const out = new Uint8Array(2 + blocks * 5 + raw.length + 4);
+  let at = 0;
+  out[at++] = 0x78;
+  out[at++] = 0x01;
+  let n = 0;
+  for (let offset = 0; offset < raw.length || offset === 0; offset += MAX_BLOCK) {
+    const len = Math.min(MAX_BLOCK, raw.length - offset);
+    const final = offset + len >= raw.length ? 1 : 0;
+    out[at++] = final;
+    out[at++] = len & 0xff;
+    out[at++] = (len >>> 8) & 0xff;
+    out[at++] = ~len & 0xff;
+    out[at++] = (~len >>> 8) & 0xff;
+    out.set(raw.subarray(offset, offset + len), at);
+    at += len;
+    n += 1;
+    if (n % 4 === 0) await yieldToUi();
+    if (final) break;
+  }
+  const adler = await adler32Paced(raw);
+  out[at++] = (adler >>> 24) & 0xff;
+  out[at++] = (adler >>> 16) & 0xff;
+  out[at++] = (adler >>> 8) & 0xff;
+  out[at++] = adler & 0xff;
+  return out.subarray(0, at);
+};
+
+const chunkPaced = async (type: string, body: Uint8Array): Promise<Uint8Array> => {
+  const out = new Uint8Array(body.length + 12);
+  const view = new DataView(out.buffer);
+  view.setUint32(0, body.length);
+  for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+  out.set(body, 8);
+  view.setUint32(out.length - 4, await crc32Paced(out.subarray(4, out.length - 4)));
+  return out;
+};
+
 const encodePngExact = (image: ScanImage): Uint8Array => {
   // PNG scanlines: one filter byte (0 = none) per row, then RGBA.
   const stride = image.width * 4;
@@ -177,6 +254,43 @@ export const scanImageToThumbnailPngBytes = (
  */
 export const scanImageToArtifactPngBytes = (image: ScanImage): Uint8Array =>
   encodePngExact(image);
+
+/** Full-resolution PNG that yields every few rows so navigation stays usable. */
+export const scanImageToArtifactPngBytesAsync = async (image: ScanImage): Promise<Uint8Array> => {
+  const stride = image.width * 4;
+  const raw = new Uint8Array((stride + 1) * image.height);
+  for (let y = 0; y < image.height; y++) {
+    raw[y * (stride + 1)] = 0;
+    raw.set(image.data.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1);
+    if (y > 0 && y % 32 === 0) await yieldToUi();
+  }
+  await yieldToUi();
+  const ihdr = new Uint8Array(13);
+  const header = new DataView(ihdr.buffer);
+  header.setUint32(0, image.width);
+  header.setUint32(4, image.height);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+  const idat = await storedZlibPaced(raw);
+  const parts = [
+    new Uint8Array(PNG_SIGNATURE),
+    chunk('IHDR', ihdr),
+    await chunkPaced('IDAT', idat),
+    chunk('IEND', new Uint8Array(0)),
+  ];
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const png = new Uint8Array(total);
+  let at = 0;
+  for (const part of parts) {
+    png.set(part, at);
+    at += part.length;
+  }
+  await yieldToUi();
+  return png;
+};
 
 /**
  * @deprecated Prefer {@link scanImageToThumbnailPngBytes} or

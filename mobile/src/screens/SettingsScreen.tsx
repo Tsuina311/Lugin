@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { libraryStore } from '../data/libraryStore';
+import { useLibrary } from '../data/useLibrary';
 import {
   checkScannerDataUpdates,
   getScannerDataStatus,
@@ -53,6 +55,68 @@ const formatUpdated = (iso: string | null): string => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const DriveSection = () => {
+  const library = useLibrary();
+  const [paste, setPaste] = useState('');
+  const [importNote, setImportNote] = useState<string | null>(null);
+  const syncLabel = library.connected
+    ? library.pending
+      ? 'Changes waiting to sync'
+      : library.syncedAt
+        ? `Synced ${library.syncedAt.slice(0, 16).replace('T', ' ')}`
+        : 'Connected'
+    : library.configured
+      ? 'Not connected'
+      : 'No Google client id in this build';
+  return (
+    <View>
+      <Text style={styles.section}>Google Drive</Text>
+      <Text style={styles.line}>{syncLabel}</Text>
+      <Text style={styles.line}>
+        Library store: {library.storage === 'sqlite' ? 'SQLite' : library.storage === 'file' ? 'File (SQLite needs a new app build)' : 'Starting'}
+      </Text>
+      {library.error ? <Text style={styles.error}>{library.error}</Text> : null}
+      <View style={styles.actions}>
+        <Pressable
+          onPress={() => void (library.connected ? libraryStore.syncNow() : libraryStore.connect())}
+          style={styles.button}
+        >
+          <Text style={styles.buttonLabel}>{library.connected ? 'Sync now' : 'Connect Google Drive'}</Text>
+        </Pressable>
+        {library.connected ? (
+          <Pressable onPress={() => void libraryStore.disconnect()} style={styles.button}>
+            <Text style={styles.buttonLabel}>Sign out</Text>
+          </Pressable>
+        ) : null}
+        <Pressable onPress={() => void libraryStore.shareCollection()} style={styles.button}>
+          <Text style={styles.buttonLabel}>Share collection</Text>
+        </Pressable>
+      </View>
+      <Text style={styles.label}>Paste a ManaBox CSV or a deck list</Text>
+      <TextInput
+        multiline
+        onChangeText={setPaste}
+        placeholder="Name,Set code,..."
+        placeholderTextColor="#6E7B91"
+        style={[styles.input, styles.inputTall]}
+        value={paste}
+      />
+      <Pressable
+        onPress={() => {
+          void libraryStore.importPasted(paste).then(message => {
+            setImportNote(message);
+            setPaste('');
+          });
+        }}
+        style={styles.button}
+      >
+        <Text style={styles.buttonLabel}>Import</Text>
+      </Pressable>
+      {importNote ? <Text style={styles.line}>{importNote}</Text> : null}
+    </View>
+  );
 };
 
 /**
@@ -101,6 +165,7 @@ export function SettingsScreen() {
       style={styles.root}
     >
       <Text style={styles.title}>Settings</Text>
+      <DriveSection />
 
       <Text style={styles.section}>Version</Text>
       <Text style={styles.line}>{lugin.buildLabel ?? `Lugin ${expoConfig?.version ?? '—'}`}</Text>

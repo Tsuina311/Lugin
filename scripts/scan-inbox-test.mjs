@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { isSafeId, pairingUrl, parseBearer, parsePairInput, sanitizeId, timingSafeEqualToken } from './scan-inbox/lib.mjs';
 import { startInboxServer } from './scan-inbox/server.mjs';
@@ -84,6 +86,47 @@ await check('pairing URL round-trip', () => {
   const alt = parsePairInput(started.pairingAlt);
   assert.ok(alt);
   assert.equal(alt.token, token);
+});
+
+await check('pair QR round-trips through the phone decoder', async () => {
+  const QRCode = (await import('qrcode')).default;
+  const jsQR = createRequire(join(dirname(fileURLToPath(import.meta.url)), '../mobile/package.json'))('jsqr');
+  const { renderPairQr } = await import('./scan-inbox/pair-qr.mjs');
+  const pair = pairingUrl('https://amber-widget-demo.trycloudflare.com', token);
+  const created = QRCode.create(pair, { errorCorrectionLevel: 'M' });
+  const n = created.modules.size;
+  const quiet = 4;
+  const scale = 4;
+  const dim = (n + quiet * 2) * scale;
+  const data = new Uint8ClampedArray(dim * dim * 4);
+  data.fill(255);
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      if (!created.modules.get(y, x)) continue;
+      for (let dy = 0; dy < scale; dy++) {
+        for (let dx = 0; dx < scale; dx++) {
+          const px = (x + quiet) * scale + dx;
+          const py = (y + quiet) * scale + dy;
+          const i = (py * dim + px) * 4;
+          data[i] = data[i + 1] = data[i + 2] = 0;
+        }
+      }
+    }
+  }
+  const found = jsQR(data, dim, dim);
+  assert.ok(found);
+  assert.equal(found.data, pair);
+  const parsed = parsePairInput(found.data);
+  assert.equal(parsed.url, 'https://amber-widget-demo.trycloudflare.com');
+  assert.equal(parsed.token, token);
+  process.env.SCAN_INBOX_NO_QR_OPEN = '1';
+  const qrDir = await mkdtemp(join(tmpdir(), 'lugin-pair-qr-'));
+  const rendered = await renderPairQr(qrDir, pair);
+  const png = await readFile(rendered.path);
+  assert.equal(png[0], 0x89);
+  assert.equal(png[1], 0x50);
+  assert.match(rendered.terminal, /█|▀|▄/);
+  await rm(qrDir, { recursive: true, force: true });
 });
 
 await check('health requires token', async () => {

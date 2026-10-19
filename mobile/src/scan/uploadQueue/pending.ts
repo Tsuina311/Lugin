@@ -40,6 +40,7 @@ import {
   loadGeometryBundle,
 } from '../geometryTest/persist';
 import { isInboxConfigured, loadInboxSettings } from '../debugInbox/settings';
+import { listStoredNormalScanDirs } from '../verifiedScan/enqueue';
 
 type LegacyFS = typeof import('expo-file-system/legacy');
 const fs = async (): Promise<LegacyFS> => import('expo-file-system/legacy');
@@ -93,11 +94,15 @@ const resolveDirForAck = async (
     if (kind === 'geometry-test') return await geometryRunDir(runId);
     if (kind === 'normal-scan') {
       const FileSystem = await fs();
-      const root = FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? '';
-      if (!root) return null;
-      const dir = `${root}normal-scan/${runId}/`;
-      const info = await FileSystem.getInfoAsync(dir);
-      return info.exists ? dir : null;
+      const roots = [FileSystem.documentDirectory, FileSystem.cacheDirectory].filter(
+        (root): root is string => Boolean(root),
+      );
+      for (const root of roots) {
+        const dir = `${root}normal-scan/${runId}/`;
+        const info = await FileSystem.getInfoAsync(dir);
+        if (info.exists) return dir;
+      }
+      return null;
     }
   } catch {
     return null;
@@ -224,6 +229,23 @@ export const listIncompleteUploads = async (): Promise<PendingUploadItem[]> => {
     }
   } catch {
     /* ignore */
+  }
+
+  for (const stored of await listStoredNormalScanDirs()) {
+    const ack = await loadUploadAckState(stored.runId);
+    if (ack?.uploadStatus === 'COMPLETE') continue;
+    if (items.some(item => item.kind === 'normal-scan' && item.runId === stored.runId)) continue;
+    pushUnique(items, {
+      id: `normal-scan:${stored.runId}`,
+      kind: 'normal-scan',
+      runId: stored.runId,
+      label: kindLabel('normal-scan'),
+      missingCount: ack?.missingRequired.length ?? 1,
+      acknowledgedCount: ack?.acknowledged.length ?? 0,
+      status: ack?.uploadStatus ?? 'INCOMPLETE',
+      dirUri: stored.dirUri,
+      detail: ack?.failReasons?.[0] ?? 'saved on the phone',
+    });
   }
 
   await restoreInboxQueue();

@@ -6,7 +6,8 @@
  * - Persists inbox token/name in .scan-inbox/config.json (not regenerated on restart)
  * - On process exit / network blip: exponential backoff restart
  * - New Quick Tunnel URL is written to .scan-inbox/tunnel.json + Pair line reprinted
- * - Phone only needs to paste the new Pair line (token/name retained on device)
+ * - Pair QR opens on screen (.scan-inbox/pair-qr.png) for the phone scan button
+ * - Phone can paste the new Pair line instead (token stays on device if omitted)
  *
  * Named Cloudflare Tunnel (stable hostname): see docs/SCAN-DEBUG-INBOX.md
  *   SCAN_INBOX_NAMED_TUNNEL=1 cloudflared tunnel run <name>
@@ -17,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { DEFAULT_PORT, pairingUrl, pairingUrlAlt } from './scan-inbox/lib.mjs';
+import { renderPairQr } from './scan-inbox/pair-qr.mjs';
 import { ensureInboxConfig, writeTunnelState, tunnelRestartBackoffMs } from './scan-inbox/inbox-config.mjs';
 import { readReceiverSession } from './scan-inbox/session-file.mjs';
 import {
@@ -119,9 +121,19 @@ const announce = async (url) => {
   console.log('');
   console.log(`Pair: ${pair}`);
   console.log(`Pair (app scheme): ${pairAlt}`);
+  try {
+    const qr = await renderPairQr(inboxRoot, pairAlt);
+    console.log('');
+    console.log(qr.terminal);
+    console.log(`Pair QR: ${qr.path}`);
+    console.log('Phone: scan this QR with the camera. It opens Lugin and pairs.');
+  } catch (err) {
+    console.log(
+      `Pair QR skipped (${err instanceof Error ? err.message : String(err)}). Paste the Pair line instead.`,
+    );
+  }
   console.log('');
-  console.log('Phone: paste Pair line → updates endpoint URL; keeps saved token/name.');
-  console.log('If only the URL changed, you can also paste the bare HTTPS URL.');
+  console.log('Paste still works: Pair line, or the bare HTTPS URL if the phone already has the token.');
   console.log('');
   process.stdout.write('HTTPS health: checking…\n');
   const health = await waitForHttpsHealth(url, token);

@@ -27,6 +27,7 @@ import {
 } from 'react-native-vision-camera';
 
 import { CameraDebugPanel } from '../camera/CameraDebugPanel';
+import { isPairScanActive, subscribePairScan } from '../scan/debugInbox/pairScanGate';
 import { describeDevice, selectMainRearDevice } from '../camera/selectMainRearDevice';
 import { useAppActive } from '../lifecycle/useAppActive';
 import {
@@ -38,13 +39,17 @@ import {
   restoreBenchmarkSession,
   subscribeBenchmark,
 } from '../scan/benchmark';
-import { collectionAddFromPrinting } from '../scan/collectionCommand';
+import { libraryStore } from '../data/libraryStore';
 import { extractTitleCrop } from '@/lib/scan/ocrInput';
 import { tickOverlay } from '../scan/overlayEase';
 import { ScanDebugPanel } from '../scan/ScanDebugPanel';
+import { isScannerVNextEnabled } from '../scan/vnextFlag';
+import { VNextCoach } from '../scan/VNextCoach';
+import { ScanCollectionBar } from '../scan/ScanCollectionBar';
 import { ScanResultCard } from '../scan/ScanResultCard';
 import { VerifiedScanPanel } from '../scan/VerifiedScanPanel';
 import { isGeometryV2Pipeline } from '@/lib/scan/singleCardCapture';
+import { collectionCardFromPrinting } from '../scan/collectionCard';
 import { mapCornersToOverlay, type CardCorners, type Point2D } from '../scan/sharedCore';
 import { RECOGNITION_SOURCES, type PreferredSource } from '../scan/hiresCapture';
 import {
@@ -185,7 +190,8 @@ export function CameraScanScreen(props?: {
 
   const preferred = useMemo(() => selectMainRearDevice(rearDevices), [rearDevices]);
   // Keep display on while the camera screen is mounted (scan + binder + geometry).
-  useKeepAwake('lugin-camera-scan');
+  // Android rejects deactivate after the activity is already gone (tab change, reload).
+  useKeepAwake('lugin-camera-scan', { suppressDeactivateWarnings: true });
   const [overrideId, setOverrideId] = useState<string | null>(null);
   const device: CameraDevice | undefined = useMemo(() => {
     if (overrideId) return rearDevices.find(d => d.id === overrideId) ?? preferred;
@@ -221,6 +227,7 @@ export function CameraScanScreen(props?: {
   const [showNumbers, setShowNumbers] = useState(true);
   const [pendingAdd, setPendingAdd] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [lastCaptureUri, setLastCaptureUri] = useState<string | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
   const [trainBusy, setTrainBusy] = useState(false);
   const [debugViewer, setDebugViewer] = useState<PreparedDebugBundle | null>(null);
@@ -270,7 +277,9 @@ export function CameraScanScreen(props?: {
   // Tab switch remounts the screen (works); AppState pause/resume does the same
   // without leaving Scan.
   const appActive = useAppActive();
-  const scanning = detectorOn && appActive && !labOpen && !labOpening;
+  const [pairScan, setPairScan] = useState(isPairScanActive);
+  useEffect(() => subscribePairScan(setPairScan), []);
+  const scanning = detectorOn && appActive && !pairScan && !labOpen && !labOpening;
 
   useEffect(() => {
     if (!scanning) {
@@ -1044,6 +1053,9 @@ export function CameraScanScreen(props?: {
         ? `${phase.toUpperCase()}\nWaiting: ${lockWait}`
         : phase.toUpperCase();
 
+  const vnextQuiet =
+    isScannerVNextEnabled() && surface === 'scan' && !labOpen && scannerMode === 'normal';
+
   const buildReportPayload = (): DebugSharePayload => {
     const analysisResult = result;
     const lugin = (Constants.expoConfig?.extra as { lugin?: { buildLabel?: string } } | undefined)
@@ -1335,16 +1347,15 @@ export function CameraScanScreen(props?: {
         device={device}
         enableNativeTapToFocusGesture={false}
         implementationMode={preferredSource === 'snapshot' ? 'compatible' : 'performance'}
-        isActive={appActive}
+        isActive={appActive && !pairScan}
         orientationSource="interface"
         outputs={cameraOutputs}
         resizeMode="cover"
         style={StyleSheet.absoluteFill}
-        zoom={1}
       />
 
       {/* Tap-to-focus must not cover exclusive HUDs — it eats START/Retry presses. */}
-      {exclusiveOwner ? null : (
+      {exclusiveOwner || vnextQuiet ? null : (
         <Pressable onPress={onTap} style={StyleSheet.absoluteFill} />
       )}
 
@@ -1375,17 +1386,17 @@ export function CameraScanScreen(props?: {
                 />
               ))
             : null}
-          {showDiagPolygons && rawQuad
+          {showDiagPolygons && !vnextQuiet && rawQuad
             ? rawQuad.map(([a, b], i) => (
                 <View key={`raw-${i}`} style={[styles.edge, edgeStyle(a, b), styles.edgeRaw]} />
               ))
             : null}
-          {showDiagPolygons && trackedQuad
+          {showDiagPolygons && !vnextQuiet && trackedQuad
             ? trackedQuad.map(([a, b], i) => (
                 <View key={`trk-${i}`} style={[styles.edge, edgeStyle(a, b), styles.edgeTracked]} />
               ))
             : null}
-          {showDiagPolygons && recognitionQuad
+          {showDiagPolygons && !vnextQuiet && recognitionQuad
             ? recognitionQuad.map(([a, b], i) => (
                 <View key={`rec-${i}`} style={[styles.edge, edgeStyle(a, b), styles.edgeRecognition]} />
               ))
@@ -1410,7 +1421,7 @@ export function CameraScanScreen(props?: {
               : null
             : null}
           {captureFlash ? <View pointerEvents="none" style={styles.captureFlashVeil} /> : null}
-          {showDiagPolygons && showNumbers && mappedCorners
+          {showDiagPolygons && !vnextQuiet && showNumbers && mappedCorners
             ? (
                 [
                   ['1', mappedCorners.topLeft],
@@ -1460,6 +1471,7 @@ export function CameraScanScreen(props?: {
         ]}
       >
         <View pointerEvents="box-none" style={styles.topBar}>
+          {vnextQuiet ? null : (
           <Text
             style={[
               styles.badge,
@@ -1469,10 +1481,13 @@ export function CameraScanScreen(props?: {
           >
             {badgeText}
           </Text>
+          )}
+          {vnextQuiet ? null : (
           <Text numberOfLines={2} style={styles.deviceLine}>
             {describeDevice(device)}
           </Text>
-          {forceDebugOverlay &&
+          )}
+          {!vnextQuiet && forceDebugOverlay &&
           scannerMode === 'normal' &&
           session.snapshot?.singleCardCapture?.pipeline === 'geometry-v2' ? (
             <Text style={styles.saveStatus} numberOfLines={3}>
@@ -1494,12 +1509,12 @@ export function CameraScanScreen(props?: {
               })()}
             </Text>
           ) : null}
-          {saveStatus ? (
+          {!vnextQuiet && saveStatus ? (
             <Text style={styles.saveStatus} numberOfLines={2}>
               {saveStatus}
             </Text>
           ) : null}
-          {isBenchmarkToolsEnabled() && !labOpen ? (
+          {!vnextQuiet && isBenchmarkToolsEnabled() && !labOpen ? (
             exclusiveOwner ? (
               <Pressable
                 onPress={() => setForceDebugOverlay(v => !v)}
@@ -1566,7 +1581,42 @@ export function CameraScanScreen(props?: {
           </View>
         ) : null}
 
-        {showNormalResultUi &&
+        {vnextQuiet && lastCaptureUri ? (
+          <Image
+            source={{ uri: lastCaptureUri }}
+            style={[styles.captureThumb, { top: insets.top + 12 }]}
+          />
+        ) : null}
+
+        {vnextQuiet ? (
+          <View style={styles.resultWrap}>
+            <VNextCoach
+              onCapture={async () => {
+                const shot = await session.checkCurrentOutline();
+                if (!shot.ok) {
+                  return {
+                    naming: false,
+                    ok: false,
+                    message:
+                      shot.reason === 'no card outline'
+                        ? 'No card outline yet. Fill the frame with one card, then tap again.'
+                        : shot.reason,
+                    previewUri: null,
+                  };
+                }
+                return {
+                  naming: shot.naming,
+                  ok: true,
+                  message: 'Captured',
+                  previewUri: shot.previewUri,
+                };
+              }}
+              onPreview={setLastCaptureUri}
+            />
+          </View>
+        ) : null}
+
+        {!vnextQuiet && showNormalResultUi &&
         surface !== 'binder' &&
         workflow !== 'continuous' &&
         isGeometryV2Pipeline() &&
@@ -1576,7 +1626,7 @@ export function CameraScanScreen(props?: {
           </View>
         ) : null}
 
-        {showNormalResultUi &&
+        {!vnextQuiet && showNormalResultUi &&
         surface !== 'binder' &&
         workflow !== 'continuous' &&
         isGeometryV2Pipeline() &&
@@ -1609,8 +1659,9 @@ export function CameraScanScreen(props?: {
               verifiedPhase={session.verified.phase}
               warpUri={session.verified.warpUri}
             />
+            <ScanCollectionBar snapshot={session.snapshot} />
           </View>
-        ) : showNormalResultUi &&
+        ) : !vnextQuiet && showNormalResultUi &&
           !isGeometryV2Pipeline() &&
           session.snapshot &&
           (session.snapshot.phase === 'found' || session.snapshot.phase === 'ambiguous') ? (
@@ -1628,18 +1679,46 @@ export function CameraScanScreen(props?: {
                   setPendingAdd(`finish: ${extra.finish}`);
                   return;
                 }
+                const snap = session.snapshot;
+                const live = snap?.lockGates?.cardSessionId ?? null;
+                const owner = snap?.resultCardSessionId ?? null;
                 if (action === 'add') {
-                  const name = session.snapshot?.fused?.card?.name;
-                  setPendingAdd(name ? `queued add: ${name}` : 'queued add (unnamed)');
-                  const printing = extra?.printing;
-                  if (printing) collectionAddFromPrinting(printing);
+                  const printing = extra?.printing ?? snap?.fused?.printing ?? null;
+                  const status = snap?.fused?.status === 'printing-ambiguous' ? 'printing-ambiguous' : 'identified';
+                  const card = printing
+                    ? collectionCardFromPrinting(printing, {
+                        confidence: 1,
+                        foil: extra?.finish === 'foil' || extra?.finish === 'etched',
+                        reason: 'user',
+                      })
+                    : null;
+                  void libraryStore
+                    .addScan({ card, liveSessionId: live, ownerSessionId: owner, status })
+                    .then(setPendingAdd);
                 }
                 if (action === 'wrong-card' && extra?.name) {
-                  setPendingAdd(`correction: ${extra.name}`);
+                  void libraryStore
+                    .addScan({
+                      card: { foil: false, name: extra.name, quantity: 1, source: 'import' },
+                      liveSessionId: live,
+                      ownerSessionId: owner,
+                      status: 'manual',
+                    })
+                    .then(setPendingAdd);
                 }
                 if (action === 'wrong-printing' && extra?.printing) {
-                  collectionAddFromPrinting(extra.printing);
-                  setPendingAdd(`printing: ${extra.printing.setCode} ${extra.printing.collectorNumber}`);
+                  void libraryStore
+                    .addScan({
+                      card: collectionCardFromPrinting(extra.printing, {
+                        confidence: 1,
+                        foil: false,
+                        reason: 'user',
+                      }),
+                      liveSessionId: live,
+                      ownerSessionId: owner,
+                      status: 'manual',
+                    })
+                    .then(setPendingAdd);
                 }
               }}
               snapshot={session.snapshot}
@@ -1728,7 +1807,7 @@ export function CameraScanScreen(props?: {
           </View>
         ) : null}
 
-        {panel === 'scan' ? (
+        {!vnextQuiet && panel === 'scan' ? (
           <View style={styles.panelWrap}>
             <View style={styles.missWrap}>
               {(() => {
@@ -1917,7 +1996,7 @@ export function CameraScanScreen(props?: {
           </View>
         ) : null}
 
-        {panel === 'camera' ? (
+        {!vnextQuiet && panel === 'camera' ? (
           <View style={styles.panelWrap}>
             <CameraDebugPanel
               device={device}
@@ -1931,7 +2010,7 @@ export function CameraScanScreen(props?: {
 
         {continuousEnabled ? <ContinuousHud ui={continuous.ui} /> : null}
 
-        {scannerMode === 'geometry-test' ? null : (
+        {vnextQuiet || scannerMode === 'geometry-test' ? null : (
         <View style={styles.bottomBar}>
           <Pressable onPress={cycleDevice} style={styles.chip}>
             <Text style={styles.chipLabel}>Lens ({rearDevices.length})</Text>
@@ -2941,6 +3020,16 @@ const styles = StyleSheet.create({
   },
   resultWrap: {
     marginBottom: 8,
+  },
+  captureThumb: {
+    borderColor: '#F5C542',
+    borderRadius: 10,
+    borderWidth: 2,
+    height: 96,
+    position: 'absolute',
+    right: 16,
+    top: 16,
+    width: 68,
   },
   verifiedCaptureBanner: {
     alignItems: 'center',

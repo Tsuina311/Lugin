@@ -34,7 +34,7 @@ The installed development APK does not allow `http://192.168…`. Use a temporar
    Leave it running. Copy is not needed yet.
 2. **Terminal B:** `yarn scan:inbox:tunnel`  
    Requires `cloudflared`. Prints an `https://….trycloudflare.com` URL and a Pair line.
-3. **Phone:** Settings → Check for update → Apply (version stamp may look unchanged). Then Scan dbg **or** Settings → **Debug receiver** → paste the **Pair** line → Test connection
+3. **Phone:** Settings → Check for update → Apply (version stamp may look unchanged). Then Settings → **Debug receiver** → scan icon, and point the camera at the Pair QR on the Mac. Pasting the Pair line still works.
 4. **Phone:** Scan dbg → Capture geometry trace
 5. Wait for **Uploaded ✓ trace-00NN**
 6. **Cursor:** *Analyze the latest scanner trace in `.scan-inbox/latest.json`*
@@ -96,8 +96,8 @@ retries with backoff and prints a new Pair line when the Quick Tunnel URL
 changes. Bearer token / inbox name live in `.scan-inbox/config.json` and are
 **not** regenerated on tunnel restart.
 
-Phone Settings → Debug receiver: paste the new Pair line (or bare HTTPS URL).
-Saved token/name on the phone are kept; only the endpoint updates.
+Phone camera: scan the Pair QR. It is an `lugin://pair-debug` link, so Lugin opens and stores the receiver. The in-app scan icon reads the same code. Pasting the Pair line still works.
+Saved token on the phone is replaced only when the QR includes one; a bare HTTPS URL keeps it.
 
 Current state is written to `.scan-inbox/tunnel.json` (url, status, pid).
 

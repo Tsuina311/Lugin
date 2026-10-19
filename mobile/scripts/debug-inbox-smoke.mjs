@@ -46,6 +46,8 @@ export const deleteAsync = async (uri) => { files.delete(uri); };
 );
 
 await writeFile(benchStub, 'export const isBenchmarkToolsEnabled = () => true;\n');
+const pairScanStub = join(dir, 'pair-scan.mjs');
+await writeFile(pairScanStub, 'export function PairQrScanner() { return null; }\n');
 await writeFile(
   ocrStub,
   `
@@ -90,6 +92,7 @@ await esbuild.build({
       name: 'stub-benchmark-gate',
       setup(build) {
         build.onResolve({ filter: /benchmark\/isBenchmarkEnabled$/ }, () => ({ path: benchStub }));
+        build.onResolve({ filter: /PairQrScanner$/ }, () => ({ path: pairScanStub }));
       },
     },
   ],

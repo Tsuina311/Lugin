@@ -57,7 +57,7 @@ export interface DetectResult {
 /** Analysis resolution. Corners are mapped back to full resolution at the end. */
 const WORK_WIDTH = 320;
 
-export const detectCardQuad = (image: ScanImage): DetectResult => {
+const prepareCardQuad = (image: ScanImage) => {
   const began =
     typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
   const { height: fullH, width: fullW } = image;
@@ -145,17 +145,18 @@ export const detectCardQuad = (image: ScanImage): DetectResult => {
     }
   };
 
-  // --- luminance difference masks (multi-threshold) ---
+  // --- luminance / chroma / edge passes. Order is the frozen candidate list. ---
+  const passes: Array<() => void> = [];
   const ringStats = sampleRingStats(gray, w, h);
   if (ringStats) {
     const { background, spread } = ringStats;
     for (const mult of [2.5, 3.5, 5, 7]) {
       const thr = Math.max(10, spread * mult);
-      consider(diffMask(gray, w, h, background, thr), `luma×${mult}`);
+      passes.push(() => consider(diffMask(gray, w, h, background, thr), `luma×${mult}`));
     }
     // Absolute fixed thresholds help when MAD collapses on flat desks.
     for (const thr of [12, 18, 28]) {
-      consider(diffMask(gray, w, h, background, thr), `luma@${thr}`);
+      passes.push(() => consider(diffMask(gray, w, h, background, thr), `luma@${thr}`));
     }
   }
 
@@ -163,14 +164,17 @@ export const detectCardQuad = (image: ScanImage): DetectResult => {
   const chromaBg = sampleRingRgb(rgb, w, h);
   if (chromaBg) {
     for (const thr of [18, 28, 40]) {
-      consider(chromaMask(rgb, w, h, chromaBg, thr), `chroma@${thr}`);
+      passes.push(() => consider(chromaMask(rgb, w, h, chromaBg, thr), `chroma@${thr}`));
     }
   }
 
   // --- edge magnitude fallback ---
-  const edges = sobelMask(gray, w, h);
-  if (edges) consider(edges, 'edge', { edge: 0.5 });
+  passes.push(() => {
+    const edges = sobelMask(gray, w, h);
+    if (edges) consider(edges, 'edge', { edge: 0.5 });
+  });
 
+  const finish = (): DetectResult => {
   const ms =
     (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()) -
     began;
@@ -234,6 +238,29 @@ export const detectCardQuad = (image: ScanImage): DetectResult => {
     quad: selected.quad,
     score: selected.score,
   };
+  };
+  return { finish, passes };
+};
+
+const yieldDetection = (): Promise<void> =>
+  new Promise(resolve => {
+    setTimeout(resolve, 0);
+  });
+
+export const detectCardQuad = (image: ScanImage): DetectResult => {
+  const job = prepareCardQuad(image);
+  for (const pass of job.passes) pass();
+  return job.finish();
+};
+
+/** Same candidates as {@link detectCardQuad}. Yields between mask passes so the UI can take a tap. */
+export const detectCardQuadPaced = async (image: ScanImage): Promise<DetectResult> => {
+  const job = prepareCardQuad(image);
+  for (const pass of job.passes) {
+    pass();
+    await yieldDetection();
+  }
+  return job.finish();
 };
 
 const scoreParts = (
