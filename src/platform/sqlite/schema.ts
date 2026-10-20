@@ -75,6 +75,9 @@ export const MIGRATIONS: readonly string[] = [
     payload TEXT NOT NULL
   );
   `,
+  `
+  CREATE INDEX IF NOT EXISTS idx_collection_items_scryfall ON collection_items (scryfall_id);
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

@@ -58,15 +58,10 @@ export const adjustCollectionQuantity = (
   return [
     ...other,
     {
-      collectorNumber: rep?.collectorNumber,
+      ...(rep ?? { foil: false, name, source: 'import' as const }),
       foil: rep?.foil ?? false,
-      imageUrl: rep?.imageUrl,
       name,
-      productId: rep?.productId,
       quantity,
-      scryfallId: rep?.scryfallId,
-      setCode: rep?.setCode,
-      setName: rep?.setName,
       source: rep?.source ?? 'import',
     },
   ];

@@ -2,10 +2,11 @@
 // Dynamic so version stamps match web/extension (build/version.ts) and EAS
 // project id can come from the environment without committing secrets.
 
-import type { ConfigContext, ExpoConfig } from 'expo/config';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 const mobileDir = __dirname;
 const rootDir = join(mobileDir, '..');
@@ -25,7 +26,7 @@ function readStamp(): Stamp {
   }
   try {
     const raw = execSync(
-      `node --experimental-strip-types -e "import { buildVersion } from './build/version.ts'; process.stdout.write(JSON.stringify(buildVersion('./')))"`,
+      'node --experimental-strip-types -e "import { buildVersion } from \'./build/version.ts\'; process.stdout.write(JSON.stringify(buildVersion(\'./\')))"',
       { cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
     );
     return JSON.parse(raw) as Stamp;
@@ -53,10 +54,19 @@ const readDotEnv = (name: string): string | undefined => {
 };
 
 const googleClientId =
-  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID?.trim() ||
-  process.env.VITE_GOOGLE_CLIENT_ID?.trim() ||
-  readDotEnv('VITE_GOOGLE_CLIENT_ID') ||
+  process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim() ||
+  readDotEnv('EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID') ||
   '';
+
+// Same rule as googleAndroidRedirect. Kept inline because Expo loads this file
+// without the TypeScript path of the shared helper.
+const googleScheme = (() => {
+  const suffix = '.apps.googleusercontent.com';
+  if (!googleClientId.endsWith(suffix)) return undefined;
+  const prefix = googleClientId.slice(0, -suffix.length);
+  if (!prefix || /[^A-Za-z0-9-]/.test(prefix)) return undefined;
+  return `com.googleusercontent.apps.${prefix}`;
+})();
 
 const pricesCandidate =
   process.env.EXPO_PUBLIC_LUGIN_PRICES_URL?.trim() ||
@@ -90,64 +100,53 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   return {
     ...config,
-    name: 'Lugin',
-    slug: 'lugin',
-    version: stamp.version,
-    orientation: 'portrait',
     icon: './assets/icon.png',
-    userInterfaceStyle: 'dark',
-    scheme: 'lugin',
-    // Default: fingerprint policy (OTA only applies to matching native APKs).
-    // Escape hatch for JS-only publishes when the Mac tree has native WIP that
-    // must not retarget the installed phone APK: LUGIN_OTA_RUNTIME_VERSION=<hash>
-    // (Settings → Runtime / fingerprint on the device). Never use this to ship
-    // real native changes onto an old binary.
-    runtimeVersion: process.env.LUGIN_OTA_RUNTIME_VERSION?.trim()
-      ? process.env.LUGIN_OTA_RUNTIME_VERSION.trim()
-      : {
-          policy: 'fingerprint',
-        },
-    updates: updatesUrl
-      ? {
-          url: updatesUrl,
-          // Download on launch; apply on the next cold start so an active scan
-          // is never force-reloaded mid-session. Channel comes from the EAS
-          // build profile (`eas.json`), not a hardcoded request header, so
-          // preview/production binaries stay on their own channels.
-          checkAutomatically: 'ON_LOAD',
-          fallbackToCacheTimeout: 0,
-        }
-      : undefined,
     ios: {
-      supportsTablet: true,
       bundleIdentifier: 'app.lugin.mobile',
       infoPlist: {
         NSCameraUsageDescription: 'Lugin uses the camera to scan Magic cards offline.',
       },
+      supportsTablet: true,
     },
-    android: {
-      package: 'app.lugin.mobile',
-      permissions: ['android.permission.CAMERA'],
+    name: 'Lugin',
+    
+
+
+
+
+android: {
       adaptiveIcon: {
         backgroundColor: '#0B1220',
-        foregroundImage: './assets/android-icon-foreground.png',
         backgroundImage: './assets/android-icon-background.png',
+        foregroundImage: './assets/android-icon-foreground.png',
         monochromeImage: './assets/android-icon-monochrome.png',
       },
+      package: 'app.lugin.mobile',
+      permissions: ['android.permission.CAMERA'],
       predictiveBackGestureEnabled: false,
     },
-    plugins: [
-      'expo-dev-client',
-      'expo-updates',
-      'expo-sharing',
-      'lugin-card-detector',
-      'lugin-ocr',
-      'lugin-visual-recognizer',
-    ],
-    web: {
-      favicon: './assets/favicon.png',
-    },
-    extra: {
+    
+
+
+
+
+
+
+
+
+
+orientation: 'portrait',
+    
+
+
+
+
+
+
+
+
+
+extra: {
       eas: projectId ? { projectId } : undefined,
       lugin: {
         buildId: stamp.id,
@@ -156,6 +155,58 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         googleClientId,
         pricesUrl,
       },
+    },
+    
+
+
+
+
+// Default: fingerprint policy (OTA only applies to matching native APKs).
+// Escape hatch for JS-only publishes when the Mac tree has native WIP that
+// must not retarget the installed phone APK: LUGIN_OTA_RUNTIME_VERSION=<hash>
+// (Settings → Runtime / fingerprint on the device). Never use this to ship
+// real native changes onto an old binary.
+runtimeVersion: process.env.LUGIN_OTA_RUNTIME_VERSION?.trim()
+      ? process.env.LUGIN_OTA_RUNTIME_VERSION.trim()
+      : {
+          policy: 'fingerprint',
+        },
+    
+    
+    
+    
+    
+    plugins: [
+      'expo-dev-client',
+      'expo-updates',
+      'expo-sharing',
+      'expo-sqlite',
+      ['expo-secure-store', { configureAndroidBackup: true }],
+      'lugin-card-detector',
+      'lugin-ocr',
+      'lugin-visual-recognizer',
+    ],
+    scheme: googleScheme ? ['lugin', googleScheme] : 'lugin',
+    slug: 'lugin',
+    updates: updatesUrl
+      ? {
+          // Download on launch; apply on the next cold start so an active scan
+// is never force-reloaded mid-session. Channel comes from the EAS
+// build profile (`eas.json`), not a hardcoded request header, so
+// preview/production binaries stay on their own channels.
+checkAutomatically: 'ON_LOAD',
+          
+          
+          
+          
+          fallbackToCacheTimeout: 0,
+          url: updatesUrl,
+        }
+      : undefined,
+    userInterfaceStyle: 'dark',
+    version: stamp.version,
+    web: {
+      favicon: './assets/favicon.png',
     },
   };
 };

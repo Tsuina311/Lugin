@@ -24,7 +24,9 @@ await writeFile(
    export * from '${root}src/core/sync/memory';
    export * from '${root}src/core/sync/repository';
    export * from '${root}src/core/sync/serialize';
-   export * from '${root}src/platform/web/localRepository';`,
+   export * from '${root}src/platform/web/localRepository';
+   export * from '${root}src/platform/google/androidRedirect';
+   export * from '${root}src/platform/secure/tokenVault';`,
 );
 
 const bundle = join(out, 'sync.mjs');
@@ -46,8 +48,11 @@ const {
   createSyncEngine,
   createWebLocalRepository,
   emptyData,
+  googleAndroidRedirect,
+  migrateLegacyToken,
   readSyncedState,
   toSyncedState,
+  writeSecureToken,
 } = await import(pathToFileURL(bundle).href);
 
 const at = n => new Date(Date.UTC(2026, 0, n)).toISOString();
@@ -378,6 +383,106 @@ test('an expired token is refreshed once rather than surfacing as a failure', as
 
   const saved = await repo.save(toSyncedState(emptyData(at(1)), 'desktop'), null);
   assert.equal(saved.revision, '1');
+});
+
+test('unknown fields on every domain survive a shared parse', () => {
+  const document = {
+    data: {
+      collection: {
+        updatedAt: at(2),
+        value: {
+          cards: [{ binderSlot: 'p1', foil: false, name: 'Birds of Paradise', quantity: 1 }],
+          format: 'list',
+          importedAt: 1,
+          shelf: 'box-a',
+          source: 'pwa',
+        },
+      },
+      decks: {
+        updatedAt: at(2),
+        value: [{ cards: [{ name: 'Birds of Paradise', printing: { scryfallId: 'bird' }, quantity: 1 }], id: 'd', note: 'keep' }],
+      },
+      preferences: {
+        updatedAt: at(2),
+        value: { addPurchasesToCollection: true, currency: 'EUR', homeCountry: 3, theme: 'dark' },
+      },
+      printings: {
+        updatedAt: at(2),
+        value: { birds: { note: 'keep', scryfallId: 'bird' } },
+      },
+    },
+    deviceId: 'pwa',
+    schemaVersion: 1,
+    updatedAt: at(2),
+  };
+  const parsed = readSyncedState(JSON.stringify(document));
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.state.data.collection.value.shelf, 'box-a');
+  assert.equal(parsed.state.data.collection.value.cards[0].binderSlot, 'p1');
+  assert.equal(parsed.state.data.decks.value[0].note, 'keep');
+  assert.equal(parsed.state.data.decks.value[0].cards[0].printing.scryfallId, 'bird');
+  assert.equal(parsed.state.data.preferences.value.currency, 'EUR');
+  assert.equal(parsed.state.data.preferences.value.homeCountry, 3);
+  assert.equal(parsed.state.data.printings.value.birds.note, 'keep');
+  const again = readSyncedState(JSON.stringify(toSyncedState(parsed.state.data, 'native')));
+  assert.equal(again.ok, true);
+  assert.equal(again.state.data.preferences.value.currency, 'EUR');
+  assert.equal(again.state.data.collection.value.shelf, 'box-a');
+});
+
+test('a newer empty remote collection replaces the local cards', async () => {
+  const remote = new InMemorySyncRepository();
+  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
+  desktop.edit('collection', { cards: [{ foil: false, name: 'Sol Ring', quantity: 1 }], format: 'list', importedAt: 1, source: '' }, at(2));
+  await createSyncEngine({ local: desktop, now: () => at(2), remote }).sync();
+  const phone = new InMemoryLocalRepository('phone', emptyData(at(1)));
+  await createSyncEngine({ local: phone, now: () => at(3), remote }).sync();
+  desktop.edit('collection', null, at(5));
+  await createSyncEngine({ local: desktop, now: () => at(5), remote }).sync();
+  await createSyncEngine({ local: phone, now: () => at(6), remote }).sync();
+  assert.equal(phone.snapshot().collection.value, null);
+});
+
+test('the Android redirect is the reversed client id, not the app scheme', () => {
+  const redirect = googleAndroidRedirect('123-abc.apps.googleusercontent.com');
+  assert.equal(redirect.scheme, 'com.googleusercontent.apps.123-abc');
+  assert.equal(redirect.redirectUri, 'com.googleusercontent.apps.123-abc:/oauth2redirect');
+  assert.equal(googleAndroidRedirect('not-a-google-client'), null);
+});
+
+test('a plaintext token moves to secure storage and stays if the write fails', async () => {
+  const memory = new Map();
+  const store = {
+    delete: async key => {
+      memory.delete(key);
+    },
+    get: async key => memory.get(key) ?? null,
+    set: async (key, value) => {
+      memory.set(key, value);
+    },
+  };
+  let file = JSON.stringify({ accessToken: 'access', expiresAt: 10, refreshToken: 'refresh' });
+  const legacy = {
+    read: async () => file,
+    remove: async () => {
+      file = null;
+    },
+  };
+  const moved = await migrateLegacyToken(store, legacy);
+  assert.equal(moved.accessToken, 'access');
+  assert.equal(moved.refreshToken, 'refresh');
+  assert.equal(file, null);
+
+  file = JSON.stringify({ accessToken: 'old', expiresAt: 11, refreshToken: 'old-refresh' });
+  const broken = {
+    delete: async () => {},
+    get: async () => null,
+    set: async () => {},
+  };
+  await assert.rejects(() => migrateLegacyToken(broken, legacy));
+  assert.equal(JSON.parse(file).accessToken, 'old');
+  await writeSecureToken(store, null);
+  assert.equal(memory.size, 0);
 });
 
 test('an overwritten version is kept as its own file', async () => {

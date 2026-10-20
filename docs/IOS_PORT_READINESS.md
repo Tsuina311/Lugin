@@ -15,7 +15,7 @@ These modules do not import Android or Kotlin APIs.
 - File fallback and price cache: `expo-file-system` and `expo-sharing`, already in the app.
 - Collection and deck screens, the library store, and settings Drive controls: React Native, no Android-only imports.
 - Card images on the collection list: React Native `Image` plus the Scryfall CDN helper `cdnImageFromId`.
-- Google sign-in: system browser, PKCE, and `Linking` to `lugin://oauth` (`mobile/src/auth/nativeGoogleAuth.ts`). No Android SDK. The same redirect has to be accepted by the Google client on iOS as on Android. Tokens are a JSON file in the app document directory, not the platform keychain.
+- Google sign-in: system browser and PKCE (`mobile/src/auth/nativeGoogleAuth.ts`). The redirect is the reversed Android client id, not `lugin://oauth`. Tokens use `expo-secure-store`. See `docs/NATIVE_GOOGLE_OAUTH.md`. An iOS client would be a separate Google credential and a different reversed scheme.
 
 ## ANDROID_SPECIFIC
 
@@ -41,7 +41,7 @@ Not started. This phase does not port the scanner.
 
 - iOS implementations of the detector, OCR, and ONNX recognizer, if a later phase wants the camera on iPhone. ML Kit's Android artifact and `onnxruntime-android` do not cover that.
 - An iOS pass over the camera adapters above before Single Scan or Binder can be trusted. `react-native-vision-camera` and `react-native-nitro-image` are dependencies with their own iOS support; the Lugin adapters around them are written against the Android camera.
-- A new development binary before SQLite is the on-device store. The JS package is installed. The installed APK is not.
+- `expo-sqlite` and `expo-secure-store` are Expo config plugins. They ship in the next Android development binary. iOS builds of those two packages come from Expo; this repo has not produced an iOS binary.
 - A Google OAuth client that allows `lugin://oauth`. That is configuration, not Swift. A Web client may reject the custom scheme. Collection editing does not wait on it.
 
 ## UNKNOWN

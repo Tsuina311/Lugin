@@ -1,5 +1,5 @@
-# Files EAS Build does not need from the monorepo root.
-# Keep fingerprint/build focused on the mobile workspace + shared source.
+# Unused by EAS. The archive ignore list is the git-root `.easignore`
+# (EAS resolves it from the repository root, not from this workspace).
 # Do NOT ignore yarn.lock, package.json, or .yarnrc.yml — EAS needs Berry.
 
 .scan-fixtures/

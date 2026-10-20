@@ -67,7 +67,13 @@ const readCollection = (v: unknown): StoredCollection | null | undefined => {
       quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
     });
   }
+  const rest = { ...v };
+  delete rest.cards;
+  delete rest.format;
+  delete rest.importedAt;
+  delete rest.source;
   return {
+    ...rest,
     cards,
     format: v.format === 'manabox' ? 'manabox' : 'list',
     importedAt: typeof v.importedAt === 'number' ? v.importedAt : 0,
@@ -90,13 +96,35 @@ const readPrintings = (v: unknown): ApplicationData['printings']['value'] | unde
   return out;
 };
 
+const KNOWN_PREFERENCE_KEYS = new Set(['addPurchasesToCollection', 'homeCountry', 'theme']);
+
+/**
+ * Keep fields this build does not model. Known fields are normalized; everything
+ * else is copied through so another Lugin surface does not lose its own data.
+ */
+export const withPreferenceExtras = (
+  known: SyncedPreferences,
+  carried: object | undefined,
+): SyncedPreferences => {
+  if (!carried) return known;
+  const extras: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(carried)) {
+    if (KNOWN_PREFERENCE_KEYS.has(key)) continue;
+    extras[key] = value;
+  }
+  return { ...extras, ...known };
+};
+
 const readPreferences = (v: unknown): SyncedPreferences | undefined => {
   if (!isObject(v)) return undefined;
-  return {
-    addPurchasesToCollection: v.addPurchasesToCollection === true,
-    homeCountry: typeof v.homeCountry === 'number' ? v.homeCountry : null,
-    theme: v.theme === 'site' ? 'site' : 'dark',
-  };
+  return withPreferenceExtras(
+    {
+      addPurchasesToCollection: v.addPurchasesToCollection === true,
+      homeCountry: typeof v.homeCountry === 'number' ? v.homeCountry : null,
+      theme: v.theme === 'site' ? 'site' : 'dark',
+    },
+    v,
+  );
 };
 
 /** The most recent stamp across the domains — the document's own `updatedAt`. */

@@ -15,7 +15,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { libraryStore } from '../data/libraryStore';
 import { useLibrary } from '../data/useLibrary';
+import { CardThumb, deckImageCandidates } from '../ui/CardThumb';
 
+import { candidatesByName } from '@/lib/cardImage';
 import { cardKey } from '@/lib/cardName';
 import { buildCollection } from '@/lib/collection';
 import {
@@ -139,10 +141,12 @@ const DeckEditor = ({ deck, onClose }: { deck: Deck; onClose: () => void }) => {
   const library = useLibrary();
   const [line, setLine] = useState('');
   const [tagQuery, setTagQuery] = useState('');
-  const owned = useMemo(() => {
-    const cards = library.data?.collection.value?.cards ?? [];
-    return buildCollection(cards, '', 'list').byKey;
-  }, [library.data?.collection.value?.cards]);
+  const collectionCards = library.data?.collection.value?.cards ?? [];
+  const owned = useMemo(
+    () => buildCollection(collectionCards, '', 'list').byKey,
+    [collectionCards],
+  );
+  const images = useMemo(() => candidatesByName(collectionCards), [collectionCards]);
   const bracket = useMemo(
     () => (deck.format === 'commander' ? estimateDeck(deck.cards, null) : null),
     [deck.cards, deck.format],
@@ -273,6 +277,7 @@ const DeckEditor = ({ deck, onClose }: { deck: Deck; onClose: () => void }) => {
             card={item}
             deck={deck}
             decks={library.data?.decks.value ?? []}
+            images={images}
             onChange={quantity =>
               save(current => ({
                 ...current,
@@ -330,12 +335,14 @@ const DeckRow = ({
   card,
   deck,
   decks,
+  images,
   onChange,
   owned,
 }: {
   card: DeckCard;
   deck: Deck;
   decks: readonly Deck[];
+  images: Map<string, readonly string[]>;
   onChange: (quantity: number) => void;
   owned: number;
 }) => {
@@ -343,6 +350,7 @@ const DeckRow = ({
   const mark = coverageView(owned, uses, deck.frozen === true);
   return (
     <View style={styles.deckRow}>
+      <CardThumb candidates={deckImageCandidates(card, images)} style={styles.thumb} />
       <View style={styles.flex}>
         <Text style={styles.name}>{card.name}</Text>
         <Text style={styles.meta}>
@@ -414,5 +422,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 32,
   },
+  thumb: { backgroundColor: '#1C2636', borderRadius: 4, height: 46, width: 32 },
   title: { color: '#F4F7FB', fontSize: 22, fontWeight: '700', marginBottom: 8 },
 });

@@ -69,7 +69,7 @@ const DriveSection = () => {
         : 'Connected'
     : library.configured
       ? 'Not connected'
-      : 'No Google client id in this build';
+      : 'No Android Google client id in this build';
   return (
     <View>
       <Text style={styles.section}>Google Drive</Text>

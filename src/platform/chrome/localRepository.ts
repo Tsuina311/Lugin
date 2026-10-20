@@ -25,6 +25,7 @@ import {
   type SyncedPreferences,
 } from '@/core/sync/model';
 import type { LocalRepository } from '@/core/sync/repository';
+import { withPreferenceExtras } from '@/core/sync/serialize';
 import type { StoredCollection } from '@/lib/collection';
 import type { Deck } from '@/lib/deck';
 
@@ -126,7 +127,7 @@ export const watchLocalChanges = (now: () => string = () => new Date().toISOStri
   });
 };
 
-const currentPrefs = async (): Promise<SyncedPreferences> => {
+const currentPrefs = async (carried: SyncedPreferences | undefined): Promise<SyncedPreferences> => {
   const stored = await chrome.storage.local.get(SHIPPING_KEY);
   const shipping = stored[SHIPPING_KEY] as { toCountry?: number | null } | undefined;
   let theme: SyncedPreferences['theme'] = 'dark';
@@ -135,11 +136,14 @@ const currentPrefs = async (): Promise<SyncedPreferences> => {
   } catch {
     // a page that denies storage just gets the default
   }
-  return {
-    addPurchasesToCollection: shouldAddPurchasesToCollection(),
-    homeCountry: shipping?.toCountry ?? null,
-    theme,
-  };
+  return withPreferenceExtras(
+    {
+      addPurchasesToCollection: shouldAddPurchasesToCollection(),
+      homeCountry: shipping?.toCountry ?? null,
+      theme,
+    },
+    carried,
+  );
 };
 
 const samePrefs = (a: SyncedPreferences | undefined, b: SyncedPreferences): boolean =>
@@ -155,7 +159,7 @@ export const createChromeLocalRepository = (
     const [stored, record, prefs] = await Promise.all([
       chrome.storage.local.get([COLLECTION_KEY, DECKS_KEY, OVERRIDES_STORAGE_KEY]),
       readRecord(),
-      currentPrefs(),
+      currentPrefs(record.lastPrefs),
     ]);
 
     // Preferences changed while nothing was watching: stamp them now, once.

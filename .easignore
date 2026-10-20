@@ -1,0 +1,62 @@
+# EAS reads this from the git root and, when it exists, ignores .gitignore.
+# Git still ignores the packed visual weights so they are never committed.
+# This file does not ignore them: the development APK must contain the same
+# CLIP assets the local fingerprint hashes, or the runtime version check fails
+# and the scanner ships without its model.
+
+.git
+node_modules
+**/node_modules/
+
+# Yarn Berry cache. Keep .yarn/releases — EAS needs the committed binary.
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+.yarn/cache/
+
+# Secrets and signing material
+*.local
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+.extension-key.pem
+
+# Native prebuild and build output
+dist
+dist-web
+dist-smoke
+release
+mobile/dist
+mobile/web-build
+mobile/.expo
+mobile/android
+mobile/ios
+mobile/expo-env.d.ts
+mobile/.eas-decide.json
+**/.expo
+.eas-yarn-bin
+mobile/modules/**/android/build
+
+# Local corpora. Not inputs to the app binary.
+.lugin-prices
+.scan-fixtures
+.scan-real
+.scan-corpus
+.scan-inbox
+.scan-cache
+.geometry-corpus
+.geometry-benchmarks
+scanner-benchmark
+generated/commander-combos/*.json
+workers
+
+.DS_Store
+*.tsbuildinfo
+.vite

@@ -20,7 +20,8 @@ await writeFile(
    export * from '${root}src/lib/sha256.ts';
    export * from '${root}src/core/sync/engine.ts';
    export * from '${root}src/core/sync/memory.ts';
-   export * from '${root}src/core/sync/serialize.ts';`,
+   export * from '${root}src/core/sync/serialize.ts';
+   export { MIGRATIONS, SCHEMA_VERSION } from '${root}src/platform/sqlite/schema.ts';`,
 );
 
 await build({
@@ -36,6 +37,8 @@ const lib = await import(pathToFileURL(bundle).href);
 const {
   InMemoryLocalRepository,
   InMemorySyncRepository,
+  MIGRATIONS,
+  SCHEMA_VERSION,
   createSqliteLocalRepository,
   createSyncEngine,
   decideScanIntake,
@@ -308,6 +311,7 @@ test('a Drive document keeps card and printing fields through SQLite', async () 
           ],
           format: 'manabox',
           importedAt: 10,
+          shelf: 'box-a',
           source: 'manabox',
         },
       },
@@ -327,7 +331,7 @@ test('a Drive document keeps card and printing fields through SQLite', async () 
       },
       preferences: {
         updatedAt: '2026-04-01T00:00:00.000Z',
-        value: { addPurchasesToCollection: false, homeCountry: 3, theme: 'dark' },
+        value: { addPurchasesToCollection: false, currency: 'EUR', homeCountry: 3, theme: 'dark' },
       },
       printings: {
         updatedAt: '2026-04-01T00:00:00.000Z',
@@ -344,15 +348,43 @@ test('a Drive document keeps card and printing fields through SQLite', async () 
   await phone.repo.write(parsed.state.data, ['collection', 'decks', 'preferences', 'printings']);
   const data = await phone.repo.read();
   assert.equal(data.collection.value.cards[0].binderSlot, 'p1');
+  assert.equal(data.collection.value.shelf, 'box-a');
   assert.equal(data.collection.value.format, 'manabox');
   assert.equal(data.decks.value[0].cards[0].printing.scryfallId, 'bird');
   assert.equal(data.preferences.value.homeCountry, 3);
+  assert.equal(data.preferences.value.currency, 'EUR');
   assert.equal(data.printings.value.birds.note, 'keep');
   const again = readSyncedState(JSON.stringify(toSyncedState(data, 'phone-d')));
   assert.equal(again.ok, true);
   assert.equal(again.state.data.collection.value.cards[0].binderSlot, 'p1');
+  assert.equal(again.state.data.collection.value.shelf, 'box-a');
+  assert.equal(again.state.data.preferences.value.currency, 'EUR');
   assert.equal(again.state.data.printings.value.birds.note, 'keep');
   phone.close();
+});
+
+test('a version-1 database gains the scryfall index without losing rows', async () => {
+  assert.equal(SCHEMA_VERSION, 2);
+  const file = join(out, 'upgrade.db');
+  const db = new DatabaseSync(file);
+  db.exec('PRAGMA foreign_keys = ON');
+  db.exec(MIGRATIONS[0]);
+  db.exec('CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY NOT NULL)');
+  db.prepare('INSERT INTO schema_migrations (version) VALUES (1)').run();
+  db.prepare(
+    `INSERT INTO domains (key, updated_at, payload) VALUES ('collection', ?, ?)`,
+  ).run('2026-01-01T00:00:00.000Z', JSON.stringify({ cards: [{ foil: false, name: 'Negate', quantity: 1 }], format: 'list', importedAt: 1, source: '' }));
+  db.close();
+  const opened = await open(file, 'phone-upgrade');
+  const version = await opened.repo.read();
+  assert.equal(version.collection.value.cards[0].name, 'Negate');
+  const check = new DatabaseSync(file);
+  const row = check.prepare('SELECT MAX(version) AS version FROM schema_migrations').get();
+  const index = check.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_collection_items_scryfall'").get();
+  assert.equal(row.version, 2);
+  assert.equal(index.name, 'idx_collection_items_scryfall');
+  check.close();
+  opened.close();
 });
 
 test('malformed remote text is not a document', () => {

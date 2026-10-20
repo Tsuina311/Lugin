@@ -3,7 +3,6 @@ import { useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -14,8 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { libraryStore } from '../data/libraryStore';
 import { useLibrary } from '../data/useLibrary';
+import { CardThumb, collectionImageCandidates } from '../ui/CardThumb';
 
-import { cdnImageFromId } from '@/lib/cardImage';
 import { cardKey } from '@/lib/cardName';
 import { buildCollection } from '@/lib/collection';
 import type { CollectionCard } from '@/lib/collection';
@@ -146,10 +145,11 @@ const SyncLine = () => {
 };
 
 const CardRow = ({ card, onPress }: { card: CollectionCard; onPress: () => void }) => {
-  const uri = cdnImageFromId(card.scryfallId);
+  const library = useLibrary();
+  const override = library.data?.printings.value[cardKey(card.name)];
   return (
     <Pressable onPress={onPress} style={styles.row}>
-      {uri ? <Image source={{ uri }} style={styles.thumb} /> : <View style={styles.thumb} />}
+      <CardThumb candidates={collectionImageCandidates(card, override)} style={styles.thumb} />
       <View style={styles.rowText}>
         <Text style={styles.name}>{card.name}</Text>
         <Text style={styles.meta}>
@@ -169,11 +169,11 @@ const Detail = ({ card, onClose }: { card: CollectionCard; onClose: () => void }
   const price = library.prices.snapshot
     ? collectionValue([card], library.prices.snapshot)
     : null;
-  const uri = cdnImageFromId(card.scryfallId);
+  const override = library.data?.printings.value[cardKey(card.name)];
   return (
     <View style={styles.detail}>
       <View style={styles.detailHead}>
-        {uri ? <Image source={{ uri }} style={styles.detailImage} /> : null}
+        <CardThumb candidates={collectionImageCandidates(card, override)} style={styles.detailImage} />
         <View style={styles.rowText}>
           <Text style={styles.name}>{card.name}</Text>
           <Text style={styles.meta}>
