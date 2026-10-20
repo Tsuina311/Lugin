@@ -156,9 +156,9 @@ export const createChromeLocalRepository = (
   now: () => string = () => new Date().toISOString(),
 ): LocalRepository => ({
   async read(): Promise<ApplicationData> {
-    const [stored, record, prefs] = await Promise.all([
+    const record = await readRecord();
+    const [stored, prefs] = await Promise.all([
       chrome.storage.local.get([COLLECTION_KEY, DECKS_KEY, OVERRIDES_STORAGE_KEY]),
-      readRecord(),
       currentPrefs(record.lastPrefs),
     ]);
 
