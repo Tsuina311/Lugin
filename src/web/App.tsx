@@ -1,4 +1,4 @@
-// The phone app's shell.
+// Lugin Web's mobile-first shell.
 //
 // Mobile-first and deliberately not the overlay. The extension's panel is a
 // dense desktop instrument sitting in a shadow root beside a Cardmarket page;
@@ -17,9 +17,11 @@ import { CollectionView } from './CollectionView';
 import { DeckList } from './DeckList';
 import { ImportScreen } from './ImportScreen';
 import { ScanScreen } from './ScanScreen';
+import { InstallLugin, WebUpdateNotice } from './pwa';
 import { takeSharedImport, type SharedImport } from './sharedImport';
 import { syncStore } from './syncStore';
 
+import { capabilitiesFor, PRODUCT_NAMES } from '@/core/mobile/capabilities';
 import type { DomainKey } from '@/core/sync/model';
 import { buildCollection } from '@/lib/collection';
 import { PreviewLayer } from '@/ui/components/PreviewLayer';
@@ -63,6 +65,7 @@ const list = (items: string[]): string =>
  * question is answered by looking.
  */
 const BUILD: string = import.meta.env.VITE_LUGIN_BUILD ?? 'dev';
+const WEB_CAPABILITIES = capabilitiesFor('web');
 
 const Splash = ({
   action,
@@ -73,29 +76,30 @@ const Splash = ({
   children: React.ReactNode;
   title: string;
 }) => (
-  <div className="flex min-h-full flex-col items-center justify-center gap-5 px-8 text-center">
-    <img alt="Lugin" className="h-9 w-auto opacity-90" src={asset('icons/logo-dark.png')} />
-    <h1 className="text-lg font-semibold text-ink">{title}</h1>
-    <p className="max-w-xs text-sm leading-relaxed text-ink-muted">{children}</p>
-    {action ? (
-      <button
-        className="mt-1 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-accent-ink active:bg-accent-strong"
-        onClick={action.onClick}
-        type="button"
-      >
-        {action.label}
-      </button>
-    ) : null}
-    <span className="text-[10px] text-ink-faint opacity-70">{BUILD}</span>
+  <div className="flex min-h-full flex-col">
+    <WebUpdateNotice />
+    <InstallLugin />
+    <div className="flex flex-1 flex-col items-center justify-center gap-5 px-8 text-center">
+      <img alt="Lugin" className="h-9 w-auto opacity-90" src={asset('icons/logo-dark.png')} />
+      <h1 className="text-lg font-semibold text-ink">{title}</h1>
+      <p className="max-w-xs text-sm leading-relaxed text-ink-muted">{children}</p>
+      {action ? (
+        <button
+          className="mt-1 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-accent-ink active:bg-accent-strong"
+          onClick={action.onClick}
+          type="button"
+        >
+          {action.label}
+        </button>
+      ) : null}
+      <span className="text-[10px] text-ink-faint opacity-70">{BUILD}</span>
+    </div>
   </div>
 );
 
 export const App = () => {
-  const { conflicted, data, error, pending, persistent, status, syncedAt } = useSyncExternalStore(
-    syncStore.subscribe,
-    syncStore.getSnapshot,
-    syncStore.getSnapshot,
-  );
+  const { archiveFailures, conflicted, data, error, pending, persistent, status, syncedAt } =
+    useSyncExternalStore(syncStore.subscribe, syncStore.getSnapshot, syncStore.getSnapshot);
   const [tab, setTab] = useState<Tab>('collection');
   const [shared, setShared] = useState<SharedImport | null>(null);
 
@@ -115,7 +119,9 @@ export const App = () => {
   // what turns 20,000 rows into "how many of this card do I own".
   const collection = useMemo(() => {
     const stored = data?.collection.value;
-    return stored ? buildCollection(stored.cards, stored.source, stored.format, stored.importedAt) : null;
+    return stored
+      ? buildCollection(stored.cards, stored.source, stored.format, stored.importedAt)
+      : null;
   }, [data]);
 
   if (status === 'not-configured') {
@@ -144,7 +150,10 @@ export const App = () => {
     if (status === 'busy') return <Splash title="Loading">Reading your Drive folder…</Splash>;
     if (status === 'error') {
       return (
-        <Splash action={{ label: 'Try again', onClick: syncStore.syncNow }} title="That didn’t work">
+        <Splash
+          action={{ label: 'Try again', onClick: syncStore.syncNow }}
+          title="That didn’t work"
+        >
           {error}
         </Splash>
       );
@@ -153,14 +162,14 @@ export const App = () => {
       return (
         <Splash
           action={{ label: 'Connect Google', onClick: syncStore.connect }}
-          title="Lugin on your phone"
+          title={`Welcome to ${PRODUCT_NAMES.web}`}
         >
           {shared
-            ? `${shared.name} is ready to import — sign in first, so this phone starts from what
-               your desktop already has rather than replacing it.`
-            : `Sign in to pick up the collection and decks from your desktop — and to import ManaBox
-               scans from here. Lugin only ever sees its own hidden folder in your Drive, nothing
-               else there.`}
+            ? `${shared.name} is ready to import — connect first, so Lugin starts from the cards
+               already in your Drive rather than replacing them.`
+            : `Your cards and decks, everywhere. Connect Google to sync with Lugin Chrome and Lugin
+               Native, or continue locally after your first sync. Lugin only sees its own hidden
+               Drive folder.`}
         </Splash>
       );
     }
@@ -197,6 +206,8 @@ export const App = () => {
           </button>
         </div>
       </header>
+      <WebUpdateNotice />
+      <InstallLugin />
 
       {/* Failures are a strip, not a screen: they must not hide the cards, and on
           a phone they're usually "no signal" rather than anything to act on. */}
@@ -211,6 +222,15 @@ export const App = () => {
         </p>
       ) : null}
 
+      {archiveFailures > 0 ? (
+        <p className="border-b border-line bg-warn-soft px-4 py-2 text-xs text-warn">
+          {archiveFailures === 1
+            ? 'A conflict recovery copy'
+            : `${archiveFailures} conflict recovery copies`}{' '}
+          could not be saved to Drive. The selected version is still synced.
+        </p>
+      ) : null}
+
       {!persistent ? (
         <p className="border-b border-line bg-warn-soft px-4 py-2 text-xs text-warn">
           This browser won’t let the app store anything, so what you import will only last until you
@@ -220,12 +240,12 @@ export const App = () => {
 
       <main
         className={`min-h-0 flex-1 ${
-          tab === 'scan'
-            ? 'flex flex-col overflow-hidden'
-            : 'overflow-y-auto overscroll-contain'
+          tab === 'scan' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto overscroll-contain'
         }`}
       >
-        {tab === 'collection' ? <CollectionView collection={collection} /> : null}
+        {tab === 'collection' ? (
+          <CollectionView collection={collection} printings={data?.printings.value ?? {}} />
+        ) : null}
         {tab === 'decks' ? <DeckList collection={collection} decks={decks} /> : null}
         {tab === 'scan' ? (
           <ScanScreen
@@ -257,7 +277,7 @@ export const App = () => {
           [
             ['collection', 'Collection', collection?.uniqueCards ?? 0],
             ['decks', 'Decks', decks.length],
-            ['scan', 'Scan', null],
+            ...(WEB_CAPABILITIES.browserScanner ? ([['scan', 'Scan', null]] as const) : []),
             ['import', 'Import', null],
           ] as const
         ).map(([id, label, count]) => (

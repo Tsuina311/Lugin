@@ -32,6 +32,8 @@ import { toSyncedState } from './serialize';
 export interface SyncReport {
   /** Domains taken from the other device and written locally. */
   applied: DomainKey[];
+  /** Conflict copies that could not be archived remotely. */
+  archiveFailures: number;
   /** Domains where both sides had moved; the loser was archived. */
   conflicted: DomainKey[];
   /** Domains sent to the cloud. */
@@ -64,7 +66,12 @@ type Decision<T> = {
  */
 const decide = <T>(local: Domain<T>, remote: Domain<T>, base: string | undefined): Decision<T> => {
   if (local.updatedAt === remote.updatedAt) {
-    return { archive: null, conflict: false, take: 'local', value: local };
+    if (JSON.stringify(local.value) === JSON.stringify(remote.value)) {
+      return { archive: null, conflict: false, take: 'local', value: local };
+    }
+    // Equal clocks must not leave two devices permanently divergent. The cloud
+    // copy is the stable tie-breaker; retain the local value as a conflict copy.
+    return { archive: local.value, conflict: true, take: 'remote', value: remote };
   }
   const localMoved = base === undefined || local.updatedAt !== base;
   const remoteMoved = base === undefined || remote.updatedAt !== base;
@@ -82,7 +89,11 @@ const decide = <T>(local: Domain<T>, remote: Domain<T>, base: string | undefined
   };
 };
 
-export const createSyncEngine = ({ local, now = () => new Date().toISOString(), remote }: EngineOptions) => {
+export const createSyncEngine = ({
+  local,
+  now = () => new Date().toISOString(),
+  remote,
+}: EngineOptions) => {
   /** One pass. Returns the report, or throws for the caller to show. */
   const runOnce = async (attempt: number): Promise<SyncReport> => {
     const [data, meta] = await Promise.all([local.read(), local.readMeta()]);
@@ -104,10 +115,17 @@ export const createSyncEngine = ({ local, now = () => new Date().toISOString(), 
         lastPulledAt: now(),
         lastPushedAt: now(),
       });
-      return { applied: [], conflicted: [], pushed: [...DOMAINS], seeded: true };
+      return {
+        applied: [],
+        archiveFailures: 0,
+        conflicted: [],
+        pushed: [...DOMAINS],
+        seeded: true,
+      };
     }
 
     const applied: DomainKey[] = [];
+    let archiveFailures = 0;
     const conflicted: DomainKey[] = [];
     const pushed: DomainKey[] = [];
     const merged: ApplicationData = emptyData(now());
@@ -131,7 +149,7 @@ export const createSyncEngine = ({ local, now = () => new Date().toISOString(), 
         try {
           await remote.archiveConflict(key, decision.archive, now());
         } catch {
-          // reported by the caller through the failed-archive count, not here
+          archiveFailures += 1;
         }
       }
     }
@@ -160,7 +178,7 @@ export const createSyncEngine = ({ local, now = () => new Date().toISOString(), 
       lastPushedAt: pushed.length > 0 ? now() : meta.lastPushedAt,
     });
 
-    return { applied, conflicted, pushed, seeded: false };
+    return { applied, archiveFailures, conflicted, pushed, seeded: false };
   };
 
   return {

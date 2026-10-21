@@ -85,9 +85,14 @@ const describe = (report: SyncReport): string => {
   if (parts.length === 0) return 'Already up to date.';
   const note =
     report.conflicted.length > 0
-      ? ` ${plural(report.conflicted.length, 'change')} differed on both devices; the older ${
-          report.conflicted.length === 1 ? 'version was' : 'versions were'
-        } kept in your Google account.`
+      ? report.archiveFailures > 0
+        ? ` ${plural(report.conflicted.length, 'change')} differed on both devices; ${plural(
+            report.archiveFailures,
+            'recovery copy',
+          )} could not be saved.`
+        : ` ${plural(report.conflicted.length, 'change')} differed on both devices; the older ${
+            report.conflicted.length === 1 ? 'version was' : 'versions were'
+          } kept in your Google account.`
       : '';
   return `Synced — ${parts.join(' and ')}.${note}`;
 };
@@ -184,7 +189,8 @@ export const syncStore = {
 
 /** Did this storage change mean "the user edited something"? */
 const isLocalEdit = (change: chrome.storage.StorageChange): boolean => {
-  const now = (change.newValue as { meta?: { dirtyAt?: string | null } } | undefined)?.meta?.dirtyAt;
+  const now = (change.newValue as { meta?: { dirtyAt?: string | null } } | undefined)?.meta
+    ?.dirtyAt;
   const before = (change.oldValue as { meta?: { dirtyAt?: string | null } } | undefined)?.meta
     ?.dirtyAt;
   // A sync writes this record too. Only a fresh dirty stamp means new work —

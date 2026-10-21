@@ -69,10 +69,13 @@ const run = async (request: ApiRequest): Promise<ApiResult> => {
 
   for (let attempt = 0; ; attempt++) {
     lastStartedAt = Date.now();
+    const reactNative =
+      typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
     const response = await fetch(request.url, {
       body: request.body,
       headers: {
         Accept: 'application/json',
+        ...(reactNative ? { 'User-Agent': 'Lugin (Android)' } : {}),
         ...request.headers,
       },
       method: request.method ?? 'GET',

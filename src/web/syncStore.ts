@@ -45,6 +45,8 @@ export type SyncStatus =
   | 'error';
 
 export interface SyncState {
+  /** Conflict values that Drive could not preserve as recovery files. */
+  archiveFailures: number;
   /** Domains the last sync had to resolve; a copy of the loser is in Drive. */
   conflicted: DomainKey[];
   /** This device's document — what the UI renders, online or not. */
@@ -68,6 +70,7 @@ const engine = createSyncEngine({
 });
 
 let state: SyncState = {
+  archiveFailures: 0,
   conflicted: [],
   data: null,
   error: null,
@@ -123,6 +126,7 @@ const reconcile = async (quiet: boolean): Promise<void> => {
     const report = await engine.sync();
     const [data, meta] = await Promise.all([local.read(), local.readMeta()]);
     set({
+      archiveFailures: report.archiveFailures,
       conflicted: report.conflicted,
       data,
       pending: meta.dirtyAt !== null,
@@ -269,7 +273,6 @@ export const syncStore = {
 
   getSnapshot: (): SyncState => state,
 
-  
   /**
    * Apply a reviewed import to this device, then try to push it.
    *
@@ -277,7 +280,7 @@ export const syncStore = {
    * user has just approved what to do with it, and whether Drive is reachable in
    * the next second has nothing to do with either.
    */
-async importDecisions(
+  async importDecisions(
     decisions: ImportDecision[],
     options: { format: ImportFormat; source: string },
   ): Promise<void> {
@@ -297,7 +300,8 @@ async importDecisions(
           // Keep the established format once there is one: after a merge that
           // label describes the collection, not the last file to land in it.
           format:
-            before.collection.value?.format ?? (options.format === 'plain-list' ? 'list' : 'manabox'),
+            before.collection.value?.format ??
+            (options.format === 'plain-list' ? 'list' : 'manabox'),
           importedAt: Date.now(),
           source: options.source,
         };
@@ -320,14 +324,12 @@ async importDecisions(
     await reconcile(true);
   },
 
-  
-  
-/**
+  /**
    * File a pasted or uploaded decklist as a new deck, returning its id — or null
    * when the text held no cards, which the caller says in place rather than as a
    * sync error, because nothing about syncing went wrong.
    */
-async importDeckList(text: string, source: string): Promise<string | null> {
+  async importDeckList(text: string, source: string): Promise<string | null> {
     const { cards, name } = parseDeckList(text);
     const deck = deckFromImport(cards, { name, source });
     if (!deck) return null;
@@ -335,9 +337,7 @@ async importDeckList(text: string, source: string): Promise<string | null> {
     return deck.id;
   },
 
-  
-  
-async removeDeck(id: string): Promise<void> {
+  async removeDeck(id: string): Promise<void> {
     await writeDecks(decks => decks.filter(deck => deck.id !== id));
   },
 

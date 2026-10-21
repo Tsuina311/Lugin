@@ -1,6 +1,6 @@
 # Native Google sign-in
 
-The Chrome extension and the phone website keep using the **Web** OAuth client
+Lugin Chrome and Lugin Web keep using the **Web** OAuth client
 (`VITE_GOOGLE_CLIENT_ID`). The native app does not. A Web client cannot
 register a custom scheme, and Google rejects `lugin://oauth` because that
 scheme has no period.
@@ -21,6 +21,16 @@ Tokens are stored with `expo-secure-store` (Android Keystore). A leftover
 `lugin-library/google-token.json` is copied into that store and deleted only
 after the copy reads back the same value.
 
+The iOS TestFlight app uses a separate **iOS** OAuth client for bundle id
+`app.lugin.mobile` and redirect:
+
+```text
+com.googleusercontent.apps.<CLIENT_ID_PREFIX>:/oauth2callback
+```
+
+Store that public client id in `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`. Tokens use
+the iOS Keychain through the same `expo-secure-store` API.
+
 ## Google Cloud console
 
 Use the same project as the existing Web client. Drive API already enabled.
@@ -38,6 +48,7 @@ Use the same project as the existing Web client. Drive API already enabled.
    Open the development build's keystore and copy the SHA-1 fingerprint.
    A debug keystore from a local `expo run:android` is a different certificate.
    The installed EAS APK will not match it.
+
 5. Create the client. Open it → Advanced settings → enable **Custom URI scheme** → Save.
    New Android clients leave this off, and the browser redirect then fails.
 6. Copy the Android client id (it ends in `.apps.googleusercontent.com`).
@@ -50,6 +61,7 @@ Local builds read it from `.env.local`:
 
 ```bash
 EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=<the Android client id>
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=<the iOS client id>
 ```
 
 EAS development builds read it from the EAS environment named `development`

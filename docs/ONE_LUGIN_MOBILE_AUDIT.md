@@ -1,8 +1,9 @@
-# One Lugin Mobile — audit
+# Historical mobile audit
 
-Written before the native library work. This is what the tree already does.
-The native app should become the primary phone experience. The phone website
-stays a zero-install fallback. It is not the place to chase feature parity.
+Written before the current Lugin Web parity decision. Keep this as historical
+design context; `LUGIN_MOBILE_PARITY.md` is the current product and architecture
+contract. Lugin Native is the Android app and Lugin Web is the zero-install,
+first-class iPhone experience.
 
 Scanner vNext stays frozen. This work is persistence, sync, and product
 screens. Recognition thresholds, CLIP, galleries, and the detector are out
@@ -10,20 +11,20 @@ of scope.
 
 ## What already agrees
 
-The extension and the phone website already share one domain and one Drive
+Lugin Chrome and Lugin Web already share one domain and one Drive
 document. Native does not need a new file format.
 
-| Piece | Where | Notes |
-| --- | --- | --- |
-| Schema version | `SYNC_SCHEMA_VERSION = 1` in `src/core/sync/model.ts` | A newer version is refused. It is not partially applied. |
-| Document | `SyncedApplicationState` | `schemaVersion`, `deviceId`, `updatedAt`, `data` |
-| Domains | `collection`, `decks`, `preferences`, `printings` | Each is `{ updatedAt, value }` |
-| Drive file | `app-state.json` in `appDataFolder` | `src/core/sync/drive.ts`. Revision is Drive's file `version`. |
-| Conflict copies | `conflict-<domain>-<stamp>.json` | Same folder. The loser is archived, then the newer stamp is shown. |
-| Engine | `createSyncEngine` | Per domain. Same domain edited on both sides since `SyncMeta.base`: newer `updatedAt` wins, the other is archived. Different domains are not a conflict. |
-| Local port | `LocalRepository` | Extension: `chrome.storage`. Phone site: IndexedDB (`src/platform/web/localRepository.ts`). |
-| Token port | `TokenProvider` | Extension: `chrome.identity`. Phone site: Google Identity Services. No client secret. |
-| Scopes | `drive.appdata` and `drive.file` | App data is the library. `drive.file` is the optional scanner corpus only. |
+| Piece           | Where                                                 | Notes                                                                                                                                                    |
+| --------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema version  | `SYNC_SCHEMA_VERSION = 1` in `src/core/sync/model.ts` | A newer version is refused. It is not partially applied.                                                                                                 |
+| Document        | `SyncedApplicationState`                              | `schemaVersion`, `deviceId`, `updatedAt`, `data`                                                                                                         |
+| Domains         | `collection`, `decks`, `preferences`, `printings`     | Each is `{ updatedAt, value }`                                                                                                                           |
+| Drive file      | `app-state.json` in `appDataFolder`                   | `src/core/sync/drive.ts`. Revision is Drive's file `version`.                                                                                            |
+| Conflict copies | `conflict-<domain>-<stamp>.json`                      | Same folder. The loser is archived, then the newer stamp is shown.                                                                                       |
+| Engine          | `createSyncEngine`                                    | Per domain. Same domain edited on both sides since `SyncMeta.base`: newer `updatedAt` wins, the other is archived. Different domains are not a conflict. |
+| Local port      | `LocalRepository`                                     | Lugin Chrome: `chrome.storage`. Lugin Web: IndexedDB (`src/platform/web/localRepository.ts`).                                                            |
+| Token port      | `TokenProvider`                                       | Lugin Chrome: `chrome.identity`. Lugin Web: Google Identity Services. No client secret.                                                                  |
+| Scopes          | `drive.appdata` and `drive.file`                      | App data is the library. `drive.file` is the optional scanner corpus only.                                                                               |
 
 There is no Lugin account and no Lugin server.
 
@@ -44,7 +45,7 @@ printing row is `printingIdentity` in `src/lib/collectionEdit.ts`. A row does
 not require a printing. A name-only row is valid.
 
 Quantity edits already exist: `adjustCollectionQuantity`,
-`adjustPrintingQuantity`, `withCopies`. Scan merge on the phone site is
+`adjustPrintingQuantity`, `withCopies`. Scan merge in Lugin Web is
 `findDuplicates` + `applyImport`. Matching set + number + foil should bump
 quantity rather than insert a twin. Purchase rows are not a merge target.
 
@@ -81,7 +82,7 @@ the phone UI only displays them.
 
 Want lists, purchase history, carts, the price table, and scanner indexes
 stay on the device that produced them. Prices are a public daily file
-(`prices.json` beside the phone site, about 3.5 MB), not a Drive domain.
+(`prices.json` beside Lugin Web, about 3.5 MB), not a Drive domain.
 
 ### Import / export
 
@@ -125,14 +126,14 @@ Expo SDK 57, React Native 0.86, package `app.lugin.mobile`, scheme `lugin`.
 Development client. Camera is VisionCamera. Detector, OCR, and the visual
 recognizer are local Expo modules.
 
-| Tab | State |
-| --- | --- |
-| Collection | `StubScreen`. No rows. |
-| Decks | `StubScreen`. |
+| Tab         | State                                                                                                |
+| ----------- | ---------------------------------------------------------------------------------------------------- |
+| Collection  | `StubScreen`. No rows.                                                                               |
+| Decks       | `StubScreen`.                                                                                        |
 | Single Scan | Real. Default pipeline is geometry-v2 (`VerifiedScanPanel`). Legacy path still has `ScanResultCard`. |
-| Binder | Binder Mode V0. Tracks and best frame. No names. No collection write. |
-| Settings | Version, updates, scanner data, debug inbox, benchmark tools. |
-| Geometry | Development builds only. |
+| Binder      | Binder Mode V0. Tracks and best frame. No names. No collection write.                                |
+| Settings    | Version, updates, scanner data, debug inbox, benchmark tools.                                        |
+| Geometry    | Development builds only.                                                                             |
 
 `collectionAddFromPrinting` builds a `CollectionCard` via `cardFromScan` and
 returns it. Nothing stores it. `mobile/src/scan/memoryRepository.ts` is an
@@ -155,7 +156,7 @@ loser. It is not a blind whole-file overwrite.
 
 The dangerous case is the first sync, when `SyncMeta.base` is empty, so both
 sides look edited. A phone that scanned cards and then connects can out-stamp
-the desktop. The phone site avoids that by signing in before the first
+the desktop. Lugin Web avoids that by signing in before the first
 import. Native must not auto-push in that situation. Keep the phone data,
 refuse the automatic merge, and require an explicit choice.
 

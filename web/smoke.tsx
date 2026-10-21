@@ -19,6 +19,7 @@ import { CollectionView } from '../src/web/CollectionView';
 import { DeckEditor } from '../src/web/DeckEditor';
 import { DeckList } from '../src/web/DeckList';
 import { ImportScreen } from '../src/web/ImportScreen';
+import { ART_INDEX_CACHE } from '../src/web/artworkIndexStore';
 import { PRICES_CACHE } from '../src/web/priceStore';
 import { SHARE_INBOX, SHARE_KEY_PATH } from '../src/web/sharedImport';
 
@@ -104,7 +105,10 @@ const checks: [string, () => string][] = [
   ['CollectionView (empty)', () => renderToString(<CollectionView collection={null} />)],
   ['DeckList', () => renderToString(<DeckList collection={collection} decks={decks} />)],
   ['DeckList (empty)', () => renderToString(<DeckList collection={collection} decks={[]} />)],
-  ['DeckEditor', () => renderToString(<DeckEditor collection={collection} deck={decks[0]} onBack={() => {}} />)],
+  [
+    'DeckEditor',
+    () => renderToString(<DeckEditor collection={collection} deck={decks[0]} onBack={() => {}} />),
+  ],
   [
     'DeckEditor (a deck with nothing in it yet)',
     () =>
@@ -194,10 +198,7 @@ const deckSays: [string, boolean][] = [
   ['a deck can be thrown away', editor.includes('>Delete<')],
   ['a deck card shows a thumbnail', filled.includes('h-8 w-8') && filled.includes('Sol Ring')],
   ['the whole deck can be seen as images', filled.includes('Show as card images')],
-  [
-    'an empty deck offers no view switch to switch',
-    !editor.includes('Show as card images'),
-  ],
+  ['an empty deck offers no view switch to switch', !editor.includes('Show as card images')],
 ];
 for (const [what, held] of deckSays) {
   if (held) {
@@ -256,8 +257,10 @@ const asserts: [string, () => void][] = [
     'the worker catches a shared POST before its navigation branch',
     () => {
       const sw = emitted('sw.js');
-      const post = sw.indexOf('request.method === \'POST\'');
-      const navigate = sw.indexOf('request.mode !== \'navigate\'');
+      // eslint-disable-next-line quotes
+      const post = sw.indexOf(`request.method === 'POST'`);
+      // eslint-disable-next-line quotes
+      const navigate = sw.indexOf(`request.mode !== 'navigate'`);
       if (post < 0 || navigate < 0) throw new Error('one of the two branches is gone');
       // A share *is* a navigation, so the other order sends the file to Pages.
       if (post > navigate) throw new Error('the navigation branch would swallow the share');
@@ -281,8 +284,35 @@ const asserts: [string, () => void][] = [
       if (!sw.includes(`'${PRICES_CACHE}'`)) {
         throw new Error(`the worker no longer knows about ${PRICES_CACHE}`);
       }
+      if (!sw.includes('PERSISTENT_CACHES = [INBOX, PRICES')) {
+        throw new Error('the sweep would delete the price table');
+      }
+    },
+  ],
+  [
+    'the worker preserves the artwork index across deployments',
+    () => {
+      const sw = emitted('sw.js');
+      if (!sw.includes(`'${ART_INDEX_CACHE}'`)) {
+        throw new Error(`the worker no longer knows about ${ART_INDEX_CACHE}`);
+      }
       const sweep = sw.slice(sw.indexOf('caches.keys()'), sw.indexOf('clients.claim'));
-      if (!sweep.includes('PRICES')) throw new Error('the sweep would delete the price table');
+      if (!sweep.includes('PERSISTENT_CACHES')) {
+        throw new Error('the cache sweep no longer uses the declared preservation list');
+      }
+    },
+  ],
+  [
+    'the offline shell precaches generated application assets',
+    () => {
+      const sw = emitted('sw.js');
+      const encoded = sw.match(/const PRECACHE = (\[[^\n]+\]);/)?.[1];
+      if (!encoded) throw new Error('no precache asset list');
+      const assets = JSON.parse(encoded) as string[];
+      if (!assets.some(url => url.endsWith('.js'))) throw new Error('JavaScript is not precached');
+      if (!sw.includes('PRECACHE.includes(pathname)')) {
+        throw new Error('precache assets are not served offline');
+      }
     },
   ],
   [
@@ -339,7 +369,8 @@ const asserts: [string, () => void][] = [
       if (share.params.files[0]?.name !== 'file') {
         throw new Error('the worker reads the part named "file"');
       }
-      if (!share.params.files[0].accept.includes('text/csv')) throw new Error('CSV is not accepted');
+      if (!share.params.files[0].accept.includes('text/csv'))
+        throw new Error('CSV is not accepted');
     },
   ],
 ];

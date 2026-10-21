@@ -1,4 +1,4 @@
-// Entry point for the phone build.
+// Entry point for Lugin Web.
 //
 // The stylesheet is the overlay's, reused: its `:host` rule is inert outside a
 // shadow root, and every design token it defines hangs off `.lugin-root` — so
@@ -8,6 +8,7 @@
 import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
+import { WEB_UPDATE_EVENT } from './pwa';
 
 import { loadBracketLists } from '@/lib/bracket';
 import { ensureComboIndex } from '@/lib/combos/load';
@@ -40,8 +41,33 @@ createRoot(mount).render(
 // a new version is the update check answering from the thing it is checking.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, {
-      updateViaCache: 'none',
-    });
+    void navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`, {
+        updateViaCache: 'none',
+      })
+      .then(registration => {
+        const hadController = Boolean(navigator.serviceWorker.controller);
+        let announced = false;
+        const announce = () => {
+          if (announced) return;
+          announced = true;
+          window.dispatchEvent(new Event(WEB_UPDATE_EVENT));
+        };
+        const watch = (worker: ServiceWorker | null) => {
+          if (!worker) return;
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'activated' && hadController) announce();
+          });
+        };
+        registration.addEventListener('updatefound', () => watch(registration.installing));
+
+        // iOS may suspend the page for days. Re-check when it becomes visible
+        // instead of waiting for Safari's next periodic worker check.
+        const recheck = () => {
+          if (document.visibilityState === 'visible') void registration.update();
+        };
+        document.addEventListener('visibilitychange', recheck);
+        window.addEventListener('focus', recheck);
+      });
   });
 }

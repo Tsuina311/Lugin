@@ -1,12 +1,12 @@
 // Google Drive token for the native app.
 //
-// Android OAuth client only. The redirect is the reversed client id, which is
-// the URI Google issues after custom URI schemes are enabled. No client secret.
+// Native OAuth client for Android and iOS. Each platform uses its own Google
+// client id and reversed-client-id redirect. No client secret.
 // Tokens live in the platform keystore. A leftover plaintext file is copied
 // across and deleted only after that copy reads back.
 
 import Constants from 'expo-constants';
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import { AuthError, type TokenProvider, type TokenRequest } from '@/core/sync/auth';
 import { DRIVE_SCOPES } from '@/core/sync/scopes';
@@ -24,11 +24,36 @@ const EXPIRY_MARGIN_MS = 60_000;
 const LEGACY_NAME = 'google-token.json';
 
 const clientId = (): string => {
-  const extra = Constants.expoConfig?.extra as { lugin?: { googleClientId?: string } } | undefined;
-  return extra?.lugin?.googleClientId?.trim() ?? '';
+  const extra = Constants.expoConfig?.extra as
+    | {
+        lugin?: {
+          googleAndroidClientId?: string;
+          googleClientId?: string;
+          googleIosClientId?: string;
+        };
+      }
+    | undefined;
+  const lugin = extra?.lugin;
+  return (
+    (Platform.OS === 'ios' ? lugin?.googleIosClientId : lugin?.googleAndroidClientId) ??
+    lugin?.googleClientId ??
+    ''
+  ).trim();
 };
 
-const redirectUri = (): string | null => googleAndroidRedirect(clientId())?.redirectUri ?? null;
+const iosRedirect = (id: string): string | null => {
+  const suffix = '.apps.googleusercontent.com';
+  if (!id.endsWith(suffix)) return null;
+  const prefix = id.slice(0, -suffix.length);
+  if (!prefix || /[^A-Za-z0-9-]/.test(prefix)) return null;
+  // GoogleSignIn-iOS uses kBrowserCallbackPath = "/oauth2callback".
+  return `com.googleusercontent.apps.${prefix}:/oauth2callback`;
+};
+
+const redirectUri = (): string | null =>
+  Platform.OS === 'ios'
+    ? iosRedirect(clientId())
+    : googleAndroidRedirect(clientId())?.redirectUri ?? null;
 
 const randomVerifier = (): string => {
   const bytes = new Uint8Array(32);
@@ -215,12 +240,14 @@ export const nativeGoogleAuth: TokenProvider & {
     }
   },
 
-  configured: () => googleAndroidRedirect(clientId()) !== null,
+  configured: () => redirectUri() !== null,
 
   connect: async () => {
     const id = clientId();
     const redirect = redirectUri();
-    if (!id || !redirect) throw new AuthError('not-configured', 'This build has no Android Google client id');
+    if (!id || !redirect) {
+      throw new AuthError('not-configured', `This build has no ${Platform.OS === 'ios' ? 'iOS' : 'Android'} Google client id`);
+    }
     const verifier = randomVerifier();
     const challenge = base64Url(sha256(verifier));
     const state = randomVerifier();

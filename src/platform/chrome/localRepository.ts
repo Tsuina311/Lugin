@@ -14,7 +14,11 @@ import {
   cardImageOverrideStore,
   type CardImageOverride,
 } from '@/content/cardImageOverrideStore';
-import { collectionStore , setAddPurchasesToCollection, shouldAddPurchasesToCollection } from '@/content/collectionStore';
+import {
+  collectionStore,
+  setAddPurchasesToCollection,
+  shouldAddPurchasesToCollection,
+} from '@/content/collectionStore';
 import { deckStore } from '@/content/deckStore';
 import { shippingStore } from '@/content/shippingStore';
 import {
@@ -28,6 +32,7 @@ import type { LocalRepository } from '@/core/sync/repository';
 import { withPreferenceExtras } from '@/core/sync/serialize';
 import type { StoredCollection } from '@/lib/collection';
 import type { Deck } from '@/lib/deck';
+import { shouldWriteHomeCountry } from '@/platform/chrome/preferenceSync';
 
 const COLLECTION_KEY = 'lugin:collection';
 const DECKS_KEY = 'lugin:decks';
@@ -69,7 +74,8 @@ const newDeviceId = (): string =>
 const readRecord = async (): Promise<SyncRecord> => {
   const stored = await chrome.storage.local.get(SYNC_KEY);
   const raw = stored[SYNC_KEY] as Partial<SyncRecord> | undefined;
-  if (raw?.meta?.deviceId) return { lastPrefs: raw.lastPrefs, meta: raw.meta, stamps: raw.stamps ?? {} };
+  if (raw?.meta?.deviceId)
+    return { lastPrefs: raw.lastPrefs, meta: raw.meta, stamps: raw.stamps ?? {} };
   // First run on this device: mint an id and keep it for good.
   const record: SyncRecord = { meta: emptyMeta(newDeviceId()), stamps: {} };
   await chrome.storage.local.set({ [SYNC_KEY]: record });
@@ -185,7 +191,8 @@ export const createChromeLocalRepository = (
       preferences: { updatedAt: at('preferences'), value: prefs },
       printings: {
         updatedAt: at('printings'),
-        value: (stored[OVERRIDES_STORAGE_KEY] as Record<string, CardImageOverride> | undefined) ?? {},
+        value:
+          (stored[OVERRIDES_STORAGE_KEY] as Record<string, CardImageOverride> | undefined) ?? {},
       },
     };
   },
@@ -241,7 +248,7 @@ const applyPrefs = async (prefs: SyncedPreferences): Promise<void> => {
   // user's next real one — so only claim it when something will actually change.
   const stored = await chrome.storage.local.get(SHIPPING_KEY);
   const shipping = stored[SHIPPING_KEY] as { toCountry?: number | null } | undefined;
-  if (prefs.homeCountry !== null && (shipping?.toCountry ?? null) !== prefs.homeCountry) {
+  if (shouldWriteHomeCountry(shipping?.toCountry, prefs.homeCountry)) {
     expectSelfWrite(SHIPPING_KEY);
     await shippingStore.setToCountry(prefs.homeCountry);
   }

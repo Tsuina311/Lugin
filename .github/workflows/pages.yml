@@ -8,7 +8,7 @@
 # Web never depends on EAS availability. Native uses Expo fingerprint:
 # matching finished development build → EAS Update OTA; otherwise → EAS Build APK.
 #
-# Scheduled runs refresh the web price snapshot only (no native deploy).
+# Scheduled runs rebuild Lugin Web and its generated data, but do not deploy Native.
 
 name: Deploy Lugin
 
@@ -16,7 +16,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '30 10 * * *'
+    - cron: "30 10 * * *"
   workflow_dispatch:
 
 permissions:
@@ -278,7 +278,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_PROJECT_ID: ${{ env.EAS_PROJECT_ID }}
         run: |
-          node ../scripts/write-mobile-build-stamp.mjs
+          node ../scripts/write-mobile-build-stamp.mjs --bump
           yarn eas update \
             --channel development \
             --platform android \

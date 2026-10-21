@@ -53,20 +53,30 @@ const readDotEnv = (name: string): string | undefined => {
   return undefined;
 };
 
-const googleClientId =
+const googleAndroidClientId =
   process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim() ||
   readDotEnv('EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID') ||
   '';
 
-// Same rule as googleAndroidRedirect. Kept inline because Expo loads this file
-// without the TypeScript path of the shared helper.
-const googleScheme = (() => {
+const googleIosClientId =
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() ||
+  readDotEnv('EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID') ||
+  '';
+
+// Same reversed-client-id rule on both native platforms. Kept inline because
+// Expo loads this file without the TypeScript path of the shared helper.
+const googleScheme = (clientId: string): string | undefined => {
   const suffix = '.apps.googleusercontent.com';
-  if (!googleClientId.endsWith(suffix)) return undefined;
-  const prefix = googleClientId.slice(0, -suffix.length);
+  if (!clientId.endsWith(suffix)) return undefined;
+  const prefix = clientId.slice(0, -suffix.length);
   if (!prefix || /[^A-Za-z0-9-]/.test(prefix)) return undefined;
   return `com.googleusercontent.apps.${prefix}`;
-})();
+};
+
+const googleSchemes = [
+  googleScheme(googleAndroidClientId),
+  googleScheme(googleIosClientId),
+].filter((scheme): scheme is string => Boolean(scheme));
 
 const pricesCandidate =
   process.env.EXPO_PUBLIC_LUGIN_PRICES_URL?.trim() ||
@@ -104,6 +114,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       bundleIdentifier: 'app.lugin.mobile',
       infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
         NSCameraUsageDescription: 'Lugin uses the camera to scan Magic cards offline.',
       },
       supportsTablet: true,
@@ -152,7 +163,8 @@ extra: {
         buildId: stamp.id,
         buildLabel: stamp.label,
         channel: 'development',
-        googleClientId,
+        googleAndroidClientId,
+        googleIosClientId,
         pricesUrl,
       },
     },
@@ -186,7 +198,7 @@ runtimeVersion: process.env.LUGIN_OTA_RUNTIME_VERSION?.trim()
       'lugin-ocr',
       'lugin-visual-recognizer',
     ],
-    scheme: googleScheme ? ['lugin', googleScheme] : 'lugin',
+    scheme: googleSchemes.length > 0 ? ['lugin', ...googleSchemes] : 'lugin',
     slug: 'lugin',
     updates: updatesUrl
       ? {

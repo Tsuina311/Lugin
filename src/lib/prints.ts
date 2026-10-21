@@ -1,10 +1,11 @@
 // Fetch every printing of a card from Scryfall, so the user can pick the exact
 // version they own when our automatic guess is wrong (see the "not this
-// version" flow in CollectionPanel). Routed through the background worker
-// (requestApi) to sidestep page CORS, same as the rest of our Scryfall use.
+// version" flow in CollectionPanel). The extension routes through its background
+// worker; native clients use the shared polite Scryfall request lane directly.
 
 import { frontFaceName } from './cardName';
 import { requestApi } from './messaging';
+import { scryfallFetch } from './scryfallFetch';
 
 /** One printing of a card, with just what the picker + override need. */
 export interface CardPrint {
@@ -84,7 +85,12 @@ export const fetchCardPrints = async (name: string): Promise<CardPrint[]> => {
   const out: CardPrint[] = [];
   let next: string | undefined = url;
   for (let page = 0; next && page < MAX_PAGES; page++) {
-    const res = await requestApi({ priority: PICKER_PRIORITY, url: next });
+    const hasExtensionRuntime =
+      typeof chrome !== 'undefined' && typeof chrome.runtime?.sendMessage === 'function';
+    const res = await (hasExtensionRuntime ? requestApi : scryfallFetch)({
+      priority: PICKER_PRIORITY,
+      url: next,
+    });
     if (!res.ok) {
       if (res.status === 404) break; // no matching card
       throw new Error(`Scryfall search failed (HTTP ${res.status})`);

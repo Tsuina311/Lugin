@@ -1,8 +1,12 @@
-# Native Android deployment (EAS Build + EAS Update)
+# Native mobile deployment (EAS Build + EAS Update)
 
 Lugin’s web companion still deploys to **GitHub Pages**. The native Samsung
 development app deploys through **EAS** on the same `main` push, using Expo’s
 **native fingerprint** as the source of truth for OTA vs new APK.
+
+The iPhone tester build uses **TestFlight** and the same `development` EAS
+Update channel. JavaScript/UI publishes target both platforms; native changes
+still require a new Android APK and/or TestFlight build.
 
 ```text
 git push main
@@ -25,18 +29,18 @@ native job warns and skips.
 
 Having two `package.json` files is intentional. Do **not** merge them.
 
-| Path | Role | May contain |
-| --- | --- | --- |
-| `/package.json` | Yarn Berry **workspace root** (extension + web) | `workspaces`, `packageManager`, web/extension deps, root scripts |
-| `/mobile/package.json` | Expo **app** package | Expo/RN deps, `eas-build-pre-install`, mobile scripts |
+| Path                   | Role                                            | May contain                                                      |
+| ---------------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
+| `/package.json`        | Yarn Berry **workspace root** (extension + web) | `workspaces`, `packageManager`, web/extension deps, root scripts |
+| `/mobile/package.json` | Expo **app** package                            | Expo/RN deps, `eas-build-pre-install`, mobile scripts            |
 
 Expo / EAS config does **not** live in either `package.json`:
 
-| File | Purpose |
-| --- | --- |
-| `mobile/app.config.ts` | Expo app config (name, plugins, updates, projectId) |
-| `mobile/eas.json` | EAS Build / Update profiles |
-| `mobile/eas-project.json` | EAS project id fallback |
+| File                      | Purpose                                             |
+| ------------------------- | --------------------------------------------------- |
+| `mobile/app.config.ts`    | Expo app config (name, plugins, updates, projectId) |
+| `mobile/eas.json`         | EAS Build / Update profiles                         |
+| `mobile/eas-project.json` | EAS project id fallback                             |
 
 Root must **not** gain `expo`, `react-native`, or `app.json`/`app.config.*`. Mobile must **not** become the Yarn workspace root (no root `workspaces` move).
 
@@ -55,7 +59,9 @@ must not shift the hash between your machine and EAS. That is handled by
 `mobile/fingerprint.config.js` (source skips + ignore native dirs) and by baking
 `mobile/build-stamp.json` before `eas build` / `eas update` / fingerprint
 (`scripts/write-mobile-build-stamp.mjs`) so the APK still shows the real
-commit-count version even though `.git/` is not uploaded.
+commit-count version even though `.git/` is not uploaded. Each publish to the
+phone appends a counter (`v1.0.92.4`) so Settings changes even when the git
+commit does not. The counter lives in `mobile/phone-publish.json`.
 
 ## First setup
 
@@ -134,6 +140,13 @@ Install the APK URL from the EAS build page / CI summary on the Samsung
 > install. Do **not** set `"corepack": true` or `"yarn": "3.x"` in `eas.json`
 > for this monorepo.
 
+### iPhone
+
+Native iOS distribution is deferred. Do not run EAS iOS builds, configure
+Apple signing, or submit TestFlight builds. **Lugin Web** is the supported
+iPhone experience and can be installed from Safari with Add to Home Screen.
+The existing iOS-compatible source remains available for a future native port.
+
 ## Normal development (JS-only)
 
 ```text
@@ -179,7 +192,7 @@ Run from repo root (scripts use `mobile/` as EAS project root):
 ```bash
 yarn mobile:fingerprint          # print Android development fingerprint
 yarn mobile:deploy:status        # local fp vs matching finished build
-yarn mobile:update               # publish OTA to development
+yarn mobile:update               # publish Android OTA to development
 yarn mobile:build:eas            # force development APK build
 ```
 
@@ -225,12 +238,12 @@ yarn mobile:update:status    # alias of deploy:status
 
 ## Profiles / channels / runtime
 
-| Profile | Channel | Artifact | Role |
-| --- | --- | --- | --- |
-| `development` | `development` | APK | Daily driver + CI OTA target |
-| `development-client` | `development` | APK + dev client | Metro / camera debugging |
-| `preview` | `preview` | APK | Manual |
-| `production` | `production` | AAB default | Manual / later store |
+| Profile              | Channel       | Artifact         | Role                         |
+| -------------------- | ------------- | ---------------- | ---------------------------- |
+| `development`        | `development` | APK              | Daily driver + CI OTA target |
+| `development-client` | `development` | APK + dev client | Metro / camera debugging     |
+| `preview`            | `preview`     | APK              | Manual                       |
+| `production`         | `production`  | Store artifact   | Manual / later public store  |
 
 `runtimeVersion.policy`: **`fingerprint`** — OTA never loads into an incompatible native binary.
 
@@ -246,38 +259,38 @@ Fingerprint, build, and update all use environment **`development`**.
 
 ## Secrets / config classification
 
-| Name | Where | Class |
-| --- | --- | --- |
-| `EXPO_TOKEN` | GitHub Actions secret | **SECRET** |
-| `EAS_PROJECT_ID` | GitHub variable or `eas-project.json` | PUBLIC CONFIG |
-| Google OAuth client id (future native) | EAS env / app config | PUBLIC CONFIG |
-| Google client secret | **never in mobile** | — |
-| Android keystore | EAS credentials | SECRET (not in git) |
+| Name                                   | Where                                 | Class               |
+| -------------------------------------- | ------------------------------------- | ------------------- |
+| `EXPO_TOKEN`                           | GitHub Actions secret                 | **SECRET**          |
+| `EAS_PROJECT_ID`                       | GitHub variable or `eas-project.json` | PUBLIC CONFIG       |
+| Google OAuth client id (future native) | EAS env / app config                  | PUBLIC CONFIG       |
+| Google client secret                   | **never in mobile**                   | —                   |
+| Android keystore                       | EAS credentials                       | SECRET (not in git) |
 
 ## Troubleshooting
 
-| Symptom | Check |
-| --- | --- |
-| Phone not updating | Channel `development`? Matching fingerprint APK installed? Settings → Check |
-| Wrong fingerprint every commit | CNG `android/`/`ios/` dirty locally? Compare with `eas fingerprint:compare` |
-| CI skipped native | `EXPO_TOKEN` missing |
-| OTA failed, web ok | Expected — jobs are independent; phone keeps last good update |
-| Native build failed | No OTA published for that fingerprint; keep old APK |
-| Updates disabled in Settings | Running Metro / Expo Go / `development-client` debug binary |
-| Google auth mismatch | Android OAuth client SHA-1 must match the **installed** signing cert |
-| EAS: Yarn 1.22 vs `packageManager` yarn@3 | Ensure `.yarn/releases/yarn-3.8.1.cjs` is committed and `eas-build-pre-install` runs; check Install logs for “Replaced yarn at …” |
-| EAS: Failed to install yarn | Do not set `"corepack": true` or `"yarn": "3.x"` in eas.json |
-| EAS: `expo doctor` exited with non-zero code: 1 | Advisory step, not a build failure. One check (local `eas-cli`) fails by design — see “`expo doctor` has one expected failure” |
+| Symptom                                         | Check                                                                                                                             |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Phone not updating                              | Channel `development`? Matching fingerprint APK installed? Settings → Check                                                       |
+| Wrong fingerprint every commit                  | CNG `android/`/`ios/` dirty locally? Compare with `eas fingerprint:compare`                                                       |
+| CI skipped native                               | `EXPO_TOKEN` missing                                                                                                              |
+| OTA failed, web ok                              | Expected — jobs are independent; phone keeps last good update                                                                     |
+| Native build failed                             | No OTA published for that fingerprint; keep old APK                                                                               |
+| Updates disabled in Settings                    | Running Metro / Expo Go / `development-client` debug binary                                                                       |
+| Google auth mismatch                            | Android OAuth client SHA-1 must match the **installed** signing cert                                                              |
+| EAS: Yarn 1.22 vs `packageManager` yarn@3       | Ensure `.yarn/releases/yarn-3.8.1.cjs` is committed and `eas-build-pre-install` runs; check Install logs for “Replaced yarn at …” |
+| EAS: Failed to install yarn                     | Do not set `"corepack": true` or `"yarn": "3.x"` in eas.json                                                                      |
+| EAS: `expo doctor` exited with non-zero code: 1 | Advisory step, not a build failure. One check (local `eas-cli`) fails by design — see “`expo doctor` has one expected failure”    |
 
 ## Acceptance scenario (document when you run it)
 
-| Commit | Change | Expect |
-| --- | --- | --- |
-| A | First APK | Install once |
-| B | UI string only | OTA, no EAS Build |
-| C | Scanner TS only | OTA, no EAS Build |
-| D | Native dep / manifest | New APK, **no** OTA |
-| E | JS after D | OTA again |
+| Commit | Change                | Expect              |
+| ------ | --------------------- | ------------------- |
+| A      | First APK             | Install once        |
+| B      | UI string only        | OTA, no EAS Build   |
+| C      | Scanner TS only       | OTA, no EAS Build   |
+| D      | Native dep / manifest | New APK, **no** OTA |
+| E      | JS after D            | OTA again           |
 
 JS-only pushes must **not** consume a native EAS build.
 

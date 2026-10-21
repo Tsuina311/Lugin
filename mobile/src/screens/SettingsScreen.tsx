@@ -34,6 +34,7 @@ import {
   subscribeBenchmark,
   type BenchmarkSession,
 } from '../scan/benchmark';
+import { PHONE_VERSION } from '../phoneVersion';
 import { useAppUpdates } from '../updates/UpdateProvider';
 import { DebugInboxPanel } from '../scan/debugInbox';
 import { PendingUploadsPanel } from '../scan/uploadQueue/PendingUploadsPanel';
@@ -69,7 +70,7 @@ const DriveSection = () => {
         : 'Connected'
     : library.configured
       ? 'Not connected'
-      : 'No Android Google client id in this build';
+      : `No ${Platform.OS === 'ios' ? 'iOS' : 'Android'} Google client id in this build`;
   return (
     <View>
       <Text style={styles.section}>Google Drive</Text>
@@ -126,7 +127,6 @@ const DriveSection = () => {
 export function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const updates = useAppUpdates();
-  const expoConfig = Constants.expoConfig;
   const native = Constants.nativeAppVersion ?? '—';
   const lugin = extraLugin();
   const channel = updates.channel ?? lugin.channel ?? 'development';
@@ -168,7 +168,7 @@ export function SettingsScreen() {
       <DriveSection />
 
       <Text style={styles.section}>Version</Text>
-      <Text style={styles.line}>{lugin.buildLabel ?? `Lugin ${expoConfig?.version ?? '—'}`}</Text>
+      <Text style={styles.line}>{PHONE_VERSION}</Text>
       <Text style={styles.line}>Platform: {Platform.OS} native</Text>
       <Text style={styles.line}>Native app version: {native}</Text>
       <Text style={styles.line}>Source commit: {lugin.buildId ?? '—'}</Text>
@@ -180,6 +180,7 @@ export function SettingsScreen() {
       </Text>
       <Text style={styles.line}>Updates enabled: {String(updates.isEnabled)}</Text>
       <Text style={styles.line}>Update phase: {updates.phase}</Text>
+      {updates.detail ? <Text style={styles.line}>{updates.detail}</Text> : null}
       {updates.error ? <Text style={styles.error}>{updates.error}</Text> : null}
 
       <View style={styles.actions}>

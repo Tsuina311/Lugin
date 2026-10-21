@@ -1,4 +1,4 @@
-// Build config for the phone build — the same source, without the extension.
+// Build config for Lugin Web — the same shared domain, without the extension.
 //
 // Kept separate from vite.config.ts rather than folded into it with a mode flag,
 // because the two builds disagree about almost everything: this one has no
@@ -20,7 +20,7 @@ const ROOT = fileURLToPath(new URL('.', import.meta.url));
 
 // Which build is this, in words the app can show.
 //
-// Worth the trouble because the phone build is served over a service worker:
+// Worth the trouble because Lugin Web is served over a service worker:
 // after a deploy you reload and get *something*, and there is otherwise no way to
 // tell the new code from a cached shell — so "did my fix reach the phone?" becomes
 // guesswork, and every bug report after it is suspect.
@@ -41,13 +41,21 @@ const THEME = '#0b1017';
  * extension build and neither of these belongs in a Chrome Web Store package.
  */
 const pwaAssets = (): Plugin => ({
-  generateBundle() {
+  generateBundle(_options, bundle) {
+    const precache = [
+      BASE,
+      ...Object.values(bundle)
+        .map(output => output.fileName)
+        .filter(fileName => /\.(?:css|js)$/.test(fileName))
+        .map(fileName => `${BASE}${fileName}`),
+    ];
     this.emitFile({
       fileName: 'manifest.webmanifest',
       source: JSON.stringify(
         {
           background_color: THEME,
-          description: 'Your collection and decks on your phone, and ManaBox imports into them.',
+          categories: ['games', 'utilities'],
+          description: 'Lugin Web — your Magic collection and decks, everywhere.',
           display: 'standalone',
           icons: [
             { sizes: '192x192', src: `${BASE}icons/icon-192.png`, type: 'image/png' },
@@ -59,6 +67,8 @@ const pwaAssets = (): Plugin => ({
               type: 'image/png',
             },
           ],
+          id: BASE,
+          lang: 'en',
           name: NAME,
           orientation: 'portrait',
           scope: BASE,
@@ -122,6 +132,7 @@ const pwaAssets = (): Plugin => ({
       fileName: 'sw.js',
       source: `const SHELL = '${BASE}';
 const SHARE = '${BASE}share';
+const PRECACHE = ${JSON.stringify(precache)};
 
 // Named after the build, so the sweep on activation drops the previous one and
 // the offline fallback can never be a shell from two deploys ago.
@@ -144,10 +155,16 @@ const PRICES = 'lugin-prices';
 // and more so: card names barely age, so an old copy is a perfectly good answer
 // and re-downloading it per deploy would be pure waste.
 const CARD_INDEX = 'lugin-card-index';
+const ART_INDEX = 'lugin-art-index';
+const PERSISTENT_CACHES = [INBOX, PRICES, CARD_INDEX, ART_INDEX];
 
 self.addEventListener('install', event => {
   self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then(cache => cache.add(SHELL)).catch(() => {}));
+  event.waitUntil(
+    caches.open(CACHE).then(cache =>
+      Promise.all(PRECACHE.map(url => cache.add(url).catch(() => undefined))),
+    ),
+  );
 });
 
 self.addEventListener('activate', event => {
@@ -155,9 +172,7 @@ self.addEventListener('activate', event => {
     caches.keys()
       .then(keys => Promise.all(
         keys
-          .filter(
-            key => key !== CACHE && key !== INBOX && key !== PRICES && key !== CARD_INDEX,
-          )
+          .filter(key => key !== CACHE && !PERSISTENT_CACHES.includes(key))
           .map(key => caches.delete(key)),
       ))
       .then(() => self.clients.claim()),
@@ -197,6 +212,10 @@ self.addEventListener('fetch', event => {
   // which would otherwise put a multipart POST to a static host and get a 405.
   if (request.method === 'POST' && pathname.endsWith('/share')) {
     event.respondWith(receiveShare(request));
+    return;
+  }
+  if (request.method === 'GET' && PRECACHE.includes(pathname)) {
+    event.respondWith(caches.match(request).then(hit => hit ?? fetch(request)));
     return;
   }
   if (request.mode !== 'navigate') return;

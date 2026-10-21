@@ -1,1 +1,14 @@
-yarn typecheck && yarn mobile:typecheck
+echo "pre-push: checking types before this push (about half a minute)"
+echo "pre-push: 1/2  yarn typecheck"
+if ! yarn typecheck; then
+  echo "pre-push: typecheck failed — push cancelled"
+  exit 1
+fi
+echo "pre-push: 1/2  passed"
+echo "pre-push: 2/2  yarn mobile:typecheck"
+if ! yarn mobile:typecheck; then
+  echo "pre-push: mobile typecheck failed — push cancelled"
+  exit 1
+fi
+echo "pre-push: 2/2  passed"
+echo "pre-push: done, pushing"

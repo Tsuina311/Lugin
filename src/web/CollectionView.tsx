@@ -13,17 +13,19 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import { CollectionAddDialog } from './CollectionAddDialog';
 import { ExportBar } from './ExportBar';
 import { loadPrices } from './priceStore';
 import { syncStore } from './syncStore';
 
-import { cardImageCandidates, printingRank } from '@/lib/cardImage';
-import { cardKey, stripVersion } from '@/lib/cardName';
-import type { Collection, CollectionCard } from '@/lib/collection';
-import { printingIdentity } from '@/lib/collectionEdit';
-import { parseDeckList } from '@/lib/deck';
+import { cardImageCandidates } from '@/lib/cardImage';
+import { cardKey } from '@/lib/cardName';
+import type { Collection } from '@/lib/collection';
+import { collectionViewRows, type CollectionViewRow } from '@/lib/collectionView';
 import { collectionFile } from '@/lib/export';
 import { collectionValue, money, signedMoney, type CollectionValue } from '@/lib/prices';
+import type { CardImageOverride } from '@/lib/printing';
+import { searchCards } from '@/lib/search';
 import { CollectionThumb } from '@/ui/components/CollectionThumb';
 import { ViewToggle, type ViewShape } from '@/ui/components/ViewToggle';
 import { usePrices } from '@/ui/usePrices';
@@ -62,101 +64,6 @@ const Stepper = ({
     </button>
   </span>
 );
-
-/** One printing under a rolled-up card name. */
-interface PrintingLine {
-  candidates: string[];
-  edition: string;
-  foil: boolean;
-  identity: string;
-  quantity: number;
-}
-
-/** A card name, with its printings available to unfold. */
-interface Row {
-  candidates: string[];
-  foil: number;
-  key: string;
-  name: string;
-  printings: PrintingLine[];
-  total: number;
-}
-
-const editionLabel = (card: CollectionCard): string => {
-  const set = card.setName || card.setCode;
-  const num = card.collectorNumber ? `#${card.collectorNumber}` : null;
-  if (set && num) return `${set} ${num}`;
-  if (set) return set;
-  if (num) return num;
-  if (card.productId) return `CM ${card.productId}`;
-  return 'Unknown edition';
-};
-
-/**
- * Roll the raw rows up per card, keeping every distinct printing for unfold.
- *
- * Keyed exactly as `buildCollection` keys `byKey`, so the list length and the
- * "unique" count in the header can't drift apart and quietly disagree.
- */
-const rollUp = (collection: Collection): Row[] => {
-  const map = new Map<string, Row & { rank: number }>();
-  const printingsByKey = new Map<string, Map<string, PrintingLine>>();
-
-  for (const card of collection.cards) {
-    const key = cardKey(card.name);
-    if (!key) continue;
-    let row = map.get(key);
-    if (!row) {
-      row = {
-        candidates: [],
-        foil: 0,
-        key,
-        name: stripVersion(card.name),
-        printings: [],
-        rank: 0,
-        total: 0,
-      };
-      map.set(key, row);
-      printingsByKey.set(key, new Map());
-    }
-    const qty = card.quantity || 0;
-    row.total += qty;
-    if (card.foil) row.foil += qty;
-
-    const rank = printingRank(card);
-    if (rank > row.rank || row.candidates.length === 0) {
-      const candidates = cardImageCandidates(card);
-      if (candidates.length) {
-        row.candidates = candidates;
-        row.rank = rank;
-      }
-    }
-
-    const identity = printingIdentity(card);
-    const byPrinting = printingsByKey.get(key)!;
-    const existing = byPrinting.get(identity);
-    if (existing) {
-      existing.quantity += qty;
-    } else {
-      byPrinting.set(identity, {
-        candidates: cardImageCandidates(card),
-        edition: editionLabel(card),
-        foil: card.foil,
-        identity,
-        quantity: qty,
-      });
-    }
-  }
-
-  return [...map.values()]
-    .map(({ rank: _rank, ...row }) => ({
-      ...row,
-      printings: [...(printingsByKey.get(row.key)?.values() ?? [])].sort((a, b) =>
-        a.edition.localeCompare(b.edition),
-      ),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-};
 
 /**
  * What it's worth, and what it has done since you bought it.
@@ -198,9 +105,16 @@ const Worth = ({ value, stale }: { stale: boolean; value: CollectionValue }) => 
   );
 };
 
-export const CollectionView = ({ collection }: { collection: Collection | null }) => {
+export const CollectionView = ({
+  collection,
+  printings = {},
+}: {
+  collection: Collection | null;
+  printings?: Record<string, CardImageOverride>;
+}) => {
   const [query, setQuery] = useState('');
-  const [adding, setAdding] = useState('');
+  const [adding, setAdding] = useState<string | null>(null);
+  const [remoteSuggestions, setRemoteSuggestions] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const { snapshot, stale } = usePrices(loadPrices);
   const value = useMemo(
@@ -223,28 +137,54 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
     }
   }, [view]);
 
-  const all = useMemo(() => (collection ? rollUp(collection) : []), [collection]);
+  const all = useMemo(() => (collection ? collectionViewRows(collection) : []), [collection]);
   const rows = useMemo(() => {
     const needle = cardKey(query.trim());
     return needle ? all.filter(row => cardKey(row.name).includes(needle)) : all;
   }, [all, query]);
+  const canSuggest = query.trim().length >= 2;
+  useEffect(() => {
+    if (!canSuggest) {
+      setRemoteSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void searchCards({ text: query.trim() }, 10).then(
+        response => {
+          if (!cancelled) setRemoteSuggestions(response.cards.map(card => card.name));
+        },
+        () => {
+          if (!cancelled) setRemoteSuggestions([]);
+        },
+      );
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [canSuggest, query]);
+  const suggestions = useMemo(() => {
+    if (!canSuggest) return [];
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const name of [...rows.map(row => row.name), ...remoteSuggestions]) {
+      const key = cardKey(name);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      names.push(name);
+    }
+    return names
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+      .slice(0, 10);
+  }, [canSuggest, remoteSuggestions, rows]);
+  const addSuggestion =
+    suggestions.find(name => cardKey(name) === cardKey(query.trim())) ??
+    (suggestions.length === 1 ? suggestions[0] : null);
 
   const shown = rows.slice(0, view === 'box' ? BOX_LIMIT : VISIBLE_LIMIT);
 
-  const add = (text: string) => {
-    const { cards } = parseDeckList(text);
-    if (cards.length === 0) return;
-    const incoming: CollectionCard[] = cards.map(card => ({
-      foil: false,
-      name: card.name,
-      quantity: card.quantity,
-      source: 'import',
-    }));
-    void syncStore.addCards(incoming, 'manual');
-    setAdding('');
-  };
-
-  const setQuantity = (row: Row, quantity: number) =>
+  const setQuantity = (row: CollectionViewRow, quantity: number) =>
     void syncStore.setCollectionQuantity(row.key, quantity, row.name);
 
   const setPrintingQty = (identity: string, quantity: number) =>
@@ -260,41 +200,63 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
   };
 
   const empty = !collection || collection.cards.length === 0;
+  const imageCandidates = (name: string, candidates: readonly string[]): string[] => {
+    const override = cardImageCandidates(printings[cardKey(name)] ?? {});
+    return [...new Set([...override, ...candidates])];
+  };
 
   return (
     <div>
       <div className="sticky top-0 z-10 border-b border-line bg-canvas/95 px-4 py-3 backdrop-blur">
         <div className="flex gap-2">
           <input
-            aria-label="Card to add"
-            autoCapitalize="words"
+            aria-label="Search collection or add a card"
+            autoCapitalize="none"
             autoCorrect="off"
             className="min-w-0 flex-1 rounded-lg border border-line-strong bg-raised px-3 py-2.5 text-base text-ink placeholder:text-ink-faint"
-            onChange={event => setAdding(event.target.value)}
-            onKeyDown={event => {
-              if (event.key === 'Enter') add(adding);
-            }}
-            placeholder="Add a card, or paste a list"
-            value={adding}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="Search your collection"
+            type="search"
+            value={query}
           />
           <button
-            className="shrink-0 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-40"
-            disabled={!adding.trim()}
-            onClick={() => add(adding)}
+            aria-label="Add this card"
+            className="h-11 w-11 shrink-0 rounded-lg bg-accent text-xl font-semibold text-accent-ink disabled:opacity-40"
+            disabled={!addSuggestion}
+            onClick={() => {
+              if (addSuggestion) setAdding(addSuggestion);
+            }}
             type="button"
           >
-            Add
+            +
           </button>
+          {!empty ? <ViewToggle onChange={setView} size="md" value={view} /> : null}
         </div>
-        <input
-          autoCapitalize="none"
-          autoCorrect="off"
-          className="mt-2 w-full rounded-lg border border-line-strong bg-raised px-3 py-2.5 text-base text-ink placeholder:text-ink-faint"
-          onChange={event => setQuery(event.target.value)}
-          placeholder="Search your collection"
-          type="search"
-          value={query}
-        />
+        {suggestions.length > 0 ? (
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+            {suggestions.map(name => {
+              const owned = collection?.byKey[cardKey(name)]?.total ?? 0;
+              return (
+                <button
+                  key={name}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${
+                    owned > 0
+                      ? 'border-accent/50 bg-accent-soft text-accent'
+                      : 'border-line bg-raised text-ink-muted'
+                  }`}
+                  onClick={() => {
+                    setQuery(name);
+                    setAdding(name);
+                  }}
+                  type="button"
+                >
+                  {name}
+                  {owned > 0 ? ` · ${owned}` : ''}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
         <div className="mt-2 flex items-center gap-3">
           <p className="min-w-0 flex-1 text-[11px] text-ink-faint">
             {empty
@@ -302,7 +264,6 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
               : `${collection.totalCards.toLocaleString()} cards, ${collection.uniqueCards.toLocaleString()} unique`}
             {query ? ` · ${rows.length.toLocaleString()} matching` : ''}
           </p>
-          {!empty ? <ViewToggle onChange={setView} size="md" value={view} /> : null}
           {!empty ? (
             <ExportBar actions={['save', 'share']} file={() => collectionFile(collection)} />
           ) : null}
@@ -312,7 +273,7 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
 
       {empty ? (
         <p className="px-6 py-10 text-center text-sm text-ink-muted">
-          Type a card name above, or paste a list — the same format as adding to a deck.
+          Search for a card above, then tap + to choose its art, edition, and finish.
         </p>
       ) : null}
 
@@ -321,7 +282,7 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
           {shown.map(row => (
             <div key={row.key} className="flex flex-col gap-1">
               <CollectionThumb
-                candidates={row.candidates}
+                candidates={imageCandidates(row.name, row.candidates)}
                 className="card-frame aspect-[488/680] w-full overflow-hidden bg-raised"
                 imgStyle={{ objectPosition: '50% 17%' }}
                 name={row.name}
@@ -364,7 +325,7 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
                     <span className="w-7 shrink-0" />
                   )}
                   <CollectionThumb
-                    candidates={row.candidates}
+                    candidates={imageCandidates(row.name, row.candidates)}
                     name={row.name}
                     previewKey={`collection|list|${row.key}`}
                   />
@@ -393,7 +354,10 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
                     </span>
                   ) : null}
                   {!open ? (
-                    <Stepper onChange={quantity => setQuantity(row, quantity)} quantity={row.total} />
+                    <Stepper
+                      onChange={quantity => setQuantity(row, quantity)}
+                      quantity={row.total}
+                    />
                   ) : (
                     <span className="w-[5.5rem] shrink-0 text-right text-xs tabular-nums text-ink-faint">
                       {row.total}
@@ -403,17 +367,16 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
                 {open ? (
                   <ul className="border-l border-line ml-4 divide-y divide-line/50 bg-raised/40">
                     {row.printings.map(printing => (
-                      <li
-                        key={printing.identity}
-                        className="flex items-center gap-2 px-2 py-1.5"
-                      >
+                      <li key={printing.identity} className="flex items-center gap-2 px-2 py-1.5">
                         <CollectionThumb
-                          candidates={printing.candidates}
+                          candidates={imageCandidates(row.name, printing.candidates)}
                           name={row.name}
                           previewKey={`collection|printing|${printing.identity}`}
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs text-ink">{printing.edition}</span>
+                          <span className="block truncate text-xs text-ink">
+                            {printing.edition}
+                          </span>
                           {printing.foil ? (
                             <span className="text-[10px] text-accent">foil</span>
                           ) : null}
@@ -442,6 +405,16 @@ export const CollectionView = ({ collection }: { collection: Collection | null }
         <p className="px-6 py-10 text-center text-sm text-ink-muted">
           Nothing in your collection matches “{query}”.
         </p>
+      ) : null}
+      {adding ? (
+        <CollectionAddDialog
+          cards={collection?.cards ?? []}
+          name={adding}
+          onClose={added => {
+            setAdding(null);
+            if (added) setQuery('');
+          }}
+        />
       ) : null}
     </div>
   );

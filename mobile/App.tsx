@@ -1,21 +1,27 @@
 import { Component, useEffect, type ReactNode } from 'react';
 
 import { StatusBar } from 'expo-status-bar';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { libraryStore } from './src/data/libraryStore';
 import { RootTabs } from './src/navigation/RootTabs';
+import { PHONE_VERSION } from './src/phoneVersion';
 import { usePairLink } from './src/scan/debugInbox/pairLink';
 import { UpdateProvider } from './src/updates/UpdateProvider';
 
-type BoundaryState = { message: string | null };
+type BoundaryState = { message: string | null; stack: string | null };
 
 class AppBoundary extends Component<{ children: ReactNode }, BoundaryState> {
-  state: BoundaryState = { message: null };
+  state: BoundaryState = { message: null, stack: null };
 
   static getDerivedStateFromError(error: Error): BoundaryState {
-    return { message: error.message };
+    return { message: error.message, stack: error.stack ?? null };
+  }
+
+  componentDidCatch(error: Error, info: { componentStack?: string | null }) {
+    const stack = [error.stack, info.componentStack].filter(Boolean).join('\n');
+    this.setState({ message: error.message, stack: stack || null });
   }
 
   render() {
@@ -23,7 +29,20 @@ class AppBoundary extends Component<{ children: ReactNode }, BoundaryState> {
       return (
         <View style={styles.crash}>
           <Text style={styles.crashTitle}>The phone app hit an error</Text>
-          <Text style={styles.crashBody}>{this.state.message}</Text>
+          <Text style={styles.crashVersion}>{PHONE_VERSION}</Text>
+          <ScrollView style={styles.crashScroll}>
+            <Text selectable style={styles.crashBody}>
+              {this.state.message}
+            </Text>
+            {this.state.stack ? (
+              <Text selectable style={styles.crashStack}>
+                {this.state.stack}
+              </Text>
+            ) : null}
+          </ScrollView>
+          <Pressable onPress={() => this.setState({ message: null, stack: null })} style={styles.crashRetry}>
+            <Text style={styles.crashRetryLabel}>Try again</Text>
+          </Pressable>
         </View>
       );
     }
@@ -66,6 +85,34 @@ const styles = StyleSheet.create({
     color: '#C5D0DE',
     fontSize: 16,
     lineHeight: 22,
+  },
+  crashRetry: {
+    alignItems: 'center',
+    backgroundColor: '#1C2636',
+    borderRadius: 8,
+    marginTop: 16,
+    paddingVertical: 12,
+  },
+  crashRetryLabel: {
+    color: '#E8EEF7',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  crashScroll: {
+    flexGrow: 0,
+    maxHeight: 360,
+  },
+  crashStack: {
+    color: '#8A97AD',
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 12,
+  },
+  crashVersion: {
+    color: '#9EC1FF',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
   },
   crashTitle: {
     color: '#F4F7FB',

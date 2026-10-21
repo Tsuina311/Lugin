@@ -4,17 +4,19 @@
 // exercised in plain node — two in-memory devices sharing one in-memory cloud,
 // which is the only honest way to test "we both edited it".
 
-import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
-const root = new URL('..', import.meta.url).pathname;
-const { build } = await import(pathToFileURL(join(root, 'node_modules/esbuild/lib/main.js')).href);
+const root = new URL("..", import.meta.url).pathname;
+const { build } = await import(
+  pathToFileURL(join(root, "node_modules/esbuild/lib/main.js")).href
+);
 
-const out = await mkdtemp(join(tmpdir(), 'lugin-sync-'));
-const entry = join(out, 'entry.ts');
+const out = await mkdtemp(join(tmpdir(), "lugin-sync-"));
+const entry = join(out, "entry.ts");
 await writeFile(
   entry,
   `export * from '${root}src/core/sync/model';
@@ -24,131 +26,223 @@ await writeFile(
    export * from '${root}src/core/sync/memory';
    export * from '${root}src/core/sync/repository';
    export * from '${root}src/core/sync/serialize';
+   export * from '${root}src/core/mobile/capabilities';
+   export * from '${root}src/lib/collectionPrintPicker';
    export * from '${root}src/platform/web/localRepository';
+   export * from '${root}src/platform/chrome/preferenceSync';
    export * from '${root}src/platform/google/androidRedirect';
    export * from '${root}src/platform/secure/tokenVault';`,
 );
 
-const bundle = join(out, 'sync.mjs');
+const bundle = join(out, "sync.mjs");
 await build({
   bundle: true,
   entryPoints: [entry],
-  format: 'esm',
+  format: "esm",
   outfile: bundle,
-  platform: 'neutral',
-  tsconfigRaw: { compilerOptions: { paths: { '@/*': [`${root}src/*`] } } },
+  platform: "neutral",
+  tsconfigRaw: { compilerOptions: { paths: { "@/*": [`${root}src/*`] } } },
 });
 
 const {
   ConflictError,
   InMemoryLocalRepository,
   InMemorySyncRepository,
+  PLATFORM_CAPABILITIES,
+  PRODUCT_NAMES,
   SYNC_SCHEMA_VERSION,
   createDriveRepository,
   createSyncEngine,
   createWebLocalRepository,
+  collectionCardFromPrint,
   emptyData,
   googleAndroidRedirect,
   migrateLegacyToken,
+  ownedCardPrintScore,
   readSyncedState,
+  shouldWriteHomeCountry,
   toSyncedState,
   writeSecureToken,
 } = await import(pathToFileURL(bundle).href);
 
 const at = n => new Date(Date.UTC(2026, 0, n)).toISOString();
-const deck = name => ({ cards: [], createdAt: 1, id: name, name, updatedAt: 1 });
+const deck = name => ({
+  cards: [],
+  createdAt: 1,
+  id: name,
+  name,
+  updatedAt: 1,
+});
 const prefs = over => ({
   addPurchasesToCollection: false,
   homeCountry: null,
-  theme: 'dark',
+  theme: "dark",
   ...over,
 });
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
 
-test('an empty cloud is seeded from this device, preferences included', async () => {
-  const local = new InMemoryLocalRepository('desktop', emptyData(at(1)));
-  local.edit('preferences', prefs({ homeCountry: 12, theme: 'site' }), at(2));
+test("an empty cloud is seeded from this device, preferences included", async () => {
+  const local = new InMemoryLocalRepository("desktop", emptyData(at(1)));
+  local.edit("preferences", prefs({ homeCountry: 12, theme: "site" }), at(2));
   const remote = new InMemorySyncRepository();
 
-  const report = await createSyncEngine({ local, now: () => at(3), remote }).sync();
+  const report = await createSyncEngine({
+    local,
+    now: () => at(3),
+    remote,
+  }).sync();
 
   assert.equal(report.seeded, true);
   const stored = readSyncedState(remote.peek());
   assert.equal(stored.ok, true);
-  assert.deepEqual(stored.state.data.preferences.value, prefs({ homeCountry: 12, theme: 'site' }));
+  assert.deepEqual(
+    stored.state.data.preferences.value,
+    prefs({ homeCountry: 12, theme: "site" }),
+  );
   assert.equal(stored.state.schemaVersion, SYNC_SCHEMA_VERSION);
+});
+
+test("the product capability contract keeps shared and platform-only features explicit", () => {
+  assert.deepEqual(PRODUCT_NAMES, {
+    chrome: "Lugin Chrome",
+    native: "Lugin Native",
+    web: "Lugin Web",
+  });
+  assert.equal(PLATFORM_CAPABILITIES["native-android"].nativeScanner, true);
+  assert.equal(PLATFORM_CAPABILITIES.web.browserScanner, true);
+  assert.equal(PLATFORM_CAPABILITIES.web.nativeScanner, false);
+  assert.equal(PLATFORM_CAPABILITIES.web.indexedDb, true);
+});
+
+test("Lugin Chrome applies a synced null home country instead of resurrecting its old value", () => {
+  assert.equal(shouldWriteHomeCountry(12, null), true);
+  assert.equal(shouldWriteHomeCountry(null, null), false);
+  assert.equal(shouldWriteHomeCountry(undefined, null), false);
 });
 
 test("a domain only the other device touched arrives, and nothing else is written", async () => {
   const remote = new InMemorySyncRepository();
-  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
-  const engine = () => createSyncEngine({ local: desktop, now: () => at(9), remote });
+  const desktop = new InMemoryLocalRepository("desktop", emptyData(at(1)));
+  const engine = () =>
+    createSyncEngine({ local: desktop, now: () => at(9), remote });
   await engine().sync();
 
   // The phone starts from the same document, adds a deck, and pushes.
-  const phone = new InMemoryLocalRepository('phone', emptyData(at(1)));
+  const phone = new InMemoryLocalRepository("phone", emptyData(at(1)));
   await createSyncEngine({ local: phone, now: () => at(2), remote }).sync();
-  phone.edit('decks', [deck('phone-deck')], at(4));
+  phone.edit("decks", [deck("phone-deck")], at(4));
   await createSyncEngine({ local: phone, now: () => at(4), remote }).sync();
 
   const report = await engine().sync();
 
-  assert.deepEqual(report.applied, ['decks']);
+  assert.deepEqual(report.applied, ["decks"]);
   assert.deepEqual(report.conflicted, []);
-  assert.deepEqual(desktop.snapshot().decks.value, [deck('phone-deck')]);
+  assert.deepEqual(desktop.snapshot().decks.value, [deck("phone-deck")]);
   // Only decks was written locally: a deck edit must not rewrite the collection.
-  assert.deepEqual(desktop.writes, [['decks']]);
+  assert.deepEqual(desktop.writes, [["decks"]]);
 });
 
-test('the same domain edited in both places keeps the later one and shelves the other', async () => {
+test("the same domain edited in both places keeps the later one and shelves the other", async () => {
   const remote = new InMemorySyncRepository();
-  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
-  const phone = new InMemoryLocalRepository('phone', emptyData(at(1)));
+  const desktop = new InMemoryLocalRepository("desktop", emptyData(at(1)));
+  const phone = new InMemoryLocalRepository("phone", emptyData(at(1)));
   await createSyncEngine({ local: desktop, now: () => at(1), remote }).sync();
   await createSyncEngine({ local: phone, now: () => at(1), remote }).sync();
 
-  phone.edit('decks', [deck('from-phone')], at(5));
+  phone.edit("decks", [deck("from-phone")], at(5));
   await createSyncEngine({ local: phone, now: () => at(5), remote }).sync();
 
-  desktop.edit('decks', [deck('from-desktop')], at(6));
-  const report = await createSyncEngine({ local: desktop, now: () => at(7), remote }).sync();
+  desktop.edit("decks", [deck("from-desktop")], at(6));
+  const report = await createSyncEngine({
+    local: desktop,
+    now: () => at(7),
+    remote,
+  }).sync();
 
-  assert.deepEqual(report.conflicted, ['decks']);
-  assert.deepEqual(report.pushed, ['decks']);
-  assert.deepEqual(desktop.snapshot().decks.value, [deck('from-desktop')]);
+  assert.deepEqual(report.conflicted, ["decks"]);
+  assert.deepEqual(report.pushed, ["decks"]);
+  assert.deepEqual(desktop.snapshot().decks.value, [deck("from-desktop")]);
   // The version that lost is still recoverable.
-  assert.deepEqual(remote.archived[0].domain, 'decks');
-  assert.deepEqual(remote.archived[0].value, [deck('from-phone')]);
+  assert.deepEqual(remote.archived[0].domain, "decks");
+  assert.deepEqual(remote.archived[0].value, [deck("from-phone")]);
 });
 
-test('edits to different domains both survive', async () => {
+test("equal timestamps with different values converge on the cloud copy", async () => {
   const remote = new InMemorySyncRepository();
-  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
-  const phone = new InMemoryLocalRepository('phone', emptyData(at(1)));
+  const desktop = new InMemoryLocalRepository("desktop", emptyData(at(1)));
+  const web = new InMemoryLocalRepository("web", emptyData(at(1)));
+  await createSyncEngine({ local: desktop, now: () => at(1), remote }).sync();
+  await createSyncEngine({ local: web, now: () => at(1), remote }).sync();
+
+  web.edit("decks", [deck("from-web")], at(5));
+  await createSyncEngine({ local: web, now: () => at(5), remote }).sync();
+  desktop.edit("decks", [deck("from-desktop")], at(5));
+  const report = await createSyncEngine({
+    local: desktop,
+    now: () => at(6),
+    remote,
+  }).sync();
+
+  assert.deepEqual(report.applied, ["decks"]);
+  assert.deepEqual(report.conflicted, ["decks"]);
+  assert.deepEqual(desktop.snapshot().decks.value, [deck("from-web")]);
+  assert.deepEqual(remote.archived.at(-1).value, [deck("from-desktop")]);
+});
+
+test("a failed conflict archive is visible in the sync report", async () => {
+  const remote = new InMemorySyncRepository();
+  const desktop = new InMemoryLocalRepository("desktop", emptyData(at(1)));
+  const web = new InMemoryLocalRepository("web", emptyData(at(1)));
+  await createSyncEngine({ local: desktop, now: () => at(1), remote }).sync();
+  await createSyncEngine({ local: web, now: () => at(1), remote }).sync();
+  web.edit("decks", [deck("from-web")], at(4));
+  await createSyncEngine({ local: web, now: () => at(4), remote }).sync();
+  desktop.edit("decks", [deck("from-desktop")], at(5));
+  remote.archiveConflict = async () => {
+    throw new Error("archive unavailable");
+  };
+
+  const report = await createSyncEngine({
+    local: desktop,
+    now: () => at(6),
+    remote,
+  }).sync();
+  assert.equal(report.archiveFailures, 1);
+  assert.deepEqual(desktop.snapshot().decks.value, [deck("from-desktop")]);
+});
+
+test("edits to different domains both survive", async () => {
+  const remote = new InMemorySyncRepository();
+  const desktop = new InMemoryLocalRepository("desktop", emptyData(at(1)));
+  const phone = new InMemoryLocalRepository("phone", emptyData(at(1)));
   await createSyncEngine({ local: desktop, now: () => at(1), remote }).sync();
   await createSyncEngine({ local: phone, now: () => at(1), remote }).sync();
 
-  phone.edit('preferences', prefs({ theme: 'site' }), at(4));
+  phone.edit("preferences", prefs({ theme: "site" }), at(4));
   await createSyncEngine({ local: phone, now: () => at(4), remote }).sync();
 
-  desktop.edit('decks', [deck('local')], at(5));
-  const report = await createSyncEngine({ local: desktop, now: () => at(6), remote }).sync();
+  desktop.edit("decks", [deck("local")], at(5));
+  const report = await createSyncEngine({
+    local: desktop,
+    now: () => at(6),
+    remote,
+  }).sync();
 
   assert.deepEqual(report.conflicted, []);
-  assert.deepEqual(report.applied, ['preferences']);
-  assert.deepEqual(report.pushed, ['decks']);
-  assert.equal(desktop.snapshot().preferences.value.theme, 'site');
+  assert.deepEqual(report.applied, ["preferences"]);
+  assert.deepEqual(report.pushed, ["decks"]);
+  assert.equal(desktop.snapshot().preferences.value.theme, "site");
 
   const stored = readSyncedState(remote.peek());
-  assert.deepEqual(stored.state.data.decks.value, [deck('local')]);
-  assert.equal(stored.state.data.preferences.value.theme, 'site');
+  assert.deepEqual(stored.state.data.decks.value, [deck("local")]);
+  assert.equal(stored.state.data.preferences.value.theme, "site");
 });
 
-test('a write that lost a race is retried against the newer document', async () => {
+test("a write that lost a race is retried against the newer document", async () => {
   const remote = new InMemorySyncRepository();
-  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
+  const desktop = new InMemoryLocalRepository("desktop", emptyData(at(1)));
   await createSyncEngine({ local: desktop, now: () => at(1), remote }).sync();
 
   // Another device slips a revision in between our read and our write, once.
@@ -158,42 +252,53 @@ test('a write that lost a race is retried against the newer document', async () 
     if (!interfered) {
       interfered = true;
       const current = readSyncedState(remote.peek()).state;
-      save({ ...current, deviceId: 'phone' }, base);
+      save({ ...current, deviceId: "phone" }, base);
       return save(state, base); // now stale: throws ConflictError
     }
     return save(state, base);
   };
 
-  desktop.edit('decks', [deck('mine')], at(3));
-  const report = await createSyncEngine({ local: desktop, now: () => at(4), remote }).sync();
+  desktop.edit("decks", [deck("mine")], at(3));
+  const report = await createSyncEngine({
+    local: desktop,
+    now: () => at(4),
+    remote,
+  }).sync();
 
   assert.equal(interfered, true);
-  assert.deepEqual(report.pushed, ['decks']);
-  assert.deepEqual(readSyncedState(remote.peek()).state.data.decks.value, [deck('mine')]);
+  assert.deepEqual(report.pushed, ["decks"]);
+  assert.deepEqual(readSyncedState(remote.peek()).state.data.decks.value, [
+    deck("mine"),
+  ]);
 });
 
-test('a document from a newer version is refused, not half-read', async () => {
+test("a document from a newer version is refused, not half-read", async () => {
   const future = JSON.stringify({
-    ...toSyncedState(emptyData(at(1)), 'phone'),
+    ...toSyncedState(emptyData(at(1)), "phone"),
     schemaVersion: SYNC_SCHEMA_VERSION + 1,
   });
   const read = readSyncedState(future);
   assert.equal(read.ok, false);
-  assert.equal(read.reason, 'unsupported-schema');
+  assert.equal(read.reason, "unsupported-schema");
 });
 
-test('junk and missing pieces read as absent rather than throwing', async () => {
-  assert.equal(readSyncedState('not json').ok, false);
-  assert.equal(readSyncedState({ schemaVersion: 'one' }).reason, 'malformed');
+test("junk and missing pieces read as absent rather than throwing", async () => {
+  assert.equal(readSyncedState("not json").ok, false);
+  assert.equal(readSyncedState({ schemaVersion: "one" }).reason, "malformed");
 
   const partial = readSyncedState({
-    data: { decks: { updatedAt: at(2), value: [deck('a'), 'rubbish', { id: 7 }] } },
+    data: {
+      decks: { updatedAt: at(2), value: [deck("a"), "rubbish", { id: 7 }] },
+    },
     schemaVersion: SYNC_SCHEMA_VERSION,
   });
   assert.equal(partial.ok, true);
-  assert.deepEqual(partial.state.data.decks.value, [deck('a')]);
+  assert.deepEqual(partial.state.data.decks.value, [deck("a")]);
   // A domain the writer never sent loses to whatever the reader has.
-  assert.equal(partial.state.data.collection.updatedAt, new Date(0).toISOString());
+  assert.equal(
+    partial.state.data.collection.updatedAt,
+    new Date(0).toISOString(),
+  );
 });
 
 // --- the phone's local repository -------------------------------------------
@@ -202,94 +307,253 @@ test('junk and missing pieces read as absent rather than throwing', async () => 
 // exercise is the same code the phone runs, minus persistence between calls,
 // which is exactly the seam that fallback creates.
 
-const stored = cards => ({ cards, format: 'manabox', importedAt: 1, source: 'ManaBox.csv' });
+const stored = cards => ({
+  cards,
+  format: "manabox",
+  importedAt: 1,
+  source: "ManaBox.csv",
+});
 const card = (name, over) => ({ foil: false, name, quantity: 1, ...over });
 
-test('a phone with no usable store says so rather than failing', async () => {
+test("Native and Web share collection printing choice and intake semantics", () => {
+  const print = {
+    cardmarketId: 42,
+    collectorNumber: "15",
+    finishes: ["nonfoil", "foil"],
+    id: "00000000-0000-0000-0000-000000000015",
+    imageUrl: "https://example.test/card.jpg",
+    setCode: "leg",
+    setName: "Legends",
+  };
+  const owned = card("Akroma, Angel of Wrath", {
+    collectorNumber: "15",
+    setCode: "leg",
+    scryfallId: print.id,
+  });
+  assert.equal(ownedCardPrintScore(print, [owned]), 5);
+  assert.deepEqual(
+    collectionCardFromPrint("Akroma, Angel of Wrath", print, true),
+    {
+      collectorNumber: "15",
+      foil: true,
+      imageUrl: "https://example.test/card.jpg",
+      name: "Akroma, Angel of Wrath",
+      productId: "42",
+      quantity: 1,
+      scryfallId: print.id,
+      setCode: "leg",
+      setName: "Legends",
+      source: "import",
+    },
+  );
+});
+
+test("a phone with no usable store says so rather than failing", async () => {
   const phone = createWebLocalRepository(() => at(1));
   // Still a working device for the session: a locked-down browser is a warning,
   // not an error screen.
   const data = await phone.read();
   assert.equal(data.collection.value, null);
   assert.equal(data.collection.updatedAt, new Date(0).toISOString());
-  assert.equal(phone.persistent(), false, 'and it admits nothing will be kept');
+  assert.equal(phone.persistent(), false, "and it admits nothing will be kept");
 
-  await phone.edit('collection', stored([card('Sol Ring')]));
-  assert.deepEqual((await phone.read()).collection.value.cards, [card('Sol Ring')]);
+  await phone.edit("collection", stored([card("Sol Ring")]));
+  assert.deepEqual((await phone.read()).collection.value.cards, [
+    card("Sol Ring"),
+  ]);
 });
 
-test('a fresh phone mints one device id and keeps it', async () => {
+test("a fresh phone mints one device id and keeps it", async () => {
   const phone = createWebLocalRepository(() => at(1));
   const first = await phone.readMeta();
   assert.match(first.deviceId, /\S/);
   assert.equal((await phone.readMeta()).deviceId, first.deviceId);
 });
 
-test('an import on the phone reaches the desktop', async () => {
+test("an import on the phone reaches the desktop", async () => {
   const remote = new InMemorySyncRepository();
-  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
-  desktop.edit('collection', stored([card('Sol Ring')]), at(2));
+  const desktop = new InMemoryLocalRepository("desktop", emptyData(at(1)));
+  desktop.edit("collection", stored([card("Sol Ring")]), at(2));
   await createSyncEngine({ local: desktop, now: () => at(2), remote }).sync();
 
   // The phone picks the collection up, then a ManaBox scan is imported on it.
   const phone = createWebLocalRepository(() => at(5));
   await createSyncEngine({ local: phone, now: () => at(3), remote }).sync();
-  assert.deepEqual((await phone.read()).collection.value.cards, [card('Sol Ring')]);
-
-  await phone.edit('collection', stored([card('Sol Ring'), card('Rhystic Study')]));
-  assert.equal((await phone.readMeta()).dirtyAt, at(5), 'an edit is marked for pushing');
-
-  const push = await createSyncEngine({ local: phone, now: () => at(5), remote }).sync();
-  assert.deepEqual(push.pushed, ['collection']);
-  assert.equal((await phone.readMeta()).dirtyAt, null, 'and unmarked once pushed');
-
-  const report = await createSyncEngine({ local: desktop, now: () => at(6), remote }).sync();
-  assert.deepEqual(report.applied, ['collection']);
-  assert.deepEqual(desktop.snapshot().collection.value.cards.map(c => c.name), [
-    'Sol Ring',
-    'Rhystic Study',
+  assert.deepEqual((await phone.read()).collection.value.cards, [
+    card("Sol Ring"),
   ]);
+
+  await phone.edit(
+    "collection",
+    stored([card("Sol Ring"), card("Rhystic Study")]),
+  );
+  assert.equal(
+    (await phone.readMeta()).dirtyAt,
+    at(5),
+    "an edit is marked for pushing",
+  );
+
+  const push = await createSyncEngine({
+    local: phone,
+    now: () => at(5),
+    remote,
+  }).sync();
+  assert.deepEqual(push.pushed, ["collection"]);
+  assert.equal(
+    (await phone.readMeta()).dirtyAt,
+    null,
+    "and unmarked once pushed",
+  );
+
+  const report = await createSyncEngine({
+    local: desktop,
+    now: () => at(6),
+    remote,
+  }).sync();
+  assert.deepEqual(report.applied, ["collection"]);
+  assert.deepEqual(
+    desktop.snapshot().collection.value.cards.map(c => c.name),
+    ["Sol Ring", "Rhystic Study"],
+  );
 });
 
-test('adopting a deck from the desktop leaves the phone’s collection alone', async () => {
+test("Lugin Chrome, Web, and Native round-trip every shared domain without field loss", async () => {
+  const remote = new InMemorySyncRepository();
+  const chrome = new InMemoryLocalRepository("chrome", emptyData(at(1)));
+  const originalDeck = {
+    ...deck("cousin-commander"),
+    cards: [
+      {
+        name: "Sol Ring",
+        quantity: 1,
+        tags: ["ramp"],
+        futureCardField: "keep",
+      },
+    ],
+    commander: "Lathril, Blade of the Elves",
+    format: "commander",
+    futureDeckField: { keep: true },
+  };
+  chrome.edit(
+    "collection",
+    {
+      ...stored([
+        card("Sol Ring", {
+          collectorNumber: "1",
+          setCode: "cmm",
+          scryfallId: "sol-ring-id",
+        }),
+      ]),
+      futureCollectionField: "keep",
+    },
+    at(2),
+  );
+  chrome.edit("decks", [originalDeck], at(2));
+  chrome.edit(
+    "preferences",
+    { ...prefs({ theme: "site" }), futurePreference: "keep" },
+    at(2),
+  );
+  chrome.edit(
+    "printings",
+    { "sol ring": { scryfallId: "sol-ring-id", futurePrintingField: "keep" } },
+    at(2),
+  );
+  await createSyncEngine({ local: chrome, now: () => at(2), remote }).sync();
+
+  const web = createWebLocalRepository(() => at(4));
+  await createSyncEngine({ local: web, now: () => at(3), remote }).sync();
+  assert.deepEqual((await web.read()).decks.value, [originalDeck]);
+
+  const webDeck = {
+    ...originalDeck,
+    cards: [...originalDeck.cards, { name: "Arcane Signet", quantity: 1 }],
+    updatedAt: 4,
+  };
+  await web.edit("decks", [webDeck]);
+  await createSyncEngine({ local: web, now: () => at(4), remote }).sync();
+
+  const native = new InMemoryLocalRepository(
+    "native-android",
+    emptyData(at(1)),
+  );
+  await createSyncEngine({ local: native, now: () => at(5), remote }).sync();
+  assert.deepEqual(native.snapshot().decks.value, [webDeck]);
+  native.edit(
+    "collection",
+    {
+      ...native.snapshot().collection.value,
+      cards: [
+        ...native.snapshot().collection.value.cards,
+        card("Rhystic Study", { setCode: "wot", scryfallId: "rhystic-id" }),
+      ],
+    },
+    at(6),
+  );
+  await createSyncEngine({ local: native, now: () => at(6), remote }).sync();
+
+  await createSyncEngine({ local: chrome, now: () => at(7), remote }).sync();
+  await createSyncEngine({ local: web, now: () => at(7), remote }).sync();
+  for (const state of [chrome.snapshot(), await web.read()]) {
+    assert.equal(state.collection.value.futureCollectionField, "keep");
+    assert.deepEqual(state.decks.value, [webDeck]);
+    assert.equal(state.decks.value[0].futureDeckField.keep, true);
+    assert.equal(state.preferences.value.futurePreference, "keep");
+    assert.equal(state.printings.value["sol ring"].futurePrintingField, "keep");
+    assert.deepEqual(
+      state.collection.value.cards.map(entry => entry.name),
+      ["Sol Ring", "Rhystic Study"],
+    );
+  }
+});
+
+test("adopting a deck from the desktop leaves the phone’s collection alone", async () => {
   const remote = new InMemorySyncRepository();
   const phone = createWebLocalRepository(() => at(4));
-  await phone.edit('collection', stored([card('Sol Ring')]));
+  await phone.edit("collection", stored([card("Sol Ring")]));
   await createSyncEngine({ local: phone, now: () => at(4), remote }).sync();
 
-  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
+  const desktop = new InMemoryLocalRepository("desktop", emptyData(at(1)));
   await createSyncEngine({ local: desktop, now: () => at(5), remote }).sync();
-  desktop.edit('decks', [deck('desktop-deck')], at(6));
+  desktop.edit("decks", [deck("desktop-deck")], at(6));
   await createSyncEngine({ local: desktop, now: () => at(6), remote }).sync();
 
-  const report = await createSyncEngine({ local: phone, now: () => at(7), remote }).sync();
+  const report = await createSyncEngine({
+    local: phone,
+    now: () => at(7),
+    remote,
+  }).sync();
 
-  assert.ok(report.applied.includes('decks'));
+  assert.ok(report.applied.includes("decks"));
   const data = await phone.read();
-  assert.deepEqual(data.decks.value, [deck('desktop-deck')]);
+  assert.deepEqual(data.decks.value, [deck("desktop-deck")]);
   // The stamp is what proves it: a restamped collection would be pushed back on
   // the next sync as though the phone had edited it.
   assert.equal(data.collection.updatedAt, at(4));
-  assert.deepEqual(data.collection.value.cards, [card('Sol Ring')]);
+  assert.deepEqual(data.collection.value.cards, [card("Sol Ring")]);
 });
 
-test('a phone import and a desktop import of the same day are a conflict, not a silent loss', async () => {
+test("a phone import and a desktop import of the same day are a conflict, not a silent loss", async () => {
   const remote = new InMemorySyncRepository();
   const phone = createWebLocalRepository(() => at(5));
-  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
+  const desktop = new InMemoryLocalRepository("desktop", emptyData(at(1)));
   await createSyncEngine({ local: phone, now: () => at(2), remote }).sync();
   await createSyncEngine({ local: desktop, now: () => at(2), remote }).sync();
 
-  await phone.edit('collection', stored([card('from-phone')]));
+  await phone.edit("collection", stored([card("from-phone")]));
   await createSyncEngine({ local: phone, now: () => at(5), remote }).sync();
 
-  desktop.edit('collection', stored([card('from-desktop')]), at(6));
-  const report = await createSyncEngine({ local: desktop, now: () => at(7), remote }).sync();
+  desktop.edit("collection", stored([card("from-desktop")]), at(6));
+  const report = await createSyncEngine({
+    local: desktop,
+    now: () => at(7),
+    remote,
+  }).sync();
 
-  assert.ok(report.conflicted.includes('collection'));
+  assert.ok(report.conflicted.includes("collection"));
   // The phone's scan is the one at risk here, and it is still recoverable.
-  const shelved = remote.archived.find(a => a.domain === 'collection');
-  assert.deepEqual(shelved.value.cards, [card('from-phone')]);
+  const shelved = remote.archived.find(a => a.domain === "collection");
+  assert.deepEqual(shelved.value.cards, [card("from-phone")]);
 });
 
 // --- Drive client -----------------------------------------------------------
@@ -299,43 +563,53 @@ test('a phone import and a desktop import of the same day are a conflict, not a 
 const fakeDrive = () => {
   const files = new Map();
   let nextId = 1;
-  const body = raw => raw.split(/\r\n--lugin-sync-boundary(?:--)?\r\n/).filter(Boolean);
+  const body = raw =>
+    raw.split(/\r\n--lugin-sync-boundary(?:--)?\r\n/).filter(Boolean);
 
   const http = async (url, init = {}) => {
     const { pathname, searchParams } = new URL(url);
-    const method = init.method ?? 'GET';
+    const method = init.method ?? "GET";
     calls.push(`${method} ${pathname}`);
 
-    if (!/^Bearer /.test(init.headers?.Authorization ?? '')) {
-      return new Response('no token', { status: 401 });
+    if (!/^Bearer /.test(init.headers?.Authorization ?? "")) {
+      return new Response("no token", { status: 401 });
     }
-    if (init.headers.Authorization === 'Bearer stale') {
-      return new Response('expired', { status: 401 });
+    if (init.headers.Authorization === "Bearer stale") {
+      return new Response("expired", { status: 401 });
     }
 
-    if (method === 'GET' && pathname === '/drive/v3/files') {
-      const wanted = /name = '([^']+)'/.exec(searchParams.get('q'))[1];
+    if (method === "GET" && pathname === "/drive/v3/files") {
+      const wanted = /name = '([^']+)'/.exec(searchParams.get("q"))[1];
       const found = [...files.values()].filter(f => f.name === wanted);
-      return Response.json({ files: found.map(f => ({ id: f.id, version: f.version })) });
+      return Response.json({
+        files: found.map(f => ({ id: f.id, version: f.version })),
+      });
     }
-    if (method === 'GET' && pathname.startsWith('/drive/v3/files/')) {
-      const file = files.get(pathname.split('/').pop());
-      return file ? new Response(file.content) : new Response('gone', { status: 404 });
+    if (method === "GET" && pathname.startsWith("/drive/v3/files/")) {
+      const file = files.get(pathname.split("/").pop());
+      return file
+        ? new Response(file.content)
+        : new Response("gone", { status: 404 });
     }
-    if (method === 'POST' && pathname === '/upload/drive/v3/files') {
+    if (method === "POST" && pathname === "/upload/drive/v3/files") {
       const [meta, content] = body(init.body);
       const id = `file-${nextId++}`;
-      const file = { content: content.split('\r\n\r\n')[1], id, name: JSON.parse(meta.split('\r\n\r\n')[1]).name, version: '1' };
+      const file = {
+        content: content.split("\r\n\r\n")[1],
+        id,
+        name: JSON.parse(meta.split("\r\n\r\n")[1]).name,
+        version: "1",
+      };
       files.set(id, file);
       return Response.json({ id, version: file.version });
     }
-    if (method === 'PATCH' && pathname.startsWith('/upload/drive/v3/files/')) {
-      const file = files.get(pathname.split('/').pop());
+    if (method === "PATCH" && pathname.startsWith("/upload/drive/v3/files/")) {
+      const file = files.get(pathname.split("/").pop());
       file.content = init.body;
       file.version = String(Number(file.version) + 1);
       return Response.json({ id: file.id, version: file.version });
     }
-    return new Response('unexpected', { status: 500 });
+    return new Response("unexpected", { status: 500 });
   };
 
   const calls = [];
@@ -347,110 +621,166 @@ const tokens = (...sequence) => {
   return { getToken: async () => sequence[Math.min(n++, sequence.length - 1)] };
 };
 
-test('a first save creates the document, and a load reads it straight back', async () => {
+test("a first save creates the document, and a load reads it straight back", async () => {
   const drive = fakeDrive();
-  const repo = createDriveRepository({ http: drive.http, token: tokens('good') });
+  const repo = createDriveRepository({
+    http: drive.http,
+    token: tokens("good"),
+  });
 
   assert.equal(await repo.load(), null);
-  const saved = await repo.save(toSyncedState(emptyData(at(1)), 'desktop'), null);
-  assert.equal(saved.revision, '1');
+  const saved = await repo.save(
+    toSyncedState(emptyData(at(1)), "desktop"),
+    null,
+  );
+  assert.equal(saved.revision, "1");
 
   const loaded = await repo.load();
-  assert.equal(loaded.revision, '1');
-  assert.equal(loaded.state.deviceId, 'desktop');
-  assert.equal([...drive.files.values()][0].name, 'app-state.json');
+  assert.equal(loaded.revision, "1");
+  assert.equal(loaded.state.deviceId, "desktop");
+  assert.equal([...drive.files.values()][0].name, "app-state.json");
 });
 
-test('saving against a revision that has moved on is a conflict, not an overwrite', async () => {
+test("saving against a revision that has moved on is a conflict, not an overwrite", async () => {
   const drive = fakeDrive();
-  const repo = createDriveRepository({ http: drive.http, token: tokens('good') });
-  await repo.save(toSyncedState(emptyData(at(1)), 'desktop'), null);
+  const repo = createDriveRepository({
+    http: drive.http,
+    token: tokens("good"),
+  });
+  await repo.save(toSyncedState(emptyData(at(1)), "desktop"), null);
 
   // Someone else's write lands in between.
-  await repo.save(toSyncedState(emptyData(at(2)), 'phone'), '1');
+  await repo.save(toSyncedState(emptyData(at(2)), "phone"), "1");
 
   await assert.rejects(
-    () => repo.save(toSyncedState(emptyData(at(3)), 'desktop'), '1'),
+    () => repo.save(toSyncedState(emptyData(at(3)), "desktop"), "1"),
     err => err instanceof ConflictError,
   );
   // The phone's version is still there, untouched.
-  assert.equal((await repo.load()).state.deviceId, 'phone');
+  assert.equal((await repo.load()).state.deviceId, "phone");
 });
 
-test('an expired token is refreshed once rather than surfacing as a failure', async () => {
+test("an expired token is refreshed once rather than surfacing as a failure", async () => {
   const drive = fakeDrive();
-  const repo = createDriveRepository({ http: drive.http, token: tokens('stale', 'good') });
+  const repo = createDriveRepository({
+    http: drive.http,
+    token: tokens("stale", "good"),
+  });
 
-  const saved = await repo.save(toSyncedState(emptyData(at(1)), 'desktop'), null);
-  assert.equal(saved.revision, '1');
+  const saved = await repo.save(
+    toSyncedState(emptyData(at(1)), "desktop"),
+    null,
+  );
+  assert.equal(saved.revision, "1");
 });
 
-test('unknown fields on every domain survive a shared parse', () => {
+test("unknown fields on every domain survive a shared parse", () => {
   const document = {
     data: {
       collection: {
         updatedAt: at(2),
         value: {
-          cards: [{ binderSlot: 'p1', foil: false, name: 'Birds of Paradise', quantity: 1 }],
-          format: 'list',
+          cards: [
+            {
+              binderSlot: "p1",
+              foil: false,
+              name: "Birds of Paradise",
+              quantity: 1,
+            },
+          ],
+          format: "list",
           importedAt: 1,
-          shelf: 'box-a',
-          source: 'pwa',
+          shelf: "box-a",
+          source: "pwa",
         },
       },
       decks: {
         updatedAt: at(2),
-        value: [{ cards: [{ name: 'Birds of Paradise', printing: { scryfallId: 'bird' }, quantity: 1 }], id: 'd', note: 'keep' }],
+        value: [
+          {
+            cards: [
+              {
+                name: "Birds of Paradise",
+                printing: { scryfallId: "bird" },
+                quantity: 1,
+              },
+            ],
+            id: "d",
+            note: "keep",
+          },
+        ],
       },
       preferences: {
         updatedAt: at(2),
-        value: { addPurchasesToCollection: true, currency: 'EUR', homeCountry: 3, theme: 'dark' },
+        value: {
+          addPurchasesToCollection: true,
+          currency: "EUR",
+          homeCountry: 3,
+          theme: "dark",
+        },
       },
       printings: {
         updatedAt: at(2),
-        value: { birds: { note: 'keep', scryfallId: 'bird' } },
+        value: { birds: { note: "keep", scryfallId: "bird" } },
       },
     },
-    deviceId: 'pwa',
+    deviceId: "pwa",
     schemaVersion: 1,
     updatedAt: at(2),
   };
   const parsed = readSyncedState(JSON.stringify(document));
   assert.equal(parsed.ok, true);
-  assert.equal(parsed.state.data.collection.value.shelf, 'box-a');
-  assert.equal(parsed.state.data.collection.value.cards[0].binderSlot, 'p1');
-  assert.equal(parsed.state.data.decks.value[0].note, 'keep');
-  assert.equal(parsed.state.data.decks.value[0].cards[0].printing.scryfallId, 'bird');
-  assert.equal(parsed.state.data.preferences.value.currency, 'EUR');
+  assert.equal(parsed.state.data.collection.value.shelf, "box-a");
+  assert.equal(parsed.state.data.collection.value.cards[0].binderSlot, "p1");
+  assert.equal(parsed.state.data.decks.value[0].note, "keep");
+  assert.equal(
+    parsed.state.data.decks.value[0].cards[0].printing.scryfallId,
+    "bird",
+  );
+  assert.equal(parsed.state.data.preferences.value.currency, "EUR");
   assert.equal(parsed.state.data.preferences.value.homeCountry, 3);
-  assert.equal(parsed.state.data.printings.value.birds.note, 'keep');
-  const again = readSyncedState(JSON.stringify(toSyncedState(parsed.state.data, 'native')));
+  assert.equal(parsed.state.data.printings.value.birds.note, "keep");
+  const again = readSyncedState(
+    JSON.stringify(toSyncedState(parsed.state.data, "native")),
+  );
   assert.equal(again.ok, true);
-  assert.equal(again.state.data.preferences.value.currency, 'EUR');
-  assert.equal(again.state.data.collection.value.shelf, 'box-a');
+  assert.equal(again.state.data.preferences.value.currency, "EUR");
+  assert.equal(again.state.data.collection.value.shelf, "box-a");
 });
 
-test('a newer empty remote collection replaces the local cards', async () => {
+test("a newer empty remote collection replaces the local cards", async () => {
   const remote = new InMemorySyncRepository();
-  const desktop = new InMemoryLocalRepository('desktop', emptyData(at(1)));
-  desktop.edit('collection', { cards: [{ foil: false, name: 'Sol Ring', quantity: 1 }], format: 'list', importedAt: 1, source: '' }, at(2));
+  const desktop = new InMemoryLocalRepository("desktop", emptyData(at(1)));
+  desktop.edit(
+    "collection",
+    {
+      cards: [{ foil: false, name: "Sol Ring", quantity: 1 }],
+      format: "list",
+      importedAt: 1,
+      source: "",
+    },
+    at(2),
+  );
   await createSyncEngine({ local: desktop, now: () => at(2), remote }).sync();
-  const phone = new InMemoryLocalRepository('phone', emptyData(at(1)));
+  const phone = new InMemoryLocalRepository("phone", emptyData(at(1)));
   await createSyncEngine({ local: phone, now: () => at(3), remote }).sync();
-  desktop.edit('collection', null, at(5));
+  desktop.edit("collection", null, at(5));
   await createSyncEngine({ local: desktop, now: () => at(5), remote }).sync();
   await createSyncEngine({ local: phone, now: () => at(6), remote }).sync();
   assert.equal(phone.snapshot().collection.value, null);
 });
 
-test('the Android redirect is the reversed client id, not the app scheme', () => {
-  const redirect = googleAndroidRedirect('123-abc.apps.googleusercontent.com');
-  assert.equal(redirect.scheme, 'com.googleusercontent.apps.123-abc');
-  assert.equal(redirect.redirectUri, 'com.googleusercontent.apps.123-abc:/oauth2redirect');
-  assert.equal(googleAndroidRedirect('not-a-google-client'), null);
+test("the Android redirect is the reversed client id, not the app scheme", () => {
+  const redirect = googleAndroidRedirect("123-abc.apps.googleusercontent.com");
+  assert.equal(redirect.scheme, "com.googleusercontent.apps.123-abc");
+  assert.equal(
+    redirect.redirectUri,
+    "com.googleusercontent.apps.123-abc:/oauth2redirect",
+  );
+  assert.equal(googleAndroidRedirect("not-a-google-client"), null);
 });
 
-test('a plaintext token moves to secure storage and stays if the write fails', async () => {
+test("a plaintext token moves to secure storage and stays if the write fails", async () => {
   const memory = new Map();
   const store = {
     delete: async key => {
@@ -461,7 +791,11 @@ test('a plaintext token moves to secure storage and stays if the write fails', a
       memory.set(key, value);
     },
   };
-  let file = JSON.stringify({ accessToken: 'access', expiresAt: 10, refreshToken: 'refresh' });
+  let file = JSON.stringify({
+    accessToken: "access",
+    expiresAt: 10,
+    refreshToken: "refresh",
+  });
   const legacy = {
     read: async () => file,
     remove: async () => {
@@ -469,31 +803,38 @@ test('a plaintext token moves to secure storage and stays if the write fails', a
     },
   };
   const moved = await migrateLegacyToken(store, legacy);
-  assert.equal(moved.accessToken, 'access');
-  assert.equal(moved.refreshToken, 'refresh');
+  assert.equal(moved.accessToken, "access");
+  assert.equal(moved.refreshToken, "refresh");
   assert.equal(file, null);
 
-  file = JSON.stringify({ accessToken: 'old', expiresAt: 11, refreshToken: 'old-refresh' });
+  file = JSON.stringify({
+    accessToken: "old",
+    expiresAt: 11,
+    refreshToken: "old-refresh",
+  });
   const broken = {
     delete: async () => {},
     get: async () => null,
     set: async () => {},
   };
   await assert.rejects(() => migrateLegacyToken(broken, legacy));
-  assert.equal(JSON.parse(file).accessToken, 'old');
+  assert.equal(JSON.parse(file).accessToken, "old");
   await writeSecureToken(store, null);
   assert.equal(memory.size, 0);
 });
 
-test('an overwritten version is kept as its own file', async () => {
+test("an overwritten version is kept as its own file", async () => {
   const drive = fakeDrive();
-  const repo = createDriveRepository({ http: drive.http, token: tokens('good') });
+  const repo = createDriveRepository({
+    http: drive.http,
+    token: tokens("good"),
+  });
 
-  await repo.archiveConflict('decks', [deck('older')], at(4));
+  await repo.archiveConflict("decks", [deck("older")], at(4));
 
   const [file] = [...drive.files.values()];
   assert.match(file.name, /^conflict-decks-/);
-  assert.deepEqual(JSON.parse(file.content).value, [deck('older')]);
+  assert.deepEqual(JSON.parse(file.content).value, [deck("older")]);
 });
 
 let failed = 0;

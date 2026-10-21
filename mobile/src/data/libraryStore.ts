@@ -14,15 +14,18 @@ import { emptyData, type ApplicationData, type DomainKey } from '@/core/sync/mod
 import { UnsupportedSchemaError } from '@/core/sync/repository';
 import type { CollectionCard, StoredCollection } from '@/lib/collection';
 import { adjustCollectionQuantity, adjustPrintingQuantity } from '@/lib/collectionEdit';
-import { decideScanIntake, mergeScanCard, nameOnlyCard, type IntakeStatus } from '@/lib/collectionIntake';
+import {
+  decideScanIntake,
+  mergeScanCard,
+  nameOnlyCard,
+  type IntakeStatus,
+} from '@/lib/collectionIntake';
 import { deckFromImport, newDeck, parseDeckList, type Deck, type DeckFormat } from '@/lib/deck';
 import { applyImport } from '@/lib/duplicates';
 import { collectionFile, deckFile } from '@/lib/export';
 import { inspectImport } from '@/lib/import';
 import { NO_PRICES, type PriceState } from '@/lib/prices';
 import type { LibraryRepository } from '@/platform/sqlite/localRepository';
-
-
 
 const EPOCH = new Date(0).toISOString();
 
@@ -31,13 +34,7 @@ export interface SessionMark {
   state: 'added' | 'review';
 }
 
-export type LibraryStatus =
-  | 'boot'
-  | 'busy'
-  | 'choose-sync'
-  | 'disconnected'
-  | 'error'
-  | 'ready';
+export type LibraryStatus = 'boot' | 'busy' | 'choose-sync' | 'disconnected' | 'error' | 'ready';
 
 export interface LibrarySnapshot {
   configured: boolean;
@@ -147,9 +144,22 @@ const reconcile = async (quiet: boolean, force = false): Promise<void> => {
   try {
     const report = await engine.sync();
     await refreshFromDisk();
-    set({ conflicted: report.conflicted, connected: true, status: 'ready' });
+    set({
+      conflicted: report.conflicted,
+      connected: true,
+      error:
+        report.archiveFailures > 0
+          ? `${report.archiveFailures} conflict recovery ${
+              report.archiveFailures === 1 ? 'copy' : 'copies'
+            } could not be saved to Drive.`
+          : null,
+      status: 'ready',
+    });
   } catch (error) {
-    if (error instanceof AuthError && (error.failure === 'no-session' || error.failure === 'cancelled')) {
+    if (
+      error instanceof AuthError &&
+      (error.failure === 'no-session' || error.failure === 'cancelled')
+    ) {
       set({ connected: false, status: 'disconnected' });
       return;
     }
@@ -192,6 +202,35 @@ const mark = (name: string, state: SessionMark['state']): void => {
 };
 
 export const libraryStore = {
+  addCollectionCard: async (card: CollectionCard): Promise<void> => {
+    await editCollection((cards, prev) => ({
+      cards: applyImport([...cards], [{ ...card, quantity: Math.max(1, card.quantity) }], []),
+      format: prev?.format ?? 'list',
+      importedAt: prev?.importedAt ?? Date.now(),
+      source: prev?.source ?? 'manual',
+    }));
+    mark(card.name, 'added');
+  },
+
+  addCollectionText: async (text: string): Promise<number> => {
+    const parsed = parseDeckList(text);
+    if (parsed.cards.length === 0) return 0;
+    const incoming: CollectionCard[] = parsed.cards.map(card => ({
+      foil: false,
+      name: card.name,
+      quantity: card.quantity,
+      source: 'import',
+    }));
+    await editCollection((cards, prev) => ({
+      cards: applyImport([...cards], incoming, []),
+      format: prev?.format ?? 'list',
+      importedAt: prev?.importedAt ?? Date.now(),
+      source: prev?.source ?? 'manual',
+    }));
+    for (const card of incoming) mark(card.name, 'added');
+    return incoming.length;
+  },
+
   addManualCard: async (name: string): Promise<boolean> => {
     const card = nameOnlyCard(name);
     if (!card.name) return false;
@@ -214,7 +253,8 @@ export const libraryStore = {
     const decision = decideScanIntake({ ...input, committedSessionId });
     if (!decision.ok) {
       if (decision.reason === 'withheld') mark(input.card?.name || 'Unknown', 'review');
-      if (decision.reason === 'stale') return 'That result is no longer the card in front of the camera';
+      if (decision.reason === 'stale')
+        return 'That result is no longer the card in front of the camera';
       if (decision.reason === 'duplicate-tap') return 'Already added';
       if (decision.reason === 'withheld') return 'Not added — confirm the card first';
       return 'No card to add';
