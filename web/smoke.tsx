@@ -19,6 +19,7 @@ import { CollectionView } from '../src/web/CollectionView';
 import { DeckEditor } from '../src/web/DeckEditor';
 import { DeckList } from '../src/web/DeckList';
 import { ImportScreen } from '../src/web/ImportScreen';
+import { Landing } from '../src/web/Landing';
 import { ART_INDEX_CACHE } from '../src/web/artworkIndexStore';
 import { PRICES_CACHE } from '../src/web/priceStore';
 import { SHARE_INBOX, SHARE_KEY_PATH } from '../src/web/sharedImport';
@@ -68,6 +69,7 @@ const manabox = inspectImport(
 
 const checks: [string, () => string][] = [
   ['App', () => renderToString(<App />)],
+  ['Landing', () => renderToString(<Landing />)],
   [
     'ImportReview',
     () =>
@@ -127,6 +129,14 @@ for (const [name, run] of checks) {
   } catch (error) {
     failed += 1;
     console.log(`  FAIL  ${name}: ${error instanceof Error ? error.message : error}`);
+  }
+}
+
+const landing = renderToString(<Landing />).replace(/<!--.*?-->/g, '');
+for (const text of ['Open Lugin Web', 'Desktop Chrome', 'Public install coming soon']) {
+  if (!landing.includes(text)) {
+    failed += 1;
+    console.log(`  FAIL  landing page is missing “${text}”`);
   }
 }
 
@@ -273,6 +283,9 @@ const asserts: [string, () => void][] = [
       for (const name of [SHARE_INBOX, SHARE_KEY_PATH]) {
         if (!sw.includes(`'${name}'`)) throw new Error(`the worker no longer names ${name}`);
       }
+      if (!sw.includes('?app=1&shared=1')) {
+        throw new Error('shared files no longer open inside Lugin Web');
+      }
     },
   ],
   [
@@ -359,11 +372,15 @@ const asserts: [string, () => void][] = [
           method: string;
           params: { files: { accept: string[]; name: string }[] };
         };
+        start_url: string;
       };
       const share = manifest.share_target;
       if (!share) throw new Error('no share_target');
       // Chrome ignores the whole entry if any of these are wrong, without saying so.
       if (!share.action.startsWith(manifest.scope)) throw new Error('action is outside the scope');
+      if (!manifest.start_url.includes('?app=1')) {
+        throw new Error('installed Lugin opens the product chooser instead of Lugin Web');
+      }
       if (share.method !== 'POST') throw new Error('a file share has to be a POST');
       if (share.enctype !== 'multipart/form-data') throw new Error('wrong enctype for a file');
       if (share.params.files[0]?.name !== 'file') {

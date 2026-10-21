@@ -90,6 +90,11 @@ Known sync risks to address separately:
 
 Public URL: <https://tsuina311.github.io/Lugin/>
 
+The root URL is the public product chooser. **Open Lugin Web** enters the Web
+client with `?app=1`; an installed Home Screen app starts there directly, so it
+does not show the chooser or repeat installation instructions. Shared-file
+launches also enter the Web client directly.
+
 In iPhone/iPad Safari, when the site is not already standalone, Lugin Web shows
 a dismissible install helper:
 

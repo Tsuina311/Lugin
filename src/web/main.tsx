@@ -8,6 +8,7 @@
 import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
+import { Landing } from './Landing';
 import { WEB_UPDATE_EVENT } from './pwa';
 
 import { loadBracketLists } from '@/lib/bracket';
@@ -21,13 +22,19 @@ const mount = document.getElementById('root');
 if (!mount) throw new Error('index.html is missing #root');
 
 mount.classList.add('lugin-root');
-loadBracketLists();
-void ensureComboIndex();
+const params = new URLSearchParams(window.location.search);
+const standalone =
+  window.matchMedia('(display-mode: standalone)').matches ||
+  Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+const openApp = standalone || params.has('app') || params.has('shared');
+
+if (openApp) {
+  loadBracketLists();
+  void ensureComboIndex();
+}
 
 createRoot(mount).render(
-  <ErrorBoundary label="Lugin">
-    <App />
-  </ErrorBoundary>,
+  <ErrorBoundary label="Lugin">{openApp ? <App /> : <Landing />}</ErrorBoundary>,
 );
 
 // The worker earns installability — "Add to Home Screen" gives a real standalone

@@ -109,7 +109,7 @@ const pwaAssets = (): Plugin => ({
             },
           },
           short_name: NAME,
-          start_url: BASE,
+          start_url: `${BASE}?app=1`,
           theme_color: THEME,
         },
         null,
@@ -202,7 +202,7 @@ const receiveShare = async request => {
   }
   // 303 so the browser follows with a GET: left as the POST it arrived as, a
   // reload would re-submit the share.
-  return Response.redirect(new URL(SHELL + '?shared=1', self.location.href).href, 303);
+  return Response.redirect(new URL(SHELL + '?app=1&shared=1', self.location.href).href, 303);
 };
 
 self.addEventListener('fetch', event => {

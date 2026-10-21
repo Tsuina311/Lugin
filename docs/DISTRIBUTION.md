@@ -1,13 +1,32 @@
 # Shipping Lugin to a list of test users
 
+## Public entry point
+
+<https://tsuina311.github.io/Lugin/> is the single public product entry point.
+It opens Lugin Web on any modern browser and explains iPhone installation.
+
+Lugin Chrome is not currently offered as a public download. The tester zip
+below requires Developer mode, manual updates and a pinned private signing key;
+do not link it from the public landing page. A safe **Install Lugin Chrome**
+button requires:
+
+1. a Chrome Web Store developer account and item;
+2. the store item ID/public key pinned in the build;
+3. its `chromiumapp.org` redirect registered on the Google Web OAuth client;
+4. completed store listing, privacy declarations and screenshots;
+5. store review/publication and the resulting listing URL.
+
+Only then should the landing page replace “Public install coming soon” with the
+Chrome Web Store link.
+
 Four routes, because they carry different things:
 
-| What                        | Where                | Gate on the tester list                | Cost |
-| --------------------------- | -------------------- | -------------------------------------- | ---- |
-| The extension, as a zip     | **You, by hand**     | Whoever you send the file to           | free |
-| The extension, installable  | **Chrome Web Store** | Visibility `Private` + trusted testers | $5   |
-| The phone web companion     | **GitHub Pages**     | OAuth test users — no sign-in, no data | free |
-| The native Android companion| **Google Play**      | Internal testing track + tester emails | $25  |
+| What                       | Where                | Gate on the tester list                | Cost |
+| -------------------------- | -------------------- | -------------------------------------- | ---- |
+| The extension, as a zip    | **You, by hand**     | Whoever you send the file to           | free |
+| The extension, installable | **Chrome Web Store** | Visibility `Private` + trusted testers | $5   |
+| Lugin Web                  | **GitHub Pages**     | OAuth test users — no sign-in, no data | free |
+| Lugin Native Android       | **Google Play**      | Internal testing track + tester emails | $25  |
 
 Google Play does not distribute browser extensions, and the Chrome Web Store does
 not distribute Android apps. There is no single place that does both — and
@@ -15,8 +34,8 @@ neither of the free routes needs an account anywhere.
 
 A third list also exists and is easy to forget: the **OAuth consent screen's
 test users**, in Google Cloud. Lugin's consent screen is in `Testing` status, so
-a person who is not on that list cannot sign in to Google *even if the store let
-them install the extension*. Any tester therefore has to appear on **two** lists:
+a person who is not on that list cannot sign in to Google _even if the store let
+them install the extension_. Any tester therefore has to appear on **two** lists:
 the store's, and the OAuth one.
 
 ---
@@ -62,7 +81,7 @@ treats it as unrelated to the one already installed.
 ## 2. Register that redirect URI
 
 Google Cloud console → **APIs & Services** → **Credentials** → your OAuth 2.0
-client (the *Web application* one) → **Authorised redirect URIs** → add the line
+client (the _Web application_ one) → **Authorised redirect URIs** → add the line
 `yarn key` printed, trailing slash included. A client can hold several, so
 existing ones can stay.
 
@@ -113,7 +132,7 @@ Worth doing when the tester list outgrows email, or the developer-mode nag does.
 while giving them a normal one-click install and automatic updates.
 
 > **The id changes here, and it is the one thing to plan for.** The store re-signs
-> the item with its *own* key and assigns its own permanent id, so the published
+> the item with its _own_ key and assigns its own permanent id, so the published
 > extension does **not** have the id from Part 1. Nothing breaks if you register
 > both redirect URIs on the OAuth client and leave them there: the zip installs
 > keep working while the store item takes over. Step 3 below then switches
@@ -145,7 +164,7 @@ because the store insists on signing with its own.
 1. On the dashboard, **Add new item**, and upload the zip. Do not publish yet.
 2. Open the item's **Package** tab → **View public key**.
 3. Copy everything between `-----BEGIN PUBLIC KEY-----` and `-----END PUBLIC
-   KEY-----`, and **replace** the value `yarn key` wrote in `.env.local`:
+KEY-----`, and **replace** the value `yarn key` wrote in `.env.local`:
 
    ```bash
    LUGIN_EXTENSION_KEY=MIIBIjANBgkqhkiG9w0…
@@ -154,6 +173,7 @@ because the store insists on signing with its own.
    Newlines are stripped for you, so pasting the block as-is on one line is fine.
    Keep `.extension-key.pem` regardless: it is what the zip installs from Part 1
    are still running on.
+
 4. `yarn build`, then reload the unpacked extension. Its id at
    `chrome://extensions` should now equal the **Item ID** on the dashboard.
 
@@ -163,7 +183,7 @@ redirect URI.
 ## 4. Register the redirect URI on the OAuth client
 
 Google Cloud console → **APIs & Services** → **Credentials** → your OAuth 2.0
-client (the *Web application* one, `690972952850-…`) → **Authorised redirect
+client (the _Web application_ one, `690972952850-…`) → **Authorised redirect
 URIs** → add, with the trailing slash:
 
 ```
@@ -198,7 +218,7 @@ quota permanently, so don't add addresses speculatively.
 The tabs that block submission, and what Lugin's answers are:
 
 **Store listing** — description (the manifest's is reused; the store's own field
-allows more), category *Productivity*, language, and:
+allows more), category _Productivity_, language, and:
 
 - At least one **screenshot**, 1280×800 or 640×400 PNG/JPEG. Screenshot the
   overlay open on a Cardmarket page.
@@ -214,17 +234,17 @@ allows more), category *Productivity*, language, and:
 
 - _Permission justifications_:
 
-  | Permission                  | Justification                                                                                                        |
-  | --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-  | `storage`                   | Stores the user's collection, decks and preferences locally.                                                          |
-  | `unlimitedStorage`          | A full collection with cached card metadata exceeds the 10 MB quota.                                                  |
-  | `identity`                  | Opens the Google sign-in window so the user can sync their own data to their own Google Drive. Nothing starts unprompted. |
-  | `host` — cardmarket.com     | The site the interface is built on; the extension reads the page the user has open.                                   |
-  | `host` — api.scryfall.com   | Free card metadata (types, colours, mana values) that Cardmarket doesn't expose, looked up by card name.               |
-  | `host` — json.edhrec.com    | Commander deck recommendations; serves no CORS headers, so the request must come from the worker.                      |
-  | `host` — www.mtggoldfish.com | Per-archetype card breakdowns, parsed from the page.                                                                  |
-  | `host` — help.cardmarket.com | Cardmarket's own public shipping-cost calculator.                                                                    |
-  | `host` — googleapis.com     | The Drive appDataFolder the user's data syncs through.                                                                 |
+  | Permission                   | Justification                                                                                                             |
+  | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+  | `storage`                    | Stores the user's collection, decks and preferences locally.                                                              |
+  | `unlimitedStorage`           | A full collection with cached card metadata exceeds the 10 MB quota.                                                      |
+  | `identity`                   | Opens the Google sign-in window so the user can sync their own data to their own Google Drive. Nothing starts unprompted. |
+  | `host` — cardmarket.com      | The site the interface is built on; the extension reads the page the user has open.                                       |
+  | `host` — api.scryfall.com    | Free card metadata (types, colours, mana values) that Cardmarket doesn't expose, looked up by card name.                  |
+  | `host` — json.edhrec.com     | Commander deck recommendations; serves no CORS headers, so the request must come from the worker.                         |
+  | `host` — www.mtggoldfish.com | Per-archetype card breakdowns, parsed from the page.                                                                      |
+  | `host` — help.cardmarket.com | Cardmarket's own public shipping-cost calculator.                                                                         |
+  | `host` — googleapis.com      | The Drive appDataFolder the user's data syncs through.                                                                    |
 
 - _Remote code_: **No, I am not using remote code.** Everything is bundled.
 - _Data usage_: tick **Website content**, and the three certifications (not sold
@@ -239,8 +259,8 @@ allows more), category *Productivity*, language, and:
   https://github.com/Tsuina311/Lugin/blob/main/docs/PRIVACY.md
   ```
 
-**Distribution** — **Visibility: Private**, then *Only trusted testers from the
-current publisher settings*. Free, and pick your countries.
+**Distribution** — **Visibility: Private**, then _Only trusted testers from the
+current publisher settings_. Free, and pick your countries.
 
 ## 7. Submit
 
@@ -289,7 +309,7 @@ later", not "lost".
 ## Why a web app can't be the minibrowser
 
 Worth being explicit, because it's the one thing this path cannot do. Showing
-Cardmarket *inside* our own interface needs two things a web page may not have:
+Cardmarket _inside_ our own interface needs two things a web page may not have:
 
 - **Framing.** Cardmarket sends `x-frame-options: SAMEORIGIN`, so no page on
   another origin may embed it in an `<iframe>`.
@@ -324,8 +344,9 @@ account. What remains is three settings and a push.
    ```
 
    Origin only — no path, no trailing slash. The phone build uses Google Identity
-   Services, which validates the *origin* and needs no redirect URI, so there is
+   Services, which validates the _origin_ and needs no redirect URI, so there is
    nothing extension-id-shaped to keep in step here.
+
 4. **Push to `main`.** The workflow in `.github/workflows/pages.yml` runs the
    render checks, builds with the base path derived from the repository name, and
    deploys to <https://tsuina311.github.io/Lugin/>. `workflow_dispatch` is also
@@ -353,6 +374,7 @@ account. What remains is three settings and a push.
    Either way it is a copy, not a sync: ManaBox has no API, so nothing on either
    side tracks the other's identity, and sending the same deck twice gives ManaBox
    a second deck rather than updating the first.
+
 8. **Check the collection's value**, which appears under the search box once the
    price table has downloaded — a few seconds on a first run, then offline. If your
    ManaBox export carried purchase prices, the change since you bought them sits
@@ -397,11 +419,11 @@ deployed Pages URL is the one to sign in from.
 
 ## Which track
 
-| Track        | Testers | Review           | Counts toward production access |
-| ------------ | ------- | ---------------- | ------------------------------- |
-| **Internal** | 100     | none, ~minutes   | no                              |
-| Closed       | large   | yes              | **yes**                         |
-| Open         | public  | yes              | yes                             |
+| Track        | Testers | Review         | Counts toward production access |
+| ------------ | ------- | -------------- | ------------------------------- |
+| **Internal** | 100     | none, ~minutes | no                              |
+| Closed       | large   | yes            | **yes**                         |
+| Open         | public  | yes            | yes                             |
 
 **Internal testing** is the one that matches "only people on my list": you paste
 tester emails, Google generates an opt-in link, and builds reach them within
@@ -417,7 +439,7 @@ between you and testers.
 1. Register at <https://play.google.com/console> — one-time $25. A personal
    account requires identity verification, which can take a couple of days, so
    start it early.
-2. **Create app**: name, default language, *App*, *Free*.
+2. **Create app**: name, default language, _App_, _Free_.
 3. Work through **Dashboard → set up your app**: privacy policy URL (the same one
    as the extension), app access, ads declaration, content rating questionnaire,
    target audience, and the **Data safety** form — the Drive-only architecture
