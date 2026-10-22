@@ -3,16 +3,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 
+import { CardPreviewModal } from '../ui/CardPreviewModal';
 import { CardThumb } from '../ui/CardThumb';
 
 import { cardImageCandidates } from '@/lib/cardImage';
@@ -26,10 +25,7 @@ import {
 } from '@/lib/deckCuts';
 import { buildTagsQuery, filterDeckTags } from '@/lib/deckTags';
 import { fetchEdhrec, type EdhrecData } from '@/lib/edhrec';
-import {
-  searchScryfallQuery,
-  type CardSearchResult,
-} from '@/lib/search';
+import { searchScryfallQuery, type CardSearchResult } from '@/lib/search';
 
 export function DeckTags({
   deckFormat,
@@ -136,7 +132,8 @@ export function DeckTags({
               style={[styles.tag, active && styles.tagOn]}
             >
               <Text style={[styles.tagText, active && styles.tagTextOn]}>
-                {tag.label}{active ? ' ×' : ''}
+                {tag.label}
+                {active ? ' ×' : ''}
               </Text>
             </Pressable>
           );
@@ -165,22 +162,32 @@ export function DeckTags({
           keyExtractor={card => card.id}
           renderItem={({ item }) => (
             <ToolCardRow
+              action="+"
               imageUrl={item.thumbUrl ?? item.imageUrl}
               meta={[
                 item.typeLine,
                 ownedQuantity(item.name) > 0 ? `owned ×${ownedQuantity(item.name)}` : 'not owned',
-              ].filter(Boolean).join(' · ')}
+              ]
+                .filter(Boolean)
+                .join(' · ')}
               name={item.name}
               onAction={() => onAdd(item.name)}
               onImagePress={() => setPreview(item)}
-              action="+"
             />
           )}
           style={styles.flex}
         />
       )}
       {preview ? (
-        <CardPreviewModal card={preview} onClose={() => setPreview(null)} />
+        <CardPreviewModal
+          candidates={cardImageCandidates({
+            imageUrl: preview.imageUrl,
+            name: preview.name,
+            scryfallId: preview.id,
+          })}
+          name={preview.name}
+          onClose={() => setPreview(null)}
+        />
       ) : null}
     </View>
   );
@@ -231,10 +238,7 @@ export function DeckCuts({
   }, [commanderKey]);
 
   const played = useMemo(() => edhrecPlayRates(data), [data]);
-  const cuts = useMemo(
-    () => suggestCuts(cards, played, threshold),
-    [cards, played, threshold],
-  );
+  const cuts = useMemo(() => suggestCuts(cards, played, threshold), [cards, played, threshold]);
 
   return (
     <View style={styles.root}>
@@ -289,24 +293,14 @@ export function DeckCuts({
   );
 }
 
-const CutRow = ({
-  cut,
-  floor,
-  onCut,
-}: {
-  cut: CutCandidate;
-  floor: number;
-  onCut: () => void;
-}) => (
+const CutRow = ({ cut, floor, onCut }: { cut: CutCandidate; floor: number; onCut: () => void }) => (
   <ToolCardRow
     action="Cut"
-    meta={
-      `${cut.card.quantity > 1 ? `${cut.card.quantity} copies · ` : ''}${
-        cut.inclusion == null
-          ? `not listed · under ${Math.round(floor * 100)}%`
-          : `played in ${Math.round(cut.inclusion * 100)}% of decks`
-      }`
-    }
+    meta={`${cut.card.quantity > 1 ? `${cut.card.quantity} copies · ` : ''}${
+      cut.inclusion == null
+        ? `not listed · under ${Math.round(floor * 100)}%`
+        : `played in ${Math.round(cut.inclusion * 100)}% of decks`
+    }`}
     name={cut.card.name}
     onAction={onCut}
   />
@@ -336,8 +330,12 @@ const ToolCardRow = ({
       <CardThumb candidates={cardImageCandidates({ imageUrl, name })} style={styles.thumb} />
     </Pressable>
     <View style={styles.flex}>
-      <Text numberOfLines={1} style={styles.cardName}>{name}</Text>
-      <Text numberOfLines={1} style={styles.cardMeta}>{meta}</Text>
+      <Text numberOfLines={1} style={styles.cardName}>
+        {name}
+      </Text>
+      <Text numberOfLines={1} style={styles.cardMeta}>
+        {meta}
+      </Text>
     </View>
     <Pressable
       accessibilityLabel={`${action} ${name}`}
@@ -348,40 +346,6 @@ const ToolCardRow = ({
     </Pressable>
   </View>
 );
-
-const CardPreviewModal = ({
-  card,
-  onClose,
-}: {
-  card: CardSearchResult;
-  onClose: () => void;
-}) => {
-  const window = useWindowDimensions();
-  const ratio = 680 / 488;
-  const height = Math.min(window.height - 100, (window.width - 36) * ratio, 544);
-  const width = height / ratio;
-  return (
-    <Modal animationType="fade" onRequestClose={onClose} transparent visible>
-      <Pressable onPress={onClose} style={styles.previewBackdrop}>
-        <Pressable
-          accessibilityLabel={`Close image for ${card.name}`}
-          onPress={onClose}
-          style={styles.previewCard}
-        >
-          <CardThumb
-            candidates={cardImageCandidates({
-              imageUrl: card.imageUrl,
-              name: card.name,
-              scryfallId: card.id,
-            })}
-            style={[styles.previewImage, { height, width }]}
-          />
-        </Pressable>
-        <Text style={styles.previewHint}>Tap the card or outside to close</Text>
-      </Pressable>
-    </Modal>
-  );
-};
 
 const styles = StyleSheet.create({
   action: {
@@ -410,7 +374,12 @@ const styles = StyleSheet.create({
   cutToolbar: { alignItems: 'center', flexDirection: 'row', gap: 6, marginBottom: 8 },
   empty: { color: '#8A97AD', lineHeight: 19, padding: 18, textAlign: 'center' },
   error: { color: '#E98A8A', lineHeight: 19, padding: 18, textAlign: 'center' },
-  filter: { backgroundColor: '#1C2636', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 5 },
+  filter: {
+    backgroundColor: '#1C2636',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
   filterText: { color: '#8A97AD', fontSize: 11, fontWeight: '600' },
   filterTextOn: { color: '#8CB4FF' },
   filters: { alignItems: 'center', flexDirection: 'row', gap: 6, marginBottom: 5 },
@@ -423,20 +392,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 9,
   },
-  previewBackdrop: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.84)',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 18,
-  },
-  previewCard: {
-    borderRadius: 14,
-    elevation: 12,
-    overflow: 'hidden',
-  },
-  previewHint: { color: '#AAB6C9', fontSize: 12, marginTop: 12 },
-  previewImage: { backgroundColor: '#1C2636', borderRadius: 14 },
   refresh: { alignItems: 'center', height: 30, justifyContent: 'center', width: 30 },
   refreshText: { color: '#C5D3E8', fontSize: 20 },
   resultCount: { color: '#697991', fontSize: 11, marginLeft: 'auto' },
@@ -449,11 +404,17 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   tagOn: { backgroundColor: '#17345B', borderColor: '#3D7EFF' },
-  tagPicker: { flexGrow: 0, maxHeight: 135, marginBottom: 7 },
+  tagPicker: { flexGrow: 0, marginBottom: 7, maxHeight: 135 },
   tagText: { color: '#AAB6C9', fontSize: 11 },
   tagTextOn: { color: '#9BBEFF', fontWeight: '700' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  threshold: { color: '#F4F7FB', fontSize: 12, fontWeight: '800', minWidth: 30, textAlign: 'center' },
+  threshold: {
+    color: '#F4F7FB',
+    fontSize: 12,
+    fontWeight: '800',
+    minWidth: 30,
+    textAlign: 'center',
+  },
   thresholdButton: {
     alignItems: 'center',
     backgroundColor: '#1C2636',

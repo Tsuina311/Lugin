@@ -314,8 +314,18 @@ export const libraryStore = {
     }
   },
 
-  createDeck: async (format: DeckFormat, name?: string): Promise<string> => {
-    const deck = newDeck({ format, name });
+  createDeck: async (
+    format: DeckFormat,
+    name?: string,
+    commanderName?: string,
+  ): Promise<string> => {
+    const created = newDeck({ format, name: name || commanderName });
+    const deck: Deck = commanderName
+      ? {
+          ...created,
+          cards: [{ name: commanderName, quantity: 1, section: 'commander' }],
+        }
+      : created;
     await editDecks(decks => [deck, ...decks]);
     return deck.id;
   },

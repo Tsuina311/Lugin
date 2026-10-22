@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Modal,
@@ -16,17 +17,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { libraryStore } from '../data/libraryStore';
 import { useLibrary } from '../data/useLibrary';
-import {
-  DeckRecommendations,
-  type RecommendationSource,
-} from './DeckRecommendations';
-import { DeckCuts, DeckTags } from './DeckTools';
+import { CardPreviewModal } from '../ui/CardPreviewModal';
 import { CardThumb, deckImageCandidates } from '../ui/CardThumb';
 
-import { candidatesByName } from '@/lib/cardImage';
-import { cardKey } from '@/lib/cardName';
+import { DeckRecommendations, type RecommendationSource } from './DeckRecommendations';
+import { DeckCuts, DeckTags } from './DeckTools';
+
 import { BRACKET_NAME } from '@/lib/bracket';
+import { cardImageCandidates, candidatesByName } from '@/lib/cardImage';
+import { cardKey } from '@/lib/cardName';
 import { buildCollection } from '@/lib/collection';
+import { commanderQuery } from '@/lib/commanders';
 import {
   countCards,
   coverageView,
@@ -45,10 +46,8 @@ import {
   type DeckSection,
 } from '@/lib/deck';
 import { filterDeckTags } from '@/lib/deckTags';
-import {
-  estimateDeck,
-  type DeckBracketEstimate,
-} from '@/lib/decks/bracket/estimator';
+import { estimateDeck, type DeckBracketEstimate } from '@/lib/decks/bracket/estimator';
+import { searchScryfallPage, type CardSearchResult } from '@/lib/search';
 
 type DeckView = 'deck' | 'tags' | 'cuts' | RecommendationSource;
 
@@ -67,15 +66,38 @@ const DeckList = ({ onOpen }: { onOpen: (id: string) => void }) => {
   const [format, setFormat] = useState<DeckFormat>('commander');
   const [name, setName] = useState('');
   const [paste, setPaste] = useState('');
+  const [pickingCommander, setPickingCommander] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [bracketInfo, setBracketInfo] = useState<DeckBracketEstimate | null>(null);
   const collectionCards = library.data?.collection.value?.cards ?? [];
   const owned = useMemo(() => {
     return buildCollection(collectionCards, '', 'list').byKey;
   }, [collectionCards]);
-  const images = useMemo(
-    () => candidatesByName(collectionCards),
-    [collectionCards],
-  );
+  const images = useMemo(() => candidatesByName(collectionCards), [collectionCards]);
+
+  const create = async (commanderName?: string) => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const id = await libraryStore.createDeck(format, name.trim() || commanderName, commanderName);
+      setName('');
+      setPickingCommander(false);
+      onOpen(id);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (pickingCommander) {
+    return (
+      <CommanderPickerScreen
+        busy={creating}
+        onCancel={() => setPickingCommander(false)}
+        onPick={commander => void create(commander)}
+        onSkip={() => void create()}
+      />
+    );
+  }
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 12 }]}>
@@ -83,7 +105,9 @@ const DeckList = ({ onOpen }: { onOpen: (id: string) => void }) => {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.formats}>
         {DECK_FORMATS.map(item => (
           <Pressable key={item.id} onPress={() => setFormat(item.id)} style={styles.chip}>
-            <Text style={[styles.chipLabel, format === item.id && styles.chipOn]}>{item.label}</Text>
+            <Text style={[styles.chipLabel, format === item.id && styles.chipOn]}>
+              {item.label}
+            </Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -97,12 +121,10 @@ const DeckList = ({ onOpen }: { onOpen: (id: string) => void }) => {
         />
         <Pressable
           onPress={() => {
-            void libraryStore.createDeck(format, name).then(id => {
-              setName('');
-              onOpen(id);
-            });
+            if (format === 'commander') setPickingCommander(true);
+            else void create();
           }}
-          style={styles.addButton}
+          style={[styles.addButton, creating && styles.disabled]}
         >
           <Text style={styles.addLabel}>New</Text>
         </Pressable>
@@ -135,8 +157,7 @@ const DeckList = ({ onOpen }: { onOpen: (id: string) => void }) => {
         renderItem={({ item }) => {
           const missing = deckShortfall(item.cards, owned);
           const commander = item.cards.find(card => card.section === 'commander');
-          const bracket =
-            item.format === 'commander' ? estimateDeck(item.cards, null) : null;
+          const bracket = item.format === 'commander' ? estimateDeck(item.cards, null) : null;
           return (
             <Pressable onPress={() => onOpen(item.id)} style={styles.deckRow}>
               {commander ? (
@@ -170,12 +191,153 @@ const DeckList = ({ onOpen }: { onOpen: (id: string) => void }) => {
         style={styles.flex}
       />
       {bracketInfo ? (
-        <BracketInfo
-          bracket={bracketInfo}
-          onClose={() => setBracketInfo(null)}
-          open
-        />
+        <BracketInfo bracket={bracketInfo} onClose={() => setBracketInfo(null)} open />
       ) : null}
+    </View>
+  );
+};
+
+const commanderImageCandidates = (card: CardSearchResult): string[] =>
+  cardImageCandidates({
+    collectorNumber: card.collectorNumber,
+    imageUrl: card.thumbUrl ?? card.imageUrl,
+    name: card.name,
+    scryfallId: card.id,
+    setCode: card.setCode,
+  });
+
+const CommanderPickerScreen = ({
+  busy,
+  onCancel,
+  onPick,
+  onSkip,
+}: {
+  busy: boolean;
+  onCancel: () => void;
+  onPick: (name: string) => void;
+  onSkip: () => void;
+}) => {
+  const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState('');
+  const [cards, setCards] = useState<CardSearchResult[]>([]);
+  const [next, setNext] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const searchQuery = useMemo(() => commanderQuery({ name: query }), [query]);
+
+  useEffect(() => {
+    const mine = generation.current + 1;
+    generation.current = mine;
+    setLoading(true);
+    setError(null);
+    const timer = setTimeout(() => {
+      void searchScryfallPage(searchQuery, { order: 'edhrec' }).then(
+        page => {
+          if (generation.current !== mine) return;
+          setCards(page.cards);
+          setNext(page.next);
+          setTotal(page.total);
+          setLoading(false);
+        },
+        reason => {
+          if (generation.current !== mine) return;
+          setCards([]);
+          setNext(null);
+          setTotal(0);
+          setLoading(false);
+          setError(reason instanceof Error ? reason.message : 'Commander search failed.');
+        },
+      );
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
+  const loadMore = () => {
+    if (!next || loading) return;
+    const mine = generation.current;
+    const pageUrl = next;
+    setLoading(true);
+    void searchScryfallPage(searchQuery, { next: pageUrl }).then(
+      page => {
+        if (generation.current !== mine) return;
+        setCards(current => [...current, ...page.cards]);
+        setNext(page.next);
+        setTotal(page.total);
+        setLoading(false);
+      },
+      reason => {
+        if (generation.current !== mine) return;
+        setLoading(false);
+        setError(reason instanceof Error ? reason.message : 'More commanders could not be loaded.');
+      },
+    );
+  };
+
+  return (
+    <View style={[styles.root, { paddingTop: insets.top + 12 }]}>
+      <View style={styles.commanderHeader}>
+        <Pressable disabled={busy} onPress={onCancel} style={styles.commanderHeaderButton}>
+          <Text style={styles.secondaryLabel}>‹ Decks</Text>
+        </Pressable>
+        <Text style={styles.commanderTitle}>Choose a commander</Text>
+        <Pressable disabled={busy} onPress={onSkip} style={styles.commanderHeaderButton}>
+          <Text style={styles.secondaryLabel}>Empty deck</Text>
+        </Pressable>
+      </View>
+      <TextInput
+        autoCapitalize="words"
+        autoCorrect={false}
+        onChangeText={setQuery}
+        placeholder="Search commanders"
+        placeholderTextColor="#6E7B91"
+        style={styles.input}
+        value={query}
+      />
+      <Text style={styles.meta}>
+        {query.trim()
+          ? `${total.toLocaleString()} legal commanders`
+          : 'Popular legal commanders · choose one to start your deck'}
+      </Text>
+      {error ? <Text style={styles.commanderError}>{error}</Text> : null}
+      <FlatList
+        ListEmptyComponent={
+          loading ? null : (
+            <Text style={styles.emptyPanel}>
+              {error ? 'Check your connection and try another search.' : 'No commanders found.'}
+            </Text>
+          )
+        }
+        ListFooterComponent={
+          loading ? <ActivityIndicator color="#8FB4FF" style={styles.commanderLoading} /> : null
+        }
+        columnWrapperStyle={styles.commanderColumns}
+        contentContainerStyle={styles.commanderGrid}
+        data={cards}
+        initialNumToRender={8}
+        keyExtractor={card => card.id}
+        keyboardShouldPersistTaps="handled"
+        numColumns={2}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.6}
+        renderItem={({ item }) => (
+          <Pressable
+            accessibilityLabel={`Choose ${item.name} as commander`}
+            disabled={busy}
+            onPress={() => onPick(item.name)}
+            style={styles.commanderChoice}
+          >
+            <CardThumb candidates={commanderImageCandidates(item)} style={styles.commanderImage} />
+            <Text numberOfLines={2} style={styles.commanderName}>
+              {item.name}
+            </Text>
+          </Pressable>
+        )}
+        style={styles.flex}
+      />
     </View>
   );
 };
@@ -186,6 +348,7 @@ const DeckEditor = ({ deck, onClose }: { deck: Deck; onClose: () => void }) => {
   const [view, setView] = useState<DeckView>('deck');
   const [bracketOpen, setBracketOpen] = useState(false);
   const [line, setLine] = useState('');
+  const [preview, setPreview] = useState<DeckCard | null>(null);
   const [tagQuery, setTagQuery] = useState('');
   const collectionCards = library.data?.collection.value?.cards ?? [];
   const owned = useMemo(
@@ -216,9 +379,8 @@ const DeckEditor = ({ deck, onClose }: { deck: Deck; onClose: () => void }) => {
   const addLine = () => {
     const parsed = parseCardLine(line);
     if (!parsed) return;
-    const section: DeckSection = formatInfo(deck.format).commanderZone && commanders.length === 0
-      ? 'commander'
-      : 'main';
+    const section: DeckSection =
+      formatInfo(deck.format).commanderZone && commanders.length === 0 ? 'commander' : 'main';
     save(current => ({
       ...current,
       cards: mergeDeckCards(current.cards, [
@@ -247,18 +409,19 @@ const DeckEditor = ({ deck, onClose }: { deck: Deck; onClose: () => void }) => {
     }));
   };
 
-  const deckTabs: readonly { id: DeckView; label: string }[] = commanders.length > 0
-    ? [
-        { id: 'deck', label: 'Deck' },
-        { id: 'tags', label: 'Tags' },
-        { id: 'edhrec', label: 'EDHREC' },
-        { id: 'goldfish', label: 'Goldfish' },
-        { id: 'cuts', label: 'Cuts' },
-      ]
-    : [
-        { id: 'deck', label: 'Deck' },
-        { id: 'tags', label: 'Tags' },
-      ];
+  const deckTabs: readonly { id: DeckView; label: string }[] =
+    commanders.length > 0
+      ? [
+          { id: 'deck', label: 'Deck' },
+          { id: 'tags', label: 'Tags' },
+          { id: 'edhrec', label: 'EDHREC' },
+          { id: 'goldfish', label: 'Goldfish' },
+          { id: 'cuts', label: 'Cuts' },
+        ]
+      : [
+          { id: 'deck', label: 'Deck' },
+          { id: 'tags', label: 'Tags' },
+        ];
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 12 }]}>
@@ -275,9 +438,7 @@ const DeckEditor = ({ deck, onClose }: { deck: Deck; onClose: () => void }) => {
           {formatInfo(deck.format).label} · {countCards(deck.cards)} cards
           {missing.length > 0 ? ` · ${missing.length} short` : ' · collection covers it'}
         </Text>
-        {bracket ? (
-          <BracketPill bracket={bracket} onPress={() => setBracketOpen(true)} />
-        ) : null}
+        {bracket ? <BracketPill bracket={bracket} onPress={() => setBracketOpen(true)} /> : null}
       </View>
       {deckTabs.length > 1 ? (
         <View style={styles.tabs}>
@@ -296,122 +457,131 @@ const DeckEditor = ({ deck, onClose }: { deck: Deck; onClose: () => void }) => {
       ) : null}
       {view === 'deck' ? (
         <>
-      <TextInput
-        onChangeText={text => save(current => ({ ...current, name: text }))}
-        style={styles.input}
-        value={deck.name}
-      />
-      <View style={styles.addRow}>
-        <Pressable
-          onPress={() => save(current => ({ ...current, frozen: !current.frozen }))}
-          style={styles.secondary}
-        >
-          <Text style={styles.secondaryLabel}>{deck.frozen ? 'Paper locked' : 'Mark paper'}</Text>
-        </Pressable>
-        <Pressable onPress={() => void libraryStore.shareDeck(deck)} style={styles.secondary}>
-          <Text style={styles.secondaryLabel}>Share</Text>
-        </Pressable>
-      </View>
-      <View style={styles.addRow}>
-        <TextInput
-          autoCapitalize="words"
-          onChangeText={setLine}
-          placeholder="2 Lightning Bolt"
-          placeholderTextColor="#6E7B91"
-          style={[styles.input, styles.flex]}
-          value={line}
-        />
-        <Pressable onPress={addLine} style={styles.addButton}>
-          <Text style={styles.addLabel}>Add</Text>
-        </Pressable>
-      </View>
-      <TextInput
-        onChangeText={setTagQuery}
-        placeholder="Tag sections"
-        placeholderTextColor="#6E7B91"
-        style={styles.input}
-        value={tagQuery}
-      />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.formats}>
-        {tags.map(tag => {
-          const on = deck.tagSections?.includes(tag.id) === true;
-          return (
-            <Pressable
-              key={tag.id}
-              onPress={() =>
-                save(current => {
-                  const currentTags = current.tagSections ?? [];
-                  const tagSections = on
-                    ? currentTags.filter(id => id !== tag.id)
-                    : [...currentTags, tag.id];
-                  return { ...current, tagSections };
-                })
-              }
-              style={styles.chip}
-            >
-              <Text style={[styles.chipLabel, on && styles.chipOn]}>{tag.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-      <FlatList
-        data={deck.cards}
-        keyExtractor={(card, index) => `${card.section}:${cardKey(card.name)}:${index}`}
-        renderItem={({ item }) => (
-          <DeckRow
-            card={item}
-            deck={deck}
-            decks={library.data?.decks.value ?? []}
-            images={images}
-            onChange={quantity =>
-              save(current => ({
-                ...current,
-                cards:
-                  quantity <= 0
-                    ? current.cards.filter(
-                        candidate =>
-                          !(candidate.section === item.section && cardKey(candidate.name) === cardKey(item.name)),
-                      )
-                    : current.cards.map(candidate =>
-                        candidate.section === item.section && cardKey(candidate.name) === cardKey(item.name)
-                          ? { ...candidate, quantity }
-                          : candidate,
-                      ),
-              }))
-            }
-            owned={owned[cardKey(item.name)]?.total ?? 0}
+          <TextInput
+            onChangeText={text => save(current => ({ ...current, name: text }))}
+            style={styles.input}
+            value={deck.name}
           />
-        )}
-        style={styles.flex}
-      />
-      <ScrollView horizontal style={styles.formats}>
-        {DECK_FORMATS.map(item => (
+          <View style={styles.addRow}>
+            <Pressable
+              onPress={() => save(current => ({ ...current, frozen: !current.frozen }))}
+              style={styles.secondary}
+            >
+              <Text style={styles.secondaryLabel}>
+                {deck.frozen ? 'Paper locked' : 'Mark paper'}
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => void libraryStore.shareDeck(deck)} style={styles.secondary}>
+              <Text style={styles.secondaryLabel}>Share</Text>
+            </Pressable>
+          </View>
+          <View style={styles.addRow}>
+            <TextInput
+              autoCapitalize="words"
+              onChangeText={setLine}
+              placeholder="2 Lightning Bolt"
+              placeholderTextColor="#6E7B91"
+              style={[styles.input, styles.flex]}
+              value={line}
+            />
+            <Pressable onPress={addLine} style={styles.addButton}>
+              <Text style={styles.addLabel}>Add</Text>
+            </Pressable>
+          </View>
+          <TextInput
+            onChangeText={setTagQuery}
+            placeholder="Tag sections"
+            placeholderTextColor="#6E7B91"
+            style={styles.input}
+            value={tagQuery}
+          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.formats}>
+            {tags.map(tag => {
+              const on = deck.tagSections?.includes(tag.id) === true;
+              return (
+                <Pressable
+                  key={tag.id}
+                  onPress={() =>
+                    save(current => {
+                      const currentTags = current.tagSections ?? [];
+                      const tagSections = on
+                        ? currentTags.filter(id => id !== tag.id)
+                        : [...currentTags, tag.id];
+                      return { ...current, tagSections };
+                    })
+                  }
+                  style={styles.chip}
+                >
+                  <Text style={[styles.chipLabel, on && styles.chipOn]}>{tag.label}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <FlatList
+            data={deck.cards}
+            keyExtractor={(card, index) => `${card.section}:${cardKey(card.name)}:${index}`}
+            renderItem={({ item }) => (
+              <DeckRow
+                card={item}
+                deck={deck}
+                decks={library.data?.decks.value ?? []}
+                images={images}
+                onChange={quantity =>
+                  save(current => ({
+                    ...current,
+                    cards:
+                      quantity <= 0
+                        ? current.cards.filter(
+                            candidate =>
+                              !(
+                                candidate.section === item.section &&
+                                cardKey(candidate.name) === cardKey(item.name)
+                              ),
+                          )
+                        : current.cards.map(candidate =>
+                            candidate.section === item.section &&
+                            cardKey(candidate.name) === cardKey(item.name)
+                              ? { ...candidate, quantity }
+                              : candidate,
+                          ),
+                  }))
+                }
+                onOpen={() => setPreview(item)}
+                owned={owned[cardKey(item.name)]?.total ?? 0}
+              />
+            )}
+            style={styles.flex}
+          />
+          <ScrollView horizontal style={styles.formats}>
+            {DECK_FORMATS.map(item => (
+              <Pressable
+                key={item.id}
+                onPress={() => save(current => withFormat(current, item.id))}
+                style={styles.chip}
+              >
+                <Text style={[styles.chipLabel, deck.format === item.id && styles.chipOn]}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
           <Pressable
-            key={item.id}
-            onPress={() => save(current => withFormat(current, item.id))}
-            style={styles.chip}
+            onPress={() =>
+              Alert.alert('Delete deck', `Delete ${deck.name}?`, [
+                { style: 'cancel', text: 'Cancel' },
+                {
+                  onPress: () => {
+                    void libraryStore.removeDeck(deck.id);
+                    onClose();
+                  },
+                  style: 'destructive',
+                  text: 'Delete',
+                },
+              ])
+            }
           >
-            <Text style={[styles.chipLabel, deck.format === item.id && styles.chipOn]}>{item.label}</Text>
+            <Text style={styles.remove}>Delete deck</Text>
           </Pressable>
-        ))}
-      </ScrollView>
-      <Pressable
-        onPress={() =>
-          Alert.alert('Delete deck', `Delete ${deck.name}?`, [
-            { style: 'cancel', text: 'Cancel' },
-            {
-              onPress: () => {
-                void libraryStore.removeDeck(deck.id);
-                onClose();
-              },
-              style: 'destructive',
-              text: 'Delete',
-            },
-          ])
-        }
-      >
-        <Text style={styles.remove}>Delete deck</Text>
-      </Pressable>
         </>
       ) : view === 'tags' ? (
         <DeckTags
@@ -437,12 +607,15 @@ const DeckEditor = ({ deck, onClose }: { deck: Deck; onClose: () => void }) => {
           source={view}
         />
       ) : null}
-      {bracket ? (
-        <BracketInfo
-          bracket={bracket}
-          onClose={() => setBracketOpen(false)}
-          open={bracketOpen}
+      {preview ? (
+        <CardPreviewModal
+          candidates={deckImageCandidates(preview, images)}
+          name={preview.name}
+          onClose={() => setPreview(null)}
         />
+      ) : null}
+      {bracket ? (
+        <BracketInfo bracket={bracket} onClose={() => setBracketOpen(false)} open={bracketOpen} />
       ) : null}
     </View>
   );
@@ -454,6 +627,7 @@ const DeckRow = ({
   decks,
   images,
   onChange,
+  onOpen,
   owned,
 }: {
   card: DeckCard;
@@ -461,6 +635,7 @@ const DeckRow = ({
   decks: readonly Deck[];
   images: Map<string, readonly string[]>;
   onChange: (quantity: number) => void;
+  onOpen: () => void;
   owned: number;
 }) => {
   const uses = copiesAcrossDecks(card.name, decks);
@@ -468,17 +643,23 @@ const DeckRow = ({
   const used = copiesUsed(uses);
   return (
     <View style={styles.deckRow}>
-      <CardThumb candidates={deckImageCandidates(card, images)} style={styles.thumb} />
-      <View style={styles.flex}>
-        <Text style={styles.name}>{card.name}</Text>
-        <Text numberOfLines={1} style={styles.rowMeta}>
-          {card.section}
-          {used > 0
-            ? ` · ${owned} owned · ${used} used in ${uses.length} deck${uses.length === 1 ? '' : 's'}`
-            : ` · ${owned} owned · ${card.quantity} here`}
-          {card.printing?.setCode ? ` · ${card.printing.setCode.toUpperCase()}` : ''}
-        </Text>
-      </View>
+      <Pressable
+        accessibilityLabel={`Open image for ${card.name}`}
+        onPress={onOpen}
+        style={styles.deckIdentity}
+      >
+        <CardThumb candidates={deckImageCandidates(card, images)} style={styles.thumb} />
+        <View style={styles.flex}>
+          <Text style={styles.name}>{card.name}</Text>
+          <Text numberOfLines={1} style={styles.rowMeta}>
+            {card.section}
+            {used > 0
+              ? ` · ${owned} owned · ${used} used in ${uses.length} deck${uses.length === 1 ? '' : 's'}`
+              : ` · ${owned} owned · ${card.quantity} here`}
+            {card.printing?.setCode ? ` · ${card.printing.setCode.toUpperCase()}` : ''}
+          </Text>
+        </View>
+      </Pressable>
       {mark ? (
         <View
           accessibilityLabel={`${owned} owned, ${used} used across decks`}
@@ -491,7 +672,8 @@ const DeckRow = ({
           ]}
         >
           <Text style={styles.coverageText}>
-            {mark.check ? '✓ ' : ''}{owned}/{used}
+            {mark.check ? '✓ ' : ''}
+            {owned}/{used}
           </Text>
         </View>
       ) : null}
@@ -542,10 +724,7 @@ const BracketInfo = ({
 }) => (
   <Modal animationType="fade" onRequestClose={onClose} transparent visible={open}>
     <Pressable onPress={onClose} style={styles.modalBackdrop}>
-      <Pressable
-        onPress={event => event.stopPropagation()}
-        style={styles.bracketPanel}
-      >
+      <Pressable onPress={event => event.stopPropagation()} style={styles.bracketPanel}>
         <View style={styles.bracketPanelHeader}>
           <View style={styles.flex}>
             <Text style={styles.bracketPanelTitle}>
@@ -632,25 +811,43 @@ const styles = StyleSheet.create({
   chip: { marginRight: 12, paddingVertical: 6 },
   chipLabel: { color: '#8A97AD', fontSize: 13 },
   chipOn: { color: '#F4F7FB', fontWeight: '700' },
-  deckRow: {
+  commanderChoice: { marginBottom: 14, width: '48%' },
+  commanderColumns: { justifyContent: 'space-between' },
+  commanderError: {
+    backgroundColor: '#431F27',
+    borderRadius: 8,
+    color: '#FFB4B4',
+    fontSize: 12,
+    marginBottom: 8,
+    padding: 9,
+  },
+  commanderGrid: { paddingBottom: 24 },
+  commanderHeader: {
     alignItems: 'center',
-    borderBottomColor: '#1C2636',
-    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: 8,
-    paddingVertical: 10,
+    marginBottom: 10,
   },
-  deckCover: {
+  commanderHeaderButton: { minWidth: 76, paddingVertical: 8 },
+  commanderImage: {
+    aspectRatio: 488 / 680,
     backgroundColor: '#1C2636',
-    borderRadius: 6,
-    height: 67,
-    width: 48,
+    borderRadius: 10,
+    width: '100%',
   },
-  emptyPanel: {
-    color: '#8A97AD',
-    lineHeight: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 28,
+  commanderLoading: { paddingVertical: 20 },
+  commanderName: {
+    color: '#F4F7FB',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 17,
+    marginTop: 6,
+  },
+  commanderTitle: {
+    color: '#F4F7FB',
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '700',
     textAlign: 'center',
   },
   coverage: {
@@ -665,6 +862,34 @@ const styles = StyleSheet.create({
   coveragePaper: { backgroundColor: '#17345B' },
   coverageText: { color: '#F4F7FB', fontSize: 11, fontWeight: '800' },
   coverageWarn: { backgroundColor: '#493819' },
+  deckCover: {
+    backgroundColor: '#1C2636',
+    borderRadius: 6,
+    height: 67,
+    width: 48,
+  },
+  deckIdentity: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  deckRow: {
+    alignItems: 'center',
+    borderBottomColor: '#1C2636',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 10,
+  },
+  disabled: { opacity: 0.45 },
+  emptyPanel: {
+    color: '#8A97AD',
+    lineHeight: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 28,
+    textAlign: 'center',
+  },
   flex: { flex: 1 },
   formats: { flexGrow: 0, marginBottom: 8, maxHeight: 36 },
   input: {
@@ -682,7 +907,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  modalDone: { backgroundColor: '#1C2636', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  modalDone: {
+    backgroundColor: '#1C2636',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
   modalDoneText: { color: '#DCE5F2', fontSize: 12, fontWeight: '700' },
   name: { color: '#F4F7FB', fontSize: 16, fontWeight: '600' },
   paste: { minHeight: 64 },
