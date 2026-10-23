@@ -50,7 +50,13 @@ import { ScanResultCard } from '../scan/ScanResultCard';
 import { VerifiedScanPanel } from '../scan/VerifiedScanPanel';
 import { isGeometryV2Pipeline } from '@/lib/scan/singleCardCapture';
 import { collectionCardFromPrinting } from '../scan/collectionCard';
-import { mapCornersToOverlay, type CardCorners, type Point2D } from '../scan/sharedCore';
+import {
+  fetchPrintingsByName,
+  mapCornersToOverlay,
+  type CardCorners,
+  type Point2D,
+} from '../scan/sharedCore';
+import { defaultPrinting } from '@/lib/scan/resolve';
 import { RECOGNITION_SOURCES, type PreferredSource } from '../scan/hiresCapture';
 import {
   downloadPreparedBundle,
@@ -1591,6 +1597,29 @@ export function CameraScanScreen(props?: {
         {vnextQuiet ? (
           <View style={styles.resultWrap}>
             <VNextCoach
+              onAdd={async result => {
+                const published = result.prototypeTop5.find(
+                  hit => hit.oracleId === result.finalPublishedOracle,
+                );
+                if (!published) return 'Not added — no published card';
+                const printings = await fetchPrintingsByName(published.name);
+                const printing = defaultPrinting(printings);
+                const card = printing
+                  ? collectionCardFromPrinting(printing, {
+                      confidence: 1,
+                      foil: false,
+                      reason: 'unset',
+                    })
+                  : null;
+                const liveSessionId =
+                  session.snapshot?.lockGates?.cardSessionId ?? null;
+                return libraryStore.addScan({
+                  card,
+                  liveSessionId,
+                  ownerSessionId: result.cardSessionId,
+                  status: 'identified',
+                });
+              }}
               onCapture={async () => {
                 const shot = await session.checkCurrentOutline();
                 if (!shot.ok) {

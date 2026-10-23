@@ -17,6 +17,17 @@ data class VNextHit(val oracleId: String, val name: String, val score: Float, va
 
 data class VNextDual(val clean: List<VNextHit>, val prototype: List<VNextHit>)
 
+data class VNextIdentity(
+  val geometryId: String,
+  val geometrySha256: String,
+  val adapterId: String,
+  val adapterWSha256: String,
+  val adapterBSha256: String,
+  val cleanSha256: String,
+  val prototypeSha256: String,
+  val refsSha256: String,
+)
+
 class VNextIndex(
   val clean: FloatArray,
   val prototype: FloatArray,
@@ -27,26 +38,40 @@ class VNextIndex(
   val adapterB: FloatArray,
   val nameToOracles: Map<String, List<String>>,
   val galleryBytes: Long,
+  val identity: VNextIdentity,
 )
 
 object VNextGallery {
+  private const val EXPECTED_GEOMETRY_ID = "gbm-iou-all-2dd2ec36b833"
+  private const val EXPECTED_GEOMETRY_SHA = "369b264919888a09ff4f72b85ec83d1fbe0eb7081cc100ad3eb7280f3c95ee70"
+  private const val EXPECTED_ADAPTER_ID = "linear-identity-v1"
+  private const val EXPECTED_ADAPTER_W_SHA = "c667fc8f197331b382bb9abdc66ccfc9d884121feab532e77645e71545b9da02"
+  private const val EXPECTED_ADAPTER_B_SHA = "2378682f6732d0f02795b7fca5b64281caad6fde1fa952a283fae3484b7c4d6d"
+  private const val EXPECTED_CLEAN_SHA = "785519ce3deda47f248392e66786d5b9008899cfec158390a31e2e3556e99b9c"
+  private const val EXPECTED_PROTOTYPE_SHA = "7cfb59e52db439239ee4a1af6b22596a539d43eccfe1afb3d7835027d5a683d1"
+  private const val EXPECTED_REFS_SHA = "58ea2f9bd6ef2c01f81a11db9865c713f9035a83b0d45bf9ae44eb0c714ae057"
+
   fun load(dir: File): VNextIndex {
     val manifest = JSONObject(File(dir, "manifest.json").readText())
     val dims = manifest.optInt("dims", 512)
     val count = manifest.getInt("count")
+    if (count != 49968 || dims != 512) {
+      throw IllegalStateException("vNext frozen shape mismatch count=$count dims=$dims")
+    }
+    val identity = validateFrozenIdentity(manifest)
     val cleanFile = File(dir, manifest.getString("clean"))
     val prototypeFile = File(dir, manifest.getString("prototype"))
-    val clean = readF32(cleanFile, manifest.optString("cleanSha256", ""))
-    val prototype = readF32(prototypeFile, manifest.optString("prototypeSha256", ""))
-    val adapterW = readF32(File(dir, manifest.getString("adapterW")))
-    val adapterB = readF32(File(dir, manifest.getString("adapterB")))
+    val clean = readF32(cleanFile, identity.cleanSha256)
+    val prototype = readF32(prototypeFile, identity.prototypeSha256)
+    val adapterW = readF32(File(dir, manifest.getString("adapterW")), identity.adapterWSha256)
+    val adapterB = readF32(File(dir, manifest.getString("adapterB")), identity.adapterBSha256)
     if (clean.size != count * dims || prototype.size != count * dims) {
       throw IllegalStateException("vNext gallery length != count*dims")
     }
     if (adapterW.size != dims * dims || adapterB.size != dims) {
       throw IllegalStateException("vNext adapter shape != ${dims}x$dims")
     }
-    val refs = JSONObject(File(dir, manifest.getString("refs")).readText())
+    val refs = JSONObject(readTextVerified(File(dir, manifest.getString("refs")), identity.refsSha256))
     val nameArr = refs.getJSONArray("names")
     val oracleArr = refs.getJSONArray("oracleIds")
     if (nameArr.length() != count || oracleArr.length() != count) {
@@ -69,7 +94,43 @@ object VNextGallery {
       adapterB,
       nameToOracles,
       (clean.size + prototype.size + adapterW.size + adapterB.size) * 4L,
+      identity,
     )
+  }
+
+  internal fun validateFrozenIdentity(manifest: JSONObject): VNextIdentity =
+    VNextIdentity(
+      requireIdentity(manifest, "geometryId", EXPECTED_GEOMETRY_ID),
+      requireIdentity(manifest, "geometrySha256", EXPECTED_GEOMETRY_SHA),
+      requireIdentity(manifest, "adapterId", EXPECTED_ADAPTER_ID),
+      requireIdentity(manifest, "adapterWSha256", EXPECTED_ADAPTER_W_SHA),
+      requireIdentity(manifest, "adapterBSha256", EXPECTED_ADAPTER_B_SHA),
+      requireIdentity(manifest, "cleanSha256", EXPECTED_CLEAN_SHA),
+      requireIdentity(manifest, "prototypeSha256", EXPECTED_PROTOTYPE_SHA),
+      requireIdentity(manifest, "refsSha256", EXPECTED_REFS_SHA),
+    )
+
+  private fun requireIdentity(manifest: JSONObject, key: String, expected: String): String {
+    val actual = manifest.optString(key, "")
+    if (!actual.equals(expected, ignoreCase = key.endsWith("Sha256"))) {
+      throw IllegalStateException("vNext frozen identity mismatch $key")
+    }
+    return actual
+  }
+
+  private fun readTextVerified(file: File, expectedSha: String): String {
+    val bytes = file.readBytes()
+    verifySha(file.name, bytes, expectedSha)
+    return bytes.toString(Charsets.UTF_8)
+  }
+
+  private fun verifySha(name: String, bytes: ByteArray, expectedSha: String) {
+    val actual = MessageDigest.getInstance("SHA-256")
+      .digest(bytes)
+      .joinToString("") { "%02x".format(it) }
+    if (!actual.equals(expectedSha, ignoreCase = true)) {
+      throw IllegalStateException("vNext sha mismatch $name")
+    }
   }
 
   /** y = normalize(x W + b). W is row-major [in, out], matching embedding/math.mjs gemv. */

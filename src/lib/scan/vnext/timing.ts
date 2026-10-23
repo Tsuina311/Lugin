@@ -10,6 +10,7 @@ export type VNextTimingSample = {
   candidateCount: number;
   warpMs: number;
   artMs: number;
+  preprocessMs: number | null;
   clipMs: number | null;
   adapterMs: number | null;
   searchMs: number | null;
@@ -71,6 +72,7 @@ export const summarizeVNextTiming = () => {
     feature: field('featureMs'),
     warp: field('warpMs'),
     art: field('artMs'),
+    preprocess: field('preprocessMs'),
     clip: field('clipMs'),
     adapter: field('adapterMs'),
     search: field('searchMs'),

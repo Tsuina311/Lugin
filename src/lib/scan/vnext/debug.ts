@@ -9,6 +9,7 @@ export type VNextHit = {
 
 export type VNextDebugSnapshot = {
   at: number;
+  cardSessionId: number;
   candidateIndex: number | null;
   candidateCount: number;
   gbmUtility: number | null;
@@ -23,6 +24,9 @@ export type VNextDebugSnapshot = {
   ocrNormalized: string | null;
   ocrExactOracle: string | null;
   ocrInTop5: boolean | null;
+  recoveredOracle: string | null;
+  finalPublishedOracle: string | null;
+  frozenIdentity: Record<string, string> | null;
   source: VNextDecisionSource;
   note: string | null;
   timing: VNextTimingSample | null;

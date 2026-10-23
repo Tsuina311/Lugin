@@ -378,6 +378,7 @@ export function DeckCuts({
       ),
     [browse, cuts.cuts, metadata, ownedQuantity],
   );
+  const previewCard = preview ? metadata[cardKey(preview)] : undefined;
 
   return (
     <View style={styles.root}>
@@ -450,9 +451,15 @@ export function DeckCuts({
       )}
       {preview ? (
         <CardPreviewModal
-          candidates={cardImageCandidates({ name: preview })}
+          candidates={cardImageCandidates({
+            imageUrl: previewCard?.imageUrl,
+            name: preview,
+            scryfallId: previewCard?.id,
+          })}
+          faceImages={previewCard?.faceImages}
           name={preview}
           onClose={() => setPreview(null)}
+          placeholderCandidates={previewCard?.thumbUrl ? [previewCard.thumbUrl] : undefined}
         />
       ) : null}
     </View>

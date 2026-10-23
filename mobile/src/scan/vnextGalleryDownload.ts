@@ -1,4 +1,5 @@
 import { getInboxSettings, isInboxConfigured, loadInboxSettings } from './debugInbox/settings';
+import { manifestHasFrozenVNextIdentity } from '@/lib/scan/vnext/frozenIdentity';
 
 const DIR = 'lugin-visual-vnext';
 
@@ -22,8 +23,20 @@ const dirUri = async (): Promise<string> => {
 export const vnextGalleryInstalled = async (): Promise<boolean> => {
   try {
     const FileSystem = await fs();
-    const info = await FileSystem.getInfoAsync(`${await dirUri()}manifest.json`);
-    return info.exists;
+    const dir = await dirUri();
+    const info = await FileSystem.getInfoAsync(`${dir}manifest.json`);
+    if (!info.exists) return false;
+    const manifest = JSON.parse(
+      await FileSystem.readAsStringAsync(`${dir}manifest.json`),
+    ) as Record<string, unknown>;
+    if (!manifestHasFrozenVNextIdentity(manifest)) return false;
+    for (const key of ['clean', 'prototype', 'refs', 'adapterW', 'adapterB']) {
+      const name = manifest[key];
+      if (typeof name !== 'string') return false;
+      const file = await FileSystem.getInfoAsync(`${dir}${name}`);
+      if (!file.exists || !file.size) return false;
+    }
+    return true;
   } catch {
     return false;
   }

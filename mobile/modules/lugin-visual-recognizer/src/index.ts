@@ -11,8 +11,10 @@ export type {
   VisualRecognizeResult,
   VisualTiming,
   VNextNameLookup,
+  VNextFrozenIdentity,
   VNextNativeHit,
   VNextNativeResult,
+  VNextParityProbeResult,
 } from './LuginVisual.types';
 
 const MODULE_NAME = 'LuginVisual';

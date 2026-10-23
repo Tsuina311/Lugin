@@ -7,15 +7,21 @@
  */
 
 import { decideVNext, type VNextDecision } from '@/lib/scan/vnext/decide';
-import { setVNextDebug, type VNextHit } from '@/lib/scan/vnext/debug';
+import {
+  setVNextDebug,
+  type VNextDebugSnapshot,
+  type VNextHit,
+} from '@/lib/scan/vnext/debug';
 import { cropRecognitionArt } from '@/lib/scan/vnext/artCrop';
 import { rankLiveCandidatesPaced } from '@/lib/scan/vnext/features';
 import { FROZEN_GBM_ID } from '@/lib/scan/vnext/gbm';
+import { selectVNextPublishedHit } from '@/lib/scan/vnext/published';
 import { recordVNextTiming, type VNextTimingSample } from '@/lib/scan/vnext/timing';
 import { detectCardQuadPaced } from '@/lib/scan/detectCard';
 import { cornersToQuad, warpQuadToCard } from '@/lib/scan/geometry';
 import type { ScanImage } from '@/lib/scan/types';
 import { shapeFold, type CardNameIndex } from '@/lib/scan/matchName';
+import { normalizedExactTitleNameForRecovery } from '@/lib/scan/titleDecode';
 import { recognizeCapturedCard } from '@/lib/scan/recognizeCaptured';
 import type { TextRecognizer } from '@/lib/scan/textRecognizer';
 import { finalizeAttempt, type RecognitionAttempt } from '@/lib/scan/verifiedScan';
@@ -23,6 +29,7 @@ import { finalizeAttempt, type RecognitionAttempt } from '@/lib/scan/verifiedSca
 import { waitUntilCaptureGap } from './capturePace';
 import { getVisualRecognizerError } from './visualRecognizer';
 import { lookupVNextExactName, recognizeVNextArt } from './vnextNative';
+import { recordVNextBenchmarkDecision } from './vnextBenchmark';
 import * as attemptRegistry from './verifiedScan/registry';
 
 const ocrBySession = new Map<number, ExactOcr>();
@@ -85,6 +92,7 @@ export const runScannerVNext = async (args: {
   let artMs = 0;
   let artAnchor: string | null = null;
   let clipMs: number | null = null;
+  let preprocessMs: number | null = null;
   let adapterMs: number | null = null;
   let searchMs: number | null = null;
   let agreementMs = 0;
@@ -100,6 +108,7 @@ export const runScannerVNext = async (args: {
   let prototypeTop: VNextHit[] = [];
   let galleryBytes: number | null = null;
   let nativeHeapBytes: number | null = null;
+  let frozenIdentity: Record<string, string> | null = null;
 
   if (card) {
     const art = cropRecognitionArt(card);
@@ -108,10 +117,12 @@ export const runScannerVNext = async (args: {
     const rgba = new Uint8Array(art.crop.data.buffer, art.crop.data.byteOffset, art.crop.data.byteLength);
     const visual = await recognizeVNextArt(rgba, art.crop.width, art.crop.height);
     clipMs = visual.encoderMs;
+    preprocessMs = visual.preprocessMs;
     adapterMs = visual.adapterMs;
     searchMs = visual.searchMs;
     galleryBytes = visual.galleryBytes;
     nativeHeapBytes = visual.nativeHeapBytes;
+    frozenIdentity = visual.frozenIdentity;
     cleanTop = hit(visual.cleanTop[0]);
     prototypeTop = visual.prototypeTop.map(row => hit(row)).filter((row): row is VNextHit => row != null);
     if (!visual.ok) {
@@ -157,7 +168,9 @@ export const runScannerVNext = async (args: {
       titleCropMs = captured.timings.cropMs;
       ocrMs = captured.timings.ocrMs;
       const tLookup = clock();
-      const name = captured.titleDecode.decision === 'exact-title' ? captured.matchName : null;
+      const name = normalizedExactTitleNameForRecovery(
+        captured.titleDecode.variants,
+      );
       let oracleId: string | null = null;
       if (name) {
         const lookup = await lookupVNextExactName(name);
@@ -196,9 +209,7 @@ export const runScannerVNext = async (args: {
     ocrInvoked = false;
   }
 
-  const published = decision.publish
-    ? prototypeTop.find(row => row.oracleId === decision.oracleId) ?? cleanTop
-    : null;
+  const published = selectVNextPublishedHit(decision, prototypeTop);
   const at = args.now();
   const timing: VNextTimingSample = {
     source: decision.source,
@@ -208,6 +219,7 @@ export const runScannerVNext = async (args: {
     candidateCount,
     warpMs,
     artMs,
+    preprocessMs,
     clipMs,
     adapterMs,
     searchMs,
@@ -219,8 +231,9 @@ export const runScannerVNext = async (args: {
     ocrInvoked,
   };
   recordVNextTiming(timing);
-  setVNextDebug({
+  const debugSnapshot: VNextDebugSnapshot = {
     at,
+    cardSessionId: args.attempt.cardSessionId,
     candidateIndex: selected?.index ?? null,
     candidateCount,
     gbmUtility: selected?.utility ?? null,
@@ -235,6 +248,10 @@ export const runScannerVNext = async (args: {
     ocrNormalized,
     ocrExactOracle: exactOracle,
     ocrInTop5: exactOracle != null ? top5.includes(exactOracle) : null,
+    recoveredOracle:
+      decision.source === 'OCR_EXACT_TOP5_RECOVERY' ? decision.oracleId : null,
+    finalPublishedOracle: decision.publish ? decision.oracleId : null,
+    frozenIdentity,
     source: decision.source,
     note: [
       note,
@@ -244,7 +261,9 @@ export const runScannerVNext = async (args: {
       .filter(part => part != null && part !== '')
       .join(' · '),
     timing,
-  });
+  };
+  setVNextDebug(debugSnapshot);
+  recordVNextBenchmarkDecision(debugSnapshot);
 
   return attemptRegistry.updateAttempt(args.attempt.attemptId, attempt =>
     finalizeAttempt(attempt, {

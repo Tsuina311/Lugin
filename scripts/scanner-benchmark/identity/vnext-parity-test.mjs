@@ -7,6 +7,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -34,6 +35,8 @@ await esbuild.build({
   stdin: {
     contents: `
       export { decideVNext, VNEXT_PUBLISH_MARGIN } from '${join(rootDir, 'src/lib/scan/vnext/decide.ts')}';
+      export { selectVNextPublishedHit } from '${join(rootDir, 'src/lib/scan/vnext/published.ts')}';
+      export { FROZEN_VNEXT_IDENTITY, manifestHasFrozenVNextIdentity } from '${join(rootDir, 'src/lib/scan/vnext/frozenIdentity.ts')}';
       export { frozenGbm, gbmTreeValues, gbmUtility, selectByUtility, vectorOf, FROZEN_GBM_ID } from '${join(rootDir, 'src/lib/scan/vnext/gbm.ts')}';
       export { buildRankerFeatureRows, parseMethod as parseMethodTs, quadCoverage as quadCoverageTs, termsOfQuad, rankLiveCandidates } from '${join(rootDir, 'src/lib/scan/vnext/features.ts')}';
       export { detectCardQuad } from '${join(rootDir, 'src/lib/scan/detectCard.ts')}';
@@ -43,10 +46,33 @@ await esbuild.build({
 });
 
 const vnext = await import(pathToFileURL(bundle).href);
+const sha256 = path => createHash('sha256').update(readFileSync(path)).digest('hex');
 
 assert.equal(vnext.VNEXT_PUBLISH_MARGIN, 0.05);
 assert.equal(vnext.VNEXT_PUBLISH_MARGIN, PUBLISH_MARGIN);
 assert.equal(vnext.FROZEN_GBM_ID, 'gbm-iou-all-2dd2ec36b833');
+const packedGalleryDir = join(rootDir, '.scan-fixtures/vnext-galleries');
+const packedManifest = JSON.parse(readFileSync(join(packedGalleryDir, 'manifest.json'), 'utf8'));
+assert.equal(packedManifest.geometryId, vnext.FROZEN_GBM_ID);
+assert.equal(packedManifest.adapterId, 'linear-identity-v1');
+assert.equal(vnext.manifestHasFrozenVNextIdentity(packedManifest), true);
+assert.equal(
+  vnext.manifestHasFrozenVNextIdentity({ ...packedManifest, adapterId: 'wrong' }),
+  false,
+);
+for (const [file, field] of [
+  ['clean.f32', 'cleanSha256'],
+  ['prototype.f32', 'prototypeSha256'],
+  ['refs.json', 'refsSha256'],
+  ['adapter-w.f32', 'adapterWSha256'],
+  ['adapter-b.f32', 'adapterBSha256'],
+]) {
+  assert.equal(sha256(join(packedGalleryDir, file)), packedManifest[field], `${field} mismatch`);
+}
+assert.equal(
+  sha256(join(rootDir, 'src/lib/scan/vnext/gbm-iou-all.json')),
+  packedManifest.geometrySha256,
+);
 
 const top = ids => ids;
 const visual = (margin, agreeIds, top5, exact = null) => vnext.decideVNext({
@@ -68,6 +94,13 @@ assert.equal(rounded.publish, true);
 const recovered = visual(0.04, ['oracle-a', 'oracle-a'], ['oracle-a', 'oracle-b', 'oracle-c', 'oracle-d', 'oracle-e'], 'oracle-c');
 assert.equal(recovered.source, 'OCR_EXACT_TOP5_RECOVERY');
 assert.equal(recovered.oracleId, 'oracle-c');
+const recoveredHit = vnext.selectVNextPublishedHit(recovered, [
+  { oracleId: 'oracle-a', name: 'Prototype Top1', score: 0.8 },
+  { oracleId: 'oracle-b', name: 'Prototype Top2', score: 0.79 },
+  { oracleId: 'oracle-c', name: 'Recovered Rank3', score: 0.78 },
+]);
+assert.equal(recoveredHit?.oracleId, 'oracle-c');
+assert.equal(recoveredHit?.name, 'Recovered Rank3');
 
 const disagreed = visual(0.2, ['oracle-a', 'oracle-b'], ['oracle-b', 'oracle-a', 'oracle-c', 'oracle-d', 'oracle-e'], 'oracle-a');
 assert.equal(disagreed.source, 'OCR_EXACT_TOP5_RECOVERY');

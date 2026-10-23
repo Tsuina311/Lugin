@@ -73,6 +73,12 @@ export type LuginVisualNativeModule = {
     height: number,
     topK: number,
   ): Promise<VNextNativeResult>;
+  /** Debuggable builds only. Uses the same frozen implementation without camera or OCR. */
+  runVNextParityProbeFromRgbaBytes?(
+    rgba: Uint8Array | ArrayBuffer,
+    width: number,
+    height: number,
+  ): Promise<VNextParityProbeResult>;
   lookupVNextExactName?(name: string): Promise<VNextNameLookup>;
 };
 
@@ -87,6 +93,7 @@ export type VNextNativeResult = {
   prototypeTop: VNextNativeHit[];
   galleryBytes: number;
   nativeHeapBytes: number;
+  frozenIdentity: VNextFrozenIdentity;
   timing: {
     preprocessMs: number;
     encoderMs: number;
@@ -94,6 +101,33 @@ export type VNextNativeResult = {
     searchMs: number;
     totalMs: number;
   };
+  error: string | null;
+};
+
+export type VNextFrozenIdentity = {
+  geometryId: string;
+  geometrySha256: string;
+  adapterId: string;
+  adapterWSha256: string;
+  adapterBSha256: string;
+  cleanSha256: string;
+  prototypeSha256: string;
+  refsSha256: string;
+};
+
+export type VNextParityProbeResult = {
+  preparedRgbaSha256: string;
+  embedding: number[];
+  cleanTop: VNextNativeHit[];
+  prototypeTop: VNextNativeHit[];
+  prototypeMargin: number | null;
+  agreement: boolean;
+  publish: boolean;
+  publishedOracleId: string | null;
+  decisionSource: 'VISUAL_AGREEMENT' | 'WITHHELD';
+  ocrIncluded: false;
+  frozenIdentity: VNextFrozenIdentity;
+  timing: VNextNativeResult['timing'];
   error: string | null;
 };
 

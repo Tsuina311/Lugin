@@ -6,6 +6,7 @@ import {
   editDistance,
   foldName,
   matchName,
+  matchNormalizedExactTitle,
   type CardNameIndex,
   type NameCandidate,
 } from './matchName';
@@ -34,6 +35,7 @@ export const STRONG_FUZZY_MIN_LEN_RATIO = 0.55;
 export type TitleDecodeDecisionKind = 'exact-title' | 'strong-fuzzy' | 'ambiguous' | 'ocr-empty';
 
 export interface TitleVariantRecord {
+  exactName: string | null;
   margin: number | null;
   ocrMs: number;
   ocrText: string;
@@ -135,6 +137,7 @@ export const recordTitleVariant = (
   const text = ocrText.trim();
   if (!text || !index) {
     return {
+      exactName: null,
       margin: null,
       ocrMs,
       ocrText: text,
@@ -147,10 +150,12 @@ export const recordTitleVariant = (
     };
   }
   const candidates = matchName(text, index, { limit: TITLE_TOP_N });
+  const exact = matchNormalizedExactTitle(text, index);
   const top = candidates[0] ?? null;
   const second = candidates[1] ?? null;
   const label = top?.printedName ?? top?.name ?? '';
   return {
+    exactName: exact?.name ?? null,
     margin: candidates.length ? candidateMargin(candidates) : null,
     ocrMs,
     ocrText: text,
@@ -269,6 +274,17 @@ const finish = (args: {
   };
 };
 
+export const isNormalizedExactTitleVariant = (variant: TitleVariantRecord): boolean =>
+  Boolean(variant.exactName && variant.topName === variant.exactName);
+
+/** Strict exact result used only by policies such as frozen vNext OCR recovery. */
+export const normalizedExactTitleNameForRecovery = (
+  variants: readonly TitleVariantRecord[],
+): string | null =>
+  variants.find(isNormalizedExactTitleVariant)?.exactName ?? null;
+
+// Production OCR keeps its existing high-confidence title behavior. Frozen
+// vNext recovery separately calls normalizedExactTitleNameForRecovery().
 const exactWinner = (variant: TitleVariantRecord): boolean =>
   Boolean(variant.topName && (variant.topScore ?? 0) >= TITLE_ONLY_MIN);
 

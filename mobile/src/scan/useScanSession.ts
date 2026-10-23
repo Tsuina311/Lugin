@@ -13,7 +13,8 @@ import { evaluateMtgFastAccept, perspectiveAspect } from '@/lib/scan/detection/m
 import { quadArea } from '@/lib/scan/recognitionQuad';
 import { scanImageToPngDataUri, scanImageToThumbnailPngDataUri } from './debug/scanImagePng';
 import { isBenchmarkToolsEnabled } from './benchmark/isBenchmarkEnabled';
-import { isScannerVNextEnabled } from './vnextFlag';
+import { hydrateScannerVNextFlag, isScannerVNextEnabled } from './vnextFlag';
+import { shouldResumeVNextSavedCards } from './vnextResumePolicy';
 import {
   HIRES_WAIT_MS,
   RECOGNITION_SOURCES,
@@ -909,7 +910,16 @@ export const useScanSession = (opts: {
   }, []);
 
   useEffect(() => {
-    resumeSavedCards(async warp => {
+    let alive = true;
+    void (async () => {
+      const vnextOn = await hydrateScannerVNextFlag();
+      if (
+        !alive ||
+        !shouldResumeVNextSavedCards(isBenchmarkToolsEnabled(), vnextOn)
+      ) {
+        return;
+      }
+      resumeSavedCards(async warp => {
       const attemptId = (verifiedAttemptIdSeq.current += 1);
       const parent = ensureParentSession();
       const attempt = createRecognitionAttempt({
@@ -940,7 +950,11 @@ export const useScanSession = (opts: {
       } finally {
         attemptRegistry.releaseAttempt(attemptId);
       }
-    });
+      });
+    })();
+    return () => {
+      alive = false;
+    };
   }, [ensureParentSession]);
 
   const syncVerifiedPhaseFromSnap = useCallback((snap: SessionSnapshot) => {
@@ -1960,6 +1974,7 @@ export const useScanSession = (opts: {
           const { setVNextDebug } = await import('@/lib/scan/vnext/debug');
           setVNextDebug({
             at: Date.now(),
+            cardSessionId: attempt.cardSessionId,
             candidateIndex: null,
             candidateCount: 0,
             gbmUtility: null,
@@ -1974,6 +1989,9 @@ export const useScanSession = (opts: {
             ocrNormalized: null,
             ocrExactOracle: null,
             ocrInTop5: null,
+            recoveredOracle: null,
+            finalPublishedOracle: null,
+            frozenIdentity: null,
             source: 'WITHHELD',
             note: err instanceof Error ? err.message : String(err),
             timing: null,

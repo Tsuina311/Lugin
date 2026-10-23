@@ -8,6 +8,7 @@
  */
 
 import { cornersToQuad, warpQuadToCard } from '@/lib/scan/geometry';
+import { withBoundedTimeout } from '@/lib/scan/boundedPromise';
 import { Images, type Image } from 'react-native-nitro-image';
 
 import { runBenchmarkUploadSession } from './benchmarkUpload/session';
@@ -49,21 +50,6 @@ let draining = false;
 
 const NAME_MS = 45_000;
 const UPLOAD_MS = 20_000;
-
-const withTimeout = <T>(work: Promise<T>, ms: number): Promise<T> =>
-  new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('timed out')), ms);
-    work.then(
-      value => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      err => {
-        clearTimeout(timer);
-        reject(err);
-      },
-    );
-  });
 
 const WARP_UPLOAD = [
   { relativePath: 'source.jpg', required: true },
@@ -153,7 +139,7 @@ const saveWarp = async (card: QueuedCard): Promise<void> => {
   const warp = await warpJpeg(card, 1280, 744, 1039);
   await writeWarpJpeg(card.dirUri, warp);
   card.warpSaved = true;
-  card.warpUpload = withTimeout(uploadFiles(card.runId, card.dirUri, WARP_UPLOAD), UPLOAD_MS).catch(
+  card.warpUpload = withBoundedTimeout(uploadFiles(card.runId, card.dirUri, WARP_UPLOAD), UPLOAD_MS).catch(
     () => false,
   );
   toName.push(card);
@@ -171,7 +157,7 @@ const nameCard = async (card: QueuedCard): Promise<void> => {
     if (!card.warpSaved) {
       await writeWarpJpeg(card.dirUri, warp);
       card.warpSaved = true;
-      card.warpUpload = withTimeout(uploadFiles(card.runId, card.dirUri, WARP_UPLOAD), UPLOAD_MS).catch(
+      card.warpUpload = withBoundedTimeout(uploadFiles(card.runId, card.dirUri, WARP_UPLOAD), UPLOAD_MS).catch(
         () => false,
       );
     }
@@ -311,11 +297,14 @@ export const captureColorCard = async (args: {
 
   let jpegOk = false;
   const jpegUpload = trackSend(runId, 3, async onProgress => {
-    const ok = await uploadFiles(runId, dirUri, [
-      { relativePath: 'source.jpg', required: true },
-      { relativePath: 'metadata.json', required: true },
-      { relativePath: 'recognition-quad.json', required: true },
-    ]);
+    const ok = await withBoundedTimeout(
+      uploadFiles(runId, dirUri, [
+        { relativePath: 'source.jpg', required: true },
+        { relativePath: 'metadata.json', required: true },
+        { relativePath: 'recognition-quad.json', required: true },
+      ]),
+      UPLOAD_MS,
+    ).catch(() => false);
     jpegOk = ok;
     onProgress(ok ? 3 : 0, 3, ok ? null : 'Picture is still on the phone');
     return { detail: ok ? null : 'Picture is still on the phone', done: ok ? 3 : 0, ok, total: 3 };
@@ -361,7 +350,11 @@ export const resumeSavedCards = (onName: (warp: ScanImage) => Promise<void>): vo
       const quadFile = await FileSystem.getInfoAsync(`${dirUri}recognition-quad.json`);
       if (!jpeg.exists || !quadFile.exists || oldPng.exists) continue;
       if (named.exists && straight.exists) {
-        void withTimeout(uploadFiles(name, dirUri, WARP_UPLOAD), UPLOAD_MS).catch(() => false);
+        void withBoundedTimeout(uploadFiles(name, dirUri, WARP_UPLOAD), UPLOAD_MS)
+          .then(async ok => {
+            if (ok) await FileSystem.deleteAsync(dirUri, { idempotent: true });
+          })
+          .catch(() => false);
         continue;
       }
       const quad = JSON.parse(await FileSystem.readAsStringAsync(`${dirUri}recognition-quad.json`)) as {
@@ -371,7 +364,7 @@ export const resumeSavedCards = (onName: (warp: ScanImage) => Promise<void>): vo
       };
       if (!quad.corners || !quad.detector) continue;
       const warpUpload = straight.exists
-        ? withTimeout(uploadFiles(name, dirUri, WARP_UPLOAD), UPLOAD_MS).catch(() => false)
+        ? withBoundedTimeout(uploadFiles(name, dirUri, WARP_UPLOAD), UPLOAD_MS).catch(() => false)
         : Promise.resolve(false);
       queue.push({
         absJpeg: absPath(`${dirUri}source.jpg`),

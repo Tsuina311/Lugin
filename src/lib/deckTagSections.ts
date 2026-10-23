@@ -7,6 +7,11 @@
 
 import { cardKey } from './cardName';
 import type { DeckCard, DeckTagAnalysis } from './deck';
+import {
+  canMatchDeckTagLocally,
+  matchesDeckTagQuery,
+  type DeckTagMatchCard,
+} from './deckTagMatch';
 import { deckTagById } from './deckTags';
 import { searchScryfallQuery } from './search';
 
@@ -113,6 +118,44 @@ export const analyzeDeckTags = async (
     results: Object.fromEntries(entries.map(entry => [entry.id, entry.result])),
     version: 2,
   };
+};
+
+/**
+ * Analyze the full shared catalogue from card metadata in-memory. Only tags
+ * using Scryfall's private `otag:` classification fall back to network search.
+ */
+export const analyzeDeckTagsWithMetadata = async (
+  cards: readonly DeckTagMatchCard[],
+  tagIds: readonly string[],
+  previous?: DeckTagAnalysis,
+  signal?: AbortSignal,
+): Promise<DeckTagAnalysis> => {
+  const ids = [...new Set(tagIds)].filter(id => deckTagById(id));
+  const localIds = ids.filter(id => canMatchDeckTagLocally(deckTagById(id)!.query));
+  const remoteIds = ids.filter(id => !localIds.includes(id));
+  const remote =
+    remoteIds.length > 0
+      ? await analyzeDeckTags(cards.map(card => card.name), remoteIds, previous, signal)
+      : undefined;
+  const keys = cards.map(card => cardKey(card.name)).filter(Boolean);
+  const queries: Record<string, string> = {};
+  const results: Record<string, string[]> = {};
+
+  for (const id of localIds) {
+    const tag = deckTagById(id)!;
+    queries[id] = tag.query;
+    results[id] = cards
+      .filter(card => matchesDeckTagQuery(card, tag.query))
+      .map(card => cardKey(card.name))
+      .filter(Boolean);
+  }
+  for (const id of remoteIds) {
+    const tag = deckTagById(id)!;
+    queries[id] = tag.query;
+    results[id] = remote?.results[id] ?? [];
+  }
+
+  return { cards: keys, queries, results, version: 2 };
 };
 
 /** Whether every current card has a result for every current tag query. */

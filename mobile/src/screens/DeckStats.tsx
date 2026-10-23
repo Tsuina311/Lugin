@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { cardKey } from '@/lib/cardName';
 import { manaCurve, type Deck, type DeckTagAnalysis, type ManaCurve } from '@/lib/deck';
 import {
-  analyzeDeckTags,
+  analyzeDeckTagsWithMetadata,
   deckTagAnalysisComplete,
 } from '@/lib/deckTagSections';
 import { DECK_TAGS, deckTagById } from '@/lib/deckTags';
@@ -169,10 +176,12 @@ const CurveChart = ({
 export const DeckStats = ({
   deck,
   metadata,
+  metadataLoading,
   onAnalysis,
 }: {
   deck: Deck;
   metadata: Record<string, CardSearchResult>;
+  metadataLoading: boolean;
   onAnalysis: (analysis: DeckTagAnalysis) => void;
 }) => {
   const cards = useMemo(
@@ -243,6 +252,14 @@ export const DeckStats = ({
   const criteria = useMemo(() => DECK_TAGS.map(tag => tag.id), []);
   const criteriaKey = criteria.join('|');
   const names = useMemo(() => cards.map(card => card.name), [cards]);
+  const analysisCards = useMemo(
+    () =>
+      cards.map(card => ({
+        ...metadata[cardKey(card.name)],
+        name: card.name,
+      })),
+    [cards, metadata],
+  );
   const [analysis, setAnalysis] = useState<DeckTagAnalysis | undefined>(deck.tagAnalysis);
   const [tagsLoading, setTagsLoading] = useState(
     !deckTagAnalysisComplete(names, criteria, deck.tagAnalysis),
@@ -274,8 +291,11 @@ export const DeckStats = ({
         .sort((a, b) => b.cards.length - a.cards.length || a.label.localeCompare(b.label)),
     [analysis, cards, criteria, deck.tagOverrides],
   );
-
   useEffect(() => {
+    if (metadataLoading) {
+      setTagsLoading(true);
+      return;
+    }
     if (deckTagAnalysisComplete(names, criteria, deck.tagAnalysis)) {
       setAnalysis(deck.tagAnalysis);
       setTagsLoading(false);
@@ -285,7 +305,12 @@ export const DeckStats = ({
     const controller = new AbortController();
     setAnalysis(deck.tagAnalysis);
     setTagsLoading(true);
-    void analyzeDeckTags(names, criteria, deck.tagAnalysis, controller.signal).then(next => {
+    void analyzeDeckTagsWithMetadata(
+      analysisCards,
+      criteria,
+      deck.tagAnalysis,
+      controller.signal,
+    ).then(next => {
       if (cancelled) return;
       setAnalysis(next);
       setTagsLoading(false);
@@ -295,7 +320,15 @@ export const DeckStats = ({
       cancelled = true;
       controller.abort();
     };
-  }, [criteria, criteriaKey, deck.tagAnalysis, names, onAnalysis]);
+  }, [
+    analysisCards,
+    criteria,
+    criteriaKey,
+    deck.tagAnalysis,
+    metadataLoading,
+    names,
+    onAnalysis,
+  ]);
 
   return (
     <ScrollView contentContainerStyle={styles.content} style={styles.root}>
@@ -336,7 +369,7 @@ export const DeckStats = ({
         <View style={styles.loading}>
           <ActivityIndicator color="#3D7EFF" size="small" />
           <Text style={styles.muted}>
-            {tags.length > 0 ? 'Updating tags for new cards…' : 'Checking tags once for this deck…'}
+            {metadataLoading ? 'Loading card details…' : 'Analyzing shared deck tags…'}
           </Text>
         </View>
       ) : null}

@@ -25,9 +25,13 @@ export interface CardSearchResult {
   id: string;
   /** Front image (normal size) — browser-cached CDN URL. */
   imageUrl?: string;
+  /** Scryfall keyword abilities, used for local shared-tag analysis. */
+  keywords?: string[];
   /** Front-face mana cost, used by the shared basic-land planner. */
   manaCost?: string;
   name: string;
+  /** Oracle text from every face, joined for whole-card theme analysis. */
+  oracleText?: string;
   setCode?: string;
   /** Smaller scan for a grid. The hover preview still uses `imageUrl`. */
   thumbUrl?: string;
@@ -73,14 +77,20 @@ export interface CardQuery {
 }
 
 interface ScryfallCard {
-  card_faces?: Array<{ image_uris?: Record<string, string>; mana_cost?: string }>;
+  card_faces?: Array<{
+    image_uris?: Record<string, string>;
+    mana_cost?: string;
+    oracle_text?: string;
+  }>;
   cmc?: number;
   collector_number?: string;
   color_identity?: string[];
   id: string;
   image_uris?: Record<string, string>;
+  keywords?: string[];
   mana_cost?: string;
   name: string;
+  oracle_text?: string;
   set?: string;
   type_line?: string;
 }
@@ -131,8 +141,15 @@ const toResult = (c: ScryfallCard): CardSearchResult => {
     faceImages: faceImages.length >= 2 ? faceImages : undefined,
     id: c.id,
     imageUrl: images?.normal ?? images?.large ?? images?.small,
+    keywords: c.keywords,
     manaCost: c.mana_cost ?? c.card_faces?.[0]?.mana_cost,
     name: c.name,
+    oracleText:
+      c.oracle_text ??
+      c.card_faces
+        ?.map(face => face.oracle_text)
+        .filter((text): text is string => Boolean(text))
+        .join('\n'),
     setCode: c.set,
     thumbUrl: images?.small ?? images?.normal,
     typeLine: c.type_line,

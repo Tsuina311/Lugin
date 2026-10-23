@@ -1166,7 +1166,12 @@ const DeckEditor = ({ deck, onClose }: { deck: Deck; onClose: () => void }) => {
           />
         )
       ) : view === 'stats' ? (
-        <DeckStats deck={deck} metadata={landMetadata} onAnalysis={saveTagAnalysis} />
+        <DeckStats
+          deck={deck}
+          metadata={landMetadata}
+          metadataLoading={landMetadataLoading}
+          onAnalysis={saveTagAnalysis}
+        />
       ) : commanders.length > 0 ? (
         <DeckRecommendations
           browse={browse}

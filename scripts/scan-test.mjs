@@ -70,14 +70,17 @@ await esbuild.build({
       export * from '${join(root, 'src/lib/scan/geometryTest/index.ts')}';
       export * from '${join(root, 'src/lib/scan/singleCardCapture/index.ts')}';
       export * from '${join(root, 'src/lib/scan/backgroundQueue.ts')}';
+      export * from '${join(root, 'src/lib/scan/boundedPromise.ts')}';
       export * from '${join(root, 'src/lib/scan/verifiedScan/index.ts')}';
       export * from '${join(root, 'src/lib/scan/recognitionChannel.ts')}';
       export * from '${join(root, 'src/lib/scan/continuous/index.ts')}';
+      export * from '${join(root, 'src/lib/scan/vnext/decide.ts')}';
       export * from '${join(root, 'src/lib/scan/binder/index.ts')}';
       export * from '${join(root, 'src/lib/scan/session/cardSession.ts')}';
       export * from '${join(root, 'src/lib/scan/session/cardChangeWatch.ts')}';
       export { mapCornersToHiRes, mapCornersHiResToDetectorSameFov, projectAnalysisQuadToSource } from '${join(root, 'mobile/src/scan/hiresMap.ts')}';
       export { startGeometryTrace, finishGeometryTrace, isGeometryTraceActive } from '${join(root, 'mobile/src/scan/geometryTrace.ts')}';
+      export { shouldResumeVNextSavedCards } from '${join(root, 'mobile/src/scan/vnextResumePolicy.ts')}';
       export * from '${join(root, 'src/lib/scan/videoMap.ts')}';
       export * from '${join(root, 'src/lib/scan/cameraCapabilities.ts')}';
       export * from '${join(root, 'src/lib/scan/scannerDataPolicy.ts')}';
@@ -465,6 +468,8 @@ const {
   startGeometryTrace,
   finishGeometryTrace,
   isGeometryTraceActive,
+  shouldResumeVNextSavedCards,
+  withBoundedTimeout,
   runLabRecognition,
   pickLabWarpQuad,
   compareLabRuns,
@@ -477,6 +482,8 @@ const {
   hashRecognitionQuad,
   decideStrongFuzzyTitle,
   decodeRecordedTitleVariants,
+  normalizedExactTitleNameForRecovery,
+  decideVNext,
   tokenWeightedSimilarity,
   titlePreservedEnough,
   formatTitleDecodeReport,
@@ -6479,6 +6486,68 @@ check('HOST REPLAY: recorded Samsung OCR identifies Hex / exact Wand / rejects f
     names,
   );
   assert.equal(french.decision, 'ambiguous');
+});
+
+check('frozen recovery exactness rejects 0.99 and 0.94 fuzzy titles', () => {
+  const almostHundred = 'A'.repeat(200);
+  const nearNinetyFour = 'ABCDEFGHIJKLMNOPQR';
+  const names = buildNameIndex({
+    names: [almostHundred, nearNinetyFour],
+    version: 1,
+  });
+  const exact = decodeRecordedTitleVariants(
+    [{ text: `  ${almostHundred.toUpperCase()}  ` }],
+    names,
+  );
+  assert.equal(normalizedExactTitleNameForRecovery(exact.variants), almostHundred);
+
+  const fuzzy99 = decodeRecordedTitleVariants(
+    [{ text: `${'A'.repeat(199)}B` }],
+    names,
+  );
+  assert.ok((fuzzy99.matchScore ?? 0) >= 0.99);
+  assert.equal(normalizedExactTitleNameForRecovery(fuzzy99.variants), null);
+  assert.equal(
+    decideVNext({
+      cleanTop1OracleId: 'a',
+      prototypeTop1OracleId: 'b',
+      prototypeMargin: 0.01,
+      prototypeTop5OracleIds: ['target', 'b'],
+      exactUniqueOracleId: null,
+    }).publish,
+    false,
+  );
+
+  const fuzzy94 = decodeRecordedTitleVariants([{ text: 'ABCDEFGHIJKLMNOPQS' }], names);
+  assert.ok((fuzzy94.matchScore ?? 0) >= 0.94);
+  assert.ok((fuzzy94.matchScore ?? 0) < 1);
+  assert.equal(normalizedExactTitleNameForRecovery(fuzzy94.variants), null);
+});
+
+check('vNext saved-card resume is disabled when scannerVNext is off', () => {
+  assert.equal(shouldResumeVNextSavedCards(true, false), false);
+  assert.equal(shouldResumeVNextSavedCards(false, true), false);
+  assert.equal(shouldResumeVNextSavedCards(true, true), true);
+});
+
+await checkAsync('source upload timeout releases the queue deterministically', async () => {
+  let fireTimeout = null;
+  let cleared = false;
+  const never = new Promise(() => {});
+  const bounded = withBoundedTimeout(never, 20_000, {
+    set(callback) {
+      fireTimeout = callback;
+      return 'source-upload-timer';
+    },
+    clear(handle) {
+      assert.equal(handle, 'source-upload-timer');
+      cleared = true;
+    },
+  });
+  assert.equal(typeof fireTimeout, 'function');
+  fireTimeout();
+  await assert.rejects(bounded, /timed out after 20000 ms/);
+  assert.equal(cleared, false, 'underlying hung upload was not mistaken for completion');
 });
 
 await checkAsync('CANONICAL: Hex fixture strong-fuzzy (if present)', async () => {

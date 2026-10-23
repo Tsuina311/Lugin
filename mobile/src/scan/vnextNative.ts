@@ -5,7 +5,11 @@
  */
 
 import { getLuginVisualModule } from 'lugin-visual-recognizer';
-import type { VNextNameLookup, VNextNativeResult } from 'lugin-visual-recognizer';
+import type {
+  VNextFrozenIdentity,
+  VNextNameLookup,
+  VNextNativeResult,
+} from 'lugin-visual-recognizer';
 
 export type VNextNativeCall = {
   ok: boolean;
@@ -13,9 +17,11 @@ export type VNextNativeCall = {
   prototypeTop: VNextNativeResult['prototypeTop'];
   galleryBytes: number | null;
   nativeHeapBytes: number | null;
+  preprocessMs: number | null;
   encoderMs: number | null;
   adapterMs: number | null;
   searchMs: number | null;
+  frozenIdentity: VNextFrozenIdentity | null;
   error: string | null;
 };
 
@@ -25,9 +31,11 @@ const empty = (error: string): VNextNativeCall => ({
   prototypeTop: [],
   galleryBytes: null,
   nativeHeapBytes: null,
+  preprocessMs: null,
   encoderMs: null,
   adapterMs: null,
   searchMs: null,
+  frozenIdentity: null,
   error,
 });
 
@@ -49,9 +57,11 @@ export const recognizeVNextArt = async (
       prototypeTop: result.prototypeTop ?? [],
       galleryBytes: result.galleryBytes ?? null,
       nativeHeapBytes: result.nativeHeapBytes ?? null,
+      preprocessMs: result.timing?.preprocessMs ?? null,
       encoderMs: result.timing?.encoderMs ?? null,
       adapterMs: result.timing?.adapterMs ?? null,
       searchMs: result.timing?.searchMs ?? null,
+      frozenIdentity: result.frozenIdentity ?? null,
       error: null,
     };
   } catch (err) {

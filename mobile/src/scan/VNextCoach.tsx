@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { getVNextDebug, subscribeVNextDebug } from '@/lib/scan/vnext/debug';
+import {
+  getVNextDebug,
+  subscribeVNextDebug,
+  type VNextDebugSnapshot,
+} from '@/lib/scan/vnext/debug';
 
 import { CAPTURE_GAP_MS, holdScannerWork } from './capturePace';
 import { downloadVNextGallery, vnextGalleryInstalled } from './vnextGalleryDownload';
 import { getSendJobs, subscribeSendJobs, type SendJob } from './sendProgress';
+import { runAndShareVNextParityProbe } from './vnextParityProbe';
 
 const COOLDOWN_MS = CAPTURE_GAP_MS;
 
@@ -17,9 +22,11 @@ type CaptureResult = {
 };
 
 export function VNextCoach({
+  onAdd,
   onCapture,
   onPreview,
 }: {
+  onAdd: (snapshot: VNextDebugSnapshot) => Promise<string>;
   onCapture: () => Promise<CaptureResult>;
   onPreview: (uri: string) => void;
 }) {
@@ -31,6 +38,12 @@ export function VNextCoach({
   const [downloading, setDownloading] = useState(false);
   const [downloadLabel, setDownloadLabel] = useState<string | null>(null);
   const [named, setNamed] = useState<string | null>(null);
+  const [published, setPublished] = useState<VNextDebugSnapshot | null>(null);
+  const [frozenIdentity, setFrozenIdentity] = useState<Record<string, string> | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [collectionNote, setCollectionNote] = useState<string | null>(null);
+  const [parityBusy, setParityBusy] = useState(false);
+  const [parityNote, setParityNote] = useState<string | null>(null);
   const coolingUntil = useRef(0);
   useEffect(() => subscribeSendJobs(() => setJobs(getSendJobs())), []);
   useEffect(() => {
@@ -41,10 +54,17 @@ export function VNextCoach({
       subscribeVNextDebug(() => {
         const snap = getVNextDebug();
         if (!snap) return;
+        setFrozenIdentity(snap.frozenIdentity);
         if (snap.source === 'VISUAL_AGREEMENT' || snap.source === 'OCR_EXACT_TOP5_RECOVERY') {
-          setNamed(snap.prototypeTop1?.name ?? 'Named');
+          const published = snap.prototypeTop5.find(
+            hit => hit.oracleId === snap.finalPublishedOracle,
+          );
+          setNamed(published?.name ?? 'Named');
+          setPublished(snap);
+          setCollectionNote(null);
           return;
         }
+        setPublished(null);
         if (snap.prototypeTop1?.name) setNamed(`Closest: ${snap.prototypeTop1.name}`);
       }),
     [],
@@ -66,9 +86,30 @@ export function VNextCoach({
               : 'Tap Capture. The picture is saved and sent on its own. You can move to the next card.')}
       </Text>
       {downloadLabel ? <Text style={styles.count}>{downloadLabel}</Text> : null}
+      {frozenIdentity ? (
+        <Text style={styles.detail}>
+          {`${frozenIdentity.geometryId} · ${frozenIdentity.adapterId}`}
+        </Text>
+      ) : null}
       <Text style={styles.count}>
         {`${taken} captured · ${sent} sent${pending > 0 ? ` · ${pending} sending` : ''}${failed.length > 0 ? ` · ${failed.length} not sent` : ''}`}
       </Text>
+      {published ? (
+        <Pressable
+          disabled={adding}
+          onPress={() => {
+            if (adding) return;
+            setAdding(true);
+            void onAdd(published)
+              .then(setCollectionNote)
+              .finally(() => setAdding(false));
+          }}
+          style={[styles.save, adding && styles.buttonDown]}
+        >
+          <Text style={styles.saveLabel}>{adding ? 'Adding…' : 'Add to collection'}</Text>
+        </Pressable>
+      ) : null}
+      {collectionNote ? <Text style={styles.count}>{collectionNote}</Text> : null}
       {latestFail?.detail ? <Text style={styles.fail}>{latestFail.detail}</Text> : null}
       <Pressable
         onPress={() => {
@@ -132,6 +173,25 @@ export function VNextCoach({
           </Text>
         </Pressable>
       )}
+      {galleryOnPhone ? (
+        <Pressable
+          disabled={parityBusy}
+          onPress={() => {
+            if (parityBusy) return;
+            setParityBusy(true);
+            setParityNote('Running identical-pixel Android probe…');
+            void runAndShareVNextParityProbe()
+              .then(setParityNote)
+              .finally(() => setParityBusy(false));
+          }}
+          style={[styles.save, parityBusy && styles.buttonDown]}
+        >
+          <Text style={styles.saveLabel}>
+            {parityBusy ? 'Running parity probe…' : 'Run phone parity probe'}
+          </Text>
+        </Pressable>
+      ) : null}
+      {parityNote ? <Text style={styles.detail}>{parityNote}</Text> : null}
     </View>
   );
 }

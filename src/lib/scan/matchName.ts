@@ -69,6 +69,14 @@ export interface CardNameIndex {
    * ranking still de-dupes by English name.
    */
   exactByKey: Map<string, number>;
+  /**
+   * Conservatively normalized title → first entry id.
+   *
+   * Unlike `exactByKey`, this does not remove punctuation/diacritics or fold
+   * OCR-confusable characters. It is the authority for policies that require
+   * actual normalized equality rather than a similarity score.
+   */
+  normalizedExactByKey: Map<string, number>;
   names: string[];
   /** Trigram → entry ids. Built once; this is what keeps a search off the full list. */
   postings: Map<string, number[]>;
@@ -128,6 +136,10 @@ export const shapeFold = (raw: string): string =>
     .replace(/[z2]/g, 'z')
     .replace(/[uv]/g, 'u');
 
+/** Normalization allowed by strict exact-title policies. */
+export const normalizeExactTitle = (raw: string): string =>
+  raw.normalize('NFKC').trim().toLocaleLowerCase('en-US').replace(/\s+/gu, ' ');
+
 export type FoldStrategy = (raw: string) => string;
 
 const trigrams = (key: string): string[] => {
@@ -164,8 +176,11 @@ export const buildNameIndex = (
 
   const postings = new Map<string, number[]>();
   const exactByKey = new Map<string, number>();
+  const normalizedExactByKey = new Map<string, number>();
   entries.forEach((entry, id) => {
     if (!exactByKey.has(entry.key)) exactByKey.set(entry.key, id);
+    const exactKey = normalizeExactTitle(entry.printed ?? data.names[entry.name] ?? '');
+    if (exactKey && !normalizedExactByKey.has(exactKey)) normalizedExactByKey.set(exactKey, id);
     // Distinct grams only: a repeated gram should not count twice toward overlap.
     for (const gram of new Set(trigrams(entry.key))) {
       const bucket = postings.get(gram);
@@ -174,7 +189,18 @@ export const buildNameIndex = (
     }
   });
 
-  return { entries, exactByKey, names: data.names, postings };
+  return { entries, exactByKey, normalizedExactByKey, names: data.names, postings };
+};
+
+/** Return a card only when the OCR title equals an indexed title after strict normalization. */
+export const matchNormalizedExactTitle = (
+  text: string,
+  index: CardNameIndex,
+): NameCandidate | null => {
+  const key = normalizeExactTitle(text);
+  if (!key) return null;
+  const id = index.normalizedExactByKey.get(key);
+  return id == null ? null : candidateFromEntry(index, index.entries[id], 1);
 };
 
 /** Levenshtein distance, two rows at a time. */

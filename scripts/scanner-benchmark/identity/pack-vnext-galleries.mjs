@@ -21,6 +21,7 @@ const cleanSrc = join(rootDir, 'scanner-benchmark/recognition-registry/autolab/a
 const prototypeSrc = join(rootDir, 'scanner-benchmark/identity-registry/candidates/mean-prototype-v1/embeddings.bin');
 const refsSrc = join(rootDir, 'scanner-benchmark/identity-registry/candidates/mean-prototype-v1/refs.json');
 const adapterSrc = join(rootDir, 'scanner-benchmark/identity-registry/challengers/linear-identity-v1.json');
+const geometrySrc = join(rootDir, 'src/lib/scan/vnext/gbm-iou-all.json');
 
 const sha256 = path => createHash('sha256').update(readFileSync(path)).digest('hex');
 
@@ -53,8 +54,12 @@ const manifest = {
   adapterB: 'adapter-b.f32',
   adapterId: 'linear-identity-v1',
   geometryId: 'gbm-iou-all-2dd2ec36b833',
+  geometrySha256: sha256(geometrySrc),
   cleanSha256: sha256(join(outDir, 'clean.f32')),
   prototypeSha256: sha256(join(outDir, 'prototype.f32')),
+  refsSha256: sha256(join(outDir, 'refs.json')),
+  adapterWSha256: sha256(join(outDir, 'adapter-w.f32')),
+  adapterBSha256: sha256(join(outDir, 'adapter-b.f32')),
   note: 'Development push only. Not an app asset. Do not quantize.',
 };
 writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2));

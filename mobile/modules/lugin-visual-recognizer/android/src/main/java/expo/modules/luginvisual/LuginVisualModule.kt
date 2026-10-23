@@ -1,6 +1,7 @@
 package expo.modules.luginvisual
 
 import android.graphics.Bitmap
+import android.content.pm.ApplicationInfo
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.modules.Module
@@ -296,45 +297,15 @@ class LuginVisualModule : Module() {
       vnextExecutor.execute {
       val started = System.nanoTime()
       try {
-        ensureClipSession()
-        val index = ensureVNext()
-        val sess = session!!
-        val tPre = System.nanoTime()
-        val pixels = preprocessRgba(rgba, width, height)
-        val preprocessMs = elapsedMs(tPre)
-        val tEnc = System.nanoTime()
-        val raw = synchronized(clipLock) {
-          val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(pixels), longArrayOf(1, 3, 224, 224))
-          val out = sess.run(mapOf("pixel_values" to tensor))
-          val embTensor = out[0].value as Array<*>
-          @Suppress("UNCHECKED_CAST")
-          val row = embTensor[0] as FloatArray
-          val normalized = l2Normalize(row)
-          out.close()
-          tensor.close()
-          normalized
-        }
-        val encoderMs = elapsedMs(tEnc)
-        val tAdapt = System.nanoTime()
-        val query = VNextGallery.applyLinear(raw, index.adapterW, index.adapterB)
-        val adapterMs = elapsedMs(tAdapt)
-        val tSearch = System.nanoTime()
-        val k = max(5, min(topK, 10))
-        val dual = VNextGallery.dualTop(query, index.clean, index.prototype, index.oracleIds, index.names, index.dims, k)
-        val searchMs = elapsedMs(tSearch)
+        val result = runVNextRecognition(rgba, width, height, topK)
         promise.resolve(
           mapOf(
-            "cleanTop" to dual.clean.map { hitMap(it) },
-            "prototypeTop" to dual.prototype.map { hitMap(it) },
-            "galleryBytes" to index.galleryBytes,
+            "cleanTop" to result.dual.clean.map { hitMap(it) },
+            "prototypeTop" to result.dual.prototype.map { hitMap(it) },
+            "galleryBytes" to result.index.galleryBytes,
             "nativeHeapBytes" to Debug.getNativeHeapAllocatedSize(),
-            "timing" to mapOf(
-              "preprocessMs" to preprocessMs,
-              "encoderMs" to encoderMs,
-              "adapterMs" to adapterMs,
-              "searchMs" to searchMs,
-              "totalMs" to elapsedMs(started),
-            ),
+            "timing" to result.timing + ("totalMs" to elapsedMs(started)),
+            "frozenIdentity" to identityMap(result.index.identity),
             "error" to null,
           ),
         )
@@ -359,6 +330,49 @@ class LuginVisualModule : Module() {
       }
     }
 
+    AsyncFunction("runVNextParityProbeFromRgbaBytes") { rgba: ByteArray, width: Int, height: Int, promise: Promise ->
+      vnextExecutor.execute {
+        val started = System.nanoTime()
+        try {
+          val ctx = appContext.reactContext ?: throw VisualFailedException("no React context")
+          val debuggable = (ctx.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+          if (!debuggable) throw VisualFailedException("VNEXT_PARITY_DEV_ONLY")
+          if (width != 625 || height != 436 || rgba.size != width * height * 4) {
+            throw VisualFailedException("VNEXT_PARITY_REQUIRES_625x436_RGBA")
+          }
+          val result = runVNextRecognition(rgba, width, height, 10)
+          val cleanTop1 = result.dual.clean.firstOrNull()
+          val prototypeTop1 = result.dual.prototype.firstOrNull()
+          val prototypeTop2 = result.dual.prototype.getOrNull(1)
+          val margin = if (prototypeTop1 != null && prototypeTop2 != null) {
+            prototypeTop1.score - prototypeTop2.score
+          } else null
+          val agreement = cleanTop1?.oracleId != null &&
+            cleanTop1.oracleId == prototypeTop1?.oracleId
+          val publish = agreement && margin != null && margin >= 0.05f
+          promise.resolve(
+            mapOf(
+              "preparedRgbaSha256" to sha256(rgba),
+              "embedding" to result.query.map { it.toDouble() },
+              "cleanTop" to result.dual.clean.map { hitMap(it) },
+              "prototypeTop" to result.dual.prototype.map { hitMap(it) },
+              "prototypeMargin" to margin?.toDouble(),
+              "agreement" to agreement,
+              "publish" to publish,
+              "publishedOracleId" to if (publish) prototypeTop1?.oracleId else null,
+              "decisionSource" to if (publish) "VISUAL_AGREEMENT" else "WITHHELD",
+              "ocrIncluded" to false,
+              "frozenIdentity" to identityMap(result.index.identity),
+              "timing" to result.timing + ("totalMs" to elapsedMs(started)),
+              "error" to null,
+            ),
+          )
+        } catch (e: Throwable) {
+          promise.resolve(mapOf("error" to (e.message ?: "vNext parity probe failed")))
+        }
+      }
+    }
+
     AsyncFunction("lookupVNextExactName") { name: String, promise: Promise ->
       vnextExecutor.execute {
         try {
@@ -371,6 +385,78 @@ class LuginVisualModule : Module() {
       }
     }
   }
+
+  private data class VNextRecognition(
+    val query: FloatArray,
+    val dual: VNextDual,
+    val index: VNextIndex,
+    val timing: Map<String, Double>,
+  )
+
+  /** Shared implementation for live frozen recognition and the dev-only parity probe. */
+  private fun runVNextRecognition(
+    rgba: ByteArray,
+    width: Int,
+    height: Int,
+    topK: Int,
+  ): VNextRecognition {
+    ensureClipSession()
+    val index = ensureVNext()
+    val sess = session!!
+    val tPre = System.nanoTime()
+    val pixels = preprocessRgba(rgba, width, height)
+    val preprocessMs = elapsedMs(tPre)
+    val tEnc = System.nanoTime()
+    val raw = synchronized(clipLock) {
+      val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(pixels), longArrayOf(1, 3, 224, 224))
+      val out = sess.run(mapOf("pixel_values" to tensor))
+      val embTensor = out[0].value as Array<*>
+      @Suppress("UNCHECKED_CAST")
+      val row = embTensor[0] as FloatArray
+      val normalized = l2Normalize(row)
+      out.close()
+      tensor.close()
+      normalized
+    }
+    val encoderMs = elapsedMs(tEnc)
+    val tAdapt = System.nanoTime()
+    val query = VNextGallery.applyLinear(raw, index.adapterW, index.adapterB)
+    val adapterMs = elapsedMs(tAdapt)
+    val tSearch = System.nanoTime()
+    val k = max(5, min(topK, 10))
+    val dual = VNextGallery.dualTop(
+      query,
+      index.clean,
+      index.prototype,
+      index.oracleIds,
+      index.names,
+      index.dims,
+      k,
+    )
+    val searchMs = elapsedMs(tSearch)
+    return VNextRecognition(
+      query,
+      dual,
+      index,
+      mapOf(
+        "preprocessMs" to preprocessMs,
+        "encoderMs" to encoderMs,
+        "adapterMs" to adapterMs,
+        "searchMs" to searchMs,
+      ),
+    )
+  }
+
+  private fun identityMap(identity: VNextIdentity): Map<String, String> = mapOf(
+    "geometryId" to identity.geometryId,
+    "geometrySha256" to identity.geometrySha256,
+    "adapterId" to identity.adapterId,
+    "adapterWSha256" to identity.adapterWSha256,
+    "adapterBSha256" to identity.adapterBSha256,
+    "cleanSha256" to identity.cleanSha256,
+    "prototypeSha256" to identity.prototypeSha256,
+    "refsSha256" to identity.refsSha256,
+  )
 
   private fun runDummy(rgba: ByteArray) {
     val pixels = preprocessRgba(rgba, 224, 224)
