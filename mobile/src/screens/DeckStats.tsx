@@ -253,9 +253,12 @@ export const DeckStats = ({
         .map(id => {
           const tag = deckTagById(id);
           if (!tag) return null;
+          const storedResults = analysis?.results[id];
           const valid =
-            analysis?.queries[id] === tag.query
-              ? new Set(analysis.results[id] ?? [])
+            analysis?.version === 2 &&
+            analysis.queries[id] === tag.query &&
+            Array.isArray(storedResults)
+              ? new Set(storedResults)
               : undefined;
           const matching = cards
             .filter(card => {
