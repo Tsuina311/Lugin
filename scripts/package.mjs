@@ -160,10 +160,8 @@ try {
   process.exit(1);
 }
 
-const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
-
-if (manifest.version !== pkg.version) {
-  fail(`dist is stale: manifest ${manifest.version} vs package.json ${pkg.version} — rebuild`);
+if (!/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(manifest.version ?? '')) {
+  fail(`manifest has invalid version ${JSON.stringify(manifest.version)}`);
 }
 if ((manifest.name ?? '').length > MAX_NAME) {
   fail(`name is ${manifest.name.length} characters, the store allows ${MAX_NAME}`);
@@ -210,7 +208,7 @@ if (!/BETA|DEVELOPMENT BUILD/i.test(manifest.name ?? '')) {
 
 // A store upload must have manifest.json at the root; a tester's copy is nicer as
 // a folder, since that is what they select in the "Load unpacked" dialog.
-const PREFIX = FOR_TESTERS ? `lugin-${pkg.version}/` : '';
+const PREFIX = FOR_TESTERS ? `lugin-${manifest.version}/` : '';
 
 const entries = walk(DIST)
   .map(path => ({ name: relative(DIST, path).split(sep).join('/'), path }))
@@ -224,7 +222,7 @@ const entries = walk(DIST)
 
 const archive = zip(entries);
 mkdirSync(OUT_DIR, { recursive: true });
-const out = join(OUT_DIR, `lugin-${pkg.version}${FOR_TESTERS ? '-testers' : ''}.zip`);
+const out = join(OUT_DIR, `lugin-${manifest.version}${FOR_TESTERS ? '-testers' : ''}.zip`);
 writeFileSync(out, archive);
 
 const kb = n => `${(n / 1024).toFixed(0)} KB`;

@@ -117,6 +117,20 @@ jobs:
           VITE_LUGIN_GOLDFISH_PROXY_URL: ${{ needs.goldfish-proxy.outputs.url || vars.VITE_LUGIN_GOLDFISH_PROXY_URL }}
         run: yarn build:web
 
+      # This is the public half of the extension identity, not a credential.
+      # Keeping it stable gives every unpacked tester the OAuth redirect already
+      # registered for Lugin Chrome. The private key remains local and untracked.
+      - name: Package Chrome tester download
+        env:
+          LUGIN_EXTENSION_KEY: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnRbyPxGVn9tYww27CqbJRc9zC3sIijQ0E3GQEslPRCqZlM9rk4k5W915sCMdDYUmbrd3X1sJqWwABozcYJyMX24iN76qxxQp+bOr8tzXoe0ZYq6LENOK7+BYxVvL3ly8ZHDnpjQJfFbUWQxT/meh8v8jFdKKfbS9L2mR4Y/+g5P35BvRMj9VVSz4XfcZ7cG1veJ2vJOvIWV9KvhUqZZ6IKC5SfKYtIzBHIhSWp631XHqG1lr4l+/slmkgTb/jDyVyeaUs9O+vRHczYxpWxe9HlE69EmrVl3DfSZzAyvY5VK+4jGdN4ohOMQ+41KDvj8EIg2H7U6f8H0mm6QcUcppWwIDAQAB
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_LUGIN_GOLDFISH_PROXY_URL: ${{ needs.goldfish-proxy.outputs.url || vars.VITE_LUGIN_GOLDFISH_PROXY_URL }}
+        run: |
+          rm -f release/lugin-*-testers.zip
+          yarn package:testers
+          mkdir -p dist-web/downloads
+          cp release/lugin-*-testers.zip dist-web/downloads/lugin-chrome-testers.zip
+
       - name: Price snapshot
         continue-on-error: true
         run: node scripts/build-prices.mjs --out dist-web/prices.json

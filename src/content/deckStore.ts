@@ -20,7 +20,7 @@ import {
   type DeckFormat,
   type DeckSection,
 } from '@/lib/deck';
-import { isBasicLand, type BasicPlan } from '@/lib/lands';
+import { isBasicLand, withBasicLands, type BasicPlan } from '@/lib/lands';
 
 const STORAGE_KEY = 'lugin:decks';
 
@@ -285,13 +285,7 @@ async replaceAll(decks: Deck[]): Promise<void> {
    */
   async setBasicLands(id: string, plan: BasicPlan): Promise<void> {
     if (state.decks.find(d => d.id === id)?.frozen) return;
-    await mutateDeck(id, d => {
-      const cards = d.cards.filter(c => !(c.section === 'main' && isBasicLand(c.name)));
-      for (const [name, quantity] of Object.entries(plan)) {
-        if (quantity > 0) cards.push({ name, quantity, section: 'main' });
-      }
-      return { ...d, cards };
-    });
+    await mutateDeck(id, d => ({ ...d, cards: withBasicLands(d.cards, plan) }));
   },
 
   

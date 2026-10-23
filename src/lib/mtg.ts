@@ -115,16 +115,21 @@ export const allowsSecondCommander = (info?: CommanderInfo): boolean =>
  * a land, not a land — so it counts as a spell on the curve and towards the mana
  * a deck needs, not towards its land count.
  */
-export const frontTypes = (meta?: CardMetadata): Set<string> => {
+export interface CardTypeMetadata {
+  typeLine?: string;
+  types?: string[];
+}
+
+export const frontTypes = (meta?: CardTypeMetadata): Set<string> => {
   if (!meta) return new Set();
   const front = meta.typeLine?.split('//')[0];
   // An em dash separates types from subtypes; only the left side interests us.
-  const words = front ? front.split('—')[0].split(/\s+/) : meta.types;
+  const words = front ? front.split('—')[0].split(/\s+/) : (meta.types ?? []);
   return new Set(words.filter(Boolean));
 };
 
 /** Whether a card is a land, going by its front face (see `frontTypes`). */
-export const isLandType = (meta?: CardMetadata): boolean => frontTypes(meta).has('Land');
+export const isLandType = (meta?: CardTypeMetadata): boolean => frontTypes(meta).has('Land');
 
 /** WUBRG order, the way Magic always prints colors and color identities. */
 export const WUBRG = ['W', 'U', 'B', 'R', 'G'];

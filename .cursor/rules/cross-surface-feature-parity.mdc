@@ -1,0 +1,22 @@
+---
+description: Keep generic Lugin deck and collection features aligned across Chrome, Native, and Web
+alwaysApply: true
+---
+
+# Cross-surface feature parity
+
+Lugin Chrome, Lugin Native, and Lugin Web share one product domain.
+
+- Put generic collection, deck-building, tags, search, validation, formatting,
+  copy coverage, bracket, import/export, and sync behavior in shared `src/`
+  modules.
+- A new or changed deck tag in `src/lib/deckTags.ts` must be available in all
+  three clients. Do not create platform-specific tag catalogues or queries.
+- When changing generic Collection or Deck behavior, inspect all three
+  presentations and either expose it everywhere or document a concrete
+  platform limitation.
+- Keep React DOM and React Native presentation separate where appropriate;
+  share the behavior rather than forcing shared UI components.
+- Camera, scanner ML, SQLite, Binder, SecureStore, native filesystem, browser
+  OAuth/storage, and platform permissions remain platform-specific.
+- Before completion, test the shared rule and each affected client adapter.

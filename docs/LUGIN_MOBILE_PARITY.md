@@ -11,7 +11,7 @@
 | FEATURE           | NATIVE                                                                                    | WEB                                                                    | SHARED LOGIC                                                                        | GAP                                                                                          | ACTION                                                                |
 | ----------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | Collection        | Search, list/grid images, quantities, printings, foil, value, add/edit/delete, counts     | Same core workflow; Scryfall suggestions and art/edition/finish picker | `collection`, `collectionEdit`, `collectionView`, `collectionPrintPicker`, `prices` | Language/condition are preserved by import and sync but neither direct add UI edits them yet | Add those fields once in shared intake, then expose platform controls |
-| Decks             | List/create/rename/delete, quantities, paste, commander, tags, paper lock and suggestions | Same, including import/export and suggestion panels                    | `deck`, `deckPaper`, deck feature modules                                           | Presentation remains intentionally platform-specific                                         | Keep rules shared; keep React Native/DOM views separate               |
+| Decks             | List/card views, shared filter/sort, edition/art choice, curve/type/tag stats, quantities, commander, tags, suggestions and automatic basic lands | Same core deck, printing, statistics, import/export, suggestion and land rules | `deck`, `deckBrowse`, `deckPaper`, `lands`, tags, printing and deck feature modules | Presentation remains intentionally platform-specific                                         | Keep rules shared; keep React Native/DOM views separate               |
 | Drive sync        | SQLite/file adapter + native OAuth                                                        | IndexedDB adapter + Google Web OAuth                                   | `src/core/sync`, schema 1, `app-state.json`                                         | Storage and OAuth adapters differ by design                                                  | Preserve adapter boundary                                             |
 | Import/export     | ManaBox and deck parsing; native file/share adapters                                      | ManaBox/deck import, downloads and browser sharing                     | `import`, `export`, `duplicates`, deck parser                                       | Picker/share UI differs                                                                      | Parser fixes belong in shared modules                                 |
 | Preferences       | Settings screen and synced preference domain                                              | Preference domain is read, stored and synced; no full Settings screen  | Sync model/serializer                                                               | Fewer Web controls                                                                           | Add only useful Web controls during polish                            |
@@ -47,6 +47,10 @@ Do not create `NativeCollectionLogic` and `WebCollectionLogic`. When a generic
 mobile feature changes, first decide whether its rule belongs in shared core.
 Native and Web may then render that rule with separate React Native and React DOM
 components.
+
+The always-applied `cross-surface-feature-parity` workspace rule also requires
+every generic Deck/Collection and tag change to inspect Lugin Chrome, Native and
+Web before completion.
 
 Intentionally platform-specific:
 
@@ -121,6 +125,9 @@ active edit.
 - trigger: push to `main`, manual `workflow_dispatch`, or the daily price refresh
   schedule at 10:30 UTC
 - hosting: GitHub Pages; no paid host or backend
+- Chrome tester download: each deploy also publishes
+  `downloads/lugin-chrome-testers.zip`; it keeps the stable public extension key
+  and must be unzipped and loaded through Chrome Developer mode
 - assets: content-hashed JavaScript/CSS
 - navigation: network-first with `cache: no-cache`, then offline shell fallback
 - updates: old shell caches are removed during service-worker activation; users

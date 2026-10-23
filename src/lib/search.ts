@@ -15,6 +15,8 @@ import { fetchRemote } from './fetchRemote';
 export interface CardSearchResult {
   cmc?: number;
   collectorNumber?: string;
+  /** Commander color identity in WUBRG order. */
+  colorIdentity?: string[];
   /**
    * Per-face images for physically two-sided cards (length >= 2), so the hover
    * preview can flip without a second lookup.
@@ -23,6 +25,8 @@ export interface CardSearchResult {
   id: string;
   /** Front image (normal size) — browser-cached CDN URL. */
   imageUrl?: string;
+  /** Front-face mana cost, used by the shared basic-land planner. */
+  manaCost?: string;
   name: string;
   setCode?: string;
   /** Smaller scan for a grid. The hover preview still uses `imageUrl`. */
@@ -69,11 +73,13 @@ export interface CardQuery {
 }
 
 interface ScryfallCard {
-  card_faces?: Array<{ image_uris?: Record<string, string> }>;
+  card_faces?: Array<{ image_uris?: Record<string, string>; mana_cost?: string }>;
   cmc?: number;
   collector_number?: string;
+  color_identity?: string[];
   id: string;
   image_uris?: Record<string, string>;
+  mana_cost?: string;
   name: string;
   set?: string;
   type_line?: string;
@@ -121,9 +127,11 @@ const toResult = (c: ScryfallCard): CardSearchResult => {
   return {
     cmc: c.cmc,
     collectorNumber: c.collector_number,
+    colorIdentity: c.color_identity,
     faceImages: faceImages.length >= 2 ? faceImages : undefined,
     id: c.id,
     imageUrl: images?.normal ?? images?.large ?? images?.small,
+    manaCost: c.mana_cost ?? c.card_faces?.[0]?.mana_cost,
     name: c.name,
     setCode: c.set,
     thumbUrl: images?.small ?? images?.normal,
@@ -225,7 +233,9 @@ export const searchScryfallPage = async (
   query: string,
   options: { format?: DeckFormat; next?: string | null; order?: 'edhrec' | 'name' } = {},
 ): Promise<CardSearchPage> => {
-  const trimmed = options.next ? query : applyDefaultSearchFilters(query, { format: options.format });
+  const trimmed = options.next
+    ? query
+    : applyDefaultSearchFilters(query, { format: options.format });
   if (!options.next && !trimmed) return { cards: [], next: null, query: '', total: 0 };
 
   const url =
@@ -272,4 +282,38 @@ export const searchCards = async (q: CardQuery, limit = 12): Promise<CardSearchR
   const query = buildScryfallQuery(q);
   if (!query || !hasSearchCriteria(q)) return { cards: [], query, total: 0 };
   return searchScryfallQuery(query, limit, q.format);
+};
+
+const exactCardCache = new Map<string, Promise<CardSearchResult | null>>();
+
+/** Exact canonical card lookup, cached for Commander identity and similar rules checks. */
+export const searchExactCard = (name: string): Promise<CardSearchResult | null> => {
+  const exact = name.trim().replace(/"/g, '');
+  if (!exact) return Promise.resolve(null);
+  const key = exact.toLowerCase();
+  const cached = exactCardCache.get(key);
+  if (cached) return cached;
+  const request = searchScryfallPage(`!"${exact}"`).then(page => page.cards[0] ?? null);
+  exactCardCache.set(key, request);
+  void request.catch(() => exactCardCache.delete(key));
+  return request;
+};
+
+/**
+ * Resolve a deck-sized list of names without issuing one request per card.
+ * Scryfall search accepts exact-name clauses, so small batches keep Native and
+ * Web land planning on the same polite request path as every other search.
+ */
+export const searchExactCards = async (names: readonly string[]): Promise<CardSearchResult[]> => {
+  const unique = [...new Set(names.map(name => name.trim()).filter(Boolean))];
+  const cards: CardSearchResult[] = [];
+  for (let start = 0; start < unique.length; start += 20) {
+    const query = unique
+      .slice(start, start + 20)
+      .map(name => `!"${name.replace(/[\\"]/g, match => `\\${match}`)}"`)
+      .join(' or ');
+    const page = await searchScryfallPage(`(${query})`);
+    cards.push(...page.cards);
+  }
+  return cards;
 };

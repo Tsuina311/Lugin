@@ -26,7 +26,7 @@ export function RootTabs() {
   const insets = useSafeAreaInsets();
   const library = useLibrary();
   const capabilities = capabilitiesFor(Platform.OS === 'ios' ? 'native-ios' : 'native-android');
-  const initialTab: Tab = capabilities.nativeScanner ? 'scan' : 'collection';
+  const initialTab: Tab = 'collection';
   const [tab, setTab] = useState<Tab>(initialTab);
   const [mountedTabs, setMountedTabs] = useState<Set<Tab>>(() => new Set([initialTab]));
   const [cameraSurface, setCameraSurface] = useState<'scan' | 'binder' | 'geometry'>('scan');
@@ -53,6 +53,20 @@ export function RootTabs() {
       setCameraSurface(tab === 'binder' ? 'binder' : tab === 'geometry' ? 'geometry' : 'scan');
     }
   }, [tab]);
+
+  // Build the deck list just after first paint, rather than making the first
+  // Decks tap pay for bracket/coverage indexes and image discovery.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMountedTabs(current => {
+        if (current.has('decks')) return current;
+        const updated = new Set(current);
+        updated.add('decks');
+        return updated;
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   const collectionCards = library.data?.collection.value?.cards;
   const printings = library.data?.printings.value;

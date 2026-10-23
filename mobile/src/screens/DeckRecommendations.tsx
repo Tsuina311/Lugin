@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
   SectionList,
   StyleSheet,
@@ -10,15 +11,16 @@ import {
 } from 'react-native';
 
 import { CardThumb } from '../ui/CardThumb';
+import { DeckSuggestionPreview } from '../ui/DeckSuggestionPreview';
 
 import { cardImageCandidates } from '@/lib/cardImage';
 import { cardKey, frontFaceName } from '@/lib/cardName';
-import {
-  EdhrecNotFound,
-  fetchEdhrec,
-  type EdhrecCard,
-  type EdhrecData,
-} from '@/lib/edhrec';
+import type { CollectionCard } from '@/lib/collection';
+import type { DeckPrinting } from '@/lib/deck';
+import { applyDeckBrowse, type DeckBrowseState } from '@/lib/deckBrowse';
+import { EdhrecNotFound, fetchEdhrec, type EdhrecCard, type EdhrecData } from '@/lib/edhrec';
+import { goldfishDeckCount, goldfishSampleSize } from '@/lib/goldfishStats';
+import { searchExactCards, type CardSearchResult } from '@/lib/search';
 
 export type RecommendationSource = 'edhrec' | 'goldfish';
 
@@ -37,21 +39,16 @@ interface RecommendationCategory {
 
 interface RecommendationData {
   categories: RecommendationCategory[];
+  sampleSize?: number;
   subtitle?: string;
 }
 
 const PAGE_SIZE = 15;
-const DEFAULT_EDHREC_OPEN = new Set([
-  'highsynergycards',
-  'highliftcards',
-  'topcards',
-  'newcards',
-]);
+const DEFAULT_EDHREC_OPEN = new Set(['highsynergycards', 'highliftcards', 'topcards', 'newcards']);
 const GOLDFISH_PROXY = 'https://lugin-goldfish.gwenaeloppitz.workers.dev';
 const memoryCache = new Map<string, RecommendationData>();
 
-const pct = (value?: number): string =>
-  value == null ? '' : `${Math.round(value * 100)}%`;
+const pct = (value?: number): string => (value == null ? '' : `${Math.round(value * 100)}%`);
 
 const signedPct = (value?: number): string => {
   if (value == null) return '';
@@ -76,7 +73,7 @@ const edhrecData = (data: EdhrecData): RecommendationData => ({
 const decodeHtml = (value: string): string =>
   value
     .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&#39;|&apos;/g, '\u0027')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -131,7 +128,18 @@ const parseGoldfish = (html: string): RecommendationData => {
   if (categories.length === 0) {
     throw new Error('MTGGoldfish has no card suggestions for this commander yet.');
   }
-  return { categories };
+  const sampleSize = goldfishSampleSize(
+    categories.flatMap(category =>
+      category.cards.flatMap(card =>
+        card.inclusion == null ? [] : [Math.round(card.inclusion * 100)],
+      ),
+    ),
+  );
+  return {
+    categories,
+    sampleSize,
+    subtitle: sampleSize ? `${sampleSize} sample decks` : undefined,
+  };
 };
 
 const loadGoldfish = async (commanderNames: readonly string[]): Promise<RecommendationData> => {
@@ -170,15 +178,19 @@ const loadSource = async (
 };
 
 export function DeckRecommendations({
+  browse,
+  collectionCards,
   commanderNames,
   deckQuantity,
   onAdd,
   ownedQuantity,
   source,
 }: {
+  browse: DeckBrowseState;
+  collectionCards: readonly CollectionCard[];
   commanderNames: readonly string[];
   deckQuantity: (name: string) => number;
-  onAdd: (name: string) => void;
+  onAdd: (name: string, printing?: DeckPrinting) => void;
   ownedQuantity: (name: string) => number;
   source: RecommendationSource;
 }) {
@@ -189,6 +201,8 @@ export function DeckRecommendations({
   const [hideInDeck, setHideInDeck] = useState(true);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [preview, setPreview] = useState<RecommendationCard | EdhrecCard | null>(null);
+  const [metadata, setMetadata] = useState<Record<string, CardSearchResult>>({});
   const request = useRef(0);
   const commanderKey = commanderNames.map(cardKey).join('|');
 
@@ -202,10 +216,13 @@ export function DeckRecommendations({
         setData(next);
         setOpen(previous => {
           if (previous.size > 0 && !force) return previous;
-          const defaults = source === 'edhrec'
-            ? next.categories.filter(category => DEFAULT_EDHREC_OPEN.has(category.id))
-            : next.categories.slice(0, 1);
-          return new Set((defaults.length > 0 ? defaults : next.categories.slice(0, 1)).map(c => c.id));
+          const defaults =
+            source === 'edhrec'
+              ? next.categories.filter(category => DEFAULT_EDHREC_OPEN.has(category.id))
+              : next.categories.slice(0, 1);
+          return new Set(
+            (defaults.length > 0 ? defaults : next.categories.slice(0, 1)).map(c => c.id),
+          );
         });
         setLoading(false);
       },
@@ -229,24 +246,76 @@ export function DeckRecommendations({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commanderKey, source]);
 
+  const recommendationNames = useMemo(
+    () => [...new Set((data?.categories ?? []).flatMap(category => category.cards.map(card => card.name)))],
+    [data],
+  );
+  const recommendationNamesKey = recommendationNames.map(cardKey).sort().join('|');
+
+  useEffect(() => {
+    if (recommendationNames.length === 0) {
+      setMetadata({});
+      return;
+    }
+    let cancelled = false;
+    void searchExactCards(recommendationNames).then(cards => {
+      if (!cancelled) {
+        setMetadata(Object.fromEntries(cards.map(card => [cardKey(card.name), card])));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Names' content, not array identity, controls the metadata lookup.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recommendationNamesKey]);
+
   const sections = useMemo(
     () =>
       (data?.categories ?? []).map(category => {
-        const filtered = category.cards.filter(card => {
+        const eligible = category.cards.filter(card => {
           if (ownedOnly && ownedQuantity(card.name) === 0) return false;
           if (hideInDeck && deckQuantity(card.name) > 0) return false;
           return true;
         });
+        const filtered = applyDeckBrowse(
+          eligible,
+          card => {
+            const meta = metadata[cardKey(card.name)];
+            return {
+              cmc: meta?.cmc,
+              land: meta?.typeLine?.includes('Land'),
+              name: card.name,
+              owned: ownedQuantity(card.name),
+              tags: [category.title],
+              typeLine: meta?.typeLine,
+            };
+          },
+          browse,
+        );
         return {
           category,
           data: open.has(category.id)
-            ? (expanded.has(category.id) ? filtered : filtered.slice(0, PAGE_SIZE))
+            ? expanded.has(category.id)
+              ? filtered
+              : filtered.slice(0, PAGE_SIZE)
             : [],
           filteredCount: filtered.length,
+          gridData: filtered,
           title: category.title,
         };
       }),
-    [data, deckQuantity, expanded, hideInDeck, open, ownedOnly, ownedQuantity],
+    [
+      browse,
+      data,
+      deckQuantity,
+      expanded,
+      hideInDeck,
+      metadata,
+      open,
+      ownedOnly,
+      ownedQuantity,
+    ],
   );
 
   const toggle = (current: Set<string>, id: string): Set<string> => {
@@ -286,17 +355,44 @@ export function DeckRecommendations({
             <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
+      ) : browse.view === 'grid' ? (
+        <FlatList
+          key="grid"
+          ListEmptyComponent={
+            <Text style={styles.empty}>No suggestions match these filters.</Text>
+          }
+          columnWrapperStyle={styles.gridColumns}
+          contentContainerStyle={styles.list}
+          data={sections.flatMap(section =>
+            section.gridData.map(card => ({ card, category: section.title })),
+          )}
+          keyExtractor={(item, index) => `${item.category}:${cardKey(item.card.name)}:${index}`}
+          numColumns={2}
+          renderItem={({ item }) => (
+            <RecommendationGridCard
+              card={item.card}
+              category={item.category}
+              deckQuantity={deckQuantity(item.card.name)}
+              onAdd={() => onAdd(item.card.name)}
+              onImagePress={() => setPreview(item.card)}
+              ownedQuantity={ownedQuantity(item.card.name)}
+            />
+          )}
+          style={styles.flex}
+        />
       ) : (
         <SectionList
+          ListEmptyComponent={<Text style={styles.empty}>No suggestions match these filters.</Text>}
           contentContainerStyle={styles.list}
           keyExtractor={(card, index) => `${cardKey(card.name)}:${index}`}
-          ListEmptyComponent={<Text style={styles.empty}>No suggestions match these filters.</Text>}
           renderItem={({ item }) => (
             <RecommendationRow
               card={item}
               deckQuantity={deckQuantity(item.name)}
               onAdd={() => onAdd(item.name)}
+              onImagePress={() => setPreview(item)}
               ownedQuantity={ownedQuantity(item.name)}
+              sampleSize={data?.sampleSize}
             />
           )}
           renderSectionFooter={({ section }) =>
@@ -317,7 +413,9 @@ export function DeckRecommendations({
               style={styles.section}
             >
               <Text style={styles.chevron}>{open.has(section.category.id) ? '▾' : '▸'}</Text>
-              <Text numberOfLines={1} style={styles.sectionTitle}>{section.title}</Text>
+              <Text numberOfLines={1} style={styles.sectionTitle}>
+                {section.title}
+              </Text>
               <Text style={styles.sectionCount}>{section.filteredCount}</Text>
             </Pressable>
           )}
@@ -326,42 +424,129 @@ export function DeckRecommendations({
           style={styles.flex}
         />
       )}
+      {preview ? (
+        <DeckSuggestionPreview
+          candidates={cardImageCandidates({
+            imageUrl: preview.imageUrl,
+            name: preview.name,
+            scryfallId: 'scryfallId' in preview ? preview.scryfallId : undefined,
+          })}
+          collectionCards={collectionCards}
+          defaultPrinting={{
+            imageUrl: preview.imageUrl,
+            scryfallId: 'scryfallId' in preview ? preview.scryfallId : undefined,
+          }}
+          name={preview.name}
+          onAdd={onAdd}
+          onClose={() => setPreview(null)}
+          placeholderCandidates={preview.imageUrl ? [preview.imageUrl] : undefined}
+        />
+      ) : null}
     </View>
   );
 }
 
-const RecommendationRow = ({
+const RecommendationGridCard = ({
   card,
+  category,
   deckQuantity,
   onAdd,
+  onImagePress,
   ownedQuantity,
 }: {
   card: RecommendationCard | EdhrecCard;
+  category: string;
   deckQuantity: number;
   onAdd: () => void;
+  onImagePress: () => void;
   ownedQuantity: number;
-}) => {
-  const details = [
-    card.inclusion != null ? `${pct(card.inclusion)} decks` : '',
-    card.synergy != null ? `${signedPct(card.synergy)} synergy` : '',
-  ].filter(Boolean).join(' · ');
-  return (
-    <View style={styles.cardRow}>
+}) => (
+  <View style={styles.gridCard}>
+    <Pressable accessibilityLabel={`Preview ${card.name}`} onPress={onImagePress}>
       <CardThumb
         candidates={cardImageCandidates({
           imageUrl: card.imageUrl,
           name: card.name,
           scryfallId: 'scryfallId' in card ? card.scryfallId : undefined,
         })}
-        style={styles.thumb}
+        style={styles.gridImage}
       />
-      <View style={styles.flex}>
-        <Text numberOfLines={1} style={styles.cardName}>{card.name}</Text>
+    </Pressable>
+    <Text numberOfLines={1} style={styles.gridName}>
+      {card.name}
+    </Text>
+    <Text numberOfLines={1} style={styles.gridCategory}>
+      {category}
+    </Text>
+    <View style={styles.gridFooter}>
+      <Text style={styles.gridOwned}>
+        {ownedQuantity > 0 ? `owned ×${ownedQuantity}` : 'not owned'}
+      </Text>
+      {deckQuantity > 0 ? (
+        <Text style={styles.gridInDeck}>In deck</Text>
+      ) : (
+        <Pressable accessibilityLabel={`Add ${card.name}`} onPress={onAdd} style={styles.gridAdd}>
+          <Text style={styles.addText}>+</Text>
+        </Pressable>
+      )}
+    </View>
+  </View>
+);
+
+const RecommendationRow = ({
+  card,
+  deckQuantity,
+  onAdd,
+  onImagePress,
+  ownedQuantity,
+  sampleSize,
+}: {
+  card: RecommendationCard | EdhrecCard;
+  deckQuantity: number;
+  onAdd: () => void;
+  onImagePress: () => void;
+  ownedQuantity: number;
+  sampleSize?: number;
+}) => {
+  const sampleCount =
+    card.inclusion != null && sampleSize
+      ? goldfishDeckCount(card.inclusion * 100, sampleSize)
+      : undefined;
+  const details = [
+    sampleCount != null && sampleSize
+      ? `${sampleCount}/${sampleSize} sample decks`
+      : card.inclusion != null
+        ? `${pct(card.inclusion)} decks`
+        : '',
+    card.synergy != null ? `${signedPct(card.synergy)} synergy` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <View style={styles.cardRow}>
+      <Pressable accessibilityLabel={`Preview ${card.name}`} onPress={onImagePress}>
+        <CardThumb
+          candidates={cardImageCandidates({
+            imageUrl: card.imageUrl,
+            name: card.name,
+            scryfallId: 'scryfallId' in card ? card.scryfallId : undefined,
+          })}
+          style={styles.thumb}
+        />
+      </Pressable>
+      <Pressable
+        accessibilityLabel={`Preview ${card.name}`}
+        onPress={onImagePress}
+        style={styles.flex}
+      >
+        <Text numberOfLines={1} style={styles.cardName}>
+          {card.name}
+        </Text>
         <Text numberOfLines={1} style={styles.cardMeta}>
           {details || 'Suggested card'}
           {ownedQuantity > 0 ? ` · owned ×${ownedQuantity}` : ' · not owned'}
         </Text>
-      </View>
+      </Pressable>
       {deckQuantity > 0 ? (
         <View style={styles.inDeck}>
           <Text style={styles.inDeckText}>In deck</Text>
@@ -401,16 +586,69 @@ const styles = StyleSheet.create({
   chevron: { color: '#8A97AD', width: 14 },
   empty: { color: '#8A97AD', padding: 16, textAlign: 'center' },
   error: { color: '#E98A8A', lineHeight: 20, textAlign: 'center' },
-  filter: { backgroundColor: '#1C2636', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 5 },
+  filter: {
+    backgroundColor: '#1C2636',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
   filterOn: { color: '#8CB4FF' },
   filterText: { color: '#8A97AD', fontSize: 11, fontWeight: '600' },
   flex: { flex: 1 },
+  gridAdd: {
+    alignItems: 'center',
+    backgroundColor: '#3D7EFF',
+    borderRadius: 7,
+    height: 28,
+    justifyContent: 'center',
+    width: 32,
+  },
+  gridCard: {
+    backgroundColor: '#121A28',
+    borderColor: '#26354B',
+    borderRadius: 9,
+    borderWidth: 1,
+    flex: 1,
+    maxWidth: '48.5%',
+    overflow: 'hidden',
+  },
+  gridCategory: { color: '#8290A6', fontSize: 9, paddingHorizontal: 7, paddingTop: 2 },
+  gridColumns: { gap: 10, marginBottom: 10 },
+  gridFooter: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    paddingBottom: 7,
+    paddingHorizontal: 7,
+    paddingTop: 4,
+  },
+  gridImage: { aspectRatio: 488 / 680, backgroundColor: '#1C2636', width: '100%' },
+  gridInDeck: { color: '#8CB4FF', fontSize: 9, fontWeight: '700' },
+  gridName: {
+    color: '#F4F7FB',
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: 7,
+    paddingTop: 6,
+  },
+  gridOwned: { color: '#8290A6', flex: 1, fontSize: 9 },
   inDeck: { backgroundColor: '#17345B', borderRadius: 9, paddingHorizontal: 8, paddingVertical: 7 },
   inDeckText: { color: '#8CB4FF', fontSize: 11, fontWeight: '700' },
   list: { paddingBottom: 16 },
-  refresh: { alignItems: 'center', height: 28, justifyContent: 'center', marginLeft: 'auto', width: 28 },
+  refresh: {
+    alignItems: 'center',
+    height: 28,
+    justifyContent: 'center',
+    marginLeft: 'auto',
+    width: 28,
+  },
   refreshText: { color: '#C5D3E8', fontSize: 20 },
-  retry: { backgroundColor: '#1C2636', borderRadius: 8, marginTop: 12, paddingHorizontal: 14, paddingVertical: 8 },
+  retry: {
+    backgroundColor: '#1C2636',
+    borderRadius: 8,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
   retryText: { color: '#E8EEF7', fontWeight: '700' },
   root: { flex: 1 },
   section: {
@@ -421,7 +659,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   sectionCount: { color: '#66758C', fontSize: 11 },
-  sectionTitle: { color: '#B7C3D5', flex: 1, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  sectionTitle: {
+    color: '#B7C3D5',
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
   showAll: { paddingHorizontal: 10, paddingVertical: 10 },
   showAllText: { color: '#8CB4FF', fontSize: 12, fontWeight: '700' },
   source: { color: '#C5D3E8', fontSize: 11, fontWeight: '700' },

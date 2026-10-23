@@ -23,6 +23,7 @@ import {
 import { libraryStore } from '../data/libraryStore';
 import { useLibrary } from '../data/useLibrary';
 import { CardThumb, collectionImageCandidates } from '../ui/CardThumb';
+import { FlippableCardImage } from '../ui/FlippableCardImage';
 import { peekCardImageCandidates, preloadCardImageCandidates } from '../ui/cardImageCache';
 
 import { cardImageCandidates } from '@/lib/cardImage';
@@ -768,8 +769,9 @@ const Detail = ({ card, onClose }: { card: CollectionCard; onClose: () => void }
       style={styles.detail}
     >
       <Pressable accessibilityLabel="Close card preview" onPress={onClose}>
-        <CardThumb
+        <FlippableCardImage
           candidates={collectionImageCandidates(card, override)}
+          name={card.name}
           style={styles.detailImage}
         />
       </Pressable>

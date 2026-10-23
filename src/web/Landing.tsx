@@ -57,15 +57,33 @@ export const Landing = () => {
             <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-muted">
               Adds Lugin collection and deck tools directly to Cardmarket on desktop Chrome.
             </p>
-            <div
-              aria-disabled="true"
-              className="mt-5 rounded-xl border border-line-strong bg-raised px-4 py-3 text-center text-sm font-semibold text-ink-faint"
+            <a
+              className="mt-5 block rounded-xl bg-accent px-4 py-3 text-center text-sm font-semibold text-accent-ink active:bg-accent-strong"
+              download
+              href={asset('downloads/lugin-chrome-testers.zip')}
             >
-              Public install coming soon
+              Download Lugin Chrome
+            </a>
+            <div className="mt-4 text-xs leading-relaxed text-ink-muted">
+              <p className="font-semibold text-ink">How to install</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5">
+                <li>Download and unzip the file somewhere permanent.</li>
+                <li>
+                  Open <strong>chrome://extensions</strong> in desktop Chrome.
+                </li>
+                <li>
+                  Enable <strong>Developer mode</strong> in the top-right corner.
+                </li>
+                <li>
+                  Select <strong>Load unpacked</strong>, then choose the unzipped{' '}
+                  <strong>lugin-…</strong> folder.
+                </li>
+                <li>Open Cardmarket and use the Lugin toolbar icon.</li>
+              </ol>
             </div>
-            <p className="mt-3 text-center text-xs leading-relaxed text-ink-faint">
-              A safe public Chrome installer is not available yet. Lugin Chrome does not run on
-              iPhone.
+            <p className="mt-2 text-xs leading-relaxed text-ink-faint">
+              Keep the unzipped folder in place. Updates are manual. Google sync requires an
+              approved tester email. Desktop Chrome and Cardmarket only—not iPhone.
             </p>
           </section>
         </div>

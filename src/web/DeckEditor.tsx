@@ -48,9 +48,15 @@ import { bucketMainByTagSections, type TagSectionBucket } from '@/lib/deckTagSec
 import { deckTagById, deckTagsByCategory, filterDeckTags } from '@/lib/deckTags';
 import { fetchEdhrec } from '@/lib/edhrec';
 import { fetchRemote } from '@/lib/fetchRemote';
-import { sortWubrg } from '@/lib/mtg';
+import {
+  basicsMatchPlan,
+  isBasicLand,
+  planBasicLands,
+  withBasicLands,
+} from '@/lib/lands';
+import { isLandType, sortWubrg } from '@/lib/mtg';
 import { fetchGoldfishArchetype } from '@/lib/mtggoldfish';
-import { searchCards } from '@/lib/search';
+import { searchCards, searchExactCards, type CardSearchResult } from '@/lib/search';
 import { BracketMark } from '@/ui/components/BracketMark';
 import { CollectionThumb } from '@/ui/components/CollectionThumb';
 import { CommanderPicker } from '@/ui/components/CommanderPicker';
@@ -145,6 +151,9 @@ export const DeckEditor = ({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [panel, setPanel] = useState<DeckPanel>('deck');
   const [browsingCommanders, setBrowsingCommanders] = useState(false);
+  const [landsOpen, setLandsOpen] = useState(false);
+  const [landMetadata, setLandMetadata] = useState<Record<string, CardSearchResult>>({});
+  const [landMetadataLoading, setLandMetadataLoading] = useState(false);
 
   useEffect(() => {
     setPanel('deck');
@@ -212,6 +221,99 @@ export const DeckEditor = ({
       cancelled = true;
     };
   }, [commandersKey, commanders]);
+
+  const landTarget = deck.landTarget ?? formatInfo(deck.format).landCount;
+  const landNames = useMemo(
+    () =>
+      [...new Set(
+        deck.cards
+          .filter(card => card.section !== 'sideboard' && !isBasicLand(card.name))
+          .map(card => card.name),
+      )],
+    [deck.cards],
+  );
+  const landNamesKey = landNames.map(cardKey).sort().join('|');
+
+  useEffect(() => {
+    if ((!landsOpen && !deck.autoLands) || landNames.length === 0) return;
+    let cancelled = false;
+    setLandMetadataLoading(true);
+    void searchExactCards(landNames).then(
+      cards => {
+        if (cancelled) return;
+        setLandMetadata(Object.fromEntries(cards.map(card => [cardKey(card.name), card])));
+        setLandMetadataLoading(false);
+      },
+      () => {
+        if (!cancelled) setLandMetadataLoading(false);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+    // The names' content, not the rebuilt array, controls this lookup.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deck.autoLands, landNamesKey, landsOpen]);
+
+  const unresolvedLandNames = landNames.filter(name => !landMetadata[cardKey(name)]).length;
+  const landColors = useMemo(() => {
+    if (formatInfo(deck.format).commanderZone) {
+      return commanders.length > 0 ? (commanderIdentity ?? null) : null;
+    }
+    const colors = new Set<string>();
+    for (const card of Object.values(landMetadata)) {
+      for (const color of card.colorIdentity ?? []) colors.add(color);
+    }
+    return sortWubrg([...colors]);
+  }, [commanderIdentity, commanders.length, deck.format, landMetadata]);
+  const landCounts = useMemo(() => {
+    let basics = 0;
+    let chosen = 0;
+    for (const card of deck.cards) {
+      if (card.section === 'sideboard') continue;
+      if (isBasicLand(card.name)) basics += card.quantity;
+      else if (isLandType(landMetadata[cardKey(card.name)])) chosen += card.quantity;
+    }
+    return { basics, chosen, total: basics + chosen };
+  }, [deck.cards, landMetadata]);
+  const landPlan = useMemo(() => {
+    if (
+      landTarget == null ||
+      landColors == null ||
+      landMetadataLoading ||
+      unresolvedLandNames > 0
+    ) {
+      return null;
+    }
+    return planBasicLands({
+      cards: deck.cards,
+      colors: landColors,
+      landTarget,
+      metaByKey: landMetadata,
+    });
+  }, [
+    deck.cards,
+    landColors,
+    landMetadata,
+    landMetadataLoading,
+    landTarget,
+    unresolvedLandNames,
+  ]);
+
+  useEffect(() => {
+    if (
+      deck.frozen ||
+      !deck.autoLands ||
+      !landPlan ||
+      basicsMatchPlan(deck.cards, landPlan)
+    ) {
+      return;
+    }
+    void syncStore.updateDeck(deck.id, current => ({
+      ...current,
+      cards: withBasicLands(current.cards, landPlan),
+    }));
+  }, [deck.autoLands, deck.cards, deck.frozen, deck.id, landPlan]);
 
   const deckTabs = useMemo(
     () => DECK_VIEWS.filter(tab => tab.id === 'deck' || tab.id === 'tags' || commanderRecs),
@@ -548,6 +650,18 @@ export const DeckEditor = ({
               }));
             }}
           />
+          {landTarget != null ? (
+            <button
+              className={`shrink-0 rounded-md px-2 py-1.5 text-[11px] font-semibold tabular-nums ${
+                deck.autoLands ? 'bg-accent-soft text-accent' : 'bg-raised text-ink-muted'
+              }`}
+              onClick={() => setLandsOpen(true)}
+              title="Land target and automatic basic lands"
+              type="button"
+            >
+              ▲ {landCounts.total}/{landTarget}
+            </button>
+          ) : null}
           <span className="min-w-0 flex-1 truncate text-[11px] tabular-nums text-ink-faint">
             {copies(deck, 'main') + copies(deck, 'commander')}
             {formatInfo(deck.format).targetSize
@@ -610,6 +724,133 @@ export const DeckEditor = ({
           </div>
         ) : null}
       </div>
+
+      {landsOpen && landTarget != null ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+          onClick={() => setLandsOpen(false)}
+          role="presentation"
+        >
+          <div
+            aria-label="Land controls"
+            aria-modal="true"
+            className="w-full max-w-sm rounded-xl border border-line bg-panel p-4 shadow-2xl"
+            onClick={event => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-semibold text-ink">Lands</h2>
+                <p className="mt-0.5 text-xs text-ink-faint">
+                  {landCounts.total} now · {landCounts.basics} basic
+                  {landCounts.chosen > 0 ? ` · ${landCounts.chosen} other` : ''}
+                </p>
+              </div>
+              <button
+                className="rounded-md bg-raised px-2.5 py-1.5 text-xs font-medium text-ink-muted"
+                onClick={() => setLandsOpen(false)}
+                type="button"
+              >
+                Done
+              </button>
+            </div>
+            <div className="mt-4 flex items-center gap-2 border-b border-line pb-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-ink">Land target</p>
+                <p className="text-[11px] text-ink-faint">
+                  Nonbasic lands count toward this total.
+                </p>
+              </div>
+              <button
+                className="h-8 w-8 rounded-md bg-raised text-ink disabled:opacity-40"
+                disabled={deck.frozen || landTarget <= 0}
+                onClick={() =>
+                  void syncStore.updateDeck(deck.id, current => ({
+                    ...current,
+                    landTarget: Math.max(0, landTarget - 1),
+                  }))
+                }
+                type="button"
+              >
+                −
+              </button>
+              <span className="w-7 text-center text-sm font-semibold tabular-nums text-ink">
+                {landTarget}
+              </span>
+              <button
+                className="h-8 w-8 rounded-md bg-raised text-ink disabled:opacity-40"
+                disabled={deck.frozen}
+                onClick={() =>
+                  void syncStore.updateDeck(deck.id, current => ({
+                    ...current,
+                    landTarget: landTarget + 1,
+                  }))
+                }
+                type="button"
+              >
+                +
+              </button>
+            </div>
+            <label
+              className={`mt-3 flex items-start gap-2 rounded-lg p-2.5 ${
+                deck.autoLands ? 'bg-accent-soft' : ''
+              }`}
+            >
+              <input
+                checked={deck.autoLands === true}
+                className="mt-0.5"
+                disabled={
+                  deck.frozen ||
+                  landMetadataLoading ||
+                  unresolvedLandNames > 0 ||
+                  landColors == null
+                }
+                onChange={event =>
+                  void syncStore.updateDeck(deck.id, current => ({
+                    ...current,
+                    autoLands: event.target.checked,
+                  }))
+                }
+                type="checkbox"
+              />
+              <span>
+                <span className="block text-sm font-medium text-ink">Top up with basics</span>
+                <span className="block text-[11px] leading-4 text-ink-faint">
+                  Keeps the target filled and splits basics by your deck’s mana needs.
+                </span>
+              </span>
+            </label>
+            {landMetadataLoading ? (
+              <p className="mt-2 text-[11px] text-accent">Reading card colors and mana costs…</p>
+            ) : landColors == null ? (
+              <p className="mt-2 text-[11px] text-warn">
+                Choose a commander before balancing its basics.
+              </p>
+            ) : unresolvedLandNames > 0 ? (
+              <p className="mt-2 text-[11px] text-warn">
+                {unresolvedLandNames} unknown card{' '}
+                {unresolvedLandNames === 1 ? 'name prevents' : 'names prevent'} safe automatic
+                land balancing.
+              </p>
+            ) : null}
+            {landCounts.basics > 0 && !deck.frozen ? (
+              <button
+                className="mt-3 text-xs font-medium text-neg"
+                onClick={() =>
+                  void syncStore.updateDeck(deck.id, current => ({
+                    ...current,
+                    autoLands: false,
+                    cards: withBasicLands(current.cards, {}),
+                  }))
+                }
+                type="button"
+              >
+                Remove all basics
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {panel === 'tags' ? (
         <TagsPanel

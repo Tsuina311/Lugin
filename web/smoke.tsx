@@ -133,7 +133,7 @@ for (const [name, run] of checks) {
 }
 
 const landing = renderToString(<Landing />).replace(/<!--.*?-->/g, '');
-for (const text of ['Open Lugin Web', 'Desktop Chrome', 'Public install coming soon']) {
+for (const text of ['Open Lugin Web', 'Desktop Chrome', 'Download Lugin Chrome', 'Load unpacked']) {
   if (!landing.includes(text)) {
     failed += 1;
     console.log(`  FAIL  landing page is missing “${text}”`);

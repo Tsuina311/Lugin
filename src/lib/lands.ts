@@ -16,7 +16,7 @@
 
 import { cardKey } from './cardName';
 import type { DeckCard } from './deck';
-import { WUBRG, isLandType, sortWubrg, type CardMetadata } from './mtg';
+import { WUBRG, isLandType, sortWubrg, type CardTypeMetadata } from './mtg';
 
 /** The basic land that produces each color; colorless decks get Wastes. */
 export const BASIC_LANDS: Record<string, string> = {
@@ -35,6 +35,7 @@ export const isBasicLand = (name: string): boolean => BASIC_KEYS.has(cardKey(nam
 
 /** How many basics a plan wants, by card name. */
 export type BasicPlan = Record<string, number>;
+export type LandPlanningMetadata = CardTypeMetadata & { manaCost?: string };
 
 const SYMBOL_RE = /\{([^}]+)\}/g;
 
@@ -104,7 +105,7 @@ export const planBasicLands = ({
   colors: string[];
   /** Lands the finished deck should run, basics included. */
   landTarget: number;
-  metaByKey: Record<string, CardMetadata>;
+  metaByKey: Record<string, LandPlanningMetadata>;
 }): BasicPlan => {
   let chosenLands = 0;
   const pips: Record<string, number> = {};
@@ -148,4 +149,13 @@ export const basicsMatchPlan = (cards: DeckCard[], plan: BasicPlan): boolean => 
   if (current.size !== want.size) return false;
   for (const [key, n] of want) if (current.get(key) !== n) return false;
   return true;
+};
+
+/** Replace only main-deck plain basics; every user-chosen land stays untouched. */
+export const withBasicLands = (cards: readonly DeckCard[], plan: BasicPlan): DeckCard[] => {
+  const kept = cards.filter(card => !(card.section === 'main' && isBasicLand(card.name)));
+  const basics = Object.entries(plan)
+    .filter(([, quantity]) => quantity > 0)
+    .map(([name, quantity]) => ({ name, quantity, section: 'main' as const }));
+  return [...kept, ...basics];
 };

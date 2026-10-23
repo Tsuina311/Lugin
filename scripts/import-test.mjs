@@ -46,6 +46,8 @@ await writeFile(
    export { shouldWelcome } from '${root}src/ui/firstRun';
    export * from '${root}src/lib/table';
    export * from '${root}src/lib/deckTags';
+   export * from '${root}src/lib/deckBrowse';
+   export * from '${root}src/lib/lands';
    export { applyDefaultSearchFilters, buildScryfallQuery } from '${root}src/lib/search';
    export { commanderQuery } from '${root}src/lib/commanders';
    export { goldfishArchetypeSlug, goldfishDeckCount, goldfishSampleSize, goldfishZoomUrl } from '${root}src/lib/mtggoldfish';`,
@@ -85,6 +87,12 @@ const {
   deckToText,
   mergeDeckCards,
   newDeck,
+  basicsMatchPlan,
+  applyDeckBrowse,
+  DEFAULT_DECK_BROWSE,
+  planBasicLands,
+  withBasicLands,
+  withDeckCardPrinting,
   withFormat,
   findDuplicates,
   inspectImport,
@@ -1445,6 +1453,75 @@ check('merging never mutates the deck it was given', () => {
   assert.equal(before[0].quantity, 1);
 });
 
+check('changing deck art updates only that card row', () => {
+  const cards = [
+    { name: 'Sol Ring', quantity: 1, section: 'main' },
+    { name: 'Sol Ring', quantity: 1, section: 'sideboard' },
+  ];
+  const printing = { collectorNumber: '1', scryfallId: 'print-1', setCode: 'cmm' };
+  const changed = withDeckCardPrinting(cards, 'main', 'Sol Ring', printing);
+  assert.deepEqual(changed[0].printing, printing);
+  assert.equal(changed[0].quantity, 1);
+  assert.equal(changed[1].printing, undefined);
+  assert.equal(withDeckCardPrinting(changed, 'main', 'Sol Ring')[0].printing, undefined);
+  assert.equal(cards[0].printing, undefined, 'the original deck remains untouched');
+});
+
+check('every client gets the same automatic basic-land plan', () => {
+  const cards = [
+    { name: 'Radha', quantity: 1, section: 'commander' },
+    { name: 'Command Tower', quantity: 1, section: 'main' },
+    { name: 'Forest', quantity: 5, section: 'main' },
+    { name: 'Plains', quantity: 1, section: 'sideboard' },
+  ];
+  const plan = planBasicLands({
+    cards,
+    colors: ['R', 'G'],
+    landTarget: 10,
+    metaByKey: {
+      [cardKey('Command Tower')]: { typeLine: 'Land' },
+      [cardKey('Radha')]: { manaCost: '{1}{R}{G}', typeLine: 'Legendary Creature — Elf' },
+    },
+  });
+  assert.deepEqual(plan, { Forest: 4, Mountain: 5 });
+  const next = withBasicLands(cards, plan);
+  assert.equal(next.find(card => card.name === 'Command Tower')?.quantity, 1);
+  assert.equal(next.find(card => card.name === 'Plains')?.section, 'sideboard');
+  assert.ok(basicsMatchPlan(next, plan));
+});
+
+check('deck browsing filters and sorts identically on every surface', () => {
+  const cards = [
+    { cmc: 4, name: 'Keeper of Secrets', owned: 0, tags: ['outside hand'], typeLine: 'Creature' },
+    { cmc: 2, name: 'Arcane Signet', owned: 1, tags: ['ramp'], typeLine: 'Artifact' },
+    { cmc: 2, name: 'Talisman', owned: 3, tags: ['ramp'], typeLine: 'Artifact' },
+    { cmc: 0, land: true, name: 'Wastes', owned: 20, tags: ['land'], typeLine: 'Land' },
+  ];
+  const facts = card => card;
+  assert.deepEqual(
+    applyDeckBrowse(cards, facts, {
+      ...DEFAULT_DECK_BROWSE,
+      mana: 2,
+      query: 'ramp',
+      sort: 'owned',
+    }).map(card => card.name),
+    ['Talisman', 'Arcane Signet'],
+  );
+  assert.deepEqual(
+    applyDeckBrowse(cards, facts, {
+      ...DEFAULT_DECK_BROWSE,
+      query: 'outside',
+      type: 'Creature',
+    }).map(card => card.name),
+    ['Keeper of Secrets'],
+  );
+  assert.deepEqual(
+    applyDeckBrowse(cards, facts, { ...DEFAULT_DECK_BROWSE, sort: 'mana' }).map(card => card.name),
+    ['Arcane Signet', 'Talisman', 'Keeper of Secrets', 'Wastes'],
+    'lands stay after spells even though their mana value is zero',
+  );
+});
+
 check('a pasted list becomes a deck through the same parser the desktop uses', () => {
   const { cards } = parseDeckList('// Commander\n1 Talrand\n\n2 Sol Ring\n2 Sol Ring');
   const deck = deckFromImport(cards, { at: 5, source: 'pasted list' });
@@ -1878,6 +1955,7 @@ check('deck tags filter by label, category, and synonyms', () => {
   const draw = filterDeckTags('draw');
   assert.ok(draw.some(t => t.id === 'draw'));
   assert.ok(draw.some(t => t.id === 'draw-two-payoff'));
+  assert.ok(draw.some(t => t.id === 'draw-trigger'));
   assert.ok(filterDeckTags('draw two').some(t => t.id === 'draw-two-payoff'));
   assert.ok(filterDeckTags('evasion').some(t => t.id === 'flying'));
   assert.ok(filterDeckTags('elf').some(t => t.id === 'tribe-elf'));
@@ -1893,11 +1971,45 @@ check('deck tags filter by label, category, and synonyms', () => {
   assert.match(deckTagById('exile')?.query ?? '', /exile target creature/);
   assert.match(deckTagById('bounce')?.query ?? '', /owner's hand/);
   assert.doesNotMatch(deckTagById('destroy-any')?.query ?? '', /destroy target creature/);
+  const selfDiscard = deckTagById('self-discard')?.query ?? '';
+  assert.match(selfDiscard, /you discard/);
+  assert.match(selfDiscard, /discard a card:/);
+  assert.doesNotMatch(selfDiscard, /o:"discard" o:"you"/);
+  assert.match(deckTagById('discard-low-hand-payoff')?.query ?? '', /one or fewer cards in hand/);
+  assert.match(deckTagById('discard-low-hand-payoff')?.query ?? '', /hellbent/);
+  const loot = deckTagById('loot')?.query ?? '';
+  assert.match(loot, /draw \[\^\.\]\*cards\?, then discard/);
+  assert.match(loot, /-o:"target player"/);
+  assert.ok(filterDeckTags('rummage').some(t => t.id === 'rummage'));
+  assert.match(deckTagById('rummage')?.query ?? '', /discard \[\^\.\]\*cards\?, then draw/);
+  assert.match(deckTagById('from-exile')?.query ?? '', /otag:cast-from-exile/);
+  assert.match(deckTagById('from-exile-payoff')?.query ?? '', /cast \[\^\.\]\* from exile/);
+  assert.match(deckTagById('from-exile-payoff')?.query ?? '', /play \[\^\.\]\* from exile/);
+  assert.match(deckTagById('from-exile-cost-reduction')?.query ?? '', /o:cost o:less/);
+  assert.match(deckTagById('cast-from-hand')?.query ?? '', /from your hand/);
+  assert.equal(deckTagById('cast-outside-hand')?.label, 'Casting outside hand: payoffs');
+  assert.match(deckTagById('cast-outside-hand')?.query ?? '', /\(when\|whenever\|if\)/);
+  assert.match(deckTagById('cast-outside-hand')?.query ?? '', /other than your hand/);
+  assert.match(deckTagById('cast-outside-hand')?.query ?? '', /your graveyard/);
+  assert.doesNotMatch(deckTagById('cast-outside-hand')?.query ?? '', /you may cast/);
+  assert.match(deckTagById('descend-trigger')?.query ?? '', /descended this turn/);
+  assert.match(deckTagById('descend-threshold')?.query ?? '', /descend \(4\|8\)/);
+  assert.match(deckTagById('crime-trigger')?.query ?? '', /whenever you commit a crime/);
+  assert.match(deckTagById('crime-payoff')?.query ?? '', /committed a crime this turn/);
+  assert.match(deckTagById('crime-enabler')?.query ?? '', /target opponent/);
+  assert.equal(deckTagById('treasure')?.label, 'Treasure: makers');
+  assert.equal(deckTagById('treasure-payoff')?.label, 'Treasure: payoffs');
+  assert.equal(deckTagById('tribe-elf')?.label, 'Elves: cards');
+  assert.equal(deckTagById('tribe-elf-payoff')?.label, 'Elves: payoffs');
+  assert.ok(filterDeckTags('treas').some(tag => tag.id === 'treasure'));
+  assert.ok(filterDeckTags('treas').some(tag => tag.id === 'treasure-payoff'));
 });
 
 check('Commander picker asks for legal commanders with rules text', () => {
   assert.equal(commanderQuery(), 'is:commander legal:commander o:/./ game:paper');
   assert.match(commanderQuery({ identity: ['U', 'W'] }), /id<=wu/);
+  assert.match(commanderQuery({ exactIdentity: true, identity: ['U', 'W'] }), /id=wu/);
+  assert.doesNotMatch(commanderQuery({ exactIdentity: true, identity: ['U', 'W'] }), /id<=/);
   assert.match(commanderQuery({ colorless: true, identity: ['R'] }), /id=c/);
   assert.doesNotMatch(commanderQuery({ colorless: true, identity: ['R'] }), /id<=/);
   assert.match(commanderQuery({ rarities: ['uncommon'] }), /r:uncommon/);
@@ -1930,6 +2042,10 @@ check('oracle search matches the spelling that was typed', () => {
     buildScryfallQuery({ oracle: true, text: 't:instant counter' }),
     't:instant o:/(?<!\\w)counter(?!\\w)/',
   );
+  assert.equal(
+    buildScryfallQuery({ format: 'commander', identity: ['W', 'U'], text: 'sol' }),
+    'name:sol id<=wu',
+  );
 });
 
 check('Scryfall search excludes Arena-only cards by default', () => {
@@ -1955,11 +2071,10 @@ check('deck tags combine into a Scryfall query with optional identity', () => {
     buildTagsQuery(['draw-two-payoff']),
     '((o:"second card" o:"each turn") or (o:"drawn two or more cards this turn"))',
   );
-  assert.equal(buildTagsQuery(['tribe-goblin']), '((t:goblin or o:goblin))');
-  assert.equal(
-    buildTagsQuery(['rooms']),
-    '((t:room or o:"a room" or o:"rooms you" or o:"unlock a door" or o:unlock or o:"that door"))',
-  );
+  assert.equal(buildTagsQuery(['tribe-goblin']), '(t:goblin)');
+  assert.equal(buildTagsQuery(['tribe-goblin-payoff']), '(o:goblin)');
+  assert.equal(buildTagsQuery(['rooms']), '(t:room)');
+  assert.match(buildTagsQuery(['rooms-payoff']), /unlock a door/);
   assert.equal(deckTagById('goad')?.query, 'keyword:goad');
   assert.equal(deckTagById('recruit')?.query, 'keyword:recruit');
   assert.equal(

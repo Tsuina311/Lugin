@@ -20,7 +20,14 @@ import {
   nameOnlyCard,
   type IntakeStatus,
 } from '@/lib/collectionIntake';
-import { deckFromImport, newDeck, parseDeckList, type Deck, type DeckFormat } from '@/lib/deck';
+import {
+  deckFromImport,
+  newDeck,
+  parseDeckList,
+  type Deck,
+  type DeckFormat,
+  type DeckTagAnalysis,
+} from '@/lib/deck';
 import { applyImport } from '@/lib/duplicates';
 import { collectionFile, deckFile } from '@/lib/export';
 import { inspectImport } from '@/lib/import';
@@ -72,6 +79,7 @@ let engine: ReturnType<typeof createSyncEngine> | null = null;
 let committedSessionId: number | null = null;
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let booting: Promise<void> | null = null;
+let deckWriteQueue: Promise<void> = Promise.resolve();
 
 const emit = (): void => listeners.forEach(listener => listener());
 const set = (patch: Partial<LibrarySnapshot>): void => {
@@ -191,10 +199,42 @@ const editCollection = async (
 };
 
 const editDecks = async (update: (decks: readonly Deck[]) => Deck[]): Promise<void> => {
-  const before = await repo().read();
-  const data = await repo().edit('decks', update(before.decks.value));
-  set({ data, pending: true });
-  schedulePush();
+  let before = snapshot.data;
+  if (!before) before = await repo().read();
+  const previous = before.decks;
+  const value = update(previous.value);
+  const optimistic: ApplicationData = {
+    ...before,
+    decks: { updatedAt: new Date().toISOString(), value },
+  };
+
+  // Publish before touching SQLite so taps, adds, and quantity changes paint
+  // on the same frame. Writes remain ordered in the background.
+  set({ data: optimistic, error: null, pending: true });
+
+  const write = deckWriteQueue
+    .catch(() => undefined)
+    .then(async () => {
+      const data = await repo().edit('decks', value);
+      // A newer optimistic deck edit may already be visible. Never replace it
+      // with this older write's readback.
+      if (snapshot.data?.decks.value === value) set({ data, pending: true });
+      schedulePush();
+    });
+  deckWriteQueue = write.catch(() => undefined);
+
+  try {
+    await write;
+  } catch (error) {
+    // Roll back only when no later optimistic edit superseded this one.
+    if (snapshot.data?.decks.value === value) {
+      set({
+        data: { ...optimistic, decks: previous },
+        error: describe(error),
+      });
+    }
+    throw error;
+  }
 };
 
 const mark = (name: string, state: SessionMark['state']): void => {
@@ -434,6 +474,16 @@ export const libraryStore = {
   updateDeck: async (id: string, update: (deck: Deck) => Deck): Promise<void> => {
     await editDecks(decks =>
       decks.map(deck => (deck.id === id ? { ...update(deck), updatedAt: Date.now() } : deck)),
+    );
+  },
+
+  /**
+   * Persist derived tag checks without making the deck look user-edited.
+   * The cache still joins the normal SQLite/Drive document for the next launch.
+   */
+  updateDeckTagAnalysis: async (id: string, tagAnalysis: DeckTagAnalysis): Promise<void> => {
+    await editDecks(decks =>
+      decks.map(deck => (deck.id === id ? { ...deck, tagAnalysis } : deck)),
     );
   },
 

@@ -12,6 +12,7 @@ import {
   manaValueBucket,
   manaValueLabel,
   type CardMetadata,
+  type CardTypeMetadata,
 } from './mtg';
 
 /** Which zone a card belongs to. */
@@ -94,6 +95,22 @@ export interface DeckCard {
   section: DeckSection;
 }
 
+/**
+ * Persisted Scryfall tag checks for deck statistics.
+ *
+ * Each tag stores the exact query that produced its results. A changed query
+ * therefore invalidates only that tag, while adding a card requires checking
+ * only the new card. Both positive and negative results are retained.
+ */
+export interface DeckTagAnalysis {
+  /** Card keys known to have been checked against every stored query. */
+  cards: string[];
+  queries: Record<string, string>;
+  /** Positive card keys only; absence means the checked card did not match. */
+  results: Record<string, string[]>;
+  version: 2;
+}
+
 export interface Deck {
   /**
    * Keep the deck's basics balanced so it always runs its land count. The lands
@@ -116,6 +133,8 @@ export interface Deck {
   name: string;
   /** Where it came from: an uploaded filename, or 'manual'. */
   source: string;
+  /** Derived tag matches, persisted so Stats does not re-query the whole deck. */
+  tagAnalysis?: DeckTagAnalysis;
   /**
    * Manual placement of main-deck cards into tag sections. Keys are cardKeys;
    * values are `DECK_TAGS` ids, or `""` to force the card into Main (skip
@@ -352,6 +371,22 @@ export const mergeDeckCards = (
     else out.push({ ...card });
   }
   return out;
+};
+
+/** Set (or clear) the chosen printing for one card row without changing copies or zones. */
+export const withDeckCardPrinting = (
+  cards: readonly DeckCard[],
+  section: DeckSection,
+  name: string,
+  printing?: DeckPrinting,
+): DeckCard[] => {
+  const key = cardKey(name);
+  return cards.map(card => {
+    if (card.section !== section || cardKey(card.name) !== key) return card;
+    const next = { ...card };
+    delete next.printing;
+    return printing ? { ...next, printing } : next;
+  });
 };
 
 /**
@@ -702,7 +737,7 @@ const typeGroup = (meta?: CardMetadata): string => {
  * recognized by name too, so the 37 of them in a Commander deck don't count as
  * unknowns for the moment before their metadata arrives.
  */
-const isLandCard = (name: string, meta?: CardMetadata): boolean =>
+const isLandCard = (name: string, meta?: CardTypeMetadata): boolean =>
   isBasicLand(name) || isLandType(meta);
 
 /** A group a card falls into, plus where that group sorts. */
@@ -798,6 +833,10 @@ export interface ManaCurve {
   total: number;
 }
 
+export interface DeckAnalysisMetadata extends CardTypeMetadata {
+  cmc?: number;
+}
+
 /**
  * The deck's mana curve: copies per mana value, counting the command zone and
  * skipping the sideboard. Lands are left out — they're what pays for the curve,
@@ -806,7 +845,7 @@ export interface ManaCurve {
  */
 export const manaCurve = (
   cards: DeckCard[],
-  metaByKey: Record<string, CardMetadata>,
+  metaByKey: Record<string, DeckAnalysisMetadata>,
 ): ManaCurve => {
   const counts = new Map<number, number>(MANA_VALUE_BUCKETS.map(b => [b, 0]));
   let lands = 0;

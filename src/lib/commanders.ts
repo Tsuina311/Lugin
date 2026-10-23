@@ -12,6 +12,8 @@ export type CommanderRarity = (typeof COMMANDER_RARITIES)[number];
 export interface CommanderQuery {
   /** Colorless commanders only. Wins over `identity`. */
   colorless?: boolean;
+  /** Require exactly `identity`, rather than allowing any subset of it. */
+  exactIdentity?: boolean;
   /**
    * Clauses for tags that aren't in the built-in catalogue: a saved custom tag,
    * or one still being typed. AND-ed with the rest, same as `tagIds`.
@@ -40,7 +42,7 @@ export const commanderQuery = (options: CommanderQuery = {}): string => {
   if (options.colorless) parts.push('id=c');
   else if (options.identity && options.identity.length > 0) {
     parts.push(
-      `id<=${sortWubrg([...options.identity])
+      `id${options.exactIdentity ? '=' : '<='}${sortWubrg([...options.identity])
         .join('')
         .toLowerCase()}`,
     );

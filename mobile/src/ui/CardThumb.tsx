@@ -15,14 +15,16 @@ import type { CardImageOverride } from '@/lib/printing';
  */
 export function CardThumb({
   candidates,
+  onReady,
   style,
 }: {
   candidates: readonly string[];
+  onReady?: (url: string) => void;
   style: StyleProp<ImageStyle>;
 }) {
   const initial = peekCardImageCandidates(candidates);
   const [index, setIndex] = useState(0);
-  const [local, setLocal] = useState<{ url: string; uri: string } | null>(initial);
+  const [local, setLocal] = useState<{ uri: string; url: string } | null>(initial);
   const key = candidates.join('\0');
   const count = candidates.length;
   const remote = candidates[index];
@@ -43,13 +45,10 @@ export function CardThumb({
       setIndex(current => (current === index && current + 1 < count ? current + 1 : current));
     };
     try {
-      cachedCardImage(remote).then(
-        uri => {
-          if (!cancelled && uri) setLocal({ url: remote, uri });
-          else fail();
-        },
-        fail,
-      );
+      cachedCardImage(remote).then(uri => {
+        if (!cancelled && uri) setLocal({ uri, url: remote });
+        else fail();
+      }, fail);
     } catch {
       fail();
     }
@@ -61,12 +60,14 @@ export function CardThumb({
   // `null?.url === undefined` is true. An exhausted candidate list must not
   // read `local.uri` — that is "Cannot read property 'uri' of null".
   const uri = local && candidates.includes(local.url) ? local.uri : null;
-  if (!uri) return <View style={style} />;
+  const loadedUrl = local?.url;
+  if (!uri || !loadedUrl) return <View style={style} />;
   return (
     <Image
       onError={() => {
         setIndex(current => (current === index && current + 1 < count ? current + 1 : current));
       }}
+      onLoad={() => onReady?.(loadedUrl)}
       source={{ uri }}
       style={style}
     />
@@ -98,8 +99,7 @@ export const deckImageCandidates = (
         collectorNumber: printing.collectorNumber,
         imageUrl: printing.imageUrl,
         name: card.name,
-        productId:
-          printing.cardmarketId != null ? String(printing.cardmarketId) : undefined,
+        productId: printing.cardmarketId != null ? String(printing.cardmarketId) : undefined,
         scryfallId: printing.scryfallId,
         setCode: printing.setCode,
       })

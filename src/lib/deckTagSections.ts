@@ -6,14 +6,32 @@
 // under the normal "Main deck" heading.
 
 import { cardKey } from './cardName';
+import type { DeckCard, DeckTagAnalysis } from './deck';
 import { deckTagById } from './deckTags';
-import type { DeckCard } from './deck';
 import { searchScryfallQuery } from './search';
 
-/** How many exact names to OR into one Scryfall query (URL length budget). */
-const NAME_CHUNK = 12;
+/** Encoded query budget, below common 8 KB request-line limits. */
+const QUERY_BUDGET = 6000;
 
 const escapeExact = (name: string): string => name.replace(/"/g, '');
+
+const nameChunks = (names: readonly string[], tagQuery: string): string[][] => {
+  const chunks: string[][] = [];
+  let chunk: string[] = [];
+  for (const name of names) {
+    const candidate = [...chunk, name];
+    const nameOr = candidate.map(n => `!"${escapeExact(n)}"`).join(' OR ');
+    const query = `(${nameOr}) (${tagQuery})`;
+    if (chunk.length > 0 && encodeURIComponent(query).length > QUERY_BUDGET) {
+      chunks.push(chunk);
+      chunk = [name];
+    } else {
+      chunk = candidate;
+    }
+  }
+  if (chunk.length > 0) chunks.push(chunk);
+  return chunks;
+};
 
 /**
  * Which of `names` match `tagQuery` on Scryfall. Returns cardKeys.
@@ -27,9 +45,8 @@ export const matchNamesToTagQuery = async (
   const unique = [...new Set(names.map(n => n.trim()).filter(Boolean))];
   if (unique.length === 0 || !tagQuery.trim()) return out;
 
-  for (let i = 0; i < unique.length; i += NAME_CHUNK) {
+  for (const chunk of nameChunks(unique, tagQuery)) {
     if (signal?.aborted) break;
-    const chunk = unique.slice(i, i + NAME_CHUNK);
     const nameOr = chunk.map(n => `!"${escapeExact(n)}"`).join(' OR ');
     const q = `(${nameOr}) (${tagQuery})`;
     try {
@@ -42,11 +59,84 @@ export const matchNamesToTagQuery = async (
   return out;
 };
 
+/**
+ * Complete the persisted per-card tag cache, querying only missing results.
+ *
+ * Removed cards/tags are pruned, and changing a tag query invalidates only that
+ * tag. Negative matches are stored too, which is what makes a second visit
+ * require no network requests.
+ */
+export const analyzeDeckTags = async (
+  names: readonly string[],
+  tagIds: readonly string[],
+  previous?: DeckTagAnalysis,
+  signal?: AbortSignal,
+): Promise<DeckTagAnalysis> => {
+  const cards = new Map<string, string>();
+  for (const name of names) {
+    const key = cardKey(name);
+    if (key && !cards.has(key)) cards.set(key, name.trim());
+  }
+  const ids = [...new Set(tagIds)].filter(id => deckTagById(id));
+  const previousCards = new Set(previous?.version === 2 ? previous.cards : []);
+  const entries = await Promise.all(
+    ids.map(async id => {
+      const tag = deckTagById(id)!;
+      const validPrevious =
+        previous?.version === 2 && previous.queries[id] === tag.query
+          ? new Set(previous.results[id] ?? [])
+          : undefined;
+      const result = new Set<string>();
+      const missing: string[] = [];
+      for (const [key, name] of cards) {
+        if (validPrevious && previousCards.has(key)) {
+          if (validPrevious.has(key)) result.add(key);
+        }
+        else missing.push(name);
+      }
+      if (missing.length > 0) {
+        const matches = await matchNamesToTagQuery(missing, tag.query, signal);
+        if (!signal?.aborted) {
+          for (const name of missing) {
+            const key = cardKey(name);
+            if (matches.has(key)) result.add(key);
+          }
+        }
+      }
+      return { id, query: tag.query, result: [...result] };
+    }),
+  );
+
+  return {
+    cards: [...cards.keys()],
+    queries: Object.fromEntries(entries.map(entry => [entry.id, entry.query])),
+    results: Object.fromEntries(entries.map(entry => [entry.id, entry.result])),
+    version: 2,
+  };
+};
+
+/** Whether every current card has a result for every current tag query. */
+export const deckTagAnalysisComplete = (
+  names: readonly string[],
+  tagIds: readonly string[],
+  analysis?: DeckTagAnalysis,
+): boolean => {
+  if (analysis?.version !== 2) return false;
+  const keys = [...new Set(names.map(cardKey).filter(Boolean))];
+  const analyzed = new Set(analysis.cards);
+  if (!keys.every(key => analyzed.has(key))) return false;
+  return [...new Set(tagIds)].every(id => {
+    const tag = deckTagById(id);
+    if (!tag || analysis.queries[id] !== tag.query) return false;
+    return Array.isArray(analysis.results[id]);
+  });
+};
+
 export interface TagSectionBucket {
   /** Main-deck cards assigned to this tag (exclusive). */
   cards: DeckCard[];
-  tagId: string;
   label: string;
+  tagId: string;
 }
 
 /**

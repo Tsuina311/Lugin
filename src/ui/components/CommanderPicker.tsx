@@ -50,6 +50,7 @@ export const CommanderPicker = ({
   const [name, setName] = useState('');
   const [colors, setColors] = useState<Set<string>>(() => new Set());
   const [colorless, setColorless] = useState(false);
+  const [exactIdentity, setExactIdentity] = useState(false);
   const [rarities, setRarities] = useState<Set<string>>(() => new Set());
   const [tags, setTags] = useState<Set<string>>(() => new Set());
   const [tagSearch, setTagSearch] = useState('');
@@ -80,13 +81,14 @@ export const CommanderPicker = ({
     () =>
       commanderQuery({
         colorless,
+        exactIdentity,
         extraQueries,
         identity: [...colors],
         name,
         rarities: [...rarities],
         tagIds: selectedIds,
       }),
-    [colorless, colors, extraQueries, name, rarities, selectedIds],
+    [colorless, colors, exactIdentity, extraQueries, name, rarities, selectedIds],
   );
   const tagQueryVisible = tags.size > 0 || Boolean(draftQuery);
 
@@ -204,7 +206,11 @@ export const CommanderPicker = ({
               }`}
               onClick={() => {
                 setColorless(false);
-                setColors(current => toggle(current, pip.code));
+                setColors(current => {
+                  const next = toggle(current, pip.code);
+                  if (next.size === 0) setExactIdentity(false);
+                  return next;
+                });
               }}
               title={`Commanders whose colors fit in ${pip.label}`}
               type="button"
@@ -218,6 +224,7 @@ export const CommanderPicker = ({
             }`}
             onClick={() => {
               setColors(new Set());
+              setExactIdentity(false);
               setColorless(value => !value);
             }}
             title="Colorless commanders"
@@ -225,9 +232,20 @@ export const CommanderPicker = ({
           >
             C
           </button>
-          <span className="ml-1 text-2xs text-ink-faint">
-            {colorless ? 'Colorless' : colors.size > 0 ? 'Fits in these colors' : 'Any colors'}
-          </span>
+          <button
+            aria-pressed={exactIdentity}
+            className={`h-5 rounded-full border px-2 text-[10px] font-semibold ${
+              exactIdentity
+                ? 'border-accent/50 bg-accent-soft text-accent'
+                : 'border-line text-ink-muted'
+            } disabled:cursor-not-allowed disabled:opacity-40`}
+            disabled={colors.size === 0}
+            onClick={() => setExactIdentity(value => !value)}
+            title="Only commanders with exactly this color identity"
+            type="button"
+          >
+            = Exact
+          </button>
         </div>
         <div className="flex flex-wrap items-center gap-1">
           {COMMANDER_RARITIES.map(rarity => (
