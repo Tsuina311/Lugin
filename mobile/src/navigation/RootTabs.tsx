@@ -81,9 +81,11 @@ export function RootTabs() {
     return () => clearTimeout(timer);
   }, [collectionCards, printings]);
 
-  // Keep one camera instance across Single Scan ↔ Binder ↔ Geometry ↔ Settings.
+  // Keep one camera instance across scanner surfaces, but never mount the
+  // scanner behind Settings: initializing the full scanner stack there can
+  // block Settings controls and tab navigation.
   const cameraVisible = tab === 'scan' || tab === 'binder' || (benchEnabled && tab === 'geometry');
-  const keepCameraMounted = capabilities.nativeScanner && (cameraVisible || tab === 'settings');
+  const keepCameraMounted = capabilities.nativeScanner && cameraVisible;
   const openTab = (next: Tab): void => {
     setMountedTabs(current => {
       if (current.has(next)) return current;
@@ -119,6 +121,7 @@ export function RootTabs() {
             style={cameraVisible ? styles.cameraFill : styles.cameraHidden}
           >
             <CameraScanScreen
+              active={cameraVisible}
               onOpenBinder={() => openTab('binder')}
               onOpenGeometry={() => openTab('geometry')}
               onOpenScan={() => openTab('scan')}

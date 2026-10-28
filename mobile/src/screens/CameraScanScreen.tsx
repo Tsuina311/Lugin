@@ -175,11 +175,13 @@ const LINE_THICKNESS = 3;
  * session, so it is not the same as a camera with no frame output at all.
  */
 export function CameraScanScreen(props?: {
+  active?: boolean;
   surface?: 'scan' | 'binder' | 'geometry';
   onOpenBinder?: () => void;
   onOpenGeometry?: () => void;
   onOpenScan?: () => void;
 }) {
+  const active = props?.active ?? true;
   const surface = props?.surface ?? 'scan';
   const scannerMode = useScannerMode();
   const exclusiveOwner = isExclusiveScannerOwner(scannerMode);
@@ -1353,7 +1355,7 @@ export function CameraScanScreen(props?: {
         device={device}
         enableNativeTapToFocusGesture={false}
         implementationMode={preferredSource === 'snapshot' ? 'compatible' : 'performance'}
-        isActive={appActive && !pairScan}
+        isActive={active && appActive && !pairScan}
         orientationSource="interface"
         outputs={cameraOutputs}
         resizeMode="cover"

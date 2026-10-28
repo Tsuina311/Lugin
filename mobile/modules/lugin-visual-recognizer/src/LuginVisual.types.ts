@@ -79,6 +79,7 @@ export type LuginVisualNativeModule = {
     width: number,
     height: number,
   ): Promise<VNextParityProbeResult>;
+  getVNextParityProbeStatus?(): Promise<{ stage: string }>;
   lookupVNextExactName?(name: string): Promise<VNextNameLookup>;
 };
 
@@ -105,6 +106,8 @@ export type VNextNativeResult = {
 };
 
 export type VNextFrozenIdentity = {
+  encoderModelFilename: string;
+  encoderModelSha256: string;
   geometryId: string;
   geometrySha256: string;
   adapterId: string;
@@ -127,6 +130,37 @@ export type VNextParityProbeResult = {
   decisionSource: 'VISUAL_AGREEMENT' | 'WITHHELD';
   ocrIncluded: false;
   frozenIdentity: VNextFrozenIdentity;
+  stageDiagnostics: {
+    model: {
+      filename: string;
+      sha256: string;
+    };
+    preprocessing: {
+      shape: number[];
+      layout: string;
+      channelOrder: string;
+      inputFormat: string;
+      resizedWidth: number;
+      resizedHeight: number;
+      cropLeft: number;
+      cropTop: number;
+      interpolation: string;
+      rescale: string;
+      mean: number[];
+      std: number[];
+      tensorF32LeBase64: string;
+      tensorSha256: string;
+      stats: {
+        min: number;
+        max: number;
+        meanPerChannel: number[];
+        firstValues: number[];
+      };
+    };
+    rawOnnxEmbeddingF32LeBase64: string;
+    rawEncoderEmbeddingF32LeBase64: string;
+    adaptedEmbeddingF32LeBase64: string;
+  };
   timing: VNextNativeResult['timing'];
   error: string | null;
 };

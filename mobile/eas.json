@@ -13,7 +13,8 @@
       "distribution": "internal",
       "environment": "development",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "autoIncrement": true
       },
       "env": {
         "APP_ENV": "development"

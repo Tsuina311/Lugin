@@ -6,12 +6,18 @@ plugins {
 group = 'app.lugin.mobile'
 version = '0.1.0'
 
+def vnextParityEnabled = System.getenv("APP_ENV") == "development"
+
 android {
   namespace "expo.modules.luginvisual"
+  buildFeatures {
+    buildConfig true
+  }
   defaultConfig {
     versionCode 1
     versionName "0.1.0"
     minSdkVersion 24
+    buildConfigField "boolean", "VNEXT_PARITY_ENABLED", vnextParityEnabled.toString()
   }
   lintOptions {
     abortOnError false

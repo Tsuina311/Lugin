@@ -1,5 +1,7 @@
 package expo.modules.luginvisual
 
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -47,6 +49,33 @@ class GbmRankerTest {
       2,
       5,
     )
+    assertEquals("a", dual.clean[0].oracleId)
+    assertEquals("b", dual.prototype[0].oracleId)
+    assertEquals(1f, dual.clean[0].score, 1e-6f)
+    assertEquals(1f, dual.prototype[0].score, 1e-6f)
+  }
+
+  @Test
+  fun dualSearchReadsDirectMappedStyleBuffersWithoutChangingMath() {
+    fun direct(vararg values: Float) = ByteBuffer
+      .allocateDirect(values.size * 4)
+      .order(ByteOrder.LITTLE_ENDIAN)
+      .asFloatBuffer()
+      .apply {
+        put(values)
+        position(0)
+      }
+
+    val dual = VNextGallery.dualTop(
+      floatArrayOf(1f, 0f),
+      direct(1f, 0f, 0f, 1f),
+      direct(0f, 1f, 1f, 0f),
+      arrayOf("a", "b"),
+      arrayOf("Alpha", "Beta"),
+      2,
+      5,
+    )
+
     assertEquals("a", dual.clean[0].oracleId)
     assertEquals("b", dual.prototype[0].oracleId)
     assertEquals(1f, dual.clean[0].score, 1e-6f)

@@ -22,18 +22,33 @@ export type PersistedVNextParityProbe = VNextParityProbeResult & {
 
 const fs = async (): Promise<LegacyFS> => import('expo-file-system/legacy');
 
-export const runAndShareVNextParityProbe = async (): Promise<string> => {
+export const runAndShareVNextParityProbe = async (
+  onStage?: (stage: string) => void,
+): Promise<string> => {
   const native = getLuginVisualModule();
   if (!native?.runVNextParityProbeFromRgbaBytes) {
-    return 'Parity probe is not in this APK. Install the new development build.';
+    throw new Error('Parity probe is not in this APK. Install the new development build.');
   }
   const rgba = createVNextParityFixtureRgba();
-  const result = await native.runVNextParityProbeFromRgbaBytes(
-    rgba,
-    VNEXT_PARITY_FIXTURE_WIDTH,
-    VNEXT_PARITY_FIXTURE_HEIGHT,
-  );
-  if (result.error) return result.error;
+  const statusTimer = native.getVNextParityProbeStatus
+    ? setInterval(() => {
+        void native
+          .getVNextParityProbeStatus?.()
+          .then(status => onStage?.(`Parity probe · ${status.stage}`))
+          .catch(() => undefined);
+      }, 400)
+    : null;
+  let result: VNextParityProbeResult;
+  try {
+    result = await native.runVNextParityProbeFromRgbaBytes(
+      rgba,
+      VNEXT_PARITY_FIXTURE_WIDTH,
+      VNEXT_PARITY_FIXTURE_HEIGHT,
+    );
+  } finally {
+    if (statusTimer) clearInterval(statusTimer);
+  }
+  if (result.error) throw new Error(result.error);
   const payload: PersistedVNextParityProbe = {
     ...result,
     fixture: {

@@ -2,7 +2,9 @@ package expo.modules.luginvisual
 
 import java.io.File
 import java.io.FileInputStream
+import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.FloatBuffer
 import java.nio.channels.FileChannel
 import java.security.MessageDigest
 import kotlin.math.sqrt
@@ -17,6 +19,13 @@ data class VNextHit(val oracleId: String, val name: String, val score: Float, va
 
 data class VNextDual(val clean: List<VNextHit>, val prototype: List<VNextHit>)
 
+class VNextMappedGallery(
+  /** Retains the mapping for the lifetime of its FloatBuffer view. */
+  val mapping: ByteBuffer,
+  val values: FloatBuffer,
+  val bytes: Long,
+)
+
 data class VNextIdentity(
   val geometryId: String,
   val geometrySha256: String,
@@ -29,8 +38,8 @@ data class VNextIdentity(
 )
 
 class VNextIndex(
-  val clean: FloatArray,
-  val prototype: FloatArray,
+  val clean: VNextMappedGallery,
+  val prototype: VNextMappedGallery,
   val oracleIds: Array<String>,
   val names: Array<String>,
   val dims: Int,
@@ -51,7 +60,8 @@ object VNextGallery {
   private const val EXPECTED_PROTOTYPE_SHA = "7cfb59e52db439239ee4a1af6b22596a539d43eccfe1afb3d7835027d5a683d1"
   private const val EXPECTED_REFS_SHA = "58ea2f9bd6ef2c01f81a11db9865c713f9035a83b0d45bf9ae44eb0c714ae057"
 
-  fun load(dir: File): VNextIndex {
+  fun load(dir: File, onStage: (String) -> Unit = {}): VNextIndex {
+    onStage("validating manifest")
     val manifest = JSONObject(File(dir, "manifest.json").readText())
     val dims = manifest.optInt("dims", 512)
     val count = manifest.getInt("count")
@@ -61,16 +71,20 @@ object VNextGallery {
     val identity = validateFrozenIdentity(manifest)
     val cleanFile = File(dir, manifest.getString("clean"))
     val prototypeFile = File(dir, manifest.getString("prototype"))
-    val clean = readF32(cleanFile, identity.cleanSha256)
-    val prototype = readF32(prototypeFile, identity.prototypeSha256)
-    val adapterW = readF32(File(dir, manifest.getString("adapterW")), identity.adapterWSha256)
-    val adapterB = readF32(File(dir, manifest.getString("adapterB")), identity.adapterBSha256)
-    if (clean.size != count * dims || prototype.size != count * dims) {
+    onStage("verifying clean gallery")
+    val clean = mapF32(cleanFile, identity.cleanSha256)
+    onStage("verifying prototype gallery")
+    val prototype = mapF32(prototypeFile, identity.prototypeSha256)
+    onStage("loading adapter")
+    val adapterW = readF32Array(File(dir, manifest.getString("adapterW")), identity.adapterWSha256)
+    val adapterB = readF32Array(File(dir, manifest.getString("adapterB")), identity.adapterBSha256)
+    if (clean.values.capacity() != count * dims || prototype.values.capacity() != count * dims) {
       throw IllegalStateException("vNext gallery length != count*dims")
     }
     if (adapterW.size != dims * dims || adapterB.size != dims) {
       throw IllegalStateException("vNext adapter shape != ${dims}x$dims")
     }
+    onStage("loading oracle map")
     val refs = JSONObject(readTextVerified(File(dir, manifest.getString("refs")), identity.refsSha256))
     val nameArr = refs.getJSONArray("names")
     val oracleArr = refs.getJSONArray("oracleIds")
@@ -93,7 +107,7 @@ object VNextGallery {
       adapterW,
       adapterB,
       nameToOracles,
-      (clean.size + prototype.size + adapterW.size + adapterB.size) * 4L,
+      clean.bytes + prototype.bytes + (adapterW.size + adapterB.size) * 4L,
       identity,
     )
   }
@@ -152,14 +166,20 @@ object VNextGallery {
 
   fun dualTop(
     query: FloatArray,
-    clean: FloatArray,
-    prototype: FloatArray,
+    clean: FloatBuffer,
+    prototype: FloatBuffer,
     oracleIds: Array<String>,
     names: Array<String>,
     dims: Int,
     k: Int,
   ): VNextDual {
     val count = oracleIds.size
+    val required = count * dims
+    if (clean.capacity() < required || prototype.capacity() < required) {
+      throw IllegalArgumentException("vNext gallery buffer shorter than count*dims")
+    }
+    val cleanValues = clean.asReadOnlyBuffer().apply { position(0) }
+    val prototypeValues = prototype.asReadOnlyBuffer().apply { position(0) }
     val oracleIndex = HashMap<String, Int>(count)
     var nextIndex = 0
     val cleanBest = HashMap<String, VNextHit>(count)
@@ -167,11 +187,10 @@ object VNextGallery {
     for (i in 0 until count) {
       var cleanScore = 0f
       var protoScore = 0f
-      val off = i * dims
       for (d in 0 until dims) {
         val q = query[d]
-        cleanScore += q * clean[off + d]
-        protoScore += q * prototype[off + d]
+        cleanScore += q * cleanValues.get()
+        protoScore += q * prototypeValues.get()
       }
       val id = oracleIds[i]
       val index = oracleIndex.getOrPut(id) { nextIndex++ }
@@ -187,44 +206,73 @@ object VNextGallery {
     return VNextDual(rank(cleanBest, k), rank(protoBest, k))
   }
 
+  fun dualTop(
+    query: FloatArray,
+    clean: FloatArray,
+    prototype: FloatArray,
+    oracleIds: Array<String>,
+    names: Array<String>,
+    dims: Int,
+    k: Int,
+  ): VNextDual = dualTop(
+    query,
+    FloatBuffer.wrap(clean),
+    FloatBuffer.wrap(prototype),
+    oracleIds,
+    names,
+    dims,
+    k,
+  )
+
   private fun rank(best: Map<String, VNextHit>, k: Int): List<VNextHit> =
     best.values.sortedWith(compareByDescending<VNextHit> { it.score }.thenBy { it.index }).take(k)
 
   /**
-   * One read of the gallery file. The mapped copy is released after the floats
-   * are in the array the search keeps, so the camera is not left holding both.
+   * Verify with a bounded streaming buffer, then retain a read-only mapping.
+   * This avoids copying both ~98 MiB galleries into the managed/native heap.
    */
-  private fun readF32(file: File, expectedSha: String = ""): FloatArray {
+  private fun mapF32(file: File, expectedSha: String): VNextMappedGallery {
+    val size = verifyFile(file, expectedSha)
     FileInputStream(file).use { input ->
       val channel = input.channel
-      val size = channel.size()
-      if (size <= 0L || size % 4L != 0L) {
-        throw IllegalStateException("vNext gallery not float32 ${file.name}")
-      }
       val mapped = channel.map(FileChannel.MapMode.READ_ONLY, 0, size).order(ByteOrder.LITTLE_ENDIAN)
+      return VNextMappedGallery(mapped, mapped.asFloatBuffer().asReadOnlyBuffer(), size)
+    }
+  }
+
+  private fun readF32Array(file: File, expectedSha: String): FloatArray {
+    val size = verifyFile(file, expectedSha)
+    FileInputStream(file).use { input ->
+      val mapped = input.channel
+        .map(FileChannel.MapMode.READ_ONLY, 0, size)
+        .order(ByteOrder.LITTLE_ENDIAN)
       try {
-        if (expectedSha.isNotEmpty()) {
-          val digest = MessageDigest.getInstance("SHA-256")
-          val bytes = mapped.duplicate()
-          val buf = ByteArray(1024 * 1024)
-          while (bytes.hasRemaining()) {
-            val n = minOf(buf.size, bytes.remaining())
-            bytes.get(buf, 0, n)
-            digest.update(buf, 0, n)
-          }
-          val actual = digest.digest().joinToString("") { "%02x".format(it) }
-          if (!actual.equals(expectedSha, ignoreCase = true)) {
-            throw IllegalStateException("vNext sha mismatch ${file.name}")
-          }
-          mapped.position(0)
-        }
-        val out = FloatArray((size / 4).toInt())
-        mapped.asFloatBuffer().get(out)
-        return out
+        return FloatArray((size / 4).toInt()).also { mapped.asFloatBuffer().get(it) }
       } finally {
         unmap(mapped)
       }
     }
+  }
+
+  private fun verifyFile(file: File, expectedSha: String): Long {
+    val size = file.length()
+    if (size <= 0L || size % 4L != 0L) {
+      throw IllegalStateException("vNext gallery not float32 ${file.name}")
+    }
+    val digest = MessageDigest.getInstance("SHA-256")
+    FileInputStream(file).use { input ->
+      val buffer = ByteArray(1024 * 1024)
+      while (true) {
+        val read = input.read(buffer)
+        if (read < 0) break
+        if (read > 0) digest.update(buffer, 0, read)
+      }
+    }
+    val actual = digest.digest().joinToString("") { "%02x".format(it) }
+    if (!actual.equals(expectedSha, ignoreCase = true)) {
+      throw IllegalStateException("vNext sha mismatch ${file.name}")
+    }
+    return size
   }
 
   private fun unmap(buffer: java.nio.ByteBuffer) {

@@ -10,13 +10,12 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import * as esbuild from 'esbuild';
 import { PNG } from 'pngjs';
 
-import { loadEncoder } from '../../recognition/encoders.mjs';
 import { rootDir } from '../lib/paths.mjs';
 
 const androidPath = process.argv[2];
@@ -105,20 +104,121 @@ const top = (query, gallery, k = 10) => {
     .slice(0, k);
 };
 
-const { runtime } = await loadEncoder('CLIP_VIT_B32');
-const hostEmbedding = adapt(await runtime.embedPath(pngPath));
+const hostModelPath = join(
+  rootDir,
+  '.scan-fixtures/transformers-cache/Xenova/clip-vit-base-patch32/onnx/vision_model_quantized.onnx',
+);
+const hostModelSha256 = createHash('sha256').update(readFileSync(hostModelPath)).digest('hex');
+const transformers = await import('@xenova/transformers');
+const {
+  AutoProcessor,
+  CLIPVisionModelWithProjection,
+  RawImage,
+  env,
+} = transformers;
+env.cacheDir = join(rootDir, '.scan-fixtures/transformers-cache');
+env.allowLocalModels = false;
+const processor = await AutoProcessor.from_pretrained('Xenova/clip-vit-base-patch32');
+const vision = await CLIPVisionModelWithProjection.from_pretrained(
+  'Xenova/clip-vit-base-patch32',
+  { quantized: true },
+);
+const image = await RawImage.read(pngPath);
+const inputs = await processor(image);
+const hostTensor = Float32Array.from(inputs.pixel_values.data);
+const hostOutput = await vision(inputs);
+const hostRawOnnx = Float32Array.from(hostOutput.image_embeds.data);
+const normalize = values => {
+  let sum = 0;
+  for (const value of values) sum += value * value;
+  const norm = Math.sqrt(sum) || 1;
+  return Float32Array.from(values, value => value / norm);
+};
+const hostRawEncoder = normalize(hostRawOnnx);
+const hostEmbedding = adapt(hostRawEncoder);
 const androidEmbedding = Float32Array.from(android.embedding);
-let dot = 0;
-let hostNorm = 0;
-let androidNorm = 0;
-let maxAbsDelta = 0;
-for (let i = 0; i < dims; i++) {
-  dot += hostEmbedding[i] * androidEmbedding[i];
-  hostNorm += hostEmbedding[i] ** 2;
-  androidNorm += androidEmbedding[i] ** 2;
-  maxAbsDelta = Math.max(maxAbsDelta, Math.abs(hostEmbedding[i] - androidEmbedding[i]));
-}
-const cosine = dot / Math.sqrt(hostNorm * androidNorm);
+const diagnostics = android.stageDiagnostics;
+assert.ok(diagnostics, 'Android result does not contain stage diagnostics; install the diagnostic APK');
+
+const decodeF32Le = encoded => {
+  const bytes = Buffer.from(encoded, 'base64');
+  assert.equal(bytes.length % 4, 0, 'Float32 artifact byte length must be divisible by four');
+  const out = new Float32Array(bytes.length / 4);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let i = 0; i < out.length; i++) out[i] = view.getFloat32(i * 4, true);
+  return { bytes, values: out };
+};
+const floatBytesLe = values => {
+  const bytes = Buffer.alloc(values.length * 4);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let i = 0; i < values.length; i++) view.setFloat32(i * 4, values[i], true);
+  return bytes;
+};
+const compareVectors = (host, phone) => {
+  assert.equal(host.length, phone.length, 'stage vector dimensions differ');
+  let dot = 0;
+  let hostNorm = 0;
+  let phoneNorm = 0;
+  let maxAbsoluteDelta = 0;
+  let absoluteDeltaSum = 0;
+  for (let i = 0; i < host.length; i++) {
+    dot += host[i] * phone[i];
+    hostNorm += host[i] ** 2;
+    phoneNorm += phone[i] ** 2;
+    const delta = Math.abs(host[i] - phone[i]);
+    maxAbsoluteDelta = Math.max(maxAbsoluteDelta, delta);
+    absoluteDeltaSum += delta;
+  }
+  return {
+    dimensions: host.length,
+    exact: floatBytesLe(host).equals(floatBytesLe(phone)),
+    cosineSimilarity: dot / Math.sqrt(hostNorm * phoneNorm),
+    maxAbsoluteDelta,
+    meanAbsoluteDelta: absoluteDeltaSum / host.length,
+  };
+};
+const tensorStats = values => {
+  const channelSize = values.length / 3;
+  let min = Infinity;
+  let max = -Infinity;
+  const sums = [0, 0, 0];
+  for (let i = 0; i < values.length; i++) {
+    min = Math.min(min, values[i]);
+    max = Math.max(max, values[i]);
+    sums[Math.min(2, Math.floor(i / channelSize))] += values[i];
+  }
+  return {
+    min,
+    max,
+    meanPerChannel: sums.map(sum => sum / channelSize),
+    firstValues: Array.from(values.slice(0, 16)),
+  };
+};
+
+const androidTensor = decodeF32Le(diagnostics.preprocessing.tensorF32LeBase64);
+const androidRawOnnx = decodeF32Le(diagnostics.rawOnnxEmbeddingF32LeBase64);
+const androidRawEncoder = decodeF32Le(diagnostics.rawEncoderEmbeddingF32LeBase64);
+const androidAdapted = decodeF32Le(diagnostics.adaptedEmbeddingF32LeBase64);
+const modelEqual = diagnostics.model.sha256 === hostModelSha256;
+const preprocessingMetrics = compareVectors(hostTensor, androidTensor.values);
+const rawOnnxMetrics = compareVectors(hostRawOnnx, androidRawOnnx.values);
+const rawEncoderMetrics = compareVectors(hostRawEncoder, androidRawEncoder.values);
+const adapterMetrics = compareVectors(hostEmbedding, androidAdapted.values);
+assert.ok(
+  compareVectors(androidEmbedding, androidAdapted.values).exact,
+  'Android adapted binary and legacy JSON embedding differ',
+);
+const firstDivergence = !modelEqual
+  ? 'A. MODEL FILE MISMATCH'
+  : !preprocessingMetrics.exact
+    ? 'B. PREPROCESSING MISMATCH'
+    : !rawEncoderMetrics.exact
+      ? 'C. ONNX RUNTIME / MODEL EXECUTION DRIFT'
+      : !adapterMetrics.exact
+        ? 'D. ADAPTER IMPLEMENTATION DRIFT'
+        : 'E. SOMETHING ELSE';
+const cosine = adapterMetrics.cosineSimilarity;
+const maxAbsDelta = adapterMetrics.maxAbsoluteDelta;
 const hostClean = top(hostEmbedding, clean);
 const hostPrototype = top(hostEmbedding, prototype);
 const hostMargin = hostPrototype[0].score - hostPrototype[1].score;
@@ -131,6 +231,13 @@ const androidTop5 = new Set(androidPrototype.slice(0, 5).map(hit => hit.oracleId
 const overlap = [...hostTop5].filter(id => androidTop5.has(id));
 
 const report = {
+  modelIdentity: {
+    androidFilename: diagnostics.model.filename,
+    androidSha256: diagnostics.model.sha256,
+    hostFilename: basename(hostModelPath),
+    hostSha256: hostModelSha256,
+    equal: modelEqual,
+  },
   fixture: {
     id: fixture.VNEXT_PARITY_FIXTURE_ID,
     rgbaSha256: rgbaSha,
@@ -139,6 +246,43 @@ const report = {
     format: 'RGBA8888',
     ocrIncluded: false,
   },
+  preprocessing: {
+    equal: preprocessingMetrics.exact,
+    metrics: preprocessingMetrics,
+    android: {
+      shape: diagnostics.preprocessing.shape,
+      layout: diagnostics.preprocessing.layout,
+      channelOrder: diagnostics.preprocessing.channelOrder,
+      resized: [
+        diagnostics.preprocessing.resizedWidth,
+        diagnostics.preprocessing.resizedHeight,
+      ],
+      crop: [diagnostics.preprocessing.cropLeft, diagnostics.preprocessing.cropTop, 224, 224],
+      interpolation: diagnostics.preprocessing.interpolation,
+      rescale: diagnostics.preprocessing.rescale,
+      mean: diagnostics.preprocessing.mean,
+      std: diagnostics.preprocessing.std,
+      stats: diagnostics.preprocessing.stats,
+      tensorSha256: diagnostics.preprocessing.tensorSha256,
+    },
+    host: {
+      shape: inputs.pixel_values.dims,
+      layout: 'NCHW',
+      channelOrder: 'RGB',
+      resized: [321, 224],
+      crop: [48, 0, 224, 224],
+      interpolation: 'Transformers.js CLIP processor resample=3 (bicubic)',
+      rescale: 'value * 1/255',
+      mean: [0.48145466, 0.4578275, 0.40821073],
+      std: [0.26862954, 0.26130258, 0.27577711],
+      stats: tensorStats(hostTensor),
+      tensorSha256: createHash('sha256').update(floatBytesLe(hostTensor)).digest('hex'),
+    },
+  },
+  rawOnnx: rawOnnxMetrics,
+  rawEncoder: rawEncoderMetrics,
+  adapter: adapterMetrics,
+  firstDivergence,
   embedding: {
     cosineSimilarity: cosine,
     maxAbsoluteDelta: maxAbsDelta,

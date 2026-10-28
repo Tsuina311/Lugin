@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -43,6 +44,7 @@ import {
   isScannerVNextEnabled,
   setScannerVNextFromDeveloper,
 } from '../scan/vnextFlag';
+import { runAndShareVNextParityProbe } from '../scan/vnextParityProbe';
 
 function extraLugin(): { buildId?: string; buildLabel?: string; channel?: string } {
   const extra = Constants.expoConfig?.extra as
@@ -140,6 +142,8 @@ export function SettingsScreen() {
   const [manifestText, setManifestText] = useState('');
   const [benchStatus, setBenchStatus] = useState<string | null>(null);
   const [vnextOn, setVnextOn] = useState(() => isScannerVNextEnabled());
+  const [parityBusy, setParityBusy] = useState(false);
+  const [parityStatus, setParityStatus] = useState<string | null>(null);
 
   useEffect(() => subscribeScannerData(() => setScanner(getScannerDataStatus())), []);
   useEffect(() => {
@@ -282,7 +286,31 @@ export function SettingsScreen() {
             >
               <Text style={styles.buttonLabel}>vNext{vnextOn ? ' · on' : ''}</Text>
             </Pressable>
+            <Pressable
+              disabled={parityBusy}
+              onPress={() => {
+                if (parityBusy) return;
+                setParityBusy(true);
+                setParityStatus('Starting deterministic fixture…');
+                void runAndShareVNextParityProbe(setParityStatus)
+                  .then(message => {
+                    setParityStatus(message);
+                  })
+                  .catch(err => {
+                    const message = err instanceof Error ? err.message : String(err);
+                    setParityStatus(message);
+                    Alert.alert('Parity probe failed', message);
+                  })
+                  .finally(() => setParityBusy(false));
+              }}
+              style={[styles.button, parityBusy && styles.buttonDisabled]}
+            >
+              <Text style={styles.buttonLabel}>
+                {parityBusy ? 'Running parity probe…' : 'Run phone/host parity probe'}
+              </Text>
+            </Pressable>
           </View>
+          {parityStatus ? <Text style={styles.line}>{parityStatus}</Text> : null}
           <Text style={styles.section}>Scanner Benchmark Session</Text>
           <Text style={styles.note}>
             Dev-only. Each recognition auto-saves JSON + full 744×1039 PNG locally. Uploads never

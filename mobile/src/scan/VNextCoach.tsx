@@ -10,7 +10,6 @@ import {
 import { CAPTURE_GAP_MS, holdScannerWork } from './capturePace';
 import { downloadVNextGallery, vnextGalleryInstalled } from './vnextGalleryDownload';
 import { getSendJobs, subscribeSendJobs, type SendJob } from './sendProgress';
-import { runAndShareVNextParityProbe } from './vnextParityProbe';
 
 const COOLDOWN_MS = CAPTURE_GAP_MS;
 
@@ -42,8 +41,6 @@ export function VNextCoach({
   const [frozenIdentity, setFrozenIdentity] = useState<Record<string, string> | null>(null);
   const [adding, setAdding] = useState(false);
   const [collectionNote, setCollectionNote] = useState<string | null>(null);
-  const [parityBusy, setParityBusy] = useState(false);
-  const [parityNote, setParityNote] = useState<string | null>(null);
   const coolingUntil = useRef(0);
   useEffect(() => subscribeSendJobs(() => setJobs(getSendJobs())), []);
   useEffect(() => {
@@ -173,25 +170,6 @@ export function VNextCoach({
           </Text>
         </Pressable>
       )}
-      {galleryOnPhone ? (
-        <Pressable
-          disabled={parityBusy}
-          onPress={() => {
-            if (parityBusy) return;
-            setParityBusy(true);
-            setParityNote('Running identical-pixel Android probe…');
-            void runAndShareVNextParityProbe()
-              .then(setParityNote)
-              .finally(() => setParityBusy(false));
-          }}
-          style={[styles.save, parityBusy && styles.buttonDown]}
-        >
-          <Text style={styles.saveLabel}>
-            {parityBusy ? 'Running parity probe…' : 'Run phone parity probe'}
-          </Text>
-        </Pressable>
-      ) : null}
-      {parityNote ? <Text style={styles.detail}>{parityNote}</Text> : null}
     </View>
   );
 }
