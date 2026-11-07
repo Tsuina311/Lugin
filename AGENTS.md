@@ -1,0 +1,10 @@
+## GitHub handoff
+
+These standing instructions apply repo-wide to Codex in Cursor and Cloud for every implementation task. Read-only tasks and explicit user instructions to keep work local are exempt from the branch, commit, push, and PR handoff requirements below.
+
+- Before implementation, inspect the current branch, upstream, and working tree, and fetch the latest remote state using the existing GitHub integration and authorized credentials only. Start from the latest remote state of the user's intended branch when safe; do not assume the default branch if the user intends another branch. Preserve unrelated local changes, staged work, and local commits. Use a separate worktree when needed for isolation; never discard or overwrite unrelated work. If synchronization is unsafe or conflicts arise, report the blocker rather than resetting or rewriting history.
+- Use a task branch for new work, based on that safe starting point. Continue an existing task branch when the task calls for it. Never push to the repository's default branch.
+- At completion, run the relevant checks and review the diff. Stage only task changes, commit them, and push the task branch to `origin`. Do not include unrelated changes or bypass permissions or required checks. Explicitly report check failures and any permission, conflict, authentication, or push blocker; never claim an unverified push succeeded.
+- Update the existing PR for the task branch, or open a draft PR against the repository's default branch when supported. Keep the PR description aligned with the final changes and checks. If PR creation or update is unsupported or blocked, report that explicitly and provide the verified remote branch URL.
+- Never force-push, merge a PR, or enable auto-merge. The owner reviews and merges manually.
+- Verify the remote branch or PR after pushing. In the final handoff, report the branch, commit SHA, PR URL (or verified remote branch URL if no PR is available), checks and their results, and any remaining permission, conflict, or push blocker.
